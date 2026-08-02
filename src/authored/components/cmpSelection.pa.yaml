@@ -1,0 +1,89 @@
+# =============================================================================
+# cmpSelection  —  single-select selector over a dynamic Items table (component)
+# =============================================================================
+# A reusable "pick one" control: a horizontal strip of option buttons bound to an
+# Items table, with the chosen row surfaced back to the app. A component CAN
+# contain a gallery (the restriction is component-INSIDE-gallery, not the reverse).
+#
+# Contract:
+#   Items    (Input, Table)   — options; schema {Id:Number, Label:Text}
+#   DefaultId(Input, Number)   — initially selected Id
+#   Selected (Output, Record)  — the chosen row (app reads cmpSelection_1.Selected)
+#   OnChange (Event)           — raised on a new pick
+#
+# Selection is owned by the INTERNAL GALLERY, not a hand-managed variable:
+#   * galSel.Default seeds the initial pick from DefaultId
+#   * Selected output = galSel.Selected (idiomatic "output reads a control")
+#   * the row template highlights via ThisItem.IsSelected
+#   * OnChange is raised from the button ONLY (no gallery OnSelect) so a tap
+#     fires exactly once
+# Delegation isn't a concern — Items is passed in already-shaped and small
+# (power-fx-development owns sourcing).
+#
+# DIALECT v3.0 pa.yaml. UNCONFIRMED token: the gallery `Variant` (same unknown as
+# the screen shells). See _COMPONENTS-NOTES.md.
+# =============================================================================
+ComponentDefinitions:
+  cmpSelection:
+    DefinitionType: CanvasComponent
+    Description: Single-select strip over an Items table; outputs Selected record, raises OnChange.
+    AccessAppScope: false
+    CustomProperties:
+      Items:
+        PropertyKind: Input
+        Description: Options to choose from. Schema {Id:Number, Label:Text}.
+        DataType: Table
+        Default: |
+          =Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })
+      DefaultId:
+        PropertyKind: Input
+        Description: Id selected before the user interacts.
+        DataType: Number
+        Default: =1
+      Selected:
+        PropertyKind: Output
+        Description: The currently selected row of Items (falls back to the first row if none).
+        DataType: Record
+        Default: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
+      OnChange:
+        PropertyKind: Event
+        Description: Raised when the selection changes.
+        ReturnType: Boolean
+        Parameters: {}
+    Properties:
+      Height: =40
+      Width: =360
+      Fill: =RGBA(0, 0, 0, 0)
+    Children:
+      - galSel:
+          Control: Gallery@2.15.0
+          # UNCONFIRMED: blank HORIZONTAL gallery variant (round-trip). See notes.
+          Variant: CONFIRM_BlankHorizontal
+          Properties:
+            Items: =cmpSelection.Items
+            # Seed the initial selection from DefaultId (no hand-managed variable).
+            Default: =LookUp(cmpSelection.Items, Id = cmpSelection.DefaultId)
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+            TemplateSize: =Max(96, Parent.Width / Max(CountRows(cmpSelection.Items), 1))
+            TemplatePadding: =4
+          Children:
+            - optBtn:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =ThisItem.Label
+                  Font: =Font.'Segoe UI'
+                  Size: =13
+                  # Highlight the gallery's selected row.
+                  Fill: =If(ThisItem.IsSelected, RGBA(0, 90, 158, 1), RGBA(255, 255, 255, 1))
+                  Color: =If(ThisItem.IsSelected, RGBA(255, 255, 255, 1), RGBA(32, 38, 45, 1))
+                  BorderColor: =RGBA(0, 90, 158, 1)
+                  BorderThickness: =1
+                  Height: =Parent.TemplateHeight - 4
+                  Width: =Parent.TemplateWidth - 8
+                  X: =4
+                  Y: =2
+                  # Select this row (drives galSel.Selected) and raise OnChange ONCE.
+                  OnSelect: =Select(Parent); cmpSelection.OnChange()
