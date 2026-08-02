@@ -1,0 +1,148 @@
+# =============================================================================
+# scrHome  —  personalised landing (screen-map §1). CORE-SHELL: header + nav +
+# empty-state tiles. Data-independent — no tmXxx tokens (Phase 2 wires the
+# my-tasks / my-issues delegable queries).
+#
+# DIALECT: modern structured schema (Screens/Children/Control:Type@version),
+# grounded on the example's genuine Studio export. Z-order is POSITIONAL (no
+# ZIndex) — later child = on top. Control version tokens are real; the ONE
+# unconfirmed token is NavGallery's `Variant` (blank vertical gallery) — confirm
+# via the studio-transfer round-trip. See _SHELL-NOTES.md.
+# Depends on App.Formulas (Theme, NavMenu) pasted last, and sibling screens
+# existing so NavMenu's Screen refs resolve.
+# =============================================================================
+Screens:
+  scrHome:
+    Properties:
+      Fill: =Theme.Color.Bg
+    Children:
+      # ---- Header band ----------------------------------------------------
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="EQD Taskmaster"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      - ScreenTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Home"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            Align: =Align.Right
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - Self.Width - Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      # ---- Left nav panel + Table-driven nav gallery (pattern T6) ----------
+      - NavPanel:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            Width: =Theme.Space.NavW
+            Height: =Parent.Height - Theme.Space.HeaderH
+            X: =0
+            Y: =Theme.Space.HeaderH
+      - NavGallery:
+          Control: Gallery@2.15.0
+          # ROUND-TRIP UNKNOWN: replace with the Variant Studio emits for a blank
+          # vertical gallery (insert one, View code, read its `Variant:`).
+          Variant: CONFIRM_BlankVertical
+          Properties:
+            Items: =NavMenu
+            TemplateSize: =Theme.Space.RowH
+            TemplatePadding: =0
+            Width: =Theme.Space.NavW
+            Height: =Parent.Height - Theme.Space.HeaderH
+            X: =0
+            Y: =Theme.Space.HeaderH
+            # Active-screen highlight — self-valid via App.ActiveScreen (T6).
+            TemplateFill: =If(ThisItem.Screen = App.ActiveScreen, Theme.Color.Accent, Theme.Color.Surface)
+            OnSelect: =Navigate(ThisItem.Screen, ScreenTransition.Fade)
+          Children:
+            - NavIcon:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =ThisItem.Icon
+                  # Grey the Power BI-gated entry for unlicensed users (App.Formulas TODO).
+                  Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.Primary)
+                  Height: =24
+                  Width: =24
+                  X: =Theme.Space.Gap
+                  Y: =(Parent.TemplateHeight - Self.Height) / 2
+            - NavLabel:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Title
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FontWeight: =If(ThisItem.Screen = App.ActiveScreen, FontWeight.Semibold, FontWeight.Normal)
+                  Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.TextPrimary)
+                  Height: =Parent.TemplateHeight
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =Theme.Space.Gap + 24 + Theme.Space.Gap
+                  Width: =Parent.TemplateWidth - Self.X - Theme.Space.Gap
+      # ---- Content area ---------------------------------------------------
+      - ContentTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Good to see you"
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H1
+            Color: =Theme.Color.TextPrimary
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
+            Height: =40
+      - ContentSubtitle:
+          Control: Label@2.5.1
+          Properties:
+            # gUserEmail comes from App.Formulas; harmless if blank at author time.
+            Text: =gUserEmail
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =ContentTitle.Y + ContentTitle.Height
+            Width: =ContentTitle.Width
+            Height: =28
+      # ---- Empty-state placeholder card (Phase 2 replaces with my-tasks) ---
+      - EmptyCard:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            Height: =180
+            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =ContentSubtitle.Y + ContentSubtitle.Height + Theme.Space.Gap
+      - EmptyCardLabel:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Your open tasks and issues will appear here once the SharePoint lists are connected."
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Color: =Theme.Color.TextMuted
+            Align: =Align.Center
+            VerticalAlign: =VerticalAlign.Middle
+            X: =EmptyCard.X
+            Y: =EmptyCard.Y
+            Width: =EmptyCard.Width
+            Height: =EmptyCard.Height

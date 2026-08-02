@@ -1,0 +1,94 @@
+# Core-shell — build notes, paste order, and the confirmation gate
+
+Phase-1 shell authored from `docs/screen-map.md` (theme + Table-driven nav + screen
+shells + empty states). **Data-independent** — no `tm*` column tokens, so it is
+paste-ready before any SharePoint list is provisioned. Nothing here is "in the app"
+until a human pastes it and it validates; log each crossing in `../../paste-log.md`.
+
+## Files
+
+| File | Transfer path | What it is |
+|---|---|---|
+| `../patches/App.Formulas.pa.fx` | **Formula bar only** (App object has no code view) | `gUserEmail`, `Theme`, `NavMenu`, `gHasPowerBiLicence` |
+| `scrHome.fx.yaml` | Code view | Landing shell — the reference header+nav template |
+| `scrReports.fx.yaml` | Code view | Reports shell + the Q2 unlicensed empty-state card |
+| `scrProjects.fx.yaml` | Code view | Projects shell + search box + empty placeholder |
+| `scrReference.fx.yaml` | Code view | Clients/Products/Indices shell placeholder |
+| `scrAdmin.fx.yaml` | Code view | Admin shell placeholder |
+
+## Paste order (dependencies are real)
+
+1. **Create five blank screens** in Studio, rename them exactly:
+   `scrHome`, `scrReports`, `scrProjects`, `scrReference`, `scrAdmin`.
+   (`NavMenu` holds live Screen references — they must exist by those names first.)
+2. **Paste each screen's controls** via code view (one screen at a time; rename any
+   `_1` suffix back and log it). The header + nav block is identical across screens.
+3. **Paste `App.Formulas`** last, into the formula bar. Screen refs now resolve.
+4. Set the app's **Data row limit to 2000** (schema.md) while you're in Settings.
+5. Verify nav: each entry highlights the active screen and navigates.
+
+## Dialect — modern structured schema (corrected after pre-paste audit)
+
+The files were **first authored in the retired inline `Name As type:` dialect** (that's
+what `pac canvas unpack` emits — the format `studio-transfer` calls retired). The pre-paste
+audit caught this against positive evidence: the example's **native** `.msapp` source
+(`/example` → `Src/*.pa.yaml`) is the **modern structured schema**. The five screens were
+**converted** to match it, using **real control-version tokens read from that genuine
+export**:
+
+| Control | Token (grounded in the example export) | Variant |
+|---|---|---|
+| Screen | *(top-level under `Screens:`)* | — |
+| Rectangle | `Rectangle@2.3.0` | none |
+| Label | `Label@2.5.1` | none |
+| Icon | `Classic/Icon@2.5.0` | none |
+| Text input | `Classic/TextInput@2.3.2` | none |
+| Gallery | `Gallery@2.15.0` | **`CONFIRM_BlankVertical`** ⟵ only unknown |
+
+Two dialect rules applied during conversion:
+- **No `ZIndex`** — z-order is **positional** (later child in `Children:` renders on top).
+  Every screen's children are ordered background-first, so the layering is correct.
+- Modern controls (Rectangle/Label) carry no `Variant`; Classic controls here (Icon/TextInput)
+  also declared without one, matching the export.
+
+## ⚠️ Confirmation gate — ONE token remains unconfirmed
+
+`NavGallery`'s `Variant: CONFIRM_BlankVertical` is a placeholder. The example only contains
+a *browse-template* gallery variant (`BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0`),
+which carries predefined template controls — wrong for our custom nav rows.
+
+**Before pasting the nav:** on the work machine insert **one blank vertical gallery**,
+**View code → Copy code**, drop it into `studio/pulled/`, read its real `Variant:`, and
+find/replace `CONFIRM_BlankVertical` across the five files. (Also treat this as the app's
+`studio-transfer` round-trip test — the first confirmation that code-view paste round-trips
+on this app at all.) This is the "few large *correct* pastes" discipline — confirm once, not
+five rejected pastes.
+
+**Zero-risk fallback if the gallery proves troublesome:** the example navigates with plain
+`Classic/Button@2.2.0` controls (`OnSelect: =Navigate(scrX, ScreenTransition.Fade)`) —
+fully-grounded tokens, paste-safest of all. The nav would stop being `NavMenu`-driven (DRY),
+but it unblocks a navigable shell immediately. Prefer the gallery once its variant is confirmed.
+
+## Deliberate deviations from the blueprint (rationale)
+
+- **Nav is a per-screen gallery bound to `NavMenu`, not a reusable component.**
+  `screen-map.md` calls for one nav *component* (T6). Components are the **hardest thing
+  to paste across the air gap** (custom-property/definition transfer), and the channel is
+  unproven. The `NavMenu` named formula already delivers T6's real intent — *screen refs
+  as data, one source of truth for menu items* — with far lower paste risk. The header +
+  nav block is duplicated across the five screens as the cost of this.
+  **Upgrade path:** once the round-trip channel is proven, lift the nav gallery into a
+  component and place it on each screen; `NavMenu` stays as its Items source unchanged.
+
+- **Absolute positioning tied to `Parent.Width/Height` + `Theme.Space.*`**, not nested
+  responsive containers (T15). Simpler to paste one control at a time and diagnose. Revisit
+  if a phone layout is required (open thread: tablet-vs-phone target).
+
+## Open TODO for you (shapes the UX) — the Power BI licence gate
+
+`gHasPowerBiLicence` in `App.Formulas` is hardcoded `false`. There is **no in-app Power BI
+licence API**, so the signal must be chosen deliberately (a `tmLookups`/allow-list flag, or
+an Entra group check). It drives both the greyed **Reports** nav entry and the Reports
+empty-state vs. embed. Decide **hide vs. grey** for the unlicensed nav entry — currently the
+shell *greys but still navigates* (the empty-state card explains it). See the TODO comment
+in `App.Formulas.pa.fx`.
