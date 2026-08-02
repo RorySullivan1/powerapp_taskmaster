@@ -12,8 +12,33 @@ decision and delete it here.
   indexing mandatory, every query delegable.
 - **Q2 Power BI licensing** → **Not everyone is licensed.** Dashboard can't carry core nav;
   native licence-independent navigation + a real empty state. (Sub-items below still open.)
-- **Q11 Provisioning route** → **Manual (SharePoint UI).** High `_x0020_` internal-name risk;
-  the schema snapshot must capture **true** internal names. No automated term-store sync path.
+- **Q11 Provisioning route** → **Manual (SharePoint UI)** *(under reconsideration — see Q11-bis).*
+  High `_x0020_` internal-name risk; the schema snapshot must capture **true** internal names. No
+  automated term-store sync path.
+
+## Q11-bis — reconsider provisioning: flow-as-list-provisioner (2026-08-02)
+
+Reviewing April Dunnam's templates surfaced a **third route** that wasn't on the table when Q11
+was decided (`docs/powerapp-patterns-distillation.md` §D, T18): ship provisioning as a **Power
+Automate flow** that creates the 8 lists + columns from a site URL — typically "Send an HTTP
+request to SharePoint" actions, or the SharePoint create-list/create-column actions.
+
+| Route | Sets clean internal names? | Repeatable (dev→test→prod)? | Term-store sync? | Needs |
+|---|---|---|---|---|
+| **Manual UI** *(current pick)* | Only if hand-disciplined; **high `_x0020_` risk** | **No** — click every column by hand, 8 lists | No | Nothing extra |
+| **Flow-as-provisioner** *(new candidate)* | **Yes** — internal name set explicitly at creation | **Yes** — re-runnable, one input (site URL) | Possible via HTTP calls | **Power Automate (Q12)** + work-machine tenant access |
+| PnP / CSOM | Yes | Yes | **Yes** (native) | PnP tooling + auth (out of this repo's reach) |
+| Graph | Yes | Yes | No (term store excluded) | Graph app reg + auth |
+
+**Recommendation:** if **Power Automate is available (Q12)**, switch Q11 to the **flow-as-
+provisioner** route — it removes the `_x0020_` risk *and* gives repeatable, environment-portable
+provisioning (which also helps Q13 solution-awareness), for far less effort than clicking 8 lists
+by hand. Keep **manual UI as the fallback** only if Power Automate is not available. This does
+**not** solve term-store taxonomy sync natively (still needs PnP/CSOM or HTTP calls), so the
+`tmIndices`/`tmLookups` taxonomy remains a separate open item regardless.
+
+**Blocks on:** Q12 (Power Automate availability). Decision deferred to the user; recorded so the
+manual-UI pick isn't treated as final. If adopted, supersede the Q11 decision in memory.
 
 ## Blocking-adjacent (elevated by this build)
 

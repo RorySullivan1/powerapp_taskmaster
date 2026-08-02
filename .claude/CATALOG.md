@@ -11,6 +11,8 @@
 - graph-api-integration — Expert at Microsoft Graph API integration for SharePoint and Microsoft 365 — authenticating an app … -> skills/graph-api-integration/SKILL.md
 - knowledge-router — When durable, reusable knowledge surfaces in a conversation — a concept, a key fact, a domain or … -> skills/knowledge-router/SKILL.md
 - power-apps-components — Expert at building reusable Power Apps canvas components and UI elements — the … -> skills/power-apps-components/SKILL.md
+- power-apps-editable-table — Expert at building an editable table / spreadsheet-style grid in a canvas Power App — a … -> skills/power-apps-editable-table/SKILL.md
+- power-apps-svg — Expert at rendering dynamic SVG inside a canvas Power App — vector charts, KPI rings, gauges, … -> skills/power-apps-svg/SKILL.md
 - power-bi-dax — Expert at DAX for Power BI — measures, evaluation context, and model calculations over a … -> skills/power-bi-dax/SKILL.md
 - power-fx-development — Expert Power Fx developer for writing, architecting, and debugging formulas in canvas Power Apps … -> skills/power-fx-development/SKILL.md
 - power-fx-review — Expert Power Fx code reviewer for Power Apps canvas apps — delegation, performance, and … -> skills/power-fx-review/SKILL.md
