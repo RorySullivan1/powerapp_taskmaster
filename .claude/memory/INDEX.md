@@ -25,13 +25,15 @@
 - [2026-07-26] Q11 → MANUAL (SharePoint UI) provisioning — cost: _x0020_ name risk + no term-store sync route — sessions/2026-07-26-1726-repo-init-decisions.md
 - [2026-07-26] Adopt list approved "as recommended"; column-token validator hook proposed not built — sessions/2026-07-26-1726-repo-init-decisions.md
 - [2026-08-02] PM-tracker template = blueprint not plumbing (SQL-backed; reuse screens/nav, NOT its data layer/SQL-view aggregation) — sessions/2026-08-02-1702-external-repo-review.md
+- [2026-08-02] Authored dual-use skills `power-apps-svg` + `power-apps-editable-table` (SVG grounded on MS Learn data-URI/EncodeUrl) — sessions/2026-08-02-1702-external-repo-review.md
+- [2026-08-02] Q11-bis: RECOMMEND flow-as-list-provisioner over manual UI IF Power Automate available (Q12) — repeatable, kills _x0020_ risk; not yet chosen — .claude/context/open-questions.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
-- Propose upstream to claudeBrain: `studio-transfer` skill + `pre-paste-review` agent (both general); flag PnP/CSOM gap.
+- Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
-- Author dual-use skills C1 SVG-in-PowerApps (native fallback visuals for unlicensed PBI) + C2 editable-table (tickets tab)? → `docs/powerapp-patterns-distillation.md`. Awaiting go.
-- Reconsider Q11 provisioning vs the flow-as-list-provisioner pattern (repeatable clean internal names).
+- **Q11-bis decision pending:** adopt flow-as-provisioner? Blocks on Q12 (Power Automate available?). If yes, supersede the manual-UI Q11 decision. → `.claude/context/open-questions.md`.
+- Start Phase 1 build (theme + nav shell + empty states) — needs tablet-vs-phone + one round-trip code-view sample from the work machine. → `docs/screen-map.md`.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md
