@@ -1,0 +1,137 @@
+# =============================================================================
+# scrReports  —  Power BI dashboard panel (screen-map §2). CORE-SHELL: header +
+# nav + the real Q2 empty-state (unlicensed users get a card, never a broken
+# embed). Phase 3 adds the PowerBI control for licensed users + the native SVG
+# KPI fallback (distillation C1). Header + nav identical to scrHome by design.
+# DIALECT: modern structured schema; positional z-order; NavGallery.Variant is
+# the sole round-trip unknown. See _SHELL-NOTES.md.
+# =============================================================================
+Screens:
+  scrReports:
+    Properties:
+      Fill: =Theme.Color.Bg
+    Children:
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="EQD Taskmaster"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      - ScreenTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Reports"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            Align: =Align.Right
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - Self.Width - Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      - NavPanel:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            Width: =Theme.Space.NavW
+            Height: =Parent.Height - Theme.Space.HeaderH
+            X: =0
+            Y: =Theme.Space.HeaderH
+      - NavGallery:
+          Control: Gallery@2.15.0
+          Variant: CONFIRM_BlankVertical
+          Properties:
+            Items: =NavMenu
+            TemplateSize: =Theme.Space.RowH
+            TemplatePadding: =0
+            Width: =Theme.Space.NavW
+            Height: =Parent.Height - Theme.Space.HeaderH
+            X: =0
+            Y: =Theme.Space.HeaderH
+            TemplateFill: =If(ThisItem.Screen = App.ActiveScreen, Theme.Color.Accent, Theme.Color.Surface)
+            OnSelect: =Navigate(ThisItem.Screen, ScreenTransition.Fade)
+          Children:
+            - NavIcon:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =ThisItem.Icon
+                  Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.Primary)
+                  Height: =24
+                  Width: =24
+                  X: =Theme.Space.Gap
+                  Y: =(Parent.TemplateHeight - Self.Height) / 2
+            - NavLabel:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Title
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FontWeight: =If(ThisItem.Screen = App.ActiveScreen, FontWeight.Semibold, FontWeight.Normal)
+                  Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.TextPrimary)
+                  Height: =Parent.TemplateHeight
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =Theme.Space.Gap + 24 + Theme.Space.Gap
+                  Width: =Parent.TemplateWidth - Self.X - Theme.Space.Gap
+      # ---- Empty state: unlicensed (Q2). Phase 3 wraps in
+      #      If(gHasPowerBiLicence, <PowerBI embed>, <this card>). ------------
+      - LicenceCard:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            Height: =220
+            Width: =Min(560, Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2))
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+            Visible: =Not(gHasPowerBiLicence)
+      - LicenceIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Table
+            Color: =Theme.Color.Accent
+            Height: =40
+            Width: =40
+            X: =LicenceCard.X + Theme.Space.Gutter
+            Y: =LicenceCard.Y + Theme.Space.Gutter
+            Visible: =Not(gHasPowerBiLicence)
+      - LicenceHeading:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Reporting needs a Power BI licence"
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Color: =Theme.Color.TextPrimary
+            X: =LicenceIcon.X + 40 + Theme.Space.Gap
+            Y: =LicenceCard.Y + Theme.Space.Gutter
+            Width: =LicenceCard.Width - (LicenceIcon.X - LicenceCard.X) - 40 - (Theme.Space.Gap * 2)
+            Height: =40
+            VerticalAlign: =VerticalAlign.Middle
+            Visible: =Not(gHasPowerBiLicence)
+      - LicenceBody:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Your account isn't licensed for the embedded dashboard. Headline status still appears on Home and across the app — no Power BI required."
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Color: =Theme.Color.TextMuted
+            X: =LicenceHeading.X
+            Y: =LicenceHeading.Y + LicenceHeading.Height + Theme.Space.Gap
+            Width: =LicenceHeading.Width
+            Height: =90
+            Visible: =Not(gHasPowerBiLicence)

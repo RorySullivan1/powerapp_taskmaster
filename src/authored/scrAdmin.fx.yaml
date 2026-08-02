@@ -1,0 +1,111 @@
+# =============================================================================
+# scrAdmin  —  Admin (screen-map §9). CORE-SHELL: header + nav + titled
+# placeholder. Phase 2/3 wires tmLookups maintenance, bulk archive, orphan
+# detection (FK integrity is app logic — no real joins on SharePoint).
+# DIALECT: modern structured schema; positional z-order; NavGallery.Variant is
+# the sole round-trip unknown. See _SHELL-NOTES.md.
+# =============================================================================
+Screens:
+  scrAdmin:
+    Properties:
+      Fill: =Theme.Color.Bg
+    Children:
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="EQD Taskmaster"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      - ScreenTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Admin"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            Align: =Align.Right
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - Self.Width - Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      - NavPanel:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            Width: =Theme.Space.NavW
+            Height: =Parent.Height - Theme.Space.HeaderH
+            X: =0
+            Y: =Theme.Space.HeaderH
+      - NavGallery:
+          Control: Gallery@2.15.0
+          Variant: CONFIRM_BlankVertical
+          Properties:
+            Items: =NavMenu
+            TemplateSize: =Theme.Space.RowH
+            TemplatePadding: =0
+            Width: =Theme.Space.NavW
+            Height: =Parent.Height - Theme.Space.HeaderH
+            X: =0
+            Y: =Theme.Space.HeaderH
+            TemplateFill: =If(ThisItem.Screen = App.ActiveScreen, Theme.Color.Accent, Theme.Color.Surface)
+            OnSelect: =Navigate(ThisItem.Screen, ScreenTransition.Fade)
+          Children:
+            - NavIcon:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =ThisItem.Icon
+                  Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.Primary)
+                  Height: =24
+                  Width: =24
+                  X: =Theme.Space.Gap
+                  Y: =(Parent.TemplateHeight - Self.Height) / 2
+            - NavLabel:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Title
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FontWeight: =If(ThisItem.Screen = App.ActiveScreen, FontWeight.Semibold, FontWeight.Normal)
+                  Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.TextPrimary)
+                  Height: =Parent.TemplateHeight
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =Theme.Space.Gap + 24 + Theme.Space.Gap
+                  Width: =Parent.TemplateWidth - Self.X - Theme.Space.Gap
+      # ---- Content placeholder --------------------------------------------
+      - AdminEmpty:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            Height: =Parent.Height - Theme.Space.HeaderH - (Theme.Space.Gutter * 2)
+            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+      - AdminEmptyLabel:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Lookups, bulk archive and orphan detection will live here (Phase 2/3)."
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Color: =Theme.Color.TextMuted
+            Align: =Align.Center
+            VerticalAlign: =VerticalAlign.Middle
+            X: =AdminEmpty.X
+            Y: =AdminEmpty.Y
+            Width: =AdminEmpty.Width
+            Height: =AdminEmpty.Height
