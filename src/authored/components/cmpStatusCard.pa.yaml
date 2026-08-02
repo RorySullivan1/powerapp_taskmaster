@@ -1,0 +1,133 @@
+# =============================================================================
+# cmpStatusCard  —  KPI / summary card (component; screen-level)
+# =============================================================================
+# A tappable headline card: title, big value, optional trend and caption, left
+# accent bar. Built from GROUNDED control tokens only (Rectangle@2.3.0,
+# Label@2.5.1, Classic/Icon@2.5.0, Classic/Button@2.2.0) — the most paste-safe
+# component in the set. Screen-level (dashboards, Home tiles, Reports SVG-fallback
+# summaries). The app supplies OnSelect, so each instance decides what a tap does.
+#
+# Keep the maths (Sum/CountRows/trend) in the app or a helper (power-fx-development)
+# and pass results in — the card only presents. Colours inline the Theme palette.
+# DIALECT: v3.0 pa.yaml. See _COMPONENTS-NOTES.md.
+# =============================================================================
+ComponentDefinitions:
+  cmpStatusCard:
+    DefinitionType: CanvasComponent
+    Description: Tappable KPI card — Title, Value, Caption, Trend, Accent; raises OnSelect.
+    AccessAppScope: false
+    CustomProperties:
+      Title:
+        PropertyKind: Input
+        Description: Small heading (e.g. "Open tasks").
+        DataType: Text
+        Default: ="Metric"
+      Value:
+        PropertyKind: Input
+        Description: Headline value, pre-formatted as text by the app.
+        DataType: Text
+        Default: ="0"
+      Caption:
+        PropertyKind: Input
+        Description: Optional sub-caption under the value.
+        DataType: Text
+        Default: =""
+      Trend:
+        PropertyKind: Input
+        Description: Optional signed change as a fraction (0.12 = +12%). Blank/0 hides the trend.
+        DataType: Number
+        Default: =0
+      Accent:
+        PropertyKind: Input
+        Description: Accent colour for the left bar.
+        DataType: Color
+        Default: =RGBA(0, 90, 158, 1)
+      OnSelect:
+        PropertyKind: Event
+        Description: Raised when the card is tapped.
+        ReturnType: Boolean
+        Parameters: {}
+    Properties:
+      Height: =120
+      Width: =240
+      Fill: =RGBA(0, 0, 0, 0)
+    Children:
+      - cardBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - accentBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =cmpStatusCard.Accent
+            Width: =6
+            Height: =Parent.Height
+            X: =0
+            Y: =0
+      - lblTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpStatusCard.Title
+            Color: =RGBA(110, 120, 130, 1)
+            Font: =Font.'Segoe UI'
+            Size: =12
+            FontWeight: =FontWeight.Semibold
+            X: =22
+            Y: =16
+            Width: =Parent.Width - 38
+            Height: =20
+      - lblValue:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpStatusCard.Value
+            Color: =RGBA(32, 38, 45, 1)
+            Font: =Font.'Segoe UI'
+            Size: =28
+            FontWeight: =FontWeight.Semibold
+            X: =22
+            Y: =38
+            Width: =Parent.Width - 38
+            Height: =40
+      - lblTrend:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(cmpStatusCard.Trend >= 0, "▲ ", "▼ ") & Text(Abs(cmpStatusCard.Trend), "0.0%")
+            Color: =If(cmpStatusCard.Trend >= 0, RGBA(49, 130, 93, 1), RGBA(197, 58, 58, 1))
+            Visible: =cmpStatusCard.Trend <> 0
+            Font: =Font.'Segoe UI'
+            Size: =12
+            FontWeight: =FontWeight.Semibold
+            X: =22
+            Y: =84
+            Width: =100
+            Height: =20
+      - lblCaption:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpStatusCard.Caption
+            Color: =RGBA(110, 120, 130, 1)
+            Visible: =Len(cmpStatusCard.Caption) > 0
+            Font: =Font.'Segoe UI'
+            Size: =11
+            X: =122
+            Y: =84
+            Width: =Parent.Width - 138
+            Height: =20
+            Align: =Align.Right
+      - cardBtn:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0)
+            HoverFill: =RGBA(0, 90, 158, 0.05)
+            PressedFill: =RGBA(0, 90, 158, 0.1)
+            BorderColor: =RGBA(0, 0, 0, 0)
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+            OnSelect: =cmpStatusCard.OnSelect()

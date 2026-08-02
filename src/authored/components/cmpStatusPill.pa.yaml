@@ -1,0 +1,60 @@
+# =============================================================================
+# cmpStatusPill  —  screen-level status badge (draggable component)
+# =============================================================================
+# A rounded, colour-coded status badge for SCREEN-LEVEL use (detail screens,
+# headers, filter bars) — one HtmlText control inside the component.
+#   * Inside a gallery row -> you CANNOT use this component; call
+#     cmpUiKit.StatusPillHtml(ThisItem.Status,"auto") from a plain HtmlText instead.
+# The tone->colour logic is intentionally the same as cmpUiKit.StatusPillHtml
+# (duplicated because a component can't call another component). Keep them in step.
+# DIALECT: v3.0 pa.yaml. See _COMPONENTS-NOTES.md for transfer + the contract table.
+# =============================================================================
+ComponentDefinitions:
+  cmpStatusPill:
+    DefinitionType: CanvasComponent
+    Description: Rounded colour-coded status badge (screen-level). Inputs Label + Tone.
+    AccessAppScope: false
+    CustomProperties:
+      Label:
+        PropertyKind: Input
+        Description: Status text shown in the pill.
+        DataType: Text
+        Default: ="Open"
+      Tone:
+        PropertyKind: Input
+        Description: Neutral | Info | Success | Warning | Danger | auto (auto maps common status words).
+        DataType: Text
+        Default: ="auto"
+    Properties:
+      Height: =28
+      Width: =120
+      Fill: =RGBA(0, 0, 0, 0)
+    Children:
+      - pillHtml:
+          Control: HtmlViewer@2.1.0
+          Properties:
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+            HtmlText: |
+              =With(
+                  { t:
+                      If( cmpStatusPill.Tone <> "auto",
+                          cmpStatusPill.Tone,
+                          Switch( true,
+                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(done|complete|completed|closed|approved|active|on track)\s*$"), "Success",
+                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(blocked|overdue|rejected|failed|error|breach)\s*$"),            "Danger",
+                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(at risk|pending|review|waiting|on hold|hold)\s*$"),             "Warning",
+                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(in progress|open|new|todo|to do)\s*$"),                          "Info",
+                              "Neutral"
+                          )
+                      )
+                  },
+                  With(
+                      { c: Switch(t, "Success","#31825D", "Warning","#D69828", "Danger","#C53A3A", "Info","#005A9E", "#6E7882") },
+                      "<span style='display:inline-block;background:" & c &
+                      ";color:#fff;padding:2px 10px;border-radius:11px;font:600 12px Segoe UI,Arial,sans-serif'>" &
+                      EncodeHTML(cmpStatusPill.Label) & "</span>"
+                  )
+              )
