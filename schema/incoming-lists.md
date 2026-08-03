@@ -1,167 +1,221 @@
 # Incoming schema — staging capture (NOT yet canonical)
 
 Transcribed verbatim from schema screenshots supplied by the user (one-way gap: these photos are
-the only channel — nothing can be pulled back to verify). **Staging only.** Nothing here is
-promoted into `.claude/context/schema.md` until the full set has arrived and the conflicts in
-§Reconciliation are settled.
+the only channel — nothing can be pulled back to verify). **Staging only** until the last two
+lists arrive, then promoted into `.claude/context/schema.md`.
+
+**Naming: snake_case is canonical** (user-confirmed 2026-08-02). It supersedes the old PascalCase
+`tm*` model in `.claude/context/schema.md`. Bonus: snake_case sidesteps `_x0020_` mangling.
 
 ## Source log
 | Received | Screenshot | Lists captured |
 |---|---|---|
-| 2026-08-02 | IMG_8566 (dated 7/23/26) | `asset_approval` (complete) |
-| 2026-08-02 | IMG_8568 | `taskmaster_clients` (complete) |
-| 2026-08-02 | IMG_8569 + IMG_8570 | `taskmaster_issues` (complete, across two shots) |
+| 2026-08-02 | IMG_8566 | `asset_approval` |
+| 2026-08-02 | IMG_8568 | `taskmaster_clients` |
+| 2026-08-02 | IMG_8569 + IMG_8570 | `taskmaster_issues` |
+| 2026-08-02 | IMG_8571 | `taskmaster_products` |
+| 2026-08-02 | IMG_8571 + 8572 + 8573 | `taskmaster_projects` |
 
-**Still awaiting:** `taskmaster_projects`, `taskmaster_tasks`, `taskmaster_transactions` (all three
-are referenced by Lookups in `taskmaster_issues` but not yet supplied), plus any lookups/comments/
-links/user-prefs/products/indices equivalents.
+**Still awaiting:** `taskmaster_tasks`, `taskmaster_transactions` (both referenced by Lookups on
+`taskmaster_issues`).
 
 ---
 
 ## List: `asset_approval`
 
-| Column | Type | Required | Description | Values / Rules |
-|---|---|---|---|---|
-| `approval_id` | Single line of text | **Yes** | Approval identifier | `MAW`, `Legal`, `Compliance`, `Brand` |
-| `approval_region` | **Choice** | **Yes** | Applicable region | `GLOBAL`, `AMER`, `EMEA`, `APAC`, `JAPAN` |
-| `approval_status` | Yes/No | No | Approval availability / active state | `True` = Active |
-| `approval_link` | Hyperlink | No | Link to approval guidance or documentation | URL |
-| `Created` · `Modified` · `Created By` · `Modified By` | System | System | — | SharePoint managed |
-
----
+| Column | Type | Req | Description | Values / Rules |
+|---|---|:-:|---|---|
+| `approval_id` | Single line text | **Y** | Approval identifier | e.g. MAW, Legal, Compliance, Brand |
+| `approval_region` | **Choice** | **Y** | Applicable region | GLOBAL, AMER, EMEA, APAC, JAPAN |
+| `approval_status` | Yes/No | N | Approval availability / active state | True = Active |
+| `approval_link` | Hyperlink | N | Link to approval guidance/documentation | URL |
+| `Created` · `Modified` · `Created By` · `Modified By` | System | — | — | SharePoint managed |
 
 ## List: `taskmaster_clients`
 
-| Column | Type | Required | Description | Values / Rules |
-|---|---|---|---|---|
-| `client_name` | Single line of text | **Yes** | Client display name | User-facing |
-| `client_type` | **Managed Metadata** | **Yes** | Client classification | Internal taxonomy |
-| `client_coverage` | **Managed Metadata** | **Yes** | Coverage group | Coverage taxonomy |
-| `client_sales` | Person | **Yes** | Primary sales owner | Single person |
-| `client_region` | **Managed Metadata** | **Yes** | Client region | `AMER`, `EMEA`, `APAC`, `JAPAN` |
-| `client_notes` | Multiple lines of text | No | Client notes | Free text |
-| `Created` · `Modified` · `Created By` · `Modified By` | System | System | — | SharePoint managed |
-
----
+| Column | Type | Req | Description | Values / Rules |
+|---|---|:-:|---|---|
+| `client_name` | Single line text | **Y** | Client display name | User-facing |
+| `client_type` | **Managed Metadata** | **Y** | Client classification | Internal taxonomy |
+| `client_coverage` | **Managed Metadata** | **Y** | Coverage group | Coverage taxonomy |
+| `client_sales` | Person | **Y** | Primary sales owner | Single person |
+| `client_region` | **Managed Metadata** | **Y** | Client region | AMER, EMEA, APAC, JAPAN |
+| `client_notes` | Multiple lines text | N | Client notes | Free text |
+| `Created` · `Modified` · `Created By` · `Modified By` | System | — | — | SharePoint managed |
 
 ## List: `taskmaster_issues`
 
-| Column | Type | Required | Description | Values / Rules |
-|---|---|---|---|---|
-| `issue_name` | Single line of text | **Yes** | Issue summary / title | User-entered |
-| `issue_description` | Multiple lines of text | No | Detailed issue description | Free text |
-| `issue_project_id` | **Lookup → Projects** | **Yes** | Parent project | Required |
-| `issue_task_name` | **Lookup → Tasks** | No | Related task | Optional |
-| `issue_transaction_name` | **Lookup → Transactions** | No | Related transaction | Optional |
-| `issue_assignee` | Person | **Yes** | Responsible resolver | Single person |
-| `issue_status` | Choice | No | Current issue status | `Open`, `Review`, `Waiting`, `Blocked`, `Closed` |
-| `issue_type` | Choice | No | Type of issue | `Approval`, `Process`, `Compliance`, `Branding`, `Technical` |
-| `issue_impact` | Choice | No | Severity / impact level | `Low`, `Moderate`, `High`, `Critical` |
-| `issue_date_open` | Date/Time | No | Date issue opened | Default = `Created` |
-| `issue_date_target` | Date/Time | No | Expected resolution date | Future date |
-| `issue_date_close` | Date/Time | No | Resolution date | Set on closure |
-| `Issue_owner` *(sic — capital I)* | System | System | Issue owner / creator | "Business Owner" |
-| `Created` · `Modified` · `Modified By` | System | System | — | SharePoint managed |
+| Column | Type | Req | Description | Values / Rules |
+|---|---|:-:|---|---|
+| `issue_name` | Single line text | **Y** | Issue summary / title | User-entered |
+| `issue_description` | Multiple lines text | N | Detailed issue description | Free text |
+| `issue_project_id` | **Lookup → Projects** | **Y** | Parent project | Required |
+| `issue_task_name` | **Lookup → Tasks** | N | Related task | Optional |
+| `issue_transaction_name` | **Lookup → Transactions** | N | Related transaction | Optional |
+| `issue_assignee` | Person | **Y** | Responsible resolver | Single person |
+| `issue_status` | Choice | N | Current issue status | Open, Review, Waiting, Blocked, Closed |
+| `issue_type` | Choice | N | Type of issue | Approval, Process, Compliance, Branding, Technical |
+| `issue_impact` | Choice | N | Severity / impact level | Low, Moderate, High, Critical |
+| `issue_date_open` | Date/Time | N | Date issue opened | Default = Created |
+| `issue_date_target` | Date/Time | N | Expected resolution date | Future date |
+| `issue_date_close` | Date/Time | N | Resolution date | Set on closure |
+| `Issue_owner` *(sic — capital I)* | System | — | Issue owner / creator | "Business Owner" |
+| `Created` · `Modified` · `Modified By` | System | — | — | SharePoint managed |
 
-> Note: `Created By` is **not** listed on this list (unlike the other two); `Issue_owner` appears
-> to take its place but is typed "System" with a rule of "Business Owner" — ambiguous whether it
-> is the SharePoint `Author` field or a Person column. **Needs confirmation.**
+## List: `taskmaster_products`
+
+| Column | Type | Req | Description | Values / Rules |
+|---|---|:-:|---|---|
+| `product_UID` *(sic — capital UID)* | Single line text | **Y** | Product identifier | e.g. ISIN, Ticker, Internal ID |
+| `product_type` | **Managed Metadata** | **Y** | Product classification | Product taxonomy |
+| `product_description` | Multiple lines text | **Y** | Product description | Free text |
+| `Created` · `Modified` · `Created By` · `Modified By` | System | — | — | SharePoint managed |
+
+## List: `taskmaster_projects`
+
+| Column | Type | Req | Description | Values / Rules |
+|---|---|:-:|---|---|
+| `project_name` | Single line text | **Y** | User-facing project title | Unique enough for identification |
+| `project_manager` | Person | **Y** | Accountable owner of project | Single person |
+| `project_coverage` | **Managed Metadata** | N | Business/product coverage area | Coverage term set |
+| `project_description` | Multiple lines text | N | Detailed project description | Free text |
+| `project_region` | **Managed Metadata** | **Y** | Regional ownership | AMER, EMEA, APAC, JAPAN, GLOBAL |
+| `project_pathway` | Single line text | N | SharedDrive folder location | Relative or full path |
+| `project_type` | **Managed Metadata** | **Y** | Project classification | Production, Campaign, Platform, Event, Operational |
+| `project_requestor` | Person | N | Requesting user | Single person |
+| `project_phase` | Choice | **Y** | Current project lifecycle phase | Planning, Active, Blocked, Complete, Archived |
+| `project_priority` | Choice | **Y** | Project priority level | Lowest, Low, Moderate, High, Critical |
+| `project_perc_completion` | Number | N | Calculated project completion % | 0–100 |
+| `project_date_start` | Date/Time | N | Actual project start date | Default = Created Date |
+| `project_date_target` | Date/Time | N | Desired completion date | Future date |
+| `project_date_complete` | Date/Time | N | Actual completion date | Set when complete |
+| `project_other_resources` | **Person — MULTI** | N | Additional project contributors | **Multi-person allowed** |
+| `Created` · `Modified` · `Created By` · `Modified By` | System | — | — | SharePoint managed |
 
 ---
 
-# Reconciliation — conflicts with documented decisions
+# Consequences & flags
 
-These are not style preferences; each has a **delegation or provisioning consequence** and each
-contradicts a decision already recorded in `.claude/memory/INDEX.md`. Nothing data-bound should be
-authored until they are resolved.
+The schema is the user's to set; these are the **consequences to design around**, not objections.
+Severity: ❗ = will break or silently return wrong results · ⚠ = needs a decision or a workaround.
 
-## C1 — Managed Metadata is used (3 columns), but our model forbids it ❗
+## F1 ❗ `project_other_resources` is multi-person — this does not delegate *at all*
 
-`client_type`, `client_coverage`, `client_region` are **Managed Metadata**.
-`.claude/context/schema.md` says **"No managed-metadata columns"**, with reasons that still apply:
+Multi-value columns are **unsupported by the SharePoint connector** for delegation (per
+`delegation.md`: *Multi-value anything → nothing delegates*). Consequences:
 
-- **Complex type → `Sort`/`SortByColumns` NEVER delegates.** A client list sorted by type, coverage,
-  or region cannot sort server-side. `=` on the subfield does delegate, so *filtering* is fine.
-- **Counts against the 12-join limit** per view (like Lookup and Person).
-- **Multi-value is unsupported** by the SharePoint connector.
-- **Graph does not fully support** managed-metadata columns, and they're excluded from Dataverse
-  virtual tables.
-- **Sync requires CSOM or PnP — not Graph.** We have **no PnP/CSOM route** (documented gap), and
-  provisioning is manual (Q11), so there is currently **no way to sync the term store**.
+- **"Projects I contribute to" cannot be a delegable server-side query.** Any filter touching this
+  column processes only the first 500/2,000 rows and silently omits the rest.
+- This is exactly the case the prior model avoided with *two fixed single-Person columns* rather
+  than one multi-person column (`Or` of two `=` delegates; a multi-value match does not).
 
-**Options:** (a) keep Managed Metadata and accept no server-side sort on those three + no term-store
-automation; (b) revert to the documented design — plain **Text** columns fed from a lookups list;
-(c) hybrid — Managed Metadata for governance, plus a denormalised Text mirror for sort.
+**Workarounds, in order of preference:**
+1. Keep multi-person for *display only*, and drive "my projects" off the single-Person
+   `project_manager` / `project_requestor` (both delegable on `.Email`).
+2. Add a delegable companion — e.g. a text `project_resources_emails` maintained at write time —
+   but note a `contains` match on it **still won't delegate**; only exact `=` would.
+3. Split into fixed single-Person slots (`project_resource_1/2/3`) if server-side "am I on it?"
+   filtering is genuinely required.
 
-## C2 — Lookup columns are used (3 on issues), but our model forbids them ❗
+**Until resolved, I will not author a delegable contributor filter — there isn't one.**
+
+## F2 ⚠ Managed Metadata on 6 columns — filter yes, sort no, and no sync route
+
+`client_type`, `client_coverage`, `client_region`, `project_coverage`, `project_region`,
+`project_type`, `product_type`.
+
+- **Complex type → `=` via subfield delegates; `Sort`/`SortByColumns` NEVER does.** So galleries
+  can *filter* by region/type server-side but cannot *sort* by them. Sorting must be by a Text,
+  Number, Date or Yes/No column (e.g. `project_name`, `project_date_target`).
+- Each MM column **costs a join** against the 12-join-per-view budget, alongside Person columns.
+- **No term-store sync route exists here** (Graph doesn't fully support MM; sync needs CSOM/PnP,
+  which this project has no path to, and provisioning is manual). The term sets are hand-maintained.
+- `project_type` (5 fixed values) and `project_region` are enumerations — a **Choice** column would
+  be cheaper (no join) and behave identically for filtering. MM is only worth it if the terms are
+  genuinely governed centrally and reused across sites.
+
+## F3 ⚠ Lookups on issues — bindings become records, not scalars
 
 `issue_project_id` → Projects, `issue_task_name` → Tasks, `issue_transaction_name` → Transactions.
-Our decision was **"no Lookup columns at all — integer FKs to the built-in `ID`, joined
-client-side."**
 
-- Each Lookup is a **join** against the 12-join budget, and Lookup is a **Complex** type: `=` via
-  subfield delegates, **`Sort` never does**, and `StartsWith` on a Lookup subfield doesn't delegate.
-- Power Fx sees a Lookup as a **record** (`.Id` / `.Value`), not an integer — so every formula in
-  `docs/screen-map.md` written as `Filter(child, FK = Gallery.Selected.ID)` must become
-  `Filter(taskmaster_issues, issue_project_id.Id = gSelProject.ID)`, and patches must write the
-  `{'@odata.type':"#…SPListExpandedReference", Id:…, Value:…}` record shape, not a number.
+- Power Fx sees a Lookup as a **record**: filter with `issue_project_id.Id = gSelProject.ID`
+  (delegates), and **patch** with the reference shape
+  `{'@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedReference", Id: …, Value: …}`
+  — never a bare number.
+- **Sorting by a Lookup never delegates**; each costs a join.
+- Naming is inconsistent (`_id` vs `_name`) though all three are Lookups yielding a record —
+  cosmetic, but formulas must use the exact internal name.
 
-**This is workable** — the project-filtered issues feed still delegates — but it changes the
-binding shape everywhere and forbids sorting issues by project/task/transaction server-side.
+## F4 ❗ "Not archived" has no delegable form as modelled
 
-## C3 — `region` is modelled two different ways, with two different value sets ⚠
+There is no boolean archive flag; `Archived` is a value of the **Choice** `project_phase`. A
+`.Value <> "Archived"` predicate resolves to a **Text `<>`**, which **does not delegate**.
+
+**Delegable form** — enumerate the wanted values with `Or` of `=`:
+```
+Filter(taskmaster_projects,
+    project_phase.Value = "Planning" || project_phase.Value = "Active"
+ || project_phase.Value = "Blocked"  || project_phase.Value = "Complete")
+```
+Verbose but server-side. (A Yes/No `is_archived` column would be cheaper and indexable.) Same
+pattern applies to "open issues" on `issue_status`.
+
+## F5 ⚠ `region` is modelled three ways, with two different domains
 
 | List | Column | Type | Values |
 |---|---|---|---|
 | `asset_approval` | `approval_region` | **Choice** | GLOBAL, AMER, EMEA, APAC, JAPAN |
-| `taskmaster_clients` | `client_region` | **Managed Metadata** | AMER, EMEA, APAC, JAPAN |
+| `taskmaster_projects` | `project_region` | **Managed Metadata** | AMER, EMEA, APAC, JAPAN, **GLOBAL** |
+| `taskmaster_clients` | `client_region` | **Managed Metadata** | AMER, EMEA, APAC, JAPAN *(no GLOBAL)* |
 
-Same concept, different type *and* different domain (`GLOBAL` exists on one only). A shared region
-filter/slicer can't treat them uniformly, and Power BI will see two unrelated dimensions. Recommend
-one region vocabulary with one type.
+One concept, two types, two domains. A shared region slicer can't treat them uniformly, and Power
+BI will model them as unrelated dimensions. Recommend one type and one value set.
 
-## C4 — `approval_id` holds an enumeration, not an identifier ⚠
+## F6 ⚠ `project_perc_completion` is described as "calculated" but typed Number
 
-Values are `MAW / Legal / Compliance / Brand` — a category, so **not unique per row**. The row key
-is the built-in `ID`. Read it as `approval_type`; do **not** use it as a join key as named.
-(Storing it as **Text** rather than Choice is correct per our policy — Text sorts delegably.)
+Typing it **Number is correct** (a SharePoint *Calculated* column can't be indexed and never
+delegates). But nothing computes it: SharePoint won't, and Power Fx can't aggregate server-side.
+It needs a **write-time rollup** — a Power Automate flow on task change (**Q12**) — or it stays
+manually entered. Decide which; otherwise the field silently stays stale/blank.
 
-## C5 — Naming-convention drift, and one casing anomaly ⚠
+## F7 ⚠ Casing anomalies must be matched exactly
 
-- Incoming lists are **snake_case** (`taskmaster_clients`, `client_name`); the documented model is
-  **PascalCase `tm*`** (`tmClients`, `ClientCode`). Confirm the snake_case set supersedes it.
-  *(Upside: snake_case avoids the `_x0020_` mangling risk entirely.)*
-- **`Issue_owner` has a capital `I`** while every sibling is lowercase. If that is the true internal
-  name, formulas must match it exactly — SharePoint internal names are case-sensitive in binding.
-- Lookup columns are named inconsistently: `issue_project_id` (`_id`) vs `issue_task_name` /
-  `issue_transaction_name` (`_name`) — all three are Lookups and all yield a record, not a scalar.
+`Issue_owner` (capital I) and `product_UID` (capital UID) break the otherwise-lowercase convention.
+Internal names bind exactly as written — if these are the true internal names, formulas must match;
+if they're typos in the design doc, fix them **before** provisioning (internal names freeze at
+creation).
 
-## C6 — Design elements from the prior model that are absent ⚠
+## F8 ⚠ No unique key columns; identity is the built-in `ID`
 
-- **No archive/active flag** on `taskmaster_issues` (our design used `IsArchived`, and the delegable
-  "not archived" filter depends on a boolean — Text `<>` does not delegate).
-- **No `NA` status** on `issue_status` — the prior design's "a plain note has no lifecycle" concept
-  (Q8) is gone. Fine if intentional.
-- **No key column** (`IssueKey`) and no `AttributesJson`.
-- `taskmaster_clients` has **no client code** and **no active flag** (prior design had both).
+`approval_id` and `product_UID` are genuine identifiers (their "Values/Rules" cells list *example
+identifier forms* — ISIN/Ticker/Internal ID — not an enumeration). But no list declares a
+uniqueness constraint, and SharePoint won't enforce one. `project_name` is only "unique enough for
+identification". Joins should use the built-in **`ID`** (always indexed, fastest possible lookup);
+treat `approval_id`/`product_UID` as business keys enforced by convention only.
 
 ---
 
-## Delegation quick-reference for what has arrived
+## Delegation quick-reference (all captured columns)
 
-| Column | Delegates for | Does NOT delegate |
+| Column kind | Delegates | Does NOT delegate |
 |---|---|---|
-| `client_name`, `issue_name`, `approval_id` (Text) | `=`, `StartsWith`, `Sort` | `<`/`>`/`<>`, `Search` |
-| `issue_status/type/impact`, `approval_region` (Choice) | `=` via `.Value` | **`Sort`**, `StartsWith` on subfield |
-| `client_type/coverage/region` (Managed Metadata) | `=` via subfield | **`Sort`** — and costs a join |
-| `issue_project_id/task_name/transaction_name` (Lookup) | `=` via `.Id`/`.Value` | **`Sort`** — and costs a join each |
-| `client_sales`, `issue_assignee` (Person) | `=` on `.Email` / `.DisplayName` | all other subfields, **`Sort`** |
-| `issue_date_*` (Date/Time) | `=`, `<`, `>`, `<=`, `>=`, `Sort` | arithmetic in the predicate |
-| `approval_status` (Yes/No) | `=`, `Sort` — index it | — |
-| `client_notes`, `issue_description` (Multi-line) | **nothing** | not filterable/indexable — display only |
-| `approval_link` (Hyperlink) | **nothing** | display only; never a query key |
-| `Created`/`Modified`/`Created By`/`Modified By` | — | **system fields — never patch** |
+| Single line text (`*_name`, `approval_id`, `product_UID`, `project_pathway`) | `=`, `StartsWith`, `Sort` | `<` `>` `<>`, `Search`, `in` |
+| Choice (`*_status`, `*_type`, `*_impact`, `project_phase/priority`, `approval_region`) | `=` via `.Value` | **`Sort`**, `StartsWith` on subfield, `<>` (Text subfield) |
+| Managed Metadata (6 cols) | `=` via subfield | **`Sort`** · costs a join |
+| Lookup (3 on issues) | `=` via `.Id`/`.Value` | **`Sort`** · costs a join each |
+| Person single (`project_manager`, `client_sales`, `issue_assignee`, `project_requestor`) | `=` on `.Email` / `.DisplayName` | other subfields, **`Sort`** · costs a join |
+| **Person multi** (`project_other_resources`) | **nothing** | **unsupported — see F1** |
+| Date/Time (`*_date_*`) | `=` `<` `>` `<=` `>=`, `Sort` | arithmetic inside the predicate |
+| Number (`project_perc_completion`) | `=` `<` `>` `<=` `>=`, `Sort` | — |
+| Yes/No (`approval_status`) | `=`, `Sort` | — |
+| Multiple lines text (`*_description`, `client_notes`) | **nothing** | not filterable/indexable — display only |
+| Hyperlink (`approval_link`) | **nothing** | display only; never a query key |
+| System (`Created`, `Modified`, `Created By`, `Modified By`) | — | **never patch these** |
 
-**Indexing (mandatory above 5,000 items, and must be created while the list is small):**
-`issue_project_id`, `issue_status`, `issue_date_target`, `issue_assignee` on issues;
-`client_region`/`client_name` on clients.
+**Aggregates never delegate to SharePoint** (`Sum`, `Average`, `CountRows`, `CountIf`, `Max`,
+`Min`) — filter delegably to a bounded set first, then aggregate locally, or use Power BI.
+
+**Index early** (mandatory >5,000 items; can't be added past 20,000):
+`project_phase`, `project_date_target`, `project_manager`, `project_name` ·
+`issue_project_id`, `issue_status`, `issue_assignee`, `issue_date_target` ·
+`client_name`, `client_region` · `product_UID` · `approval_id`, `approval_status`.

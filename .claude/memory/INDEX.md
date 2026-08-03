@@ -54,6 +54,7 @@
 - [2026-08-02] Paste/code-view dialect = modern STRUCTURED schema (Control:Type@version, positional z-order, no ZIndex); `pac canvas unpack`'s inline `As type:` is the RETIRED format — do not author to it — sessions/2026-08-02-1411-phase1-core-shell.md
 - [2026-08-02] Components authored in v3.0 `.pa.yaml` `ComponentDefinitions`; display pills/chips delivered as `cmpUiKit` OutputFunction HTML-builders (canvas components CAN'T sit in a gallery), interactive chip stays a component; components inline Theme (can't read app globals) — sessions/2026-08-02-1411-phase1-core-shell.md
 - [2026-08-02] **Air gap is ONE-WAY** (user-corrected): repo→Studio only; sole return signal is binary "works/doesn't." Kills pull/round-trip/pull-reconcile; repo is authoritative source not mirror. → resolve unknown tokens from PUBLIC sources; ship safe fallbacks; maximise first-try paste success — sessions/2026-08-02-1411-phase1-core-shell.md
+- [2026-08-02] SCHEMA: snake_case `taskmaster_*`/`asset_approval` is canonical, supersedes the PascalCase tm* model (user-confirmed) — schema/incoming-lists.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -77,6 +78,9 @@
   `cmpStatusPill`/`cmpChoicePill` in row templates, `cmpEditableGrid` on the Tickets tab.
 - **Phase-2 DATA binding still blocked** on provisioning (true internal names — `schema.md`
   ⟨capture⟩) + a confirmed pull. Every live query is a `TODO(Phase-2-data)` in the screens.
+
+- **Schema intake in progress:** 5 of 7 lists captured (approval, clients, issues, products, projects); awaiting `taskmaster_tasks` + `taskmaster_transactions`. Then promote staging → `.claude/context/schema.md` and clear `TODO(Phase-2-data)`. → `schema/incoming-lists.md`
+- **Schema consequences needing a call:** F1 multi-person `project_other_resources` (no delegable contributor filter); F6 `project_perc_completion` has no writer (needs Power Automate rollup, Q12); F5 region modelled 3 ways; F7 casing anomalies (`Issue_owner`, `product_UID`) must be confirmed before provisioning freezes names.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md
