@@ -46,7 +46,7 @@ Key facts:
 | `scrReports.pa.yaml` | Code view | Reports shell + the Q2 unlicensed empty-state card |
 | `scrProjects.pa.yaml` | Code view | Projects shell + search box + empty placeholder |
 | `scrReference.pa.yaml` | Code view | Clients/Products/Indices shell placeholder |
-| `scrAdmin.pa.yaml` | Code view | Admin shell placeholder |
+| `scrAdmin.pa.yaml` | Code view | Admin shell placeholder — **landed, but from a stale copy carrying `Variant: CONFIRM_BlankVertical`. See paste-log.** |
 | `scrProject.pa.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
 | `scrTask.pa.yaml` | Code view | **Task detail + edit** — and the live home of the C3 rollup write-back |
 

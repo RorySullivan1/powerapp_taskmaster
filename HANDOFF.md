@@ -19,6 +19,21 @@ failed, the error text.
 for you.** Tell me what landed and I'll commit the entry. An unlogged crossing is a crossing we
 can't reconstruct later, so it's worth the one-line report.
 
+## Re-copy before every paste
+
+The `scrAdmin` that reached Studio carried `Variant: CONFIRM_BlankVertical` — a placeholder that
+had been fixed in the repo long before. A stale local copy is easy to accumulate and impossible to
+spot from this side, so **re-copy the file from current `main` immediately before pasting it**, and
+run the validator first:
+
+```
+python tools/validate_pa_yaml.py
+```
+
+It now checks control tokens and gallery variants against an allow-list and rejects leftover
+`CONFIRM_` / `TODO_` placeholders — the official schema constrains neither, which is exactly how
+that one got through.
+
 ## Getting the files onto the work machine
 
 Whichever works there:
