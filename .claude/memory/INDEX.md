@@ -3,10 +3,11 @@
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **Phase:** Phase-1 **core shell + component kit AUTHORED** (first Power Fx in the repo):
   `App.Formulas` (theme + `NavMenu` T6 + `gUserEmail`) in `src/patches/`; 5 screen shells
-  `scr{Home,Reports,Projects,Reference,Admin}` + **6 components** in `src/authored/components/`
-  (`cmpUiKit` HTML-builder fns, `cmpStatusPill`, `cmpChoicePill`, `cmpStatusCard`, `cmpSelection`,
-  `cmpEditableGrid`). Data-independent (no `tm*` tokens). Both sets audited → **NOT landed**
-  (paste-log empty). See `_SHELL-NOTES.md` + `components/_COMPONENTS-NOTES.md`.
+  `scr{Home,Reports,Projects,Reference,Admin}` + **10 components** in `src/authored/components/`
+  (`cmpUiKit` fns, `cmpStatusPill`, `cmpChoicePill`, `cmpStatusCard`, `cmpSelection`,
+  `cmpEditableGrid`, `cmpSectionHeader`, `cmpConfirmDialog`, `cmpToast`, `cmpKpiRing` SVG).
+  Data-independent (no `tm*` tokens). All audited → **NOT landed** (paste-log empty).
+  See `_SHELL-NOTES.md` + `components/_COMPONENTS-NOTES.md`.
 - **Dialect (learned):** paste target is the **modern structured schema** (`Screens:`/`Children:`/
   `Control: Type@version`, positional z-order, no ZIndex) — NOT `pac canvas unpack`'s retired
   inline `As type:` format. Files converted with real tokens from the example export.
@@ -50,14 +51,17 @@
   tablet-vs-phone target. → `src/authored/_SHELL-NOTES.md`, `docs/screen-map.md`.
 - **Licence-gate signal (user decision):** `gHasPowerBiLicence` hardcoded `false`; no in-app Power
   BI API — choose a source (tmLookups flag / Entra group) + hide-vs-grey for the Reports nav entry.
-- **Component unconfirmed tokens (round-trip):** `HtmlViewer@2.1.0` + gallery `Variant`
-  placeholders. **Component transfer:** recreate from contract tables in the Studio component
-  editor / library — code-view paste unproven for component defs. → `components/_COMPONENTS-NOTES.md`.
-- **Extras offered, not built:** `cmpSectionHeader`, `cmpConfirmDialog`, `cmpToast`, `cmpKpiRing`
-  (SVG ring — the licence-free Reports visual for Q2). Wire the 6 built ones into screens in Phase 2.
+- **Component unconfirmed tokens (round-trip):** `HtmlViewer@2.1.0`, `Classic/Timer@2.1.0`
+  (cmpToast), gallery `Variant` placeholders. **Component transfer:** recreate from contract
+  tables in the Studio component editor / library — code-view paste unproven for component
+  defs. → `components/_COMPONENTS-NOTES.md`.
+- **Wire the 10 components into screens in Phase 2** (starts leaning on `tm*` bindings →
+  post-provisioning). e.g. `cmpStatusCard`/`cmpKpiRing` on Home+Reports, `cmpUiKit` pills in
+  galleries, `cmpEditableGrid` on the Tickets tab, `cmpConfirmDialog`/`cmpToast` app-wide.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md
 - 2026-08-02 1702 | review aprildunnam + PM-tracker; distillation + template decision + screen map | sessions/2026-08-02-1702-external-repo-review.md
 - 2026-08-02 1411 | Phase-1 core shell authored (theme + NavMenu + 5 screens); pre-paste audit; dialect corrected to modern structured schema | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-02 1520 | 6 reusable components authored (v3.0 ComponentDefinitions); audit found+fixed cmpSelection double-fire + Output-reads-var | sessions/2026-08-02-1411-phase1-core-shell.md
+- 2026-08-02 1545 | merged PR#2 shell + PR#3 components to main; +4 extra components (cmpSectionHeader/ConfirmDialog/Toast/KpiRing SVG), audit PASTE-clean | sessions/2026-08-02-1411-phase1-core-shell.md

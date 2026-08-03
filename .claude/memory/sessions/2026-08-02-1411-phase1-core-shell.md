@@ -72,6 +72,22 @@
   contract tables in the Studio component editor / a component library. YAML = spec of record.
 - Unconfirmed tokens: `HtmlViewer@2.1.0` (HTML control) + gallery `Variant` placeholders.
 
+## Merge + extras pass (later same session)
+- **Merged to main:** PR #2 (core shell) + PR #3 (component kit), both merge commits, branches
+  deleted. Two disjoint-file PRs off main → conflict-free, order-independent. GitHub numbering:
+  shell=PR#2, components=PR#3 (repo-init was #1).
+- **Built 4 more components** on `feat/component-kit-extras` (10 total): `cmpSectionHeader`,
+  `cmpConfirmDialog` (full-screen scrim+card modal, Destructive mode), `cmpToast` (self-dismissing;
+  `Show()` action + internal Timer + `_show` var), `cmpKpiRing` (SVG percent ring in Image@2.2.3 —
+  the licence-free Reports visual for Q2).
+- **cmpKpiRing SVG** (grounded on power-apps-svg): circumference-100 `stroke-dasharray='<pct> <100-pct>'`,
+  `r=15.9155`, colour from Power Fx. Colours passed as **hex text** to avoid Color→hex conversion;
+  injected unencoded (app-trusted — do NOT bind to list data).
+- **cmpToast** respected the prior cmpSelection lesson: `_show` read only by child controls'
+  `Visible`/`Start`, never by an Output property.
+- **pre-paste audit: PASTE — content-clean, zero defects.** Only gate = documented
+  `Classic/Timer@2.1.0` token (cmpToast); the other 3 use grounded tokens only. → PR #4.
+
 ## Open threads
 - **Round-trip test (now the hard blocker):** on the work machine, create the 5 screens named
   `scr{Home,Reports,Projects,Reference,Admin}`, insert one blank vertical gallery → View code →

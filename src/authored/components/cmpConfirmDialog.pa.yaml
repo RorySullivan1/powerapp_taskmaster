@@ -1,0 +1,151 @@
+# =============================================================================
+# cmpConfirmDialog  —  modal confirm dialog (component; place full-screen)
+# =============================================================================
+# A blocking "are you sure?" modal: dimmed scrim + centred card + Cancel/Confirm.
+# Place the instance FULL-SCREEN (X=0,Y=0,Width=Parent.Width,Height=Parent.Height)
+# so its internal scrim covers everything. Stateless: the APP owns Visible (set it
+# true to open; set it false in OnConfirm/OnCancel). `Destructive` turns the
+# confirm button red for delete-style actions.
+# Grounded control tokens only (Rectangle, Label, Classic/Button). Colours inline
+# the Theme palette. DIALECT v3.0 pa.yaml. See _COMPONENTS-NOTES.md.
+# =============================================================================
+ComponentDefinitions:
+  cmpConfirmDialog:
+    DefinitionType: CanvasComponent
+    Description: Modal confirm — scrim + card + Cancel/Confirm; app-controlled Visible; OnConfirm/OnCancel.
+    AccessAppScope: false
+    CustomProperties:
+      Visible:
+        PropertyKind: Input
+        Description: Whether the dialog is shown. App-controlled.
+        DataType: Boolean
+        Default: =false
+      Title:
+        PropertyKind: Input
+        Description: Dialog heading.
+        DataType: Text
+        Default: ="Are you sure?"
+      Message:
+        PropertyKind: Input
+        Description: Body text explaining the consequence.
+        DataType: Text
+        Default: =""
+      ConfirmLabel:
+        PropertyKind: Input
+        Description: Confirm button text.
+        DataType: Text
+        Default: ="Confirm"
+      CancelLabel:
+        PropertyKind: Input
+        Description: Cancel button text.
+        DataType: Text
+        Default: ="Cancel"
+      Destructive:
+        PropertyKind: Input
+        Description: Red confirm button for destructive actions (delete/archive).
+        DataType: Boolean
+        Default: =false
+      OnConfirm:
+        PropertyKind: Event
+        Description: Raised when Confirm is tapped. App does the action and closes (set Visible false).
+        ReturnType: Boolean
+        Parameters: {}
+      OnCancel:
+        PropertyKind: Event
+        Description: Raised on Cancel or scrim tap. App closes (set Visible false).
+        ReturnType: Boolean
+        Parameters: {}
+    Properties:
+      Height: =720
+      Width: =1366
+      Fill: =RGBA(0, 0, 0, 0)
+    Children:
+      - scrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(0, 0, 0, 0.45)
+            Visible: =cmpConfirmDialog.Visible
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - scrimBtn:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0)
+            HoverFill: =RGBA(0, 0, 0, 0)
+            PressedFill: =RGBA(0, 0, 0, 0)
+            BorderColor: =RGBA(0, 0, 0, 0)
+            Visible: =cmpConfirmDialog.Visible
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+            # Tapping outside the card cancels.
+            OnSelect: =cmpConfirmDialog.OnCancel()
+      - card:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            Visible: =cmpConfirmDialog.Visible
+            Height: =220
+            Width: =440
+            X: =(Parent.Width - 440) / 2
+            Y: =(Parent.Height - 220) / 2
+      - lblTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpConfirmDialog.Title
+            Visible: =cmpConfirmDialog.Visible
+            Color: =RGBA(32, 38, 45, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Size: =18
+            X: =(Parent.Width - 440) / 2 + 24
+            Y: =(Parent.Height - 220) / 2 + 20
+            Width: =392
+            Height: =28
+      - lblMessage:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpConfirmDialog.Message
+            Visible: =cmpConfirmDialog.Visible
+            Color: =RGBA(110, 120, 130, 1)
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =(Parent.Width - 440) / 2 + 24
+            Y: =(Parent.Height - 220) / 2 + 56
+            Width: =392
+            Height: =72
+      - btnCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =cmpConfirmDialog.CancelLabel
+            Visible: =cmpConfirmDialog.Visible
+            Fill: =RGBA(255, 255, 255, 1)
+            Color: =RGBA(32, 38, 45, 1)
+            BorderColor: =RGBA(225, 229, 235, 1)
+            BorderThickness: =1
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Height: =40
+            Width: =120
+            X: =(Parent.Width - 440) / 2 + 440 - 24 - 120 - 12 - 120
+            Y: =(Parent.Height - 220) / 2 + 220 - 20 - 40
+            OnSelect: =cmpConfirmDialog.OnCancel()
+      - btnConfirm:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =cmpConfirmDialog.ConfirmLabel
+            Visible: =cmpConfirmDialog.Visible
+            Fill: =If(cmpConfirmDialog.Destructive, RGBA(197, 58, 58, 1), RGBA(0, 90, 158, 1))
+            Color: =RGBA(255, 255, 255, 1)
+            BorderColor: =If(cmpConfirmDialog.Destructive, RGBA(197, 58, 58, 1), RGBA(0, 90, 158, 1))
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Height: =40
+            Width: =120
+            X: =(Parent.Width - 440) / 2 + 440 - 24 - 120
+            Y: =(Parent.Height - 220) / 2 + 220 - 20 - 40
+            OnSelect: =cmpConfirmDialog.OnConfirm()

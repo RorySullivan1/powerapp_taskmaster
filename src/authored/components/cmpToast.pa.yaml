@@ -1,0 +1,103 @@
+# =============================================================================
+# cmpToast  —  transient notification / snackbar (component; screen-level)
+# =============================================================================
+# A self-dismissing toast. The app sets Message + Tone, then CALLS the Show()
+# action to raise it; an internal Timer hides it after Duration ms.
+#   ThisItem?  No — place one instance per screen (or app-scope), e.g. bottom-right.
+#   To raise:  cmpToast_1.Show()   (after setting its Message/Tone inputs)
+#
+# Internal state `_show` (component Set) drives visibility — read by child controls
+# only, never by an Output property (keeps within component rules). Grounded tokens
+# except the Timer: `Classic/Timer@2.1.0` is UNCONFIRMED (round-trip). If you'd
+# rather not use a Timer, drop it and let the app own timing (Set a var + its own
+# timer) — then this becomes a visual-only toast with an Input `Visible`.
+# Colours inline the Theme palette. DIALECT v3.0 pa.yaml. See _COMPONENTS-NOTES.md.
+# =============================================================================
+ComponentDefinitions:
+  cmpToast:
+    DefinitionType: CanvasComponent
+    Description: Self-dismissing toast — Show() action raises it, internal Timer hides after Duration.
+    AccessAppScope: false
+    CustomProperties:
+      Message:
+        PropertyKind: Input
+        Description: Text to show. Set before calling Show().
+        DataType: Text
+        Default: =""
+      Tone:
+        PropertyKind: Input
+        Description: Info | Success | Warning | Danger — drives colour and icon.
+        DataType: Text
+        Default: ="Info"
+      Duration:
+        PropertyKind: Input
+        Description: Milliseconds visible before auto-dismiss.
+        DataType: Number
+        Default: =3000
+      Show:
+        PropertyKind: Action
+        Description: Raise the toast (reads current Message/Tone) and restart the dismiss timer.
+        ReturnType: Boolean
+        Parameters: {}
+        Default: =Set(_show, true); Reset(tmrToast)
+      OnDismiss:
+        PropertyKind: Event
+        Description: Raised when the toast auto-dismisses.
+        ReturnType: Boolean
+        Parameters: {}
+    Properties:
+      Height: =56
+      Width: =340
+      Fill: =RGBA(0, 0, 0, 0)
+    Children:
+      - toastBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: |
+              =Switch(cmpToast.Tone,
+                  "Success", RGBA(49, 130, 93, 1),
+                  "Warning", RGBA(214, 152, 40, 1),
+                  "Danger",  RGBA(197, 58, 58, 1),
+                  RGBA(0, 90, 158, 1))
+            Visible: =_show
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - toastIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: |
+              =Switch(cmpToast.Tone,
+                  "Success", Icon.Check,
+                  "Warning", Icon.Warning,
+                  "Danger",  Icon.Error,
+                  Icon.Information)
+            Color: =RGBA(255, 255, 255, 1)
+            Visible: =_show
+            Height: =22
+            Width: =22
+            X: =16
+            Y: =(Parent.Height - 22) / 2
+      - toastLabel:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpToast.Message
+            Color: =RGBA(255, 255, 255, 1)
+            Visible: =_show
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =50
+            Y: =0
+            Width: =Parent.Width - 66
+            Height: =Parent.Height
+            VerticalAlign: =VerticalAlign.Middle
+      - tmrToast:
+          Control: Classic/Timer@2.1.0
+          Properties:
+            Duration: =cmpToast.Duration
+            AutoStart: =false
+            Repeat: =false
+            Start: =_show
+            Visible: =false
+            OnTimerEnd: =Set(_show, false); cmpToast.OnDismiss()
