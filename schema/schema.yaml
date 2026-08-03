@@ -1,0 +1,293 @@
+# =============================================================================
+# GOLDEN SOURCE — the authoritative definition of the SharePoint backend.
+#
+# THIS FILE DEFINES THE LISTS. SharePoint is the downstream apply-target.
+# Edit here first; then apply to SharePoint and set the list's `provisioned:`
+# state. This mirrors the one-way air gap for app source: the repo is
+# authoritative, and nothing is read back (see .claude/context/air-gap.md).
+#
+# Column-by-column truth lives HERE. The model's shape, delegation costs and
+# design consequences live in .claude/context/schema.md — that brief points at
+# this file rather than repeating it, so the two cannot drift.
+#
+# INTERNAL NAMES ARE FROZEN AT CREATION. The `name:` key of each column is the
+# internal name and must be created exactly as written (a later rename changes
+# only the display label). Create the column with this name, then set a friendly
+# display name if desired.
+# =============================================================================
+
+meta:
+  version: 2.0.0
+  updated: 2026-08-03
+  authority: repo            # repo defines; SharePoint applies
+  naming: snake_case
+  source: user-supplied schema screenshots (see incoming-lists.md), then edited here
+
+# Type vocabulary used below, and what each costs.
+# join_cost 1 = counts against SharePoint's 12-joins-per-view cap.
+types:
+  Text:            { sp: "Single line of text",  delegates: ["=", "StartsWith", "Sort"], indexable: true,  join_cost: 0 }
+  Note:            { sp: "Multiple lines of text", delegates: [],                        indexable: false, join_cost: 0 }
+  Choice:          { sp: "Choice",               delegates: ["= via .Value", "Sort"],    indexable: true,  join_cost: 0 }
+  Number:          { sp: "Number",               delegates: ["=", "<", ">", "Sort"],     indexable: true,  join_cost: 0 }
+  Currency:        { sp: "Currency",             delegates: ["=", "<", ">", "Sort"],     indexable: true,  join_cost: 0 }
+  DateTime:        { sp: "Date and Time",        delegates: ["=", "<", ">", "Sort"],     indexable: true,  join_cost: 0 }
+  Boolean:         { sp: "Yes/No",               delegates: ["=", "Sort"],               indexable: true,  join_cost: 0 }
+  Person:          { sp: "Person or Group (single)", delegates: ["= on .Email/.DisplayName"], indexable: true, join_cost: 1 }
+  PersonMulti:     { sp: "Person or Group (multi)",  delegates: [],                      indexable: false, join_cost: 1 }
+  Lookup:          { sp: "Lookup",               delegates: ["= via .Id/.Value"],        indexable: true,  join_cost: 1 }
+  ManagedMetadata: { sp: "Managed Metadata",     delegates: ["= via subfield"],          indexable: true,  join_cost: 1 }
+  Hyperlink:       { sp: "Hyperlink or Picture", delegates: [],                          indexable: false, join_cost: 0 }
+  Calculated:      { sp: "Calculated",           delegates: [],                          indexable: false, join_cost: 0 }
+
+# Present on every list, managed by SharePoint. NEVER patch these from the app.
+system_columns: [Created, Modified, Created By, Modified By]
+
+# =============================================================================
+lists:
+
+  # ---------------------------------------------------------------------------
+  taskmaster_projects:
+    role: The parent. Tasks, transactions and issues all hang off it.
+    provisioned: pending
+    join_cost: 6
+    columns:
+      - { name: project_name,            type: Text,            required: true,  indexed: true,  desc: "User-facing project title (unique by convention only)" }
+      - { name: project_manager,         type: Person,          required: true,  indexed: true,  desc: "Accountable owner" }
+      - { name: project_coverage,        type: ManagedMetadata, required: false,                 desc: "Business/product coverage area", term_set: Coverage }
+      - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
+      - { name: project_region,          type: ManagedMetadata, required: true,  indexed: true,  desc: "Regional ownership", values: [AMER, EMEA, APAC, JAPAN, GLOBAL] }
+      - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
+      - { name: project_type,            type: ManagedMetadata, required: true,                  desc: "Project classification", values: [Production, Campaign, Platform, Event, Operational] }
+      - { name: project_requestor,       type: Person,          required: false,                 desc: "Requesting user" }
+      - { name: project_phase,           type: Choice,          required: true,  indexed: true,  desc: "Lifecycle phase", values: [Planning, Active, Blocked, Complete, Archived] }
+      - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
+      - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below" }
+      - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
+      - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  desc: "Desired completion date" }
+      - { name: project_date_complete,   type: DateTime,        required: false,                 desc: "Actual completion date" }
+      - { name: project_supporter,       type: Person,          required: false, indexed: true,  desc: "Supporting contributor (one extra person beside project_manager)" }
+
+  # ---------------------------------------------------------------------------
+  taskmaster_tasks:
+    role: Units of work. The busiest list in the app.
+    provisioned: pending
+    join_cost: 8          # 5 Lookup + 2 Person + 1 ManagedMetadata (10 incl. Created By/Modified By; cap is 12)
+    columns:
+      - { name: task_name,             type: Text,            required: true,  indexed: true,  desc: "Task title" }
+      - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
+      - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
+      - { name: task_category,         type: ManagedMetadata, required: false,                 desc: "Task classification", term_set: Marketing }
+      - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
+      - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
+      - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
+      - { name: task_lead,             type: Person,          required: true,  indexed: true,  desc: "Primary owner" }
+      - { name: task_supporter,        type: Person,          required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
+      - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
+      - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
+      - { name: task_date_completion,  type: DateTime,        required: false,                 desc: "Date completed" }
+      - { name: task_output_approval,  type: Lookup,          required: false,                 desc: "Approval required for output", lookup: { list: asset_approval, show: approval_id } }
+      - { name: task_output_language,  type: Choice,          required: false,                 desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
+      - { name: task_output_format,    type: Choice,          required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
+      - { name: task_output_branding,  type: Choice,          required: false,                 desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
+      - { name: task_output_asset,     type: Lookup,          required: false,                 desc: "Linked asset", lookup: { list: asset_library, show: TBD }, review: "asset_library schema not yet supplied — this binding is blocked" }
+      - { name: task_client_name,      type: Lookup,          required: false,                 desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
+      - { name: task_product_id,       type: Lookup,          required: false,                 desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
+      - { name: task_client_stage,     type: Choice,          required: false,                 desc: "Client lifecycle stage", values: [Prospect, Active, Existing, "Post-Trade"] }
+
+  # ---------------------------------------------------------------------------
+  taskmaster_transactions:
+    role: Trades, at full transaction level.
+    provisioned: pending
+    join_cost: 4
+    columns:
+      - { name: transaction_name,       type: Text,     required: true,  indexed: true,  desc: "Transaction label" }
+      - { name: transaction_project_id, type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
+      - { name: transaction_client_name, type: Lookup,  required: true,  indexed: true,  desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
+      - { name: transaction_product_id, type: Lookup,   required: true,                  desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
+      - { name: transaction_sales,      type: Person,   required: true,                  desc: "Sales owner" }
+      - { name: transaction_notional,   type: Currency, required: false,                 desc: "Trade notional amount (positive)" }
+      - { name: transaction_currency,   type: Choice,   required: true,                  desc: "Currency denomination", values: [USD, EUR, GBP, JPY, CHF] }
+      # SUPERSEDED 2026-08-03 (Q14) — DO NOT PROVISION. Kept here so the decision is
+      # discoverable rather than silently missing. Currency conversion moved to the
+      # REPORT layer: Power BI joins an FX dimension to transaction_currency +
+      # transaction_date. Nothing in the app writes this column, so provisioning it
+      # would leave a permanently blank Currency field that looks like a real figure.
+      # If you ever reinstate it, reinstate a WRITER at the same time.
+      # - { name: transaction_notional_usd, type: Currency, required: false, indexed: true, desc: "Notional normalised to USD at WRITE time" }
+      - { name: transaction_date,       type: DateTime, required: true,  indexed: true,  desc: "Actual trade date" }
+
+  # ---------------------------------------------------------------------------
+  taskmaster_issues:
+    role: Freeform issues raised against a project, optionally a task or transaction.
+    provisioned: pending
+    join_cost: 5
+    columns:
+      - { name: issue_name,             type: Text,     required: true,  indexed: true,  desc: "Issue summary / title" }
+      - { name: issue_description,      type: Note,     required: false,                 desc: "Detailed description (display only)" }
+      - { name: issue_project_id,       type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
+      - { name: issue_task_name,        type: Lookup,   required: false,                 desc: "Related task", lookup: { list: taskmaster_tasks, show: task_name } }
+      - { name: issue_transaction_name, type: Lookup,   required: false,                 desc: "Related transaction", lookup: { list: taskmaster_transactions, show: transaction_name } }
+      - { name: issue_assignee,         type: Person,   required: true,  indexed: true,  desc: "Responsible resolver" }
+      - { name: issue_status,           type: Choice,   required: true,  indexed: true,  default: Open,          desc: "Current status", values: [Open, Review, Waiting, Blocked, Closed] }
+      - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue", values: [Approval, Process, Compliance, Branding, Technical] }
+      - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact", values: [Low, Moderate, High, Critical] }
+      - { name: issue_date_open,        type: DateTime, required: false,                 desc: "Date opened (default = Created)" }
+      - { name: issue_date_target,      type: DateTime, required: false, indexed: true,  desc: "Expected resolution date" }
+      - { name: issue_date_close,       type: DateTime, required: false,                 desc: "Resolution date" }
+      - { name: issue_owner,            type: Person,   required: false,                 desc: "Issue owner / business owner (distinct from Created By)" }
+
+  # ---------------------------------------------------------------------------
+  taskmaster_clients:
+    role: Client dimension.
+    provisioned: pending
+    join_cost: 4
+    columns:
+      - { name: client_name,     type: Text,            required: true,  indexed: true, desc: "Client display name" }
+      - { name: client_type,     type: ManagedMetadata, required: true,                 desc: "Client classification", term_set: ClientType }
+      - { name: client_coverage, type: ManagedMetadata, required: true,                 desc: "Coverage group", term_set: Coverage }
+      - { name: client_sales,    type: Person,          required: true,                 desc: "Primary sales owner" }
+      - { name: client_region,   type: ManagedMetadata, required: true,  indexed: true, desc: "Client region", values: [AMER, EMEA, APAC, JAPAN] }
+      - { name: client_notes,    type: Note,            required: false,                desc: "Free-text notes (display only)" }
+
+  # ---------------------------------------------------------------------------
+  taskmaster_products:
+    role: Product reference.
+    provisioned: pending
+    join_cost: 1
+    columns:
+      - { name: product_uid,         type: Text,            required: true, indexed: true, desc: "Product identifier (ISIN / Ticker / Internal ID). Business key — uniqueness by convention, not enforced" }
+      - { name: product_type,        type: ManagedMetadata, required: true,                desc: "Product classification", term_set: Product }
+      - { name: product_description, type: Note,            required: true,                desc: "Description (display only)" }
+
+  # ---------------------------------------------------------------------------
+  asset_approval:
+    role: Approval reference. Tasks point at it via task_output_approval.
+    provisioned: pending
+    join_cost: 0
+    columns:
+      - { name: approval_id,     type: Text,      required: true, indexed: true, desc: "Approval identifier (e.g. MAW, Legal, Compliance, Brand)" }
+      - { name: approval_region, type: Choice,    required: true,                desc: "Applicable region — BROAD-STROKE by design; deliberately coarser than project/client region and never used alongside them", values: [GLOBAL, AMER, EMEA, APAC, JAPAN] }
+      - { name: approval_status, type: Boolean,   required: false, indexed: true, desc: "Active state (true = active)" }
+      - { name: approval_link,   type: Hyperlink, required: false,               desc: "Link to approval guidance (display only)" }
+
+  # ---------------------------------------------------------------------------
+  asset_library:
+    role: Linked output assets. Referenced by taskmaster_tasks.task_output_asset.
+    provisioned: unknown
+    join_cost: null
+    columns: []          # SCHEMA NOT SUPPLIED — any binding to this list is blocked.
+
+# =============================================================================
+# Derived values — computed, not stored by SharePoint.
+# =============================================================================
+rollups:
+  project_perc_completion:
+    description: Weighted completion % for a project, from the stages of its child tasks.
+    source_list: taskmaster_tasks
+    parent_key: task_project_id
+    formula: "mean(stage_weight[task_stage]) over counted tasks   # weights are already 0-100, so do NOT multiply by 100 again"
+    # WEIGHTS ARE PROPOSED — confirm or edit. Percent-of-effort per stage.
+    stage_weights:
+      "Not Started":  0
+      "Planning":     10
+      "Drafting":     35
+      "Under Review": 60
+      "Finalizing":   85
+      "Complete":     100
+      "Archived":     null    # null = EXCLUDED from numerator AND denominator
+    writer: app-side          # DECIDED 2026-08-03 — the app patches the parent
+    writer_notes: >-
+      The app recomputes and patches project_perc_completion whenever a task's stage
+      changes (task form OnSuccess / kanban drop / grid save). Weight table is mirrored
+      in src/patches/App.Formulas.pa.fx as the named formula StageWeights; the
+      write-back snippet lives beside it. Consequence: a stage edited directly in
+      SharePoint (or bulk-imported) leaves the value stale until the next in-app change
+      to that project.
+
+# =============================================================================
+# Open recommendations — edits proposed but NOT yet applied above.
+# Reasoning for each lives in .claude/context/schema.md §Consequences.
+# =============================================================================
+open_recommendations:
+  - id: C10
+    what: >-
+      project_region and project_type are REQUIRED Managed Metadata, so nothing can create a project
+      from the app without an MM write path. Decision: keep MM; build a cascading term picker that
+      walks the hierarchy and writes the leaf term's GUID.
+    validated: docs/managed-metadata-picker.md
+    findings:
+      - "READ is first-party: Graph termStore children endpoints (GA 2021-08); nesting detection falls out of the API. TermStore.Read.All, DELEGATED ONLY - app-only unsupported."
+      - "Graph still cannot set an MM column VALUE on a list item - read terms via Graph, write the column via the SharePoint connector."
+      - "WRITE shape (COMMUNITY-CONFIRMED, not first-party - riskiest construct in the app): '@odata.type' #Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy with TermGuid, Label, Path, WssId -1."
+    recommended: >-
+      Cache the term store into a flat taskmaster_terms list (term_guid, term_label, term_set,
+      term_parent_guid, term_path, term_depth, term_is_leaf) via a scheduled flow, and drive the
+      cascade from delegable Filters on term_parent_guid. Zero runtime dependency, versus a flow
+      round-trip per dropdown level.
+    decided: >-
+      2026-08-03 (REVISED, same day) - NO CACHE LIST. Choices([@list].mmColumn) returns the
+      term set from the term store with Label, Path, Guid and WssId per term, and Path is the
+      FULL hierarchical path - so the hierarchy is already in the data and the cascade reads
+      it directly. A taskmaster_terms cache list was briefly added and has been REMOVED: it
+      was a second copy of a vocabulary that already exists, carrying a refresh schedule and
+      a drift risk, to recover a hierarchy that Path hands over for free.
+      The value written is the connector's OWN record - LookUp(Choices(...), Path = <picked>)
+      - which also retires the hand-built SPListExpandedTaxonomy literal that had been the
+      least-proven construct in the app.
+    blocked_on: >-
+      Q12 - Power Automate or a custom connector, to POPULATE taskmaster_terms. The app is
+      authored and pastes without it; it just has nothing to pick from until the list is
+      filled (the picker shows an explicit banner in that state rather than failing silently).
+      A hand-seeded list is a valid stopgap for a small vocabulary.
+    status: APPLIED - cascade authored against taskmaster_terms; population still needs Q12
+  - id: C9
+    what: >-
+      task_stage, task_status and issue_status are optional, so rows with a blank value match
+      none of the enumerated Choice values and drop out of every delegable "open work" filter —
+      a silent undercount. It also means green% + amber/red% need not reach 100.
+    options:
+      - "make each required with a default (task_stage='Not Started', task_status='Green', issue_status='Open') — recommended, fixes it at source"
+      - "add `|| col.Value = Blank()` to every filter — verbose, and Blank() on a Choice subfield is an unverified delegable construct"
+      - "accept the undercount and label it"
+    status: APPLIED  # 2026-08-03 — all three now required with defaults; no blank-value gap remains
+  - id: C1
+    what: "project_other_resources / task_other_resources are multi-person → no delegable filter exists"
+    options: ["display-only (drive 'mine' off task_lead/project_manager)", "fixed single-Person slots", "write-time text mirror (exact = only)"]
+    status: APPLIED  # 2026-08-03 — single-Person task_supporter / project_supporter; "mine" is now fully delegable
+  - id: C3
+    what: "project_perc_completion has no writer"
+    options: ["Power Automate rollup on task change (needs Q12)", "manual entry", "drop the column"]
+    status: APPLIED  # 2026-08-03 — weighted stage rollup, written APP-SIDE; weights in rollups: + App.Formulas StageWeights
+  - id: C4
+    what: "task_date_start is Calculated — cannot be indexed, nothing delegates"
+    options: ["convert to DateTime written at creation (recommended)", "keep Calculated and never filter/sort on it"]
+    status: APPLIED  # task_date_start is now DateTime, indexed (2026-08-03)
+  - id: C5
+    what: "no USD-normalised notional → cross-currency totals are not meaningful"
+    options: ["add transaction_notional_usd, normalised at write", "aggregate per-currency only", "convert in Power BI with an FX table (CHOSEN)"]
+    status: SUPERSEDED  # 2026-08-03 (Q14) — write-time normalisation REVERSED
+    superseded_by: >-
+      Convert in the REPORT layer. The app stores only transaction_notional +
+      transaction_currency; Power BI joins an FX dimension on currency + date. A
+      write-time rate freezes whatever number the app held on the trade date and
+      nothing downstream can correct it, whereas report-time conversion can be
+      restated, back-dated and audited.
+    app_consequence: >-
+      NO cross-currency figure can be shown anywhere in the app. scrProject's
+      transactions tab now totals PER CURRENCY and says so; the FxToUsd table has
+      been removed from App.Formulas. Do not reintroduce a rate table to "just add
+      a total".
+    reporting_obligation: >-
+      Power BI now OWES this figure. It needs an FX dimension (currency, rate,
+      effective date) and a measure converting transaction_notional at the trade
+      date. Until that exists there is no blended notional anywhere - which is the
+      accepted cost, not an oversight.
+  - id: C6
+    what: "region modelled three ways — INTENTIONAL. approval_region is broad-stroke; project_region/client_region carry granularity. They are never used in the same setting, so no conformed dimension is needed."
+    options: ["leave as-is (chosen)"]
+    status: BY DESIGN  # regions serve different purposes and are never used together — not a defect, do not "fix"
+  - id: C8
+    what: "casing anomalies Issue_owner and product_UID; no enforced uniqueness anywhere"
+    options: ["rename to issue_owner / product_uid before creation (recommended)", "keep as-is and match exactly in every formula"]
+    status: APPLIED  # renamed to issue_owner / product_uid (2026-08-03); uniqueness still by convention only

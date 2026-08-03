@@ -40,30 +40,28 @@ ComponentDefinitions:
         PropertyKind: Output
         Description: Live staging collection including edits and new/removed rows.
         DataType: Table
-        Default: =colGrid
       RowCount:
         PropertyKind: Output
         Description: Number of rows currently staged.
         DataType: Number
-        Default: =CountRows(colGrid)
       AddRow:
         PropertyKind: Action
         Description: Append a blank row to the staging collection.
         ReturnType: Boolean
-        Parameters: {}
-        Default: |
-          =Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" })
       OnCommit:
         PropertyKind: Event
         Description: Raised by the Save button. App runs the delegation-safe bulk Patch of EditedItems.
         ReturnType: Boolean
-        Parameters: {}
     Properties:
       Height: =360
       Width: =640
       Fill: =RGBA(255, 255, 255, 1)
       # No OnStart in components; seed the staging copy on (re)set.
       OnReset: =ClearCollect(colGrid, cmpEditableGrid.Items)
+      EditedItems: =colGrid
+      RowCount: =CountRows(colGrid)
+      AddRow: |
+        =Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" })
     Children:
       - headerBar:
           Control: Rectangle@2.3.0

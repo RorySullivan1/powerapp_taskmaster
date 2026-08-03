@@ -43,13 +43,16 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 > functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
 > because you asked for components and it packages them as one importable unit.
 
-## Control tokens — and why they don't gate a paste here
+## Control tokens — and why they DO gate a paste
 
-The air gap is **one-way** (repo → Studio; only binary "works/doesn't" returns). But
-**components are never code-view-pasted** — you recreate each in the Studio component editor
-by adding controls from the UI (see Transfer, below). So a component's control **tokens are
-documentation, not a paste payload**: picking "HTML text" or "Timer" from the control list in
-Studio uses whatever the current version is, regardless of what this YAML says.
+**Corrected 2026-08-03 (user-reported): components ARE code-view-pasteable, and several have
+landed.** This file previously claimed the opposite and told you to rebuild each one by hand in
+the component editor. That was wrong — and it was wrong in the expensive direction, because it
+turned a paste into a manual rebuild.
+
+The consequence for everything below: a component's control **tokens are a paste payload, not
+documentation**. They are held to exactly the same standard as the screens — an unverified token
+is a failed paste, reported back only as "it didn't work".
 
 - Grounded tokens (from the example export): `Rectangle@2.3.0`, `Label@2.5.1`,
   `Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`, `Image@2.2.3`.
@@ -57,20 +60,26 @@ Studio uses whatever the current version is, regardless of what this YAML says.
   (`cmpSelection`) from public evidence, matching the screens. (Version suffixes are optional —
   Studio uses the current version if omitted.)
 - **`HtmlViewer@2.1.0`** (`cmpStatusPill`/`cmpChoicePill`) and **`Classic/Timer@2.1.0`**
-  (`cmpToast`) are best-effort names for the "HTML text" and "Timer" controls. Because you add
-  those from the control list by hand, the exact token can't fail anything. Fallback for the
-  toast if a Timer is awkward: drop it and let the app own timing (visual-only toast + `Visible`).
+  (`cmpToast`) are best-effort names for the "HTML text" and "Timer" controls. **Under the
+  correction above these are now a real risk**, not free: if either component is rejected, the
+  token is the first suspect. Report the error and I'll ground the name. Fallback for the toast
+  if the Timer token is wrong: drop it and let the app own timing (visual-only toast +
+  `Visible`).
 
-## ⚠️ Transfer — components do NOT cross the one-way gap by paste
+## Transfer — components DO cross by paste
 
-A canvas component definition is **not** something you paste via code view. Recreate each one:
-- In the **Studio component editor** (or a **component library** for cross-app reuse), building
-  it from the **contract tables above** and the control bodies in each file — both are
-  dialect-independent. This YAML is the **spec of record**, not a paste payload.
+**Corrected 2026-08-03 from a Studio report: these files are paste payloads.** Paste each one
+the same way as a screen, via code view. Several have already landed this way.
+
+What that changes:
+- **The dialect matters.** These are `ComponentDefinitions` in pa-yaml v3.0, and Studio validates
+  them at paste time — which is exactly how the `Parameters`-must-be-a-sequence error was found.
+  Run `python tools/validate_pa_yaml.py` before carrying anything across.
+- **Paste one at a time** and report the outcome, so a rejection points at one component.
 - A **component library** can't hold data sources or Power Automate flows — pass data in via
-  Input properties (all ten already do).
-- Since nothing here returns to the repo, treat these files as the **authoritative source**:
-  if you tweak a component in Studio, mirror the change back here by hand or it's lost.
+  Input properties (all eleven already do).
+- Since nothing returns to the repo, these files remain the **authoritative source**: if you
+  tweak a component in Studio, tell me and I'll mirror it here, or it's lost.
 
 ## Where these plug into the shell (Phase 2)
 

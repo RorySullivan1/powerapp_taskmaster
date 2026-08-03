@@ -7,7 +7,7 @@ instances onto Home/Reports/Projects with **static** data. **Data-independent** 
 Nothing here is "in the app" until a human pastes it and it validates; log each crossing
 in `../../paste-log.md`.
 
-## Phase-2 composition (static data)
+## Phase-2 composition + data binding
 
 `scrHome`, `scrReports`, `scrProjects` now instantiate components (`components/`):
 
@@ -24,8 +24,16 @@ Key facts:
   (see `components/_COMPONENTS-NOTES.md`) before pasting these screens.
 - **Demo UI-state globals** (no schema, no `OnStart` — blank is falsy): `gToastMsg`,
   `gToastTone`, `gConfirmOpen`.
-- **All values are static.** Every live query is a `TODO(Phase-2-data)` comment (KPI counts,
-  ring `Percent`, project filter) — they need provisioned lists + true internal names.
+- **Data is now bound (2026-08-03).** `scrHome`, `scrProjects` and `scrReports` carry live,
+  delegable queries against `schema/schema.yaml`'s columns. The shape everywhere is
+  **filter server-side → aggregate locally**, because `CountRows`/`Average` never delegate
+  to SharePoint. `scrReference` / `scrAdmin` remain shells.
+- **Prerequisite:** these three screens **cannot paste until the lists are provisioned** and
+  added as data sources — Studio can't bind to a list that doesn't exist. The two shells and
+  the components still paste at any time.
+- **Scope is deliberate on Reports:** an org-wide count can't be exact in-app (it only counts
+  the rows already pulled), so every ring is scoped to your tasks or the active-projects list.
+  Org-wide analysis stays in Power BI.
 - **Not yet composed:** the pills (`cmpStatusPill`/`cmpChoicePill`/`cmpUiKit`) and
   `cmpEditableGrid` are gallery/data-bound — they land when the data galleries are wired.
 
@@ -39,17 +47,23 @@ Key facts:
 | `scrProjects.fx.yaml` | Code view | Projects shell + search box + empty placeholder |
 | `scrReference.fx.yaml` | Code view | Clients/Products/Indices shell placeholder |
 | `scrAdmin.fx.yaml` | Code view | Admin shell placeholder |
+| `scrProject.fx.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
+| `scrTask.fx.yaml` | Code view | **Task detail + edit** — and the live home of the C3 rollup write-back |
 
 ## Paste order (dependencies are real)
 
 1. **Create five blank screens** in Studio, rename them exactly:
    `scrHome`, `scrReports`, `scrProjects`, `scrReference`, `scrAdmin`.
    (`NavMenu` holds live Screen references — they must exist by those names first.)
-2. **Paste each screen's controls** via code view (one screen at a time; rename any
-   `_1` suffix back and log it). The header + nav block is identical across screens.
-3. **Paste `App.Formulas`** last, into the formula bar. Screen refs now resolve.
-4. Set the app's **Data row limit to 2000** (schema.md) while you're in Settings.
-5. Verify nav: each entry highlights the active screen and navigates.
+2. **Recreate the components** in the component editor (`components/_COMPONENTS-NOTES.md`).
+3. **Paste `App.Formulas`** into the formula bar — **now step 3, not last.** The data-bound
+   screens reference `StageWeights`, which is defined there, so it must exist before they paste.
+4. **Paste each screen's controls** via code view (one screen at a time, onto a blank screen;
+   rename any `_1` suffix back and log it). The header + nav block is identical across screens.
+   `scrHome` / `scrProjects` / `scrReports` additionally require their **lists provisioned and
+   added as data sources** — they cannot paste before that.
+5. Set the app's **Data row limit to 2000** (schema.md) while you're in Settings.
+6. Verify nav: each entry highlights the active screen and navigates.
 
 ## Dialect — modern structured schema (corrected after pre-paste audit)
 

@@ -16,6 +16,23 @@ decision and delete it here.
   High `_x0020_` internal-name risk; the schema snapshot must capture **true** internal names. No
   automated term-store sync path.
 
+## Answered on 2026-08-03 (see `.claude/memory/INDEX.md` → Decisions)
+
+- **Q12 Power Automate availability** → **YES, available.** Still useful for the
+  **flow-as-list-provisioner** route (Q11-bis, whose recommendation was explicitly conditional on
+  this) and the extract flow (Q7). **No longer needed for C10 at all** — the term picker reads the
+  term store directly via `Choices()`, so there is no cache list to populate and no flow in that
+  path unless a term set exceeds 20 terms.
+- **Q14 FX rates** → **do not convert in the app at all.** `transaction_notional_usd` is dropped;
+  Power BI converts against an FX dimension keyed on currency + trade date. Reasoning and the
+  consequences (no cross-currency figure anywhere in the app; Power BI now owes the blended
+  notional) are in `.claude/context/schema.md` → C5.
+- **Power BI licence gate** → **soft gate.** Unlicensed users see Reports **greyed but reachable**,
+  landing on the empty-state card plus the three licence-free KPI rings. Reports is never hidden —
+  a hidden feature is one nobody knows to request a licence for. `gHasPowerBiLicence` stays `false`
+  (everyone treated as unlicensed) until a real signal is supplied; nav and the Reports screen both
+  read that one line.
+
 ## Q11-bis — reconsider provisioning: flow-as-list-provisioner (2026-08-02)
 
 Reviewing April Dunnam's templates surfaced a **third route** that wasn't on the table when Q11
@@ -37,8 +54,12 @@ by hand. Keep **manual UI as the fallback** only if Power Automate is not availa
 **not** solve term-store taxonomy sync natively (still needs PnP/CSOM or HTTP calls), so the
 `tmIndices`/`tmLookups` taxonomy remains a separate open item regardless.
 
-**Blocks on:** Q12 (Power Automate availability). Decision deferred to the user; recorded so the
-manual-UI pick isn't treated as final. If adopted, supersede the Q11 decision in memory.
+**UNBLOCKED 2026-08-03 — Q12 answered YES.** The recommendation above was explicitly conditional
+on Power Automate being available, and it is, so **flow-as-provisioner is now the recommended
+route** and supersedes the manual-UI pick in Q11. Manual UI remains the fallback. Still to do:
+author the provisioning flow (**8 lists** — `taskmaster_terms` no longer exists — with internal
+names set explicitly at creation and indexes applied while each list is small). No term-store sync
+flow is needed: the app reads the term store directly (C10).
 
 ## Blocking-adjacent (elevated by this build)
 
@@ -74,8 +95,6 @@ manual-UI pick isn't treated as final. If adopted, supersede the Q11 decision in
   decision.
 - **Q10 Users — desk only or wider?** Item-level permissions do **not** delegate; "show only
   mine" should be a single indexed `Owner`/`Author` filter, not per-item unique permissions.
-- **Q12 Power Automate availability.** Needed for the extract flow, optional write-time rollup
-  counters, and any term-store sync. With manual provisioning and no PnP/CSOM, this is the only
-  automation lever in scope.
+*(Q12 and Q14 were answered on 2026-08-03 — see the Answered section above.)*
 - **Q13 Solution-aware?** If the app moves dev → test → prod it needs **environment variables**,
   not hardcoded connections/list references.

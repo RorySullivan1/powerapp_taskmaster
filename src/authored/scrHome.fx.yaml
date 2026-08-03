@@ -1,9 +1,12 @@
 # =============================================================================
-# scrHome  —  personalised landing (screen-map §1). PHASE-2 COMPOSITION:
-# header + nav + component instances with STATIC placeholder data. Turns the
-# empty-state shell into a real, clickable screen. Live my-tasks / my-issues
-# queries are marked TODO(Phase-2-data) — they need provisioned lists + true
-# internal names (schema.md is still ⟨capture⟩) so are NOT authored here.
+# scrHome  —  personalised landing (screen-map §1). PHASE-2 DATA: header + nav
+# + component instances bound to LIVE queries. OnVisible pulls my-tasks and
+# my-issues delegably, then derives every figure locally. Column tokens resolve
+# to schema/schema.yaml (the golden source).
+#
+# NOT RUNNABLE until the lists exist: a SharePoint data source can't be added
+# to the app before its list is provisioned, so paste this only after
+# taskmaster_tasks / taskmaster_issues are live and added as data sources.
 #
 # Component INSTANCES use v3.0 dialect: `Control: CanvasComponent` +
 # `ComponentName:` + `Properties:` (base props X/Y/W/H AND custom props;
@@ -19,6 +22,45 @@ Screens:
   scrHome:
     Properties:
       Fill: =Theme.Color.Bg
+      # ---- PHASE-2 DATA: one delegable pull, then local derivation ----------
+      # The pattern (power-fx-development): narrow SERVER-side to a bounded set,
+      # then aggregate LOCALLY — Sum/CountRows/Average never delegate to SharePoint.
+      # Everything inside these two Filters delegates: Person `.Email =`, Choice
+      # `.Value =`, and And/Or over them. Archived is excluded by ENUMERATING the
+      # six live stages — `<> "Archived"` is a Text <> and would NOT delegate.
+      # `task_supporter` is a single Person (C1), so "mine" is fully server-side.
+      #
+      # TWO LIMITS TO KNOW:
+      #  * A delegable Filter still returns at most the DATA ROW LIMIT into a
+      #    collection — set Settings > General > Data row limit to 2000. (While
+      #    testing, set it to 1: any non-delegable clause then shows up instantly.)
+      #  * task_stage / issue_status are REQUIRED with defaults (C9), so every row
+      #    matches one of the enumerated values — these counts miss nothing.
+      OnVisible: |
+        =Concurrent(
+            ClearCollect( colMyTasks,
+                Filter( taskmaster_tasks,
+                    ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail )
+                 && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+                   || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+                   || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
+            ClearCollect( colMyIssues,
+                Filter( taskmaster_issues,
+                    ( issue_assignee.Email = gUserEmail || issue_owner.Email = gUserEmail )
+                 && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
+                   || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) )
+        );
+        Set( gMyOpen,
+             CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
+        Set( gMyOverdue,
+             CountRows( Filter( colMyTasks,
+                 task_stage.Value <> "Complete"
+              && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
+        Set( gMyIssuesOpen, CountRows(colMyIssues) );
+        Set( gMyPercent,
+             If( CountRows(colMyTasks) = 0, 0,
+                 RoundDown( Average( AddColumns( colMyTasks, "wgt",
+                     Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) )
     Children:
       # ---- Header band ----------------------------------------------------
       - HeaderBar:
@@ -99,7 +141,7 @@ Screens:
                   VerticalAlign: =VerticalAlign.Middle
                   X: =Theme.Space.Gap + 24 + Theme.Space.Gap
                   Width: =Parent.TemplateWidth - Self.X - Theme.Space.Gap
-      # ---- Content: composed component instances (static demo data) --------
+      # ---- Content: composed component instances (live data) ---------------
       - hdrMyWork:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
@@ -109,12 +151,40 @@ Screens:
             Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
             Height: =60
             Title: ="My work"
-            Subtitle: ="Snapshot — live my-tasks / my-issues connect in Phase 2"
+            Subtitle: ="Tasks you lead or support, plus issues assigned to or owned by you"
             ShowAction: =true
-            ActionLabel: ="Show toast"
-            OnAction: =Set(gToastMsg, "Refreshed (demo)"); Set(gToastTone, "Info"); cmpToastHome.Show()
-      # Three KPI cards. TODO(Phase-2-data): replace static Value/Trend with
-      # local aggregates over the delegable-filtered my-tasks collection.
+            ActionLabel: ="Refresh"
+            # Re-collect INLINE. Navigate() to the screen you are already on does
+            # not reliably re-fire OnVisible, and it defers to the end of the chain
+            # so the toast would fire first. Duplicated deliberately over being wrong.
+            OnAction: |
+              =Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
+              Concurrent(
+                  ClearCollect( colMyTasks,
+                      Filter( taskmaster_tasks,
+                          ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail )
+                       && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+                         || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+                         || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
+                  ClearCollect( colMyIssues,
+                      Filter( taskmaster_issues,
+                          ( issue_assignee.Email = gUserEmail || issue_owner.Email = gUserEmail )
+                       && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
+                         || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) )
+              );
+              Set( gMyOpen, CountRows(Filter(colMyTasks, task_stage.Value <> "Complete")) );
+              Set( gMyOverdue,
+                   CountRows( Filter( colMyTasks,
+                       task_stage.Value <> "Complete"
+                    && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
+              Set( gMyIssuesOpen, CountRows(colMyIssues) );
+              Set( gMyPercent,
+                   If( CountRows(colMyTasks) = 0, 0,
+                       RoundDown( Average( AddColumns( colMyTasks, "wgt",
+                           Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
+              Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); cmpToastHome.Show()
+      # Three KPI cards, fed by the locals Set in OnVisible. Trend has no
+      # historical source in this model, so it is omitted rather than faked.
       - cardOpen:
           Control: CanvasComponent
           ComponentName: cmpStatusCard
@@ -124,9 +194,9 @@ Screens:
             Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
             Height: =120
             Title: ="Open tasks"
-            Value: ="12"
-            Caption: ="assigned to me"
-            Trend: =0.08
+            Value: =Text(gMyOpen)
+            Caption: ="tasks you lead or support"
+            Trend: =0
             Accent: =Theme.Color.Primary
             OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
       - cardOverdue:
@@ -138,9 +208,9 @@ Screens:
             Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
             Height: =120
             Title: ="Overdue"
-            Value: ="3"
-            Caption: ="need attention"
-            Trend: =-0.15
+            Value: =Text(gMyOverdue)
+            Caption: ="past their due date"
+            Trend: =0
             Accent: =Theme.Color.Danger
             OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
       - cardIssues:
@@ -152,13 +222,13 @@ Screens:
             Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
             Height: =120
             Title: ="Open issues"
-            Value: ="5"
-            Caption: ="raised by / owned by me"
+            Value: =Text(gMyIssuesOpen)
+            Caption: ="assigned to or owned by you"
             Trend: =0
             Accent: =Theme.Color.Warning
             OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
-      # SVG completion ring (licence-free). TODO(Phase-2-data): Percent from a
-      # delegable-filtered, bounded count (done / total) — power-fx-development.
+      # SVG completion ring (licence-free Q2 fallback). Weighted mean of your
+      # task stages, using the StageWeights table in App.Formulas (C3).
       - ringHome:
           Control: CanvasComponent
           ComponentName: cmpKpiRing
@@ -167,14 +237,14 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter
             Width: =140
             Height: =140
-            Percent: =72
-            Label: ="72%"
+            Percent: =gMyPercent
+            Label: =gMyPercent & "%"
             AccentHex: ="#005A9E"
             TrackHex: ="#E1E5EB"
       - lblRing:
           Control: Label@2.5.1
           Properties:
-            Text: ="Overall completion (demo)"
+            Text: ="Your weighted completion across " & CountRows(colMyTasks) & " task(s)"
             Color: =Theme.Color.TextMuted
             Font: =Theme.Font
             Size: =Theme.Size.Body
@@ -220,11 +290,11 @@ Screens:
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            Visible: =gConfirmOpen
+            IsOpen: =gConfirmOpen
             Title: ="Archive this project?"
-            Message: ="It will be hidden from active lists. You can restore it from Admin. (Demo — no data is changed.)"
+            Message: ="It will be hidden from active lists. You can restore it from Admin."
             ConfirmLabel: ="Archive"
             CancelLabel: ="Cancel"
             Destructive: =true
-            OnConfirm: =Set(gConfirmOpen, false); Set(gToastMsg, "Archived (demo)"); Set(gToastTone, "Danger"); cmpToastHome.Show()
+            OnConfirm: =Set(gConfirmOpen, false); Set(gToastMsg, "Archive is wired on the project detail screen"); Set(gToastTone, "Info"); cmpToastHome.Show()
             OnCancel: =Set(gConfirmOpen, false)

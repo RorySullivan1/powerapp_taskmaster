@@ -1,0 +1,131 @@
+# =============================================================================
+# scrProject — KANBAN VARIANT for the Tasks tab (swap-in, NOT the default)
+# =============================================================================
+# The shipped scrProject.fx.yaml uses a FLAT, stage-grouped vertical gallery,
+# because `Variant: Vertical` is the only gallery variant with positive landing
+# evidence. This file holds the nicer horizontal-column kanban, which depends on
+# `Variant: Horizontal` — a token nothing has confirmed.
+#
+# WHY IT ISN'T THE DEFAULT: it sits mid-file in a large paste unit and gates the
+# entire Tasks tab. Across a one-way gap a rejection returns only "it didn't
+# work", so an unverified token there costs the whole screen.
+#
+# HOW TO SWAP IT IN, once a Horizontal gallery is known to paste:
+#   1. Paste any trivial Gallery with `Variant: Horizontal` onto a blank screen.
+#   2. If it lands, replace the `galTasks` block in scrProject.fx.yaml with the
+#      `galKanban` block below, and re-run: python tools/validate_pa_yaml.py
+#
+# The data shape is identical — both read the same `colProjectTasks`, filtered
+# locally per stage — so nothing else on the screen changes.
+#
+# NOTE: `Parent.TemplateHeight` inside a HORIZONTAL gallery is itself suspect —
+# TemplateSize drives WIDTH there and TemplateWidth is the documented companion.
+# Use `Parent.Height - 40` for the inner gallery height when swapping in.
+# =============================================================================
+      # =====================================================================
+      # TAB 1 — TASKS as a kanban: outer gallery = stage columns, inner
+      # gallery = that stage's cards. The inner Items filter runs against the
+      # already-narrowed LOCAL collection, so no delegation concern.
+      # FALLBACK if the nested gallery is rejected on paste: replace galKanban
+      # with a single vertical gallery over
+      #   Sort(colProjectTasks, task_stage.Value)
+      # and show the stage as a pill on each row. Same data, flat layout.
+      # =====================================================================
+      - galKanban:
+          Control: Gallery@2.15.0
+          Variant: Horizontal
+          Properties:
+            Visible: =gProjTab = 1
+            Items: |
+              =Table( { Stage: "Not Started" }, { Stage: "Planning" }, { Stage: "Drafting" },
+                      { Stage: "Under Review" }, { Stage: "Finalizing" }, { Stage: "Complete" } )
+            TemplateSize: =260
+            TemplatePadding: =Theme.Space.Gap
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap) - Theme.Space.Gutter
+            ShowScrollbar: =true
+          Children:
+            - colHeader:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.Stage & "  (" &
+                     CountRows(Filter(colProjectTasks, task_stage.Value = ThisItem.Stage)) & ")"
+                  Font: =Theme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  X: =0
+                  Y: =0
+                  Width: =240
+                  Height: =28
+                  VerticalAlign: =VerticalAlign.Middle
+            - galStageCards:
+                Control: Gallery@2.15.0
+                Variant: Vertical
+                Properties:
+                  # LOCAL filter over the project's tasks — colProjectTasks is
+                  # already scoped by the delegable OnVisible query.
+                  Items: =Filter(colProjectTasks, task_stage.Value = ThisItem.Stage)
+                  TemplateSize: =84
+                  TemplatePadding: =6
+                  X: =0
+                  Y: =32
+                  Width: =240
+                  Height: =Parent.TemplateHeight - 40
+                Children:
+                  - cardFill:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =Theme.Color.Surface
+                        X: =0
+                        Y: =0
+                        Width: =236
+                        Height: =78
+                        OnSelect: =Set(gSelTask, ThisItem); Navigate(scrTask, ScreenTransition.Cover)
+                  - cardHealth:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        # RAG stripe from task_status (health).
+                        Fill: |
+                          =Switch( ThisItem.task_status.Value,
+                                   "Green", Theme.Color.Success,
+                                   "Amber", Theme.Color.Warning,
+                                   "Red",   Theme.Color.Danger,
+                                   Theme.Color.Border )
+                        X: =0
+                        Y: =0
+                        Width: =4
+                        Height: =78
+                  - cardTitle:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =ThisItem.task_name
+                        Font: =Theme.Font
+                        FontWeight: =FontWeight.Semibold
+                        Size: =Theme.Size.Body
+                        Color: =Theme.Color.TextPrimary
+                        X: =12
+                        Y: =8
+                        Width: =216
+                        Height: =36
+                  - cardWho:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          =Coalesce(ThisItem.task_lead.DisplayName, "Unassigned")
+                           & If( IsBlank(ThisItem.task_date_target), "",
+                                 "  ·  " & Text(ThisItem.task_date_target, "dd mmm") )
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: |
+                          =If( !IsBlank(ThisItem.task_date_target)
+                            && ThisItem.task_date_target < Today()
+                            && ThisItem.task_stage.Value <> "Complete",
+                               Theme.Color.Danger, Theme.Color.TextMuted )
+                        X: =12
+                        Y: =48
+                        Width: =216
+                        Height: =20

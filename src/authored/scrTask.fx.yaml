@@ -1,0 +1,314 @@
+# =============================================================================
+# scrTask  —  task detail / edit (screen-map §5). Reached from the kanban card
+# on scrProject, which sets gSelTask.
+#
+# THIS SCREEN IS WHERE C3 LIVES. Saving a task rewrites the parent project's
+# weighted `project_perc_completion` — the app is the writer for that rollup
+# (schema.yaml -> rollups:), so if this screen doesn't run, the figure is never
+# maintained anywhere.
+#
+# CONTROL BUDGET (deliberate): only control types with tokens grounded from the
+# genuine example export are used — Label, Rectangle, Classic/Icon,
+# Classic/TextInput, Classic/Button, Gallery, plus the cmpSelection component.
+# No DropDown / DatePicker: their version tokens are UNVERIFIED, and across a
+# one-way gap an unverified token is a failed paste we learn about only as
+# "it didn't work". Stage / health / priority are therefore picked with
+# cmpSelection (already proven in the kit), and dates are read-only here.
+# =============================================================================
+Screens:
+  scrTask:
+    Properties:
+      Fill: =Theme.Color.Bg
+      # Seed the edit state into GLOBALS, and write from those — never from the
+      # cmpSelection instances. A component's internal gallery selection is user
+      # state that Reset() cannot reach from outside, so after editing task A and
+      # opening task B the strip may still hold A's pick (and Selected falls back
+      # to First(Items) = "Not Started"). Whether navigation clears it is exactly
+      # what a one-way gap cannot verify — and the failure mode is a silent wrong
+      # write to a required Choice column. Re-seeding here makes the WRITE correct
+      # regardless of what the strip is displaying.
+      OnVisible: |
+        =Set( gTaskDirty, false );
+        Set( gTaskStage,    gSelTask.task_stage.Value );
+        Set( gTaskHealth,   gSelTask.task_status.Value );
+        Set( gTaskPriority, gSelTask.task_priority.Value )
+    Children:
+      # ---- Header ----------------------------------------------------------
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Task"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      - BackIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Back
+            Color: =Theme.Color.OnPrimary
+            Height: =24
+            Width: =24
+            X: =Parent.Width - 24 - Theme.Space.Gutter
+            Y: =(Theme.Space.HeaderH - 24) / 2
+            OnSelect: =Back()
+      # This screen is the QUICK edit — name, stage, health, priority. Everything
+      # else on the task (dates, owners, the output block, category) lives on
+      # scrTaskEdit, which also maintains the same C3 rollup.
+      - btnFullEditor:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="All fields…"
+            Fill: =Theme.Color.PrimaryDark
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.PrimaryDark
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Height: =32
+            Width: =150
+            X: =Parent.Width - 24 - Theme.Space.Gutter - 166
+            Y: =(Theme.Space.HeaderH - 32) / 2
+            OnSelect: |
+              =Set( gEditMode, "Edit" );
+               Set( gEditTask, gSelTask );
+               Navigate( scrTaskEdit, ScreenTransition.Cover )
+      # ---- Editable: name --------------------------------------------------
+      - lblName:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Task name"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+            Width: =300
+            Height: =20
+      - txtTaskName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =gSelTask.task_name
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 22
+            Width: =520
+            Height: =40
+            OnChange: =Set(gTaskDirty, true)
+      # ---- Editable: stage (drives the rollup) -----------------------------
+      - lblStage:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Stage  —  changing this recalculates the project's completion"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 76
+            Width: =520
+            Height: =20
+      - selStage:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 98
+            Width: =760
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Not Started" }, { Id: 2, Label: "Planning" },
+                      { Id: 3, Label: "Drafting" },    { Id: 4, Label: "Under Review" },
+                      { Id: 5, Label: "Finalizing" },  { Id: 6, Label: "Complete" },
+                      { Id: 7, Label: "Archived" } )
+            DefaultId: |
+              =Switch( gSelTask.task_stage.Value,
+                       "Not Started", 1, "Planning", 2, "Drafting", 3,
+                       "Under Review", 4, "Finalizing", 5, "Complete", 6, 7 )
+            OnChange: =Set(gTaskStage, selStage.Selected.Label); Set(gTaskDirty, true)
+      # ---- Editable: health -------------------------------------------------
+      - lblHealth:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Health"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 152
+            Width: =300
+            Height: =20
+      - selHealth:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 174
+            Width: =300
+            Height: =40
+            Items: |
+              =Table({ Id: 1, Label: "Green" }, { Id: 2, Label: "Amber" }, { Id: 3, Label: "Red" })
+            DefaultId: |
+              =Switch( gSelTask.task_status.Value, "Green", 1, "Amber", 2, 3 )
+            OnChange: =Set(gTaskHealth, selHealth.Selected.Label); Set(gTaskDirty, true)
+      # ---- Editable: priority ----------------------------------------------
+      - lblPriority:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Priority"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter + 320
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 152
+            Width: =300
+            Height: =20
+      - selPriority:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =Theme.Space.Gutter + 320
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 174
+            Width: =440
+            Height: =40
+            Items: |
+              =Table({ Id: 1, Label: "Low" }, { Id: 2, Label: "Moderate" },
+                     { Id: 3, Label: "High" }, { Id: 4, Label: "Critical" })
+            DefaultId: |
+              =Switch( gSelTask.task_priority.Value, "Low", 1, "Moderate", 2, "High", 3, 4 )
+            OnChange: =Set(gTaskPriority, selPriority.Selected.Label); Set(gTaskDirty, true)
+      # ---- Read-only context ------------------------------------------------
+      - lblContext:
+          Control: Label@2.5.1
+          Properties:
+            # Lookup / Person / Date subfields read off the passed record.
+            Text: |
+              ="Project: " & gSelTask.task_project_id.Value & Char(10) &
+               "Lead: " & Coalesce(gSelTask.task_lead.DisplayName, "Unassigned") &
+               "   Supporter: " & Coalesce(gSelTask.task_supporter.DisplayName, "—") & Char(10) &
+               "Start: " & If(IsBlank(gSelTask.task_date_start), "—", Text(gSelTask.task_date_start, "dd mmm yyyy")) &
+               "   Due: "  & If(IsBlank(gSelTask.task_date_target), "—", Text(gSelTask.task_date_target, "dd mmm yyyy")) &
+               "   Client: " & Coalesce(gSelTask.task_client_name.Value, "—")
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 228
+            Width: =760
+            Height: =84
+      - lblDesc:
+          Control: Label@2.5.1
+          Properties:
+            Text: =Coalesce(gSelTask.task_description, "No description.")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 316
+            Width: =760
+            Height: =80
+      # ---- Save: patch the task, THEN rewrite the parent rollup (C3) --------
+      - btnSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =If(gTaskDirty, "Save changes", "Saved")
+            DisplayMode: =If(gTaskDirty, DisplayMode.Edit, DisplayMode.Disabled)
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =200
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 412
+            # Order is load-bearing: the task must be written BEFORE the rollup
+            # is recalculated, or the rollup reads the pre-edit stage.
+            #
+            # Success is NOT assumed. Errors() returns a TABLE (empty when clean),
+            # so `IsError(Errors(...))` is always false and would never gate
+            # anything — the test has to be IsEmpty(). Everything that tells the
+            # user it worked lives inside that branch.
+            OnSelect: |
+              =IfError(
+                  Patch( taskmaster_tasks, gSelTask,
+                      { task_name:     txtTaskName.Text,
+                        task_stage:    { Value: gTaskStage },
+                        task_status:   { Value: gTaskHealth },
+                        task_priority: { Value: gTaskPriority } } ),
+                  Notify("Couldn't save the task: " & FirstError.Message, NotificationType.Error)
+              );
+              If( IsEmpty(Errors(taskmaster_tasks, gSelTask)),
+                  With( { pid: gSelTask.task_project_id.Id },
+                      With( { proj: LookUp(taskmaster_projects, ID = pid),
+                              scored:
+                                AddColumns(
+                                    Filter( taskmaster_tasks,
+                                        task_project_id.Id = pid
+                                     && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+                                       || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+                                       || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
+                                    "wgt", Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
+                          If( IsBlank(proj),
+                              Notify("Task saved. Parent project not found, so completion was left unchanged.",
+                                     NotificationType.Warning),
+                              CountRows(scored) >= 2000,
+                              // The average is computed LOCALLY over the returned page. Past the
+                              // row limit it would be a truncated number written back to
+                              // SharePoint and read by Power BI — refuse rather than persist it.
+                              Notify("Task saved. This project has too many tasks to compute completion accurately, so it was left unchanged.",
+                                     NotificationType.Warning),
+                              IfError(
+                                  Set( gSelProject,
+                                      Patch( taskmaster_projects, proj,
+                                             { project_perc_completion:
+                                                   If( CountRows(scored) = 0, 0,
+                                                       RoundDown(Average(scored, wgt), 0) ) } ) ),
+                                  Notify("Task saved, but the project rollup didn't update: " & FirstError.Message,
+                                         NotificationType.Warning)
+                              )
+                          )
+                      )
+                  );
+                  Set(gTaskDirty, false);
+                  Notify("Saved", NotificationType.Success);
+                  Back()
+              )
+      - btnCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.TextPrimary
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =140
+            X: =Theme.Space.Gutter + 216
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 412
+            OnSelect: =Back()
+      - lblRollupNote:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Saving recalculates this project's weighted completion from every task's stage."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter + 372
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 412
+            Width: =400
+            Height: =44
+            VerticalAlign: =VerticalAlign.Middle
