@@ -55,6 +55,22 @@ also a pure shell).
 
 - [ ] Paste `src/authored/scrAdmin.pa.yaml`.
 
+## A1b · (Optional) Stand up a fully navigable app *now* — skeleton screens
+
+A composed screen (`scrHome`/`scrReports`/`scrProjects`) can't paste until its components exist
+**and** its lists are provisioned. To get a navigable 5-screen app immediately — before either —
+paste the **skeleton variants** instead. They're component-free and data-free: header + nav +
+a titled placeholder, needing only `App.Formulas` (do Stage A3 first, or accept an unstyled nav
+until it lands).
+
+- [ ] `src/authored/variants/scrHome.skeleton.pa.yaml`  → onto `scrHome`
+- [ ] `src/authored/variants/scrReports.skeleton.pa.yaml`  → onto `scrReports`
+- [ ] `src/authored/variants/scrProjects.skeleton.pa.yaml`  → onto `scrProjects`
+
+Now all five nav screens navigate to each other. Later, when you've built the components (A2) and
+provisioned the lists (Phase B), **replace** each skeleton by pasting the full `scr*.pa.yaml` over
+a fresh blank screen. Skeletons are a scaffold, not the destination — they carry no data or KPIs.
+
 ## A2 · Build the components you need
 
 For **each**: create the component → add every custom property (**Input/Output/Event/Action** with
