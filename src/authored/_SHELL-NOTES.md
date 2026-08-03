@@ -53,11 +53,15 @@ Key facts:
 1. **Create five blank screens** in Studio, rename them exactly:
    `scrHome`, `scrReports`, `scrProjects`, `scrReference`, `scrAdmin`.
    (`NavMenu` holds live Screen references — they must exist by those names first.)
-2. **Paste each screen's controls** via code view (one screen at a time; rename any
-   `_1` suffix back and log it). The header + nav block is identical across screens.
-3. **Paste `App.Formulas`** last, into the formula bar. Screen refs now resolve.
-4. Set the app's **Data row limit to 2000** (schema.md) while you're in Settings.
-5. Verify nav: each entry highlights the active screen and navigates.
+2. **Recreate the components** in the component editor (`components/_COMPONENTS-NOTES.md`).
+3. **Paste `App.Formulas`** into the formula bar — **now step 3, not last.** The data-bound
+   screens reference `StageWeights`, which is defined there, so it must exist before they paste.
+4. **Paste each screen's controls** via code view (one screen at a time, onto a blank screen;
+   rename any `_1` suffix back and log it). The header + nav block is identical across screens.
+   `scrHome` / `scrProjects` / `scrReports` additionally require their **lists provisioned and
+   added as data sources** — they cannot paste before that.
+5. Set the app's **Data row limit to 2000** (schema.md) while you're in Settings.
+6. Verify nav: each entry highlights the active screen and navigates.
 
 ## Dialect — modern structured schema (corrected after pre-paste audit)
 

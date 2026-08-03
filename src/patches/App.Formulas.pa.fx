@@ -5,10 +5,15 @@
 // transfer, "two hard limitations"). Paste this body into the App.Formulas
 // formula bar by hand — never through Paste code.
 //
-// PASTE ORDER (matters): the five screens must EXIST and be NAMED
-//   scrHome / scrReports / scrProjects / scrReference / scrAdmin
-// before this pastes, because NavMenu holds live Screen references. Create the
-// screen shells first (src/authored/scr*.fx.yaml), then paste this last.
+// PASTE ORDER (matters — and it CHANGED once the screens gained data):
+//   1. Create five BLANK screens, named exactly:
+//        scrHome / scrReports / scrProjects / scrReference / scrAdmin
+//      (NavMenu below holds live Screen references, so the names must exist.)
+//   2. Paste THIS file into the App.Formulas formula bar.
+//   3. Only then paste the screen controls (src/authored/scr*.fx.yaml).
+// Step 2 must precede step 3 because scrHome/scrReports OnVisible now reference
+// StageWeights, which is defined here. The old "paste App.Formulas last" order
+// would fail validation on those screens.
 //
 // Data-independent: no tmXxx column tokens — nothing here binds to SharePoint,
 // so it is paste-ready before any list is provisioned (screen-map Phase 1).
@@ -18,6 +23,11 @@
 
 // --- Identity ---------------------------------------------------------------
 // Lowercased to match the Person-column Claims convention (schema.md).
+// NOTE: this named formula INLINES into the server-side predicates on scrHome /
+// scrReports (task_lead.Email = gUserEmail). User() inside a Filter has
+// historically tripped the delegation analyser. If either Filter shows a blue
+// underline on first paste, the grounded fallback is to delete this line and
+// instead put  Set(gUserEmail, Lower(User().Email))  in App.OnStart.
 gUserEmail = Lower(User().Email);
 
 // --- Theme ------------------------------------------------------------------

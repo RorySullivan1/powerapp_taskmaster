@@ -17,7 +17,7 @@
 # =============================================================================
 
 meta:
-  version: 1.4.0
+  version: 1.5.0
   updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
@@ -204,6 +204,16 @@ rollups:
 # Reasoning for each lives in .claude/context/schema.md §Consequences.
 # =============================================================================
 open_recommendations:
+  - id: C9
+    what: >-
+      task_stage, task_status and issue_status are optional, so rows with a blank value match
+      none of the enumerated Choice values and drop out of every delegable "open work" filter —
+      a silent undercount. It also means green% + amber/red% need not reach 100.
+    options:
+      - "make each required with a default (task_stage='Not Started', task_status='Green', issue_status='Open') — recommended, fixes it at source"
+      - "add `|| col.Value = Blank()` to every filter — verbose, and Blank() on a Choice subfield is an unverified delegable construct"
+      - "accept the undercount and label it"
+    status: undecided   # raised 2026-08-03 by the pre-paste audit
   - id: C1
     what: "project_other_resources / task_other_resources are multi-person → no delegable filter exists"
     options: ["display-only (drive 'mine' off task_lead/project_manager)", "fixed single-Person slots", "write-time text mirror (exact = only)"]

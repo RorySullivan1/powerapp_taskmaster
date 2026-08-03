@@ -24,10 +24,11 @@ Screens:
                  && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
                    || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
                    || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
-            ClearCollect( colActiveProjects,
+            ClearCollect( colMyProjects,
                 Filter( taskmaster_projects,
-                    project_phase.Value = "Planning" || project_phase.Value = "Active"
-                 || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" ) )
+                    ( project_manager.Email = gUserEmail || project_supporter.Email = gUserEmail )
+                 && ( project_phase.Value = "Planning" || project_phase.Value = "Active"
+                   || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" ) ) )
         );
         Set( gRptOpen, Filter(colMyTasks, task_stage.Value <> "Complete") );
         Set( gRptOnTrack,
@@ -40,8 +41,8 @@ Screens:
                               task_status.Value = "Amber" || task_status.Value = "Red"))
                             / CountRows(gRptOpen) * 100, 0 ) ) );
         Set( gRptPortfolio,
-             If( CountRows(colActiveProjects) = 0, 0,
-                 RoundDown( Average( AddColumns( colActiveProjects, "pc",
+             If( CountRows(colMyProjects) = 0, 0,
+                 RoundDown( Average( AddColumns( colMyProjects, "pc",
                      Coalesce(project_perc_completion, 0) ), pc ), 0 ) ) )
     Children:
       - HeaderBar:
@@ -170,8 +171,11 @@ Screens:
             Visible: =Not(gHasPowerBiLicence)
       # ---- Native SVG KPI fallback (Q2 / distillation C1) ------------------
       # Licence-free headline visuals via cmpKpiRing, fed by the locals Set in
-      # OnVisible. On track / At risk read task_status (health); the third ring
-      # is the mean of project_perc_completion, the app-side weighted rollup (C3).
+      # OnVisible. Rings 1-2 read task_status (health) — note it is optional, so
+      # green% + amber-red% may not reach 100; the remainder is UNRATED, which is
+      # why the labels name the colour rather than claim a total. Ring 3 is the
+      # mean of project_perc_completion, the app-side weighted rollup (C3) — it
+      # reads 0 until the write-back is placed on a task-edit screen.
       - hdrFallback:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
@@ -194,7 +198,7 @@ Screens:
             Width: =140
             Height: =140
             Percent: =gRptOnTrack
-            Label: =gRptOnTrack & "% on track"
+            Label: =gRptOnTrack & "% green"
             AccentHex: ="#31825D"
       - ringAtRisk:
           Control: CanvasComponent
@@ -206,7 +210,7 @@ Screens:
             Width: =140
             Height: =140
             Percent: =gRptAtRisk
-            Label: =gRptAtRisk & "% at risk"
+            Label: =gRptAtRisk & "% amber/red"
             AccentHex: ="#D69828"
       - ringPortfolio:
           Control: CanvasComponent
@@ -218,5 +222,5 @@ Screens:
             Width: =140
             Height: =140
             Percent: =gRptPortfolio
-            Label: =gRptPortfolio & "% complete"
+            Label: =gRptPortfolio & "% of yours"
             AccentHex: ="#005A9E"

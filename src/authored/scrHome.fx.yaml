@@ -29,6 +29,15 @@ Screens:
       # `.Value =`, and And/Or over them. Archived is excluded by ENUMERATING the
       # six live stages — `<> "Archived"` is a Text <> and would NOT delegate.
       # `task_supporter` is a single Person (C1), so "mine" is fully server-side.
+      #
+      # TWO LIMITS TO KNOW:
+      #  * A delegable Filter still returns at most the DATA ROW LIMIT into a
+      #    collection — set Settings > General > Data row limit to 2000. (While
+      #    testing, set it to 1: any non-delegable clause then shows up instantly.)
+      #  * task_stage / issue_status are OPTIONAL in the schema, so rows with a
+      #    blank value match none of the enumerated Choice values and are omitted
+      #    from these counts. Recommendation C9 (schema.yaml) makes them required
+      #    with a default, which removes the gap at source.
       OnVisible: |
         =Concurrent(
             ClearCollect( colMyTasks,
@@ -147,9 +156,35 @@ Screens:
             Subtitle: ="Tasks you lead or support, plus issues assigned to or owned by you"
             ShowAction: =true
             ActionLabel: ="Refresh"
-            # Refresh() invalidates the cached source; re-navigating to this screen
-            # re-fires OnVisible, which is what actually rebuilds the collections.
-            OnAction: =Refresh(taskmaster_tasks); Refresh(taskmaster_issues); Navigate(scrHome); Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); cmpToastHome.Show()
+            # Re-collect INLINE. Navigate() to the screen you are already on does
+            # not reliably re-fire OnVisible, and it defers to the end of the chain
+            # so the toast would fire first. Duplicated deliberately over being wrong.
+            OnAction: |
+              =Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
+              Concurrent(
+                  ClearCollect( colMyTasks,
+                      Filter( taskmaster_tasks,
+                          ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail )
+                       && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+                         || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+                         || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
+                  ClearCollect( colMyIssues,
+                      Filter( taskmaster_issues,
+                          ( issue_assignee.Email = gUserEmail || issue_owner.Email = gUserEmail )
+                       && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
+                         || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) )
+              );
+              Set( gMyOpen, CountRows(Filter(colMyTasks, task_stage.Value <> "Complete")) );
+              Set( gMyOverdue,
+                   CountRows( Filter( colMyTasks,
+                       task_stage.Value <> "Complete"
+                    && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
+              Set( gMyIssuesOpen, CountRows(colMyIssues) );
+              Set( gMyPercent,
+                   If( CountRows(colMyTasks) = 0, 0,
+                       RoundDown( Average( AddColumns( colMyTasks, "wgt",
+                           Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
+              Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); cmpToastHome.Show()
       # Three KPI cards, fed by the locals Set in OnVisible. Trend has no
       # historical source in this model, so it is omitted rather than faked.
       - cardOpen:
@@ -257,7 +292,7 @@ Screens:
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            Visible: =gConfirmOpen
+            IsOpen: =gConfirmOpen
             Title: ="Archive this project?"
             Message: ="It will be hidden from active lists. You can restore it from Admin."
             ConfirmLabel: ="Archive"

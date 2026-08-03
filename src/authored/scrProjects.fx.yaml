@@ -103,7 +103,7 @@ Screens:
             OnAction: =Notify("New project — wired in Phase 2", NotificationType.Information)
       # Filter strip — drives galProjects.Items. There is no boolean archive
       # flag in this model: "Archived" is a value of the project_phase Choice
-      # (schema.md C7), so each branch enumerates phases with an Or of `=`.
+      # (schema.md, the Or-of-equals pattern), so each branch enumerates phases with an Or of `=`.
       - selFilter:
           Control: CanvasComponent
           ComponentName: cmpSelection
@@ -119,7 +119,7 @@ Screens:
       - SearchBox:
           Control: Classic/TextInput@2.3.2
           Properties:
-            # Phase 2: drives StartsWith(Title, Self.Text) on the projects gallery.
+            # Phase 2: drives StartsWith(project_name, SearchBox.Text) on the projects gallery.
             HintText: ="Search projects…"
             Font: =Theme.Font
             Size: =Theme.Size.Body
@@ -128,29 +128,30 @@ Screens:
             X: =Theme.Space.NavW + Theme.Space.Gutter + 360 + Theme.Space.Gap
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
       # ---- Projects gallery (delegable) -----------------------------------
-      # Each If branch is INDEPENDENTLY delegable; the selector is a constant at
-      # evaluation time, so the chosen Filter folds to SharePoint. Written this
-      # way deliberately — embedding selFilter inside one predicate risks the
-      # whole expression failing to fold. Sort on project_name (Text) delegates;
-      # the blank-search guard is the documented StartsWith pattern.
+      # Each If branch is INDEPENDENTLY delegable, and the Sort sits INSIDE each
+      # branch — `Sort(If(...))` would NOT fold, because If is not a delegable
+      # operation, so the sort would run locally over one arbitrary page.
+      # No IsBlank guard: StartsWith(col, "") is already true for every row, and
+      # IsBlank in a predicate is a delegation risk for no benefit.
       - galProjects:
           Control: Gallery@2.15.0
           Variant: Vertical
           Properties:
             Items: |
-              =Sort(
-                  If( selFilter.Selected.Id = 3,
-                      Filter( taskmaster_projects,
-                          project_phase.Value = "Archived"
-                       && ( IsBlank(SearchBox.Text) || StartsWith(project_name, SearchBox.Text) ) ),
-                      selFilter.Selected.Id = 2,
-                      Filter( taskmaster_projects,
-                          ( project_phase.Value = "Planning" || project_phase.Value = "Active"
-                         || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" )
-                       && ( IsBlank(SearchBox.Text) || StartsWith(project_name, SearchBox.Text) ) ),
-                      Filter( taskmaster_projects,
-                          IsBlank(SearchBox.Text) || StartsWith(project_name, SearchBox.Text) ) ),
-                  project_name )
+              =If( selFilter.Selected.Id = 3,
+                   Sort( Filter( taskmaster_projects,
+                             project_phase.Value = "Archived"
+                          && StartsWith(project_name, SearchBox.Text) ),
+                         project_name ),
+                   selFilter.Selected.Id = 2,
+                   Sort( Filter( taskmaster_projects,
+                             ( project_phase.Value = "Planning" || project_phase.Value = "Active"
+                            || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" )
+                          && StartsWith(project_name, SearchBox.Text) ),
+                         project_name ),
+                   Sort( Filter( taskmaster_projects,
+                             StartsWith(project_name, SearchBox.Text) ),
+                         project_name ) )
             TemplateSize: =72
             TemplatePadding: =0
             Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)

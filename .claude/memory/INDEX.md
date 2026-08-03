@@ -64,6 +64,8 @@
 - [2026-08-03] C3 RESOLVED: `project_perc_completion` = weighted mean of child task-stage weights (0/10/35/60/85/100, Archived excluded), WRITER = **app-side** — app patches parent on task-stage change. `StageWeights` named formula + write-back snippet in `src/patches/App.Formulas.pa.fx`. Cost: stale if SP edited directly — schema/schema.yaml
 - [2026-08-03] C6 BY DESIGN: three region columns are intentional — approval_region is broad-stroke, project/client_region are granular, never used together. No conformed dimension; separate PBI dimensions; do NOT 'fix' — .claude/context/schema.md
 - [2026-08-03] Phase-2 DATA bound on scrHome/scrProjects/scrReports: one delegable Filter per screen → local aggregation (CountRows/Average never delegate). galProjects uses If-of-independent-Filters so each branch folds. Reports rings deliberately SCOPED (my tasks / active projects) — org-wide counts can't be exact in-app. Trends zeroed, not faked — src/authored/
+- [2026-08-03] Pre-paste audit → DO-NOT-PASTE; 6 real defects fixed: `Sort(If(..))` does NOT fold (Sort moved INSIDE each branch); unscoped colActiveProjects → scoped to my projects; redundant+risky IsBlank search guard dropped; Navigate-to-self doesn't re-fire OnVisible (refresh now inlines the collects); PASTE ORDER now App.Formulas BEFORE data screens (they need StageWeights); cmpConfirmDialog custom prop `Visible` collided with the base prop → renamed `IsOpen` — src/authored/
+- [2026-08-03] C9 raised: task_stage/task_status/issue_status are OPTIONAL → blank rows drop out of every enumerated Choice filter (silent undercount). Recommend required-with-default. UNDECIDED — schema/schema.yaml
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -85,12 +87,14 @@
 - **Phase-2 component composition DONE for 6/10** (static data on Home/Reports/Projects).
   Remaining 4 are gallery/data-bound → compose when data galleries wired: `cmpUiKit` pills +
   `cmpStatusPill`/`cmpChoicePill` in row templates, `cmpEditableGrid` on the Tickets tab.
-- **Phase-2 DATA binding DONE (2026-08-03)** — pre-paste audit in flight. Was blocked on provisioning (true internal names — `schema.md`
+- **Phase-2 DATA bound + audited (2026-08-03)**; blockers fixed, but still DO-NOT-PASTE on the PREREQUISITE: nothing is provisioned and paste-log is empty. Was blocked on provisioning (true internal names — `schema.md`
   ⟨capture⟩) + a confirmed pull. Every live query is a `TODO(Phase-2-data)` in the screens.
 
 - **Schema intake COMPLETE (7 lists) and promoted to `.claude/context/schema.md`.** Outstanding: `asset_library` schema never supplied (blocks `task_output_asset`).
 - **Schema open_recommendations (now EDITABLE — repo is golden source): C1** multi-person no delegable filter;  Settle BEFORE provisioning — names/types freeze at creation. → `schema/schema.yaml` open_recommendations
 - **Schema consequences needing a call** (→ `context/schema.md` §Consequences): **C1** multi-person cols have no delegable filter; **C4** `task_date_start` is Calculated (nothing delegates); **C5** no USD-normalised notional; **C3** no writer for `project_perc_completion`; **C6** region modelled 3 ways; **C8** casing anomalies before provisioning.
+
+- **C9 pending:** make the three optional Choice cols required-with-default, or accept the undercount. → `schema/schema.yaml`
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md
