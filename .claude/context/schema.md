@@ -144,23 +144,26 @@ Filter(taskmaster_tasks, task_lead.Email = gUserEmail || task_supporter.Email = 
 No join cost changed (multi and single Person each cost 1), so tasks stays at 8. The trade is a
 hard cap of two people per task — accepted as sufficient.
 
-**C3 ◐ Mechanism agreed 2026-08-03 — weights proposed, writer still open.**
-`project_perc_completion` is a **weighted rollup of child task stages**, not a plain done/total
-count: each `task_stage` carries a weight, and the project's % is the mean weight across its tasks.
-The formula and the weight table live in `schema/schema.yaml` → `rollups:`.
+**C3 ✅ Resolved 2026-08-03 — weighted stage rollup, written app-side.**
+`project_perc_completion` is the **mean stage-weight across a project's tasks**, not a done/total
+count. Weights (`schema.yaml` → `rollups:`, mirrored as the `StageWeights` named formula in
+`src/patches/App.Formulas.pa.fx`): `Not Started` 0 · `Planning` 10 · `Drafting` 35 ·
+`Under Review` 60 · `Finalizing` 85 · `Complete` 100 · **`Archived` excluded** from numerator *and*
+denominator.
 
-Proposed weights (percent-of-effort): `Not Started` 0 · `Planning` 10 · `Drafting` 35 ·
-`Under Review` 60 · `Finalizing` 85 · `Complete` 100 · `Archived` **excluded** from both numerator
-and denominator (an archived task shouldn't drag a project down). **Confirm or edit these.**
+**The app is the writer** — it recomputes and patches the parent whenever a task's stage changes
+(task form `OnSuccess`, kanban drop, grid save). The canonical snippet lives beside `StageWeights`.
+Two properties of that snippet are load-bearing:
 
-Two things still to settle:
-1. **The weights themselves** — they're a judgement call about effort distribution.
-2. **Who writes it.** A weighted count still can't be done server-side (no delegable aggregate), so:
-   **Power Automate** on task change (stored, Power-BI-visible, needs Q12); **app-side** patch when
-   a stage changes (no flow needed, but stale if anything edits SharePoint directly); or
-   **compute-on-read** — don't store it at all, derive it in the app per project and let Power BI
-   compute its own from the tasks table. *Compute-on-read can never be stale; the stored column only
-   earns its place if Power BI must read it pre-computed.*
+- **Archived is excluded server-side by enumeration**, not by `<>`. The filter lists the six
+  non-archived stages as an `Or` of `=`; `task_stage.Value <> "Archived"` is a Text `<>` and would
+  **not** delegate. Tasks with a blank stage match nothing and are omitted.
+- **`Average`/`CountRows` run locally** over the already-narrowed page — correct because the
+  `Filter` reduces to one project first (indexed FK). Exact so long as a project holds fewer tasks
+  than the data row limit (set it to 2,000).
+
+**Known cost of app-side:** a stage edited directly in SharePoint, or bulk-imported, leaves the
+value stale until the next in-app change to that project. Accepted.
 
 **C4 ✅ Resolved 2026-08-03.** `task_date_start` is now a real **DateTime**, indexed, written at
 creation — so "my week", timelines and "starting soon" filters delegate and sort correctly. No

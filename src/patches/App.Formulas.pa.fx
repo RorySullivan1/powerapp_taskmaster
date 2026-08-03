@@ -66,3 +66,53 @@ NavMenu = Table(
 // (e.g. a tmLookups/allow-list flag, or an env/user-group check). Set it here so
 // every consumer (nav + Reports screen) reads one source of truth.
 gHasPowerBiLicence = false;   // <-- replace with the chosen signal
+
+// --- Task-stage weights (C3: project completion is a WEIGHTED rollup) --------
+// Golden source for these numbers: schema/schema.yaml -> rollups:
+//   project_perc_completion. Keep the two in step — this table is the app-side
+//   copy that the write-back below reads.
+//
+// A named formula is a VALUE, so the weights live here; the write-back is a
+// side effect and therefore lives in a behaviour property (snippet below).
+StageWeights = Table(
+    { Stage: "Not Started",  Weight: 0   },
+    { Stage: "Planning",     Weight: 10  },
+    { Stage: "Drafting",     Weight: 35  },
+    { Stage: "Under Review", Weight: 60  },
+    { Stage: "Finalizing",   Weight: 85  },
+    { Stage: "Complete",     Weight: 100 }
+    // "Archived" is deliberately ABSENT — archived tasks are excluded from both
+    // numerator and denominator, so a shelved task can't drag a project down.
+);
+
+// --- Write-back: recompute one project's % (app-side writer, C3) -------------
+// PASTE THIS INTO A BEHAVIOUR PROPERTY, not here. Run it wherever a task's
+// stage can change: the task form's OnSuccess, a kanban drop, the editable
+// grid's save. Substitute the project's ID for <pid>.
+//
+//   With(
+//       { scored:
+//           AddColumns(
+//               // Delegable: FK = on an indexed Lookup, plus an Or-of-equals over
+//               // the six non-archived stages. Enumerating them is how Archived is
+//               // excluded server-side — `<> "Archived"` is a Text <> and would NOT
+//               // delegate. Tasks with a blank stage match nothing and are omitted.
+//               Filter( taskmaster_tasks,
+//                       task_project_id.Id = <pid>
+//                    && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+//                      || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+//                      || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
+//               "wgt", Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
+//       Patch( taskmaster_projects,
+//              LookUp(taskmaster_projects, ID = <pid>),
+//              { project_perc_completion:
+//                    If( CountRows(scored) = 0, 0, RoundDown(Average(scored, wgt), 0) ) } )
+//   )
+//
+// Notes:
+//  * Average/CountRows here run LOCALLY over the already-filtered page — correct
+//    because the Filter narrows to one project first. Only exact if a project
+//    holds fewer tasks than the data row limit (set it to 2000).
+//  * App-side writer means the value is only as fresh as the app: a stage edited
+//    directly in SharePoint leaves project_perc_completion stale until the next
+//    in-app change to that project.
