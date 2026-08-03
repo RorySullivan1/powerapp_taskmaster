@@ -18,11 +18,11 @@ decision and delete it here.
 
 ## Answered on 2026-08-03 (see `.claude/memory/INDEX.md` → Decisions)
 
-- **Q12 Power Automate availability** → **YES, available.** Unblocks three things that were
-  waiting on it: the scheduled Graph-termStore flow that populates `taskmaster_terms` (C10), the
+- **Q12 Power Automate availability** → **YES, available.** Still useful for the
   **flow-as-list-provisioner** route (Q11-bis, whose recommendation was explicitly conditional on
-  this), and the extract flow (Q7). Note the app itself needs **no** flow at runtime — that was the
-  point of the C10 cache decision.
+  this) and the extract flow (Q7). **No longer needed for C10 at all** — the term picker reads the
+  term store directly via `Choices()`, so there is no cache list to populate and no flow in that
+  path unless a term set exceeds 20 terms.
 - **Q14 FX rates** → **do not convert in the app at all.** `transaction_notional_usd` is dropped;
   Power BI converts against an FX dimension keyed on currency + trade date. Reasoning and the
   consequences (no cross-currency figure anywhere in the app; Power BI now owes the blended
@@ -57,9 +57,9 @@ by hand. Keep **manual UI as the fallback** only if Power Automate is not availa
 **UNBLOCKED 2026-08-03 — Q12 answered YES.** The recommendation above was explicitly conditional
 on Power Automate being available, and it is, so **flow-as-provisioner is now the recommended
 route** and supersedes the manual-UI pick in Q11. Manual UI remains the fallback. Still to do:
-author the provisioning flow (9 lists incl. `taskmaster_terms`, internal names set explicitly at
-creation, indexes applied while each list is small). Term-store taxonomy sync is a separate flow —
-the same Graph termStore walk that populates `taskmaster_terms`.
+author the provisioning flow (**8 lists** — `taskmaster_terms` no longer exists — with internal
+names set explicitly at creation and indexes applied while each list is small). No term-store sync
+flow is needed: the app reads the term store directly (C10).
 
 ## Blocking-adjacent (elevated by this build)
 

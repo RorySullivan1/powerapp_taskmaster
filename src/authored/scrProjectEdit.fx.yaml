@@ -50,24 +50,16 @@ Screens:
                   { DisplayName: "", Mail: "" } ) );
         Set( gPrPhase,    If( gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, "Planning"), "Planning" ) );
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
-        // Managed metadata (C10). Empty on entry in BOTH modes: the term GUID is
-        // not recoverable from what the SharePoint connector returns, so on Edit
+        // Managed metadata (C10). Empty on entry in BOTH modes: what the connector
+        // returns for an EXISTING value is not in the picker's path form, so on Edit
         // the columns are left untouched unless the user actively re-picks. The
         // current labels are shown beside the pickers so nothing looks lost.
-        Set( gPrRegionGuid, "" ); Set( gPrRegionLabel, "" ); Set( gPrRegionPath, "" ); Set( gPrRegionDone, false );
-        Set( gPrTypeGuid,   "" ); Set( gPrTypeLabel,   "" ); Set( gPrTypePath,   "" ); Set( gPrTypeDone,   false );
-        Set( gPrCovGuid,    "" ); Set( gPrCovLabel,    "" ); Set( gPrCovPath,    "" ); Set( gPrCovDone,    false );
-        // One delegable pull per vocabulary (`=` on the indexed term_set Choice),
-        // reshaped to exactly the five columns cmpTermPicker expects.
-        ClearCollect( colTermRegion,
-            ShowColumns( Filter( taskmaster_terms, term_set.Value = "Region" ),
-                         "term_guid", "term_label", "term_parent_guid", "term_path", "term_is_leaf" ) );
-        ClearCollect( colTermProjectType,
-            ShowColumns( Filter( taskmaster_terms, term_set.Value = "ProjectType" ),
-                         "term_guid", "term_label", "term_parent_guid", "term_path", "term_is_leaf" ) );
-        ClearCollect( colTermCoverage,
-            ShowColumns( Filter( taskmaster_terms, term_set.Value = "Coverage" ),
-                         "term_guid", "term_label", "term_parent_guid", "term_path", "term_is_leaf" ) );
+        //
+        // No term collections are built here. Each picker reads the term store
+        // DIRECTLY through Choices() on its own instance — see the Terms bindings.
+        Set( gPrRegionLabel, "" ); Set( gPrRegionPath, "" ); Set( gPrRegionDone, false );
+        Set( gPrTypeLabel,   "" ); Set( gPrTypePath,   "" ); Set( gPrTypeDone,   false );
+        Set( gPrCovLabel,    "" ); Set( gPrCovPath,    "" ); Set( gPrCovDone,    false );
         // Staging areas. Cleared on every visit — a half-entered child list left
         // over from the previous project would be written to THIS one.
         Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
@@ -617,10 +609,14 @@ Screens:
             Width: =760
             Height: =150
             Caption: ="Region  *"
-            Terms: =colTermRegion
+            # Straight at the term store — no cache list, no flow, no second copy.
+            # ShowColumns trims the connector's record to the two fields the
+            # component's input schema declares. Capped at 20 terms by the
+            # connector; swap for a flow-fed collection if a set outgrows that.
+            Terms: |
+              =ShowColumns( Choices([@taskmaster_projects].project_region), "Label", "Path" )
             OnChange: |
-              =Set( gPrRegionGuid,  pickPrRegion.TermGuid );
-              Set( gPrRegionLabel, pickPrRegion.TermLabel );
+              =Set( gPrRegionLabel, pickPrRegion.TermLabel );
               Set( gPrRegionPath,  pickPrRegion.TermPath );
               Set( gPrRegionDone,  pickPrRegion.IsComplete )
       - lblPrRegionState:
@@ -628,7 +624,7 @@ Screens:
           Properties:
             Visible: =gPrTab = 2
             Text: |
-              =If( Len(gPrRegionGuid) > 0,
+              =If( Len(gPrRegionPath) > 0,
                    If( gPrRegionDone, "✓ " & gPrRegionLabel, "… " & gPrRegionLabel & " — keep going, this term has children" ),
                    gEditMode = "Edit",
                    "Currently: " & Coalesce(gEditProject.project_region.Value, "not set") & "   (leave alone to keep it)",
@@ -636,7 +632,7 @@ Screens:
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: |
-              =If( Len(gPrRegionGuid) > 0 && !gPrRegionDone, Theme.Color.Warning, Theme.Color.TextMuted )
+              =If( Len(gPrRegionPath) > 0 && !gPrRegionDone, Theme.Color.Warning, Theme.Color.TextMuted )
             X: =804
             Y: =176
             Width: =520
@@ -652,10 +648,14 @@ Screens:
             Width: =760
             Height: =150
             Caption: ="Project type  *"
-            Terms: =colTermProjectType
+            # Straight at the term store — no cache list, no flow, no second copy.
+            # ShowColumns trims the connector's record to the two fields the
+            # component's input schema declares. Capped at 20 terms by the
+            # connector; swap for a flow-fed collection if a set outgrows that.
+            Terms: |
+              =ShowColumns( Choices([@taskmaster_projects].project_type), "Label", "Path" )
             OnChange: |
-              =Set( gPrTypeGuid,  pickPrType.TermGuid );
-              Set( gPrTypeLabel, pickPrType.TermLabel );
+              =Set( gPrTypeLabel, pickPrType.TermLabel );
               Set( gPrTypePath,  pickPrType.TermPath );
               Set( gPrTypeDone,  pickPrType.IsComplete )
       - lblPrTypeState:
@@ -663,7 +663,7 @@ Screens:
           Properties:
             Visible: =gPrTab = 2
             Text: |
-              =If( Len(gPrTypeGuid) > 0,
+              =If( Len(gPrTypePath) > 0,
                    If( gPrTypeDone, "✓ " & gPrTypeLabel, "… " & gPrTypeLabel & " — keep going, this term has children" ),
                    gEditMode = "Edit",
                    "Currently: " & Coalesce(gEditProject.project_type.Value, "not set") & "   (leave alone to keep it)",
@@ -671,7 +671,7 @@ Screens:
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: |
-              =If( Len(gPrTypeGuid) > 0 && !gPrTypeDone, Theme.Color.Warning, Theme.Color.TextMuted )
+              =If( Len(gPrTypePath) > 0 && !gPrTypeDone, Theme.Color.Warning, Theme.Color.TextMuted )
             X: =804
             Y: =338
             Width: =520
@@ -687,10 +687,14 @@ Screens:
             Width: =760
             Height: =150
             Caption: ="Coverage"
-            Terms: =colTermCoverage
+            # Straight at the term store — no cache list, no flow, no second copy.
+            # ShowColumns trims the connector's record to the two fields the
+            # component's input schema declares. Capped at 20 terms by the
+            # connector; swap for a flow-fed collection if a set outgrows that.
+            Terms: |
+              =ShowColumns( Choices([@taskmaster_projects].project_coverage), "Label", "Path" )
             OnChange: |
-              =Set( gPrCovGuid,  pickPrCoverage.TermGuid );
-              Set( gPrCovLabel, pickPrCoverage.TermLabel );
+              =Set( gPrCovLabel, pickPrCoverage.TermLabel );
               Set( gPrCovPath,  pickPrCoverage.TermPath );
               Set( gPrCovDone,  pickPrCoverage.IsComplete )
       - lblPrCovState:
@@ -698,7 +702,7 @@ Screens:
           Properties:
             Visible: =gPrTab = 2
             Text: |
-              =If( Len(gPrCovGuid) > 0,
+              =If( Len(gPrCovPath) > 0,
                    If( gPrCovDone, "✓ " & gPrCovLabel, "… " & gPrCovLabel & " — keep going, this term has children" ),
                    gEditMode = "Edit",
                    "Currently: " & Coalesce(gEditProject.project_coverage.Value, "not set") & "   (leave alone to keep it)",
@@ -706,7 +710,7 @@ Screens:
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: |
-              =If( Len(gPrCovGuid) > 0 && !gPrCovDone, Theme.Color.Warning, Theme.Color.TextMuted )
+              =If( Len(gPrCovPath) > 0 && !gPrCovDone, Theme.Color.Warning, Theme.Color.TextMuted )
             X: =804
             Y: =500
             Width: =520
@@ -1241,11 +1245,11 @@ Screens:
                  If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
                  If( gEditMode = "New" && !gPrRegionDone, "a full Region path (Classification tab)   ", "" ) &
                  If( gEditMode = "New" && !gPrTypeDone,   "a full Project type path (Classification tab)   ", "" ) &
-                 If( gEditMode = "Edit" && Len(gPrRegionGuid) > 0 && !gPrRegionDone,
+                 If( gEditMode = "Edit" && Len(gPrRegionPath) > 0 && !gPrRegionDone,
                      "finish the Region path or clear it   ", "" ) &
-                 If( gEditMode = "Edit" && Len(gPrTypeGuid) > 0 && !gPrTypeDone,
+                 If( gEditMode = "Edit" && Len(gPrTypePath) > 0 && !gPrTypeDone,
                      "finish the Project type path or clear it   ", "" ) &
-                 If( Len(gPrCovGuid) > 0 && !gPrCovDone,
+                 If( Len(gPrCovPath) > 0 && !gPrCovDone,
                      "finish the Coverage path or clear it   ", "" ) )
             Font: =Theme.Font
             Size: =Theme.Size.Small
@@ -1301,14 +1305,16 @@ Screens:
                                       DisplayName: gPrManager.DisplayName,
                                       Email:       gPrManager.Mail,
                                       Department: "", JobTitle: "", Picture: "" },
+                                // The MM value handed back is the connector's OWN
+                                // record, found by the path the picker resolved — not
+                                // a hand-built SPListExpandedTaxonomy literal. See
+                                // _EDIT-NOTES.md for why that swap matters.
                                 project_region:
-                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
-                                      TermGuid: gPrRegionGuid, Label: gPrRegionLabel,
-                                      WssId: -1, Path: gPrRegionPath, Value: gPrRegionLabel },
+                                    LookUp( Choices([@taskmaster_projects].project_region),
+                                            Path = gPrRegionPath ),
                                 project_type:
-                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
-                                      TermGuid: gPrTypeGuid, Label: gPrTypeLabel,
-                                      WssId: -1, Path: gPrTypePath, Value: gPrTypeLabel },
+                                    LookUp( Choices([@taskmaster_projects].project_type),
+                                            Path = gPrTypePath ),
                                 project_date_start:    IfError( DateValue(txtPrStart.Text),    Blank() ),
                                 project_date_target:   IfError( DateValue(txtPrTarget.Text),   Blank() ),
                                 project_date_complete: IfError( DateValue(txtPrComplete.Text), Blank() ) } ) ),
@@ -1362,28 +1368,25 @@ Screens:
                       IfError( Patch(taskmaster_projects, gPrSaved, { project_supporter: Blank() }),
                                Notify("Project saved; the supporter didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
                   // Managed metadata on EDIT only — on New these went in with the
-                  // insert. Each is its own Patch: SPListExpandedTaxonomy is the
-                  // riskiest shape in the app and must not take the rest down.
-                  If( gEditMode = "Edit" && Len(gPrRegionGuid) > 0 && gPrRegionDone,
+                  // insert. Each stays its own Patch: MM is still the least-proven
+                  // write in the app and must not take the rest of the record down.
+                  If( gEditMode = "Edit" && Len(gPrRegionPath) > 0 && gPrRegionDone,
                       IfError( Patch(taskmaster_projects, gPrSaved,
                                      { project_region:
-                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
-                                           TermGuid: gPrRegionGuid, Label: gPrRegionLabel,
-                                           WssId: -1, Path: gPrRegionPath, Value: gPrRegionLabel } }),
+                                         LookUp( Choices([@taskmaster_projects].project_region),
+                                                 Path = gPrRegionPath ) }),
                                Notify("Project saved; the region didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
-                  If( gEditMode = "Edit" && Len(gPrTypeGuid) > 0 && gPrTypeDone,
+                  If( gEditMode = "Edit" && Len(gPrTypePath) > 0 && gPrTypeDone,
                       IfError( Patch(taskmaster_projects, gPrSaved,
                                      { project_type:
-                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
-                                           TermGuid: gPrTypeGuid, Label: gPrTypeLabel,
-                                           WssId: -1, Path: gPrTypePath, Value: gPrTypeLabel } }),
+                                         LookUp( Choices([@taskmaster_projects].project_type),
+                                                 Path = gPrTypePath ) }),
                                Notify("Project saved; the type didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
-                  If( Len(gPrCovGuid) > 0 && gPrCovDone,
+                  If( Len(gPrCovPath) > 0 && gPrCovDone,
                       IfError( Patch(taskmaster_projects, gPrSaved,
                                      { project_coverage:
-                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
-                                           TermGuid: gPrCovGuid, Label: gPrCovLabel,
-                                           WssId: -1, Path: gPrCovPath, Value: gPrCovLabel } }),
+                                         LookUp( Choices([@taskmaster_projects].project_coverage),
+                                                 Path = gPrCovPath ) }),
                                Notify("Project saved; the coverage didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
                   // --- 3. children ------------------------------------------
                   // IfError's third argument is the value returned when NOTHING

@@ -199,3 +199,59 @@ so supplying a signal later is a one-line change.
 **Unanswered:** how `taskmaster_terms` actually gets seeded (hand-entry now vs waiting for the
 flow). Both routes are documented in HANDOFF step 10b and neither blocks the paste, so it can be
 decided at the keyboard.
+
+## 8. C10 revised — the cache list was wrong, and the user caught it
+
+Pushback: *"I'm not sure why you have the term list. This is something that can be referenced
+recursively rather than double stored."*
+
+Correct, and the research says so more strongly than I expected.
+
+**`Choices([@list].mmColumn)` reads the term set straight from the term store** — no Graph, no
+intermediate storage — and each record carries `Label`, **`Path`**, `Guid`, `WssId`. `Path` is the
+term's *full hierarchical path* (`EMEA;UK;London`). The hierarchy is already in the data. A cascade
+is prefix matching on a string:
+
+```powerapps
+Filter( Terms, CountRows(Split(Path, ";")) = 2 && StartsWith(Path, pick1 & ";") )
+```
+
+So the `taskmaster_terms` list was a second copy of a vocabulary that already exists — refresh
+schedule, seeding step, drift risk — to reconstruct a hierarchy `Path` hands over for free. It is
+deleted. The delegation argument I used to justify it doesn't survive contact either: a term set
+small enough to be usable is small enough to hold in memory, so there was nothing to delegate.
+
+**Chain validation got simpler too.** Under the parent-GUID design, "is this level-2 pick really a
+child of the level-1 pick?" needed a `LookUp` per level. On paths it is one `StartsWith`.
+
+**The bigger win was on the write side.** The picker resolves a *path*; the screen turns that back
+into the connector's **own record**:
+
+```powerapps
+project_region: LookUp( Choices([@taskmaster_projects].project_region), Path = gPrRegionPath )
+```
+
+That retires the hand-built `SPListExpandedTaxonomy` + `WssId: -1` literal, which had been the
+least-proven construct in the whole app — community-reported, never first-party, and dependent on
+getting field names exactly right. It also sidesteps a live ambiguity in the sources over whether
+the GUID field is `Guid` or `TermGuid`, because nothing we author names it. **Person is now the only
+hand-built complex shape left**, since there is no `Choices()` equivalent for a Person column.
+
+**What the research did surface as a real constraint:** `Choices()` on an MM column is **capped at
+20 terms** by the connector's backend query, not configurable — multiple independent sources plus an
+open Microsoft Ideas request. That is the *only* reason another term source would ever be needed,
+and the answer is a flow-fed collection in the same `{Label, Path}` shape, swapped in on one
+binding. Still no second store: a session collection, not a list.
+
+**One genuinely unverifiable detail:** the `Path` segment delimiter is reported as `;` but isn't
+first-party documented. Rather than guess, it is a `PathDelimiter` input and the picker prints a raw
+path on screen under itself. First paste reveals it; the fix is one line. That is the right shape
+for a one-way gap — a single "here's what it says" report settles it.
+
+**Knock-ons:** schema 2.0.0 (list removed), Q12 no longer gates C10 at all, the provisioning flow
+drops to 8 lists, and the term-store sync flow is no longer needed.
+
+**The lesson worth keeping:** I reached for a cache because I'd framed the problem as "a canvas app
+can't call Graph, so something must sit between." True — but I never checked whether the connector
+already exposed the taxonomy. It did, and it had done all along.
+

@@ -104,35 +104,45 @@ If( Len(gErr) = 0, …everything that says it worked… )
 
 Each `IfError` argument is a **single statement** — no `;` chains inside a function argument.
 
-## 6. Two community-confirmed write shapes
+## 6. Complex column writes — give the connector its own shape wherever you can
 
-Neither is in Microsoft's first-party docs. They are the highest-risk constructs in the app,
-and each is isolated in its own `Patch` for that reason.
+**Managed metadata** is written by handing back the record `Choices()` produced, found by the
+path the picker resolved:
 
 ```powerapps
-// Person — Claims prefix is App.Formulas -> ClaimPrefix
+project_region: LookUp( Choices([@taskmaster_projects].project_region), Path = gPrRegionPath )
+```
+
+No hand-built `SPListExpandedTaxonomy` literal is authored anywhere in this repo. That literal
+was community-reported only, and depended on getting `WssId: -1` and the exact field names
+right; passing back the connector's own record removes the whole class of risk. Fallback, if
+this ever fails: `docs/managed-metadata-picker.md` §5.
+
+**Person** still has no equivalent — there is no `Choices()` for a Person column — so it is the
+one hand-built shape left, and therefore the highest-risk write in the app:
+
+```powerapps
 { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
   Claims: ClaimPrefix & Lower(mail), DisplayName: name, Email: mail,
   Department: "", JobTitle: "", Picture: "" }
-
-// Managed metadata — WssId -1 means "resolve by GUID, not by site cache"
-{ '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
-  TermGuid: guid, Label: label, WssId: -1, Path: path, Value: label }
 ```
 
-See `docs/managed-metadata-picker.md` §2 and §5.
+It stays isolated in its own guarded `Patch` for that reason.
 
 ## 7. Managed metadata on edit: untouched unless re-picked
 
-The term GUID is not recoverable from the record the SharePoint connector returns. So on an
-**edit** the MM pickers start empty and the column is left alone unless the user actively
-picks a new leaf; the current label is shown beside the picker so nothing looks lost. On a
-**new** project, `project_region` and `project_type` are required by the list, so both must
-reach a leaf before Save enables — and they go in with the insert, not afterwards.
+What the connector returns for an **existing** MM value isn't in the picker's path form, so on
+an **edit** the pickers start empty and the column is left alone unless the user actively picks
+a new leaf; the current label is shown beside the picker so nothing looks lost. On a **new**
+project, `project_region` and `project_type` are required by the list, so both must reach a leaf
+before Save enables — and they go in with the insert, not afterwards.
 
-`cmpTermPicker.IsComplete` is the leaf test, and it counts children rather than trusting the
-cached `term_is_leaf` flag: the flag is only as good as the last refresh, the child rows are
-the same data the cascade already walks.
+`cmpTermPicker.IsComplete` is the leaf test: it counts terms sitting below the pick, from the
+same data the cascade walks, so it cannot disagree with what is on screen.
+
+The picker reads the term store **directly** — `ShowColumns(Choices([@list].mmColumn), "Label",
+"Path")`. There is no terms list. `Path` already carries the full hierarchy, so the cascade is
+prefix matching and the term store stays the only copy of the vocabulary.
 
 ---
 
@@ -174,9 +184,11 @@ afterwards.
   currency + trade date. `scrProject`'s transactions tab totals per currency and says so. Do not
   reintroduce a rate table to "just add a total" — a write-time rate freezes a number nothing
   downstream can correct.
-- **`taskmaster_terms` needs a populator** (Q12). Until it has rows, `cmpTermPicker` shows an
-  explicit "no terms loaded" message rather than four empty columns — and required MM means
-  no project can be created until then.
+- **`Choices()` on an MM column is capped at 20 terms** by the connector, not configurable. If a
+  vocabulary outgrows it, terms silently go missing from the picker; the fix is to feed that one
+  instance from a Power Automate call in the same `{Label, Path}` shape — the component doesn't
+  change. The `Path` delimiter (`;`) is also not first-party documented, so it is a component
+  input and the picker prints a raw path on screen to settle it at first paste.
 - **Dates are typed, not picked.** Locale governs how `DateValue()` reads `dd/mm/yyyy`; the
   echo label is the check. A grounded `DatePicker` token would replace this whole pattern.
 - **A stale component strip can display a value the form will not write.** Point 1 makes the

@@ -17,7 +17,7 @@
 # =============================================================================
 
 meta:
-  version: 1.9.0
+  version: 2.0.0
   updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
@@ -178,30 +178,6 @@ lists:
     join_cost: null
     columns: []          # SCHEMA NOT SUPPLIED — any binding to this list is blocked.
 
-  # ---------------------------------------------------------------------------
-  taskmaster_terms:
-    role: >-
-      Flat cache of the SharePoint term store, one row per term, with a parent pointer.
-      NOT a business list — it is the read side of the Managed Metadata problem (C10).
-      The app cascades through it with delegable Filters on term_parent_guid instead of
-      calling Graph at runtime; the MM column itself is still written with the term GUID
-      via the SharePoint connector. Refilled by a scheduled flow (Q12).
-    provisioned: pending
-    join_cost: 0          # all Text / Choice / Number / Boolean — nothing joins
-    refresh: >-
-      Scheduled Power Automate flow walking Graph termStore
-      (GET /sites/{site-id}/termStore/sets/{set-id}/children, then .../terms/{id}/children).
-      TermStore.Read.All, DELEGATED ONLY — the flow must run as a signed-in user, not app-only.
-      Terms change rarely; daily is ample. See docs/managed-metadata-picker.md.
-    columns:
-      - { name: term_guid,        type: Text,    required: true,  indexed: true,  desc: "The Graph term `id`. THIS is the value written into the MM column's TermGuid" }
-      - { name: term_label,       type: Text,    required: true,  indexed: true,  desc: "Display label of the term" }
-      - { name: term_set,         type: Choice,  required: true,  indexed: true,  desc: "Which vocabulary this term belongs to", values: [Region, ProjectType, Coverage, ClientType, ProductType, Marketing] }
-      - { name: term_parent_guid, type: Text,    required: false, indexed: true,  desc: "GUID of the parent term; BLANK for a top-level term. This column drives the cascade" }
-      - { name: term_path,        type: Text,    required: false,                 desc: "Full hierarchical path, e.g. 'EMEA;UK' — written into the MM column's Path" }
-      - { name: term_depth,       type: Number,  required: false,                 desc: "1-based level; convenience only, the UI derives depth from the data" }
-      - { name: term_is_leaf,     type: Boolean, required: false,                 desc: "Precomputed 'has no children' — lets the picker stop without a count" }
-
 # =============================================================================
 # Derived values — computed, not stored by SharePoint.
 # =============================================================================
@@ -250,12 +226,15 @@ open_recommendations:
       cascade from delegable Filters on term_parent_guid. Zero runtime dependency, versus a flow
       round-trip per dropdown level.
     decided: >-
-      2026-08-03 - Option B ADOPTED. taskmaster_terms is now a real list above, and the app
-      cascades through it (src/authored/components/cmpTermPicker.pa.yaml). The alternative
-      (a flow round-trip per dropdown level) would have made every create form depend on a
-      flow being healthy at runtime, which is exactly the dependency we cannot debug across
-      a one-way gap. Option B needs the flow only for a scheduled refresh: if it stops, the
-      forms keep working on the last-known vocabulary.
+      2026-08-03 (REVISED, same day) - NO CACHE LIST. Choices([@list].mmColumn) returns the
+      term set from the term store with Label, Path, Guid and WssId per term, and Path is the
+      FULL hierarchical path - so the hierarchy is already in the data and the cascade reads
+      it directly. A taskmaster_terms cache list was briefly added and has been REMOVED: it
+      was a second copy of a vocabulary that already exists, carrying a refresh schedule and
+      a drift risk, to recover a hierarchy that Path hands over for free.
+      The value written is the connector's OWN record - LookUp(Choices(...), Path = <picked>)
+      - which also retires the hand-built SPListExpandedTaxonomy literal that had been the
+      least-proven construct in the app.
     blocked_on: >-
       Q12 - Power Automate or a custom connector, to POPULATE taskmaster_terms. The app is
       authored and pastes without it; it just has nothing to pick from until the list is

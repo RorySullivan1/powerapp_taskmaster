@@ -199,41 +199,38 @@ slicer, and read each with its own idiom — `approval_region.Value` (Choice) ve
 Metadata subfield on projects/clients. In Power BI, model them as **separate dimensions**; don't
 try to relate them.
 
-**C10 ◐ Managed Metadata stays — cascading term picker validated 2026-08-03.**
-`project_region` and `project_type` are **required** MM, so no project can be created from the app
-without a way to write MM. Decision: **keep MM**, and build a cascading picker that walks the term
-hierarchy and writes the leaf term's **GUID**.
+**C10 ✅ Resolved 2026-08-03 — MM stays, and the app reads the term store directly.**
+`project_region` and `project_type` are **required** MM, so without an MM write path no project can
+be created from the app at all. Full write-up and sources: `docs/managed-metadata-picker.md`.
 
-Validated (full write-up + sources: `docs/managed-metadata-picker.md`):
-- **Reading the hierarchy is first-party supported.** Graph's **termStore** API (GA Aug 2021)
-  exposes `…/termStore/sets/{set}/children` and `…/terms/{term}/children`, so nesting detection
-  falls out of the API — non-empty children means render another level. Permission is
-  `TermStore.Read.All`, **delegated only; app-only is not supported.**
-- **The earlier "Graph doesn't support managed metadata" note still stands but is narrower than it
-  read:** it applies to the *list column value*, not the term store. Read terms with Graph, write
-  the column with the SharePoint connector.
-- **Writing** uses `'@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy"`
-  with `TermGuid`, `Label`, `Path` and **`WssId: -1`** (resolve by GUID, not site cache). This shape
-  is **community-confirmed, not first-party** — the single riskiest construct in the app.
+**`Choices([@list].mmColumn)` returns the term set from the term store**, each record carrying
+`Label`, **`Path`**, `Guid`, `WssId` — and `Path` is the term's **full hierarchical path**
+(`EMEA;UK;London`). The hierarchy is therefore already in the data: the cascade is prefix matching
+on a string (`StartsWith(childPath, parentPath & ";")`), depth is discovered rather than declared,
+and nothing needs to be precomputed or mirrored.
 
-**Architecture DECIDED 2026-08-03 — the cache, not live Graph.** `taskmaster_terms` is now a real
-list in the golden source: a flat row per term (`term_guid`, `term_label`, `term_set`,
-`term_parent_guid`, `term_path`, `term_depth`, `term_is_leaf`), refilled by a scheduled flow. The
-cascade is then ordinary delegable Power Fx — `=` on the indexed `term_parent_guid` — with **zero
-runtime dependency**. A flow round-trip per dropdown level would have made every create form depend
-on a flow being healthy, which is the one thing that cannot be debugged across this gap; with the
-cache, a dead refresh degrades to a stale vocabulary rather than an unusable form.
+**The value written is the connector's OWN record**, found by the path the picker resolved:
 
-**Implemented** in `src/authored/components/cmpTermPicker.pa.yaml` — four progressively-revealed
-levels, a `"— select —"` sentinel row per level (a gallery's `Selected` returns its first row until
-touched, which would otherwise auto-pick a path the user never chose into a *required* column), and
-chain validation so a stale deeper pick that is no longer a child of the level above is discarded
-rather than written. `IsComplete` counts children rather than trusting the cached `term_is_leaf`.
+```powerapps
+project_region: LookUp( Choices([@taskmaster_projects].project_region), Path = gPrRegionPath )
+```
 
-**Still blocked on Q12 for POPULATION only.** The app is authored and pastes without it; it just has
-nothing to pick from until the list has rows, and the picker says so explicitly instead of showing
-four empty columns. Hand-seeding a small vocabulary is a valid stopgap. **Cheapest first test:** one
-project saved with a single region — if that MM write lands, the riskiest construct is proven.
+That retires the hand-built `SPListExpandedTaxonomy` literal (community-reported, never first-party,
+`WssId: -1`) that had been the least-proven construct in the app. Nothing we author names a GUID
+field any more, which also sidesteps a live `Guid` vs `TermGuid` ambiguity in the sources.
+
+**A `taskmaster_terms` cache list was briefly added and has been removed.** It was a second copy of
+a vocabulary that already exists — refresh schedule, seeding step, drift risk — to reconstruct a
+hierarchy `Path` provides for free. The delegation argument for it doesn't hold either: a term set
+small enough to use is small enough to hold in memory.
+
+**The one real limit: `Choices()` on an MM column is capped at 20 terms** by the connector, not
+configurable. If a set outgrows that, the screen swaps one binding for a collection filled by a
+single Power Automate call in the same `{Label, Path}` shape — the component is unchanged, and the
+collection is in memory, not a list that can drift.
+
+**Open detail:** the `Path` delimiter is reported as `;` but isn't first-party documented, so it is
+a `PathDelimiter` input on the component, which prints a raw path on screen. First paste settles it.
 
 **C8 ✅ Resolved 2026-08-03 (casing).** Renamed to **`issue_owner`** (a real Person column,
 distinct from `Created By`) and **`product_uid`**. The whole model is now consistently lowercase

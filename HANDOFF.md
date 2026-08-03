@@ -97,9 +97,11 @@ rejecting. If it did, we know the dialect is right and the rest is mechanical.
 
    **`cmpTermPicker` is new and is the one to build carefully** — it is how a required Managed
    Metadata column gets a value (C10). Four vertical galleries side by side, each revealing the
-   next; the hidden `lblPick` label carries the resolved GUID and all four outputs read it. The
-   contract and the two load-bearing decisions (the "— select —" sentinel row, and chain
-   validation) are documented at the top of `src/authored/components/cmpTermPicker.pa.yaml`.
+   next; the hidden `lblPick` label carries the resolved term **path** and the outputs read it.
+   It cascades on the term's `Path`, which `Choices()` already supplies, so there is no terms
+   list behind it. The contract and the two load-bearing decisions (the "— select —" sentinel
+   row, and chain validation) are documented at the top of
+   `src/authored/components/cmpTermPicker.pa.yaml`.
 
    Note `cmpConfirmDialog`'s input is **`IsOpen`**, not `Visible` — a custom property named
    `Visible` collides with the built-in one.
@@ -121,23 +123,22 @@ useful signal.
 
 ## Stage 4 — provision the lists, then the data screens
 
-9. **Provision the nine lists from `schema/schema.yaml`.** That file is the golden source: each
+9. **Provision the eight lists from `schema/schema.yaml`.** That file is the golden source: each
    column's `name:` **is** the internal name and freezes at creation. Create the column with that
    exact name, then set a friendly display name if you want one. Apply `indexed: true` while each
    list is small — indexes can't be added past 20,000 items.
 
    **Provisioning route: a Power Automate flow, not the UI** (Q11-bis, unblocked now that Q12 is
    answered). Setting the internal name explicitly at creation removes the `_x0020_` risk that
-   hand-clicking carries, and it is re-runnable for dev → test → prod. Clicking nine lists by hand
+   hand-clicking carries, and it is re-runnable for dev → test → prod. Clicking eight lists by hand
    remains the fallback; if you take it, watch every column name.
 
-   Two notes on specific columns:
-   - `taskmaster_terms` is the ninth list and is new — a flat cache of the term store, and what
-     makes the required Managed Metadata columns writable from the app (C10). Nothing can create a
-     project until it has rows in it; see step 10b.
-   - **Do not create `transaction_notional_usd`.** It is commented out in the golden source (Q14).
-     Nothing writes it, so provisioning it would leave a permanently blank Currency field that
-     looks like a real figure.
+   One column to skip: **do not create `transaction_notional_usd`.** It is commented out in the
+   golden source (Q14). Nothing writes it, so provisioning it would leave a permanently blank
+   Currency field that looks like a real figure.
+
+   Make sure each Managed Metadata column is **bound to its term set** — that binding is what the
+   app reads the vocabulary through (C10). There is no separate terms list to create or seed.
 
 10. In the app, **add each list as a data source**.
 
@@ -145,20 +146,20 @@ useful signal.
     `scr*Edit` screens call `Office365Users.SearchUser` for their people pickers. Do this
     **before** pasting them — an unrecognised name is a paste failure, not a runtime one.
 
-10b. **Populate `taskmaster_terms`.** A scheduled Power Automate flow walking the Graph termStore
-    is the intended route and is now **unblocked** (Q12 answered — Power Automate is available;
-    `docs/managed-metadata-picker.md` has the endpoints, and note `TermStore.Read.All` is
-    **delegated only**, so the flow must run as a signed-in user). For a small vocabulary
-    **hand-entering the rows works and unblocks everything today**: one row per term, with
-    `term_parent_guid` empty at the top level and set to the parent's `term_guid` below it. The
-    GUIDs must be the **real** term GUIDs from the term store, because they are what gets written
-    into the Managed Metadata column.
+10b. **Nothing to seed for managed metadata.** The pickers read each column's term set directly
+    via `Choices()`, so the term store is the only copy — no cache list, no refresh flow.
 
-    **Cheapest possible de-risking test, worth doing before anything else here:** create one
-    project by hand in SharePoint, then use `scrProjectEdit` to save a single region. If the
-    Managed Metadata write lands, the riskiest construct in the app is proven. If it errors, send
-    me the message — that shape is community-confirmed, not first-party, and the exact error is
-    what tells us how to adapt.
+    Two things to watch on the first run, both visible on screen:
+    - The picker prints a **raw term path** under itself (`first term's path: …`). If the separator
+      is not `;`, tell me what it is — it's the `PathDelimiter` input, a one-line fix.
+    - `Choices()` on an MM column is **capped at 20 terms** by the connector. If a vocabulary is
+      bigger than that and terms go missing from the picker, say so: the fix is to feed that one
+      picker from a Power Automate call instead, and the component itself doesn't change.
+
+    **Cheapest possible de-risking test, worth doing before anything else here:** create a project
+    with `scrProjectEdit` and set only a region. If the managed-metadata write lands, the least-
+    proven construct in the app is proven. If it errors, send me the message — the fallback is a
+    hand-built taxonomy record, documented in `docs/managed-metadata-picker.md` §5.
 
 11. Paste the nine data-bound screens. **Order matters** — paste a screen before the one that
     navigates to it, so the target exists:
@@ -225,7 +226,7 @@ Paste **one unit at a time, onto a blank screen**. A rejection then points at on
 | App.Formulas landed | **No** (this is why `scrAdmin` rendered unstyled — `Theme.*` is undefined until it lands) |
 | Screens landed | `scrAdmin` only |
 | CRUD screens | **Authored, not landed** — `scrProjectEdit`, `scrTaskEdit`, `scrTransactionEdit`, `scrIssueEdit` |
-| Managed-metadata picker | **Authored, not landed** — `cmpTermPicker`; needs `taskmaster_terms` to have rows |
+| Managed-metadata picker | **Authored, not landed** — `cmpTermPicker`, reading each term set directly via `Choices()`. Nothing to seed |
 
 Schema decisions are **complete** (C1, C3, C4, C8, C9, C10 applied; C5 superseded by Q14; C6 by
 design). Q12, Q14 and the Power BI licence gate were all answered on 2026-08-03.
@@ -236,9 +237,9 @@ rather than offering a control that cannot work.
 
 Two things Power Automate now owes, both unblocked rather than blocking:
 
-- the **provisioning flow** (nine lists, explicit internal names) — see step 9;
-- the **term-store flow** that fills `taskmaster_terms` — see step 10b. Hand-seeding works until
-  it exists, so nothing is waiting on it.
+- the **provisioning flow** (eight lists, explicit internal names) — see step 9;
+*(A term-store sync flow was on this list and is no longer needed — the app reads the term store
+directly.)*
 
 And one thing **Power BI** now owes: an FX dimension and a measure converting `transaction_notional`
 at the trade date. Since Q14 the app deliberately stores no USD figure, so until that measure

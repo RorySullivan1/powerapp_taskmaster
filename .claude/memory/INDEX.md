@@ -33,8 +33,8 @@
   grounded constructs, ship safe FALLBACKS for anything unverifiable** (e.g. button nav vs the
   gallery). The `studio-transfer` skill + CLAUDE.md still describe a two-way gap — they need fixing.
 - **Phase-3 CRUD AUTHORED (2026-08-03):** 4 edit screens + `cmpTermPicker` (11 components, 11
-  screens, 22/22 valid). Managed metadata is writable (C10 cache route). **Nothing landed** —
-  blocked on provisioning, `taskmaster_terms` rows, and the Office 365 Users connection.
+  screens, 22/22 valid). Managed metadata is writable by reading `Choices()` directly — no cache
+  list. **Nothing landed** — blocked on provisioning and the Office 365 Users connection.
 - **Template:** PM-tracker (SQL-backed) is the **screen/nav blueprint** only — rebuild on our
   SharePoint schema (`docs/screen-map.md`). Pattern candidates in `docs/powerapp-patterns-distillation.md`.
 
@@ -87,6 +87,9 @@
 - [2026-08-03] **Q12 ANSWERED = YES, Power Automate is available.** Unblocks three things that were queued behind it: the scheduled Graph-termStore flow that populates `taskmaster_terms` (C10), the flow-as-list-provisioner route (Q11-bis), and the extract flow (Q7). NOTE the app needs NO flow at runtime — that was the whole point of the C10 cache decision, and it still holds — .claude/context/open-questions.md
 - [2026-08-03] **Q11-bis ADOPTED — flow-as-provisioner supersedes the manual-UI Q11 pick.** Its recommendation was explicitly conditional on Q12, which is now yes. Internal names set explicitly at creation kills the `_x0020_` risk, and it's re-runnable dev→test→prod (helps Q13). Manual UI stays the fallback. TO AUTHOR: the provisioning flow for 9 lists — .claude/context/open-questions.md
 - [2026-08-03] **Q14 ANSWERED — C5 REVERSED. No FX in the app at all.** `transaction_notional_usd` is dropped (commented out in the golden source, DO NOT PROVISION), `FxToUsd` removed from App.Formulas, and the transaction form writes only the native notional + currency. Why: a write-time rate FREEZES whatever number the app held on the trade date and nothing downstream can correct it; report-time conversion can be restated, back-dated and audited. **CONSEQUENCE — no cross-currency figure can be shown ANYWHERE in the app**; scrProject's transactions tab now totals PER CURRENCY (five enumerated Sums, not Distinct/Concat — no novel scope-shadowing construct mid-file under a one-way gap) and the old USD column shows the product instead of a permanently blank number. **Power BI now OWES an FX dimension + a trade-date conversion measure** — schema/schema.yaml v1.9.0
+- [2026-08-03] **C10 REVISED SAME DAY — the `taskmaster_terms` cache list is DELETED.** User challenged the double-store; they were right. `Choices([@list].mmColumn)` returns the term set from the term store with **Label, Path, Guid, WssId**, and **`Path` is the FULL hierarchical path** (`EMEA;UK;London`) — so the hierarchy is already in the data and the cascade is prefix matching (`StartsWith(childPath, parentPath & ";")`). No mirror, no refresh flow, no drift; term store stays the single source of truth. My delegation argument for the cache didn't survive either: a term set small enough to use is small enough to hold in memory — schema/schema.yaml v2.0.0
+- [2026-08-03] **MM WRITE now hands the connector its OWN record back:** `LookUp(Choices([@list].col), Path = <picked path>)`. This RETIRES the hand-built `SPListExpandedTaxonomy` + `WssId:-1` literal that was the least-proven construct in the app, and sidesteps the live `Guid` vs `TermGuid` field-name ambiguity since nothing we author names it. Person is now the ONLY hand-built complex shape left (no `Choices()` exists for Person) — docs/managed-metadata-picker.md
+- [2026-08-03] **The one real MM limit: `Choices()` on an MM column is capped at 20 TERMS** by the connector, not configurable (multiple independent sources + an open MS Ideas request). If a set outgrows it, swap ONE binding for a flow-fed collection in the same `{Label, Path}` shape — component unchanged, and it's an in-memory collection, still not a second store. **`Path` delimiter (`;`) is NOT first-party documented** → it's a `PathDelimiter` component input and the picker prints a raw path on screen, so first paste settles it — src/authored/components/cmpTermPicker.pa.yaml
 - [2026-08-03] **Power BI licence gate DECIDED = SOFT GATE.** Reports stays visible but greyed for unlicensed users and still opens, landing on the empty-state card + the three licence-free KPI rings. Never hidden — a hidden feature is one nobody knows to request a licence for. `gHasPowerBiLicence` stays `false` (everyone treated as unlicensed) until a real signal exists; worst case is a licensed user seeing the fallback rings and one extra click, vs. an unlicensed user hitting a broken embed. Nav + Reports both read that one line, so a future signal is a one-line change — src/patches/App.Formulas.pa.fx
 
 ## Threads          (open items; remove when closed)
@@ -119,21 +122,19 @@
 
 - **Next physical step:** HANDOFF.md Stage 1 smoke test (paste scrReference) — proves the channel before the expensive component build.
 
-- **C10 DECIDED (cache) and IMPLEMENTED.** What remains is DATA, not design: `taskmaster_terms`
-  has no populator (Q12 — a scheduled flow walking Graph termStore; hand-seeding is a valid
-  stopgap for a small vocabulary). Cheapest first test = save ONE project with ONE region; if that
-  MM write lands, the riskiest construct in the app is proven for one paste.
-- **Two community-confirmed write shapes are still UNEXECUTED against this tenant:** expanded USER
-  (Person columns, `ClaimPrefix`) and expanded TAXONOMY (`SPListExpandedTaxonomy` + `WssId: -1`).
-  Neither is first-party. Each is isolated in its own `Patch` so a failure can't take a record
-  down; the first real save is the test.
+- **C10 CLOSED — no cache, no seeding, nothing to provision.** Two things to watch at first paste,
+  both visible on screen: the raw term **path** the picker prints (confirms the `;` delimiter), and
+  whether any vocabulary is losing terms to the **20-term `Choices()` cap**.
+- **One hand-built write shape is still UNEXECUTED against this tenant:** expanded USER for Person
+  columns (`ClaimPrefix`). Not first-party; isolated in its own `Patch`. The MM write no longer
+  belongs on this list — it hands back the connector's own record. Cheapest test = save ONE project
+  with ONE region.
 - **Power BI OWES the blended notional (consequence of Q14).** An FX dimension (currency, rate,
   effective date) + a measure converting `transaction_notional` at the trade date. Until it exists
   there is no cross-currency figure anywhere — accepted cost, not an oversight.
-- **Two Power Automate flows to author, now unblocked (Q12 = yes):** (1) the list-provisioning
-  flow, 9 lists with explicit internal names — supersedes manual UI; (2) the scheduled Graph
-  termStore walk that fills `taskmaster_terms` (`TermStore.Read.All` is DELEGATED ONLY, so it must
-  run as a signed-in user). Hand-seeding covers (2) in the meantime, so neither blocks.
+- **One Power Automate flow to author, unblocked (Q12 = yes):** the list-provisioning flow, **8
+  lists** with explicit internal names — supersedes manual UI. *(The term-store sync flow that was
+  here is no longer needed: the app reads the term store directly.)*
 - **Studio prerequisite before the edit screens:** add the **Office 365 Users** connection. An
   unrecognised connector name is a PASTE failure, not a runtime one.
 
@@ -146,3 +147,4 @@
 - 2026-08-02 1610 | merged PR#4; Phase-2 composition — component instances (static data) on Home/Reports/Projects; instance dialect grounded; audit clean (only known gates) | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-03 | schema intake → golden source → data layer → pa-yaml validator → C10 cache decision + cmpTermPicker → four CRUD screens with staged children | sessions/2026-08-03-crud-screens-and-term-picker.md
 - 2026-08-03 | Q12/Q14/licence-gate answered: FX conversion moved to Power BI (C5 reversed), flow-as-provisioner adopted, soft licence gate | sessions/2026-08-03-crud-screens-and-term-picker.md
+- 2026-08-03 | C10 revised: cache list deleted, picker cascades on the term Path from Choices(), MM write hands back the connector's own record | sessions/2026-08-03-crud-screens-and-term-picker.md

@@ -1,87 +1,115 @@
 # =============================================================================
 # cmpTermPicker  —  cascading Managed Metadata term picker (component)
 # =============================================================================
-# Implements C10 (schema.yaml -> open_recommendations, validated in
+# Implements C10 (schema.yaml -> open_recommendations; research in
 # docs/managed-metadata-picker.md): pick a term by walking the hierarchy one
 # level at a time, revealing the next level only when the chosen term has
-# children, and surface the LEAF's GUID for the SharePoint MM write.
-#
-# PURE COMPONENT — it touches no data source. The screen collects one term set
-# into a local collection and passes it in as `Terms`, so this file is safe to
-# paste before taskmaster_terms exists and cannot be broken by list naming.
-#
-# Contract:
-#   Terms       (Input, Table)   flat terms for ONE set; schema
-#                                {term_guid, term_label, term_parent_guid, term_path, term_is_leaf}
-#   Caption     (Input, Text)    field caption shown above the columns
-#   TermGuid    (Output, Text)   the resolved pick's GUID ("" when nothing valid is picked)
-#   TermLabel   (Output, Text)   its label
-#   TermPath    (Output, Text)   its full path (the MM write's `Path`)
-#   IsComplete  (Output, Boolean) true only when the pick is a LEAF — i.e. the
-#                                required depth has been reached
-#   OnChange    (Event)          raised on every pick, at any level
+# children, and hand back the LEAF so the SharePoint MM column can be written.
 #
 # ---------------------------------------------------------------------------
-# TWO DESIGN DECISIONS THAT ARE LOAD-BEARING — do not "simplify" either away.
+# IT CASCADES ON `Path`, AND THAT IS THE WHOLE DESIGN.
+#
+# `Choices([@list].mmColumn)` returns the term set straight from the term store,
+# and each record carries **Label, Path, Guid, WssId**. `Path` is the term's FULL
+# hierarchical path — "EMEA;UK;London" — so the hierarchy is already in the data.
+# There is nothing to precompute, nothing to mirror, and no parent-pointer column
+# to maintain: the term store stays the single source of truth and this component
+# just reads it.
+#
+# An earlier version of this file cascaded on a `term_parent_guid` column in a
+# `taskmaster_terms` cache list. That list is GONE. It was a second copy of a
+# vocabulary that already exists, with a refresh schedule and a drift risk, to
+# recover a hierarchy that `Path` hands over for free.
+#
+# THE ONE REAL LIMIT: `Choices()` on a managed-metadata column is capped at
+# **20 terms** by the SharePoint connector's backend query. It is not
+# configurable. If a term set exceeds 20 terms, the screen swaps its `Terms`
+# binding from `Choices(...)` to a collection filled by one Power Automate call
+# — same {Label, Path} shape, so nothing in this component changes.
+# ---------------------------------------------------------------------------
+#
+# Contract:
+#   Terms          (Input, Table)   {Label, Path} — from Choices() or a flow
+#   Caption        (Input, Text)    field caption shown above the level columns
+#   PathDelimiter  (Input, Text)    separator inside Path; ";" is the reported
+#                                   default. THE ONE THING TO CHANGE if the first
+#                                   paste shows a different separator — the hint
+#                                   line below prints a raw Path so you can see it.
+#   TermPath       (Output, Text)   resolved pick's full path ("" when nothing valid)
+#   TermLabel      (Output, Text)   its own label (last segment)
+#   IsComplete     (Output, Boolean) true only when the pick is a LEAF
+#   OnChange       (Event)          raised on every pick, at any level
+#
+# The screen turns TermPath back into a writable value with a direct lookup:
+#   project_region: LookUp( Choices([@taskmaster_projects].project_region),
+#                           Path = gPrRegionPath )
+# That hands the SharePoint connector its OWN record back, which is why this
+# component deliberately deals only in text and never builds a taxonomy record.
+#
+# ---------------------------------------------------------------------------
+# TWO DECISIONS THAT ARE LOAD-BEARING — do not "simplify" either away.
 #
 # 1. THE SENTINEL ROW. A canvas Gallery's `Selected` returns its FIRST row until
 #    the user interacts, so a bare cascade would silently auto-select a path the
 #    user never chose — and project_region / project_type are REQUIRED, so that
-#    is a wrong value written to SharePoint, not a cosmetic default. Every level
-#    therefore prepends an explicit "— select —" row whose term_guid is "".
-#    Untouched gallery => Selected is the sentinel => guid "" => no pick. The
-#    union is done with Ungroup(Table({v:...},{v:...}), "v"), the standard Power Fx
-#    way to concatenate two same-schema tables.
+#    is a wrong term written to SharePoint, not a cosmetic default. Every level
+#    prepends an explicit "— select —" row whose Path is "". The union is done
+#    with Ungroup(Table({v:...},{v:...}), "v"), the standard Power Fx way to
+#    concatenate two same-schema tables.
 #
-# 2. CHAIN VALIDATION. When the user changes level 1 after having picked level 2,
-#    whether the level-2 gallery clears its selection is exactly the sort of
-#    runtime detail a one-way gap cannot verify. So a level's value only counts
-#    if the row is genuinely a child of the level above it (`term_parent_guid`
-#    matches the level above's accepted value). A stale deeper pick fails that
-#    test and is discarded rather than written. lblPick below is where that runs.
+# 2. CHAIN VALIDATION, WHICH `Path` MAKES ALMOST FREE. When the user changes
+#    level 1 after having picked level 2, whether the level-2 gallery clears its
+#    selection is exactly the sort of runtime detail a one-way gap cannot verify.
+#    So a level's value counts only if its Path actually sits under the level
+#    above — `StartsWith(childPath, parentPath & delimiter)`. A stale deeper pick
+#    fails that test and is discarded rather than written. With parent GUIDs this
+#    needed a LookUp per level; with Path it is one StartsWith.
 #
 # Component-internal computed state lives on a hidden Label (lblPick), because a
 # component custom property referencing ANOTHER custom property of the same
 # component is unverified; a control property is the grounded way to compute once
-# and read four times.
-#
-# Grounded tokens only: Label@2.5.1, Rectangle@2.3.0, Gallery@2.15.0 (Vertical),
-# Classic/Button@2.2.0. DIALECT v3.0 pa.yaml. See _COMPONENTS-NOTES.md.
+# and read three times.
 #
 # DEPTH: four levels. Depth is discovered from the data (a level appears only if
-# the parent has children), but the number of PLACED levels is fixed — a canvas
-# app cannot instantiate controls at runtime, and nested galleries are not
-# supported, so "generate another dropdown" is realised as progressive reveal.
-# Four covers every term set in schema.yaml; a fifth is a copy-paste of level 4.
+# terms exist beneath the pick above), but the number of PLACED levels is fixed —
+# a canvas app cannot instantiate controls at runtime and nested galleries are
+# not supported, so "generate another dropdown" is progressive reveal. Four
+# covers every term set in schema.yaml; a fifth is a copy-paste of level 4.
+#
+# Grounded tokens only: Label@2.5.1, Rectangle@2.3.0, Gallery@2.15.0 (Vertical),
+# Classic/Button@2.2.0. Every formula uses constructs already proven in this repo
+# (Filter, StartsWith, CountRows, Split, Coalesce, Ungroup) — no Distinct, whose
+# result column has been named both `Result` and `Value` across versions.
 # =============================================================================
 ComponentDefinitions:
   cmpTermPicker:
     DefinitionType: CanvasComponent
-    Description: Cascading managed-metadata term picker; outputs the leaf term's GUID, label and path.
+    Description: Cascading managed-metadata term picker driven by the term Path; outputs the leaf term's path and label.
     AccessAppScope: false
     CustomProperties:
       Terms:
         PropertyKind: Input
-        Description: Flat term table for ONE term set. Schema {term_guid, term_label, term_parent_guid, term_path, term_is_leaf}.
+        Description: Term table for ONE term set, {Label, Path}. Normally ShowColumns(Choices([@list].mmColumn), "Label", "Path").
         DataType: Table
         Default: |
-          =Table( { term_guid: "", term_label: "", term_parent_guid: "", term_path: "", term_is_leaf: false } )
+          =Table( { Label: "", Path: "" } )
       Caption:
         PropertyKind: Input
         Description: Caption shown above the level columns.
         DataType: Text
         Default: ="Term"
-      TermGuid:
+      PathDelimiter:
+        PropertyKind: Input
+        Description: Separator between segments of a term Path. Change this one line if the hint shows a different separator.
+        DataType: Text
+        Default: =";"
+      TermPath:
         PropertyKind: Output
-        Description: GUID of the resolved pick — "" when nothing valid is selected.
+        Description: Full path of the resolved pick — "" when nothing valid is selected.
         DataType: Text
       TermLabel:
         PropertyKind: Output
-        Description: Label of the resolved pick.
-        DataType: Text
-      TermPath:
-        PropertyKind: Output
-        Description: Full hierarchical path of the resolved pick (the MM write's Path field).
+        Description: Own label of the resolved pick (its last path segment).
         DataType: Text
       IsComplete:
         PropertyKind: Output
@@ -95,16 +123,15 @@ ComponentDefinitions:
       Height: =190
       Width: =620
       Fill: =RGBA(0, 0, 0, 0)
-      # All four outputs read the single resolved GUID on lblPick.
-      TermGuid: =lblPick.Text
-      TermLabel: =Coalesce(LookUp(cmpTermPicker.Terms, term_guid = lblPick.Text, term_label), "")
-      TermPath: =Coalesce(LookUp(cmpTermPicker.Terms, term_guid = lblPick.Text, term_path), "")
-      # Leaf test is done by COUNTING children, not by trusting term_is_leaf —
-      # the cached flag is only as good as the last refresh, the child rows are
-      # the same data the cascade itself walks.
+      TermPath: =lblPick.Text
+      TermLabel: |
+        =Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )
+      # LEAF TEST: nothing in the set sits BELOW this path. Derived from the same
+      # data the cascade walks, so it cannot disagree with what is on screen.
       IsComplete: |
         =Len(lblPick.Text) > 0 &&
-         CountRows( Filter(cmpTermPicker.Terms, term_parent_guid = lblPick.Text) ) = 0
+         CountRows( Filter( cmpTermPicker.Terms,
+             StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0
     Children:
       - lblCaption:
           Control: Label@2.5.1
@@ -118,37 +145,34 @@ ComponentDefinitions:
             Width: =Parent.Width
             Height: =18
       # ---------------------------------------------------------------------
-      # RESOLVED PICK — the component's single piece of computed state.
-      # Hidden; every output reads it.
+      # RESOLVED PICK — the component's single piece of computed state. Hidden;
+      # every output reads it.
       #
-      # v1..v4 accept a level's selection ONLY if that row's parent is the value
-      # accepted at the level above (see decision 2 in the header). Coalesce then
-      # takes the DEEPEST accepted value; the sentinel's "" is treated as blank by
-      # Coalesce, which is why the sentinel guid is an empty string and not a
-      # marker like "none".
+      # v1..v4 accept a level's selection ONLY if its Path sits under the value
+      # accepted at the level above. Coalesce then takes the DEEPEST accepted
+      # value; the sentinel's "" is treated as blank by Coalesce, which is why
+      # the sentinel Path is an empty string and not a marker like "none".
       # ---------------------------------------------------------------------
       - lblPick:
           Control: Label@2.5.1
           Properties:
             Visible: =false
             Text: |
-              =With( { v1: galL1.Selected.term_guid },
-                 With( { v2: If( !IsBlank( LookUp( cmpTermPicker.Terms,
-                                     term_guid = galL2.Selected.term_guid && term_parent_guid = v1 ) ),
-                                 galL2.Selected.term_guid, "" ) },
-                   With( { v3: If( !IsBlank( LookUp( cmpTermPicker.Terms,
-                                       term_guid = galL3.Selected.term_guid && term_parent_guid = v2 ) ),
-                                   galL3.Selected.term_guid, "" ) },
-                     With( { v4: If( !IsBlank( LookUp( cmpTermPicker.Terms,
-                                         term_guid = galL4.Selected.term_guid && term_parent_guid = v3 ) ),
-                                     galL4.Selected.term_guid, "" ) },
-                       Coalesce( v4, v3, v2, v1, "" ) ) ) ) )
+              =With( { d: cmpTermPicker.PathDelimiter },
+                 With( { v1: galL1.Selected.Path },
+                   With( { v2: If( Len(v1) > 0 && StartsWith(galL2.Selected.Path, v1 & d),
+                                   galL2.Selected.Path, "" ) },
+                     With( { v3: If( Len(v2) > 0 && StartsWith(galL3.Selected.Path, v2 & d),
+                                     galL3.Selected.Path, "" ) },
+                       With( { v4: If( Len(v3) > 0 && StartsWith(galL4.Selected.Path, v3 & d),
+                                       galL4.Selected.Path, "" ) },
+                         Coalesce( v4, v3, v2, v1, "" ) ) ) ) ) )
             X: =0
             Y: =0
             Width: =1
             Height: =1
       # ---------------------------------------------------------------------
-      # LEVEL 1 — top of the set (term_parent_guid blank). Always visible.
+      # LEVEL 1 — the top of the set: paths with exactly one segment.
       # ---------------------------------------------------------------------
       - galL1:
           Control: Gallery@2.15.0
@@ -156,27 +180,27 @@ ComponentDefinitions:
           Properties:
             Items: |
               =Ungroup(
-                  Table( { v: Table({ term_guid: "", term_label: "— select —",
-                                      term_parent_guid: "", term_path: "", term_is_leaf: false }) },
-                         { v: Filter( cmpTermPicker.Terms, IsBlank(term_parent_guid) ) } ),
+                  Table( { v: Table({ Label: "— select —", Path: "" }) },
+                         { v: Filter( cmpTermPicker.Terms,
+                                  CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 1 ) } ),
                   "v" )
             TemplateSize: =28
             TemplatePadding: =0
             X: =0
             Y: =20
             Width: =(Parent.Width - 24) / 4
-            Height: =Parent.Height - 20
-            TemplateFill: =If(ThisItem.term_guid = galL1.Selected.term_guid, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
+            Height: =Parent.Height - 38
+            TemplateFill: =If(ThisItem.Path = galL1.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
           Children:
             - rowL1:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  Text: =ThisItem.term_label
+                  Text: =ThisItem.Label
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
                   Fill: =RGBA(0, 0, 0, 0)
-                  Color: =If(Len(ThisItem.term_guid) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
+                  Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
                   Y: =0
@@ -185,12 +209,10 @@ ComponentDefinitions:
                   # Select(Parent) drives galL1.Selected; OnChange fires once.
                   OnSelect: =Select(Parent); cmpTermPicker.OnChange()
       # ---------------------------------------------------------------------
-      # LEVEL 2 — children of the level-1 pick. The `!IsBlank(...)` guard is what
-      # stops a blank parent (the sentinel) from re-matching the TOP level, whose
-      # rows also have a blank term_parent_guid.
+      # LEVEL 2 — terms one segment deeper that sit under the level-1 pick.
       #
-      # NESTING DETECTION: Visible is CountRows(Items) > 1 — greater than one,
-      # because the sentinel is always present. One row means "no children",
+      # NESTING DETECTION: Visible is CountRows(Items) > 1 — greater than ONE,
+      # because the sentinel is always present. One row means "nothing below",
       # i.e. the level above was a leaf and the required depth is met.
       # ---------------------------------------------------------------------
       - galL2:
@@ -200,29 +222,29 @@ ComponentDefinitions:
             Visible: =CountRows(galL2.Items) > 1
             Items: |
               =Ungroup(
-                  Table( { v: Table({ term_guid: "", term_label: "— select —",
-                                      term_parent_guid: "", term_path: "", term_is_leaf: false }) },
+                  Table( { v: Table({ Label: "— select —", Path: "" }) },
                          { v: Filter( cmpTermPicker.Terms,
-                                  !IsBlank(galL1.Selected.term_guid)
-                               && term_parent_guid = galL1.Selected.term_guid ) } ),
+                                  Len(galL1.Selected.Path) > 0
+                               && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 2
+                               && StartsWith( Path, galL1.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
                   "v" )
             TemplateSize: =28
             TemplatePadding: =0
             X: =((Parent.Width - 24) / 4) + 8
             Y: =20
             Width: =(Parent.Width - 24) / 4
-            Height: =Parent.Height - 20
-            TemplateFill: =If(ThisItem.term_guid = galL2.Selected.term_guid, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
+            Height: =Parent.Height - 38
+            TemplateFill: =If(ThisItem.Path = galL2.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
           Children:
             - rowL2:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  Text: =ThisItem.term_label
+                  Text: =ThisItem.Label
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
                   Fill: =RGBA(0, 0, 0, 0)
-                  Color: =If(Len(ThisItem.term_guid) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
+                  Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
                   Y: =0
@@ -239,29 +261,29 @@ ComponentDefinitions:
             Visible: =CountRows(galL3.Items) > 1
             Items: |
               =Ungroup(
-                  Table( { v: Table({ term_guid: "", term_label: "— select —",
-                                      term_parent_guid: "", term_path: "", term_is_leaf: false }) },
+                  Table( { v: Table({ Label: "— select —", Path: "" }) },
                          { v: Filter( cmpTermPicker.Terms,
-                                  !IsBlank(galL2.Selected.term_guid)
-                               && term_parent_guid = galL2.Selected.term_guid ) } ),
+                                  Len(galL2.Selected.Path) > 0
+                               && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 3
+                               && StartsWith( Path, galL2.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
                   "v" )
             TemplateSize: =28
             TemplatePadding: =0
             X: =(((Parent.Width - 24) / 4) * 2) + 16
             Y: =20
             Width: =(Parent.Width - 24) / 4
-            Height: =Parent.Height - 20
-            TemplateFill: =If(ThisItem.term_guid = galL3.Selected.term_guid, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
+            Height: =Parent.Height - 38
+            TemplateFill: =If(ThisItem.Path = galL3.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
           Children:
             - rowL3:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  Text: =ThisItem.term_label
+                  Text: =ThisItem.Label
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
                   Fill: =RGBA(0, 0, 0, 0)
-                  Color: =If(Len(ThisItem.term_guid) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
+                  Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
                   Y: =0
@@ -270,8 +292,8 @@ ComponentDefinitions:
                   OnSelect: =Select(Parent); cmpTermPicker.OnChange()
       # ---------------------------------------------------------------------
       # LEVEL 4 — deepest placed level. If a term set is ever deeper than four,
-      # the picker stops here and IsComplete stays FALSE (the level-4 pick still
-      # has children), so the form refuses to save rather than writing a
+      # the picker stops here and IsComplete stays FALSE (terms still sit below
+      # the level-4 pick), so the form refuses to save rather than writing a
       # non-leaf term. That is the intended failure mode: visible, not silent.
       # ---------------------------------------------------------------------
       - galL4:
@@ -281,29 +303,29 @@ ComponentDefinitions:
             Visible: =CountRows(galL4.Items) > 1
             Items: |
               =Ungroup(
-                  Table( { v: Table({ term_guid: "", term_label: "— select —",
-                                      term_parent_guid: "", term_path: "", term_is_leaf: false }) },
+                  Table( { v: Table({ Label: "— select —", Path: "" }) },
                          { v: Filter( cmpTermPicker.Terms,
-                                  !IsBlank(galL3.Selected.term_guid)
-                               && term_parent_guid = galL3.Selected.term_guid ) } ),
+                                  Len(galL3.Selected.Path) > 0
+                               && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 4
+                               && StartsWith( Path, galL3.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
                   "v" )
             TemplateSize: =28
             TemplatePadding: =0
             X: =(((Parent.Width - 24) / 4) * 3) + 24
             Y: =20
             Width: =(Parent.Width - 24) / 4
-            Height: =Parent.Height - 20
-            TemplateFill: =If(ThisItem.term_guid = galL4.Selected.term_guid, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
+            Height: =Parent.Height - 38
+            TemplateFill: =If(ThisItem.Path = galL4.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
           Children:
             - rowL4:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  Text: =ThisItem.term_label
+                  Text: =ThisItem.Label
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
                   Fill: =RGBA(0, 0, 0, 0)
-                  Color: =If(Len(ThisItem.term_guid) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
+                  Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
                   Y: =0
@@ -311,15 +333,38 @@ ComponentDefinitions:
                   Height: =Parent.TemplateHeight
                   OnSelect: =Select(Parent); cmpTermPicker.OnChange()
       # ---------------------------------------------------------------------
-      # Empty state — the vocabulary has not been loaded yet. Without this the
-      # picker is just four blank columns and the cause (taskmaster_terms not
-      # populated — Q12) is invisible.
+      # PATH HINT — doubles as the first-paste diagnostic.
+      #
+      # It shows the raw Path of the current pick, or of the first term when
+      # nothing is picked. If the separator on screen is not `PathDelimiter`,
+      # that is visible immediately and the fix is one input. Under a one-way gap
+      # this is how a single "here's what it says" report resolves the one
+      # genuinely unverifiable detail in the whole component.
+      # ---------------------------------------------------------------------
+      - lblPathHint:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If( CountRows(cmpTermPicker.Terms) = 0, "",
+                   Len(lblPick.Text) > 0, "path:  " & lblPick.Text,
+                   "first term's path:  " & First(cmpTermPicker.Terms).Path )
+            Font: =Font.'Segoe UI'
+            Size: =10
+            Color: =RGBA(110, 120, 130, 1)
+            X: =0
+            Y: =Parent.Height - 16
+            Width: =Parent.Width
+            Height: =14
+      # ---------------------------------------------------------------------
+      # Empty state. With Choices() this most likely means the term set is empty
+      # or the column isn't bound; it is NOT the old "cache list not populated"
+      # case, because there is no cache any more.
       # ---------------------------------------------------------------------
       - lblNoTerms:
           Control: Label@2.5.1
           Properties:
             Visible: =CountRows(cmpTermPicker.Terms) = 0
-            Text: ="No terms loaded for this field. taskmaster_terms has not been populated yet."
+            Text: ="No terms came back for this field. Check the column is bound to a term set, and that the set has terms."
             Font: =Font.'Segoe UI'
             Size: =12
             Color: =RGBA(197, 58, 58, 1)
