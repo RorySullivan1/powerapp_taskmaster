@@ -29,6 +29,16 @@ Whichever works there:
 
 Copy the file **whole** unless a step says otherwise. Don't retype.
 
+## Validate before you carry anything across
+
+```
+python tools/validate_pa_yaml.py
+```
+
+Checks every authored file against **Microsoft's official `pa-yaml` v3.0 schema** (vendored at
+`tools/pa.schema.v3.0.yaml`). This is the only pre-paste check that exists on this side of the gap
+— it is what caught the component rejection. Expect `17/17 valid`.
+
 ---
 
 # The order
@@ -139,10 +149,11 @@ Paste **one unit at a time, onto a blank screen**. A rejection then points at on
 
 | Stage | Status |
 |---|---|
+| Channel | **PROVEN** — `scrAdmin` landed 2026-08-03. The screen dialect and control tokens are correct. |
 | Lists provisioned | **No** — every list is `provisioned: pending` in `schema/schema.yaml` |
-| Components built | **No** |
-| App.Formulas landed | **No** |
-| Screens landed | **No** — `paste-log.md` is empty |
+| Components built | **No** — first attempt was rejected; all 10 have since been corrected against Microsoft's official schema and now validate. Retry. |
+| App.Formulas landed | **No** (this is why `scrAdmin` rendered unstyled — `Theme.*` is undefined until it lands) |
+| Screens landed | `scrAdmin` only |
 
 Schema decisions are **complete** (C1, C3, C4, C5, C8, C9 applied; C6 by design). The one
 structural gap is **`asset_library`** — its schema was never supplied, so `task_output_asset` has
