@@ -1,6 +1,22 @@
 ---
-description: Reconcile a fresh Studio pull against the repo — diff vs the prior snapshot, flag drift and stale authored files, update the baseline and last-pull date.
-argument-hint: [screen/control name pulled, or "full app"]
+description: "[DEPRECATED — the air gap is one-way; nothing is ever pulled from Studio] Formerly reconciled a fresh Studio pull against the repo."
+argument-hint: (inoperative — no pull exists)
+---
+
+> # ⚠️ DEPRECATED — this command does not apply
+> The air gap is **one-way** (repo → Studio). **Nothing is ever pulled from Studio** — there is no
+> fresh state to reconcile, no baseline to update, no drift to diff. This command was written
+> assuming a two-way channel that does not exist. **Do not run it.**
+>
+> What replaces it:
+> - **The repo is the authoritative source.** There is no "live app state" to sync back. Studio-only
+>   edits are invisible drift, lost — mirror any such change back here by hand or it's gone.
+> - **Internal column names** (the one still-real concern below, §4) are captured **by hand** into
+>   `.claude/context/schema.md` when you provision, since no pull can expose them.
+> - See the **`studio-transfer`** skill (one-way principles) and `CLAUDE.md` "The air gap".
+>
+> The original two-way procedure is preserved below for historical context only.
+
 ---
 
 A human has pasted **fresh Studio state** (code-view YAML, or an exported `.msapp`/`pac canvas

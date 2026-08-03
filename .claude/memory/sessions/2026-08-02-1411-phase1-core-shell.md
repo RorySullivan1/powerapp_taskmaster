@@ -106,6 +106,25 @@
   against its definition, all Fx correct, zero tm* tokens. Only the known gates (components must
   exist first; gallery `Variant`). → PR #5.
 
+## One-way air gap correction + token de-risk (A/B)
+- **User corrected a core constraint: the air gap is ONE-WAY** (repo→Studio; only binary
+  "works/doesn't" returns). My repeated "confirm via round-trip / drop sample in studio/pulled/"
+  guidance was wrong — no return channel exists. Repo = authoritative source; Studio drift is lost.
+- **A — de-risked tokens from PUBLIC sources** (can't come back from work machine):
+  - Only the SCREEN nav gallery `Variant` is paste-critical → resolved `CONFIRM_BlankVertical`→
+    **`Vertical`**, `CONFIRM_BlankHorizontal`→**`Horizontal`** (public evidence: modern versioned
+    `Gallery@2.15.0` pairs with `Variant: Vertical`; alt is `galleryVertical`). Button-nav fallback documented.
+  - `HtmlViewer`/`Timer` tokens are **spec-only** — they live in components, which are hand-recreated
+    in the Studio component editor (never pasted), so their exact token can't fail a paste.
+  - Version suffix is OPTIONAL (Studio uses current if omitted) → only control name + Variant matter.
+- **B — fixed the two-way premise across the repo:** `CLAUDE.md` (air-gap section + layout +
+  compact + conventions), `studio-transfer/SKILL.md` (principles 1-2, round-trip section →
+  "no round-trip", lifecycle pulled→authored→landed → authored→landed, Watch Out), `pull-reconcile`
+  command **DEPRECATED** (banner), `change-end-to-end` workflow (step 1 + bail condition),
+  `studio/README.md` (inert), `docs/screen-map.md` (build order), `pre-paste-review` agent wording.
+- Follow-up: `/reindex` to regenerate CATALOG (pull-reconcile desc changed); minor incidental
+  mentions left (build-hooks.py comment, claudebrain-inventory).
+
 ## Open threads
 - **Round-trip test (now the hard blocker):** on the work machine, create the 5 screens named
   `scr{Home,Reports,Projects,Reference,Admin}`, insert one blank vertical gallery → View code →

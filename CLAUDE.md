@@ -1,17 +1,26 @@
 # powerapp_taskmaster
 
 A **canvas Power App** for EQD desk work management, backed by **SharePoint lists**, reported
-on in **Power BI**. This repo is the **mirror and workshop** for that app — the `.claude/` asset
-set, the authored source, the pulled Studio state, and the schema snapshot. It is **not** the
-running app: the app lives in Power Apps Studio on a work machine.
+on in **Power BI**. This repo is the **workshop and authoritative source** for that app — the
+`.claude/` asset set, the authored source, and the schema snapshot. There is **no pulled Studio
+state**: the gap is one-way, so nothing flows back from Studio. It is **not** the running app:
+the app lives in Power Apps Studio on a work machine.
 
 ## The air gap (true every session — read first)
 Studio runs on a **work machine**; this repo is on a **personal machine**. Between them there is
 **no connector, no MCP server, no tenant auth, no CI, no linter, no test run — only the
-clipboard, moved by hand.**
-- **Studio is the source of truth; the repo is a mirror.** It reflects the last pull or land.
-- **When unsure whether the repo matches the live app, stop and ask for a fresh pull.** A
-  confident answer against stale state is worse than no answer.
+clipboard, moved by hand, and it is ONE-WAY: repo → Studio.**
+- **The gap is one-way.** Authored source flows repo → Studio (a human pastes it). **Nothing
+  comes back** — no pull, no export, no code-view sample. The **only** return signal is the
+  human's binary **"it works / it doesn't."**
+- **The repo is the authoritative source; Studio is the downstream apply-target.** (Not the
+  reverse.) Anything edited directly in Studio is invisible drift, lost to the repo forever —
+  so author here, and treat these files as the truth.
+- **No round-trip, so resolve unknowns yourself.** Unknown paste tokens/dialect cannot be
+  confirmed by a return sample — resolve them from **public sources** (MS Learn, the
+  PowerApps-Tooling repo, public `.msapp`), or ship a **grounded fallback**. A wrong guess is a
+  failed manual paste the human can only report as "didn't work," then you revise blind — so
+  **maximise first-try correctness**; prefer grounded constructs over nicer-but-unverified ones.
 - **Studio's paste-time validation is the only check downstream.** Author small, audited units;
   a few large correct pastes beat many small speculative ones.
 - The **how-to** of crossing the gap (code view, the App-object formula-bar exception, rename-
@@ -24,8 +33,9 @@ by hand. Coverage, **by category**:
 - **Canvas app** — Power Fx authoring + delegation, reusable components/HtmlText, and review.
 - **SharePoint backend** — list/schema architecture and declarative column/view formatting.
 - **Integration & reporting** — Microsoft Graph, Power BI DAX, and Power Query/M.
-- **The air gap** — Studio transfer discipline (skill), pre-paste audit (agent), the
-  `change-end-to-end` workflow, and the `/pull-reconcile` command.
+- **The air gap** — Studio transfer discipline (skill) and pre-paste audit (agent), plus the
+  `change-end-to-end` workflow. (The `/pull-reconcile` command is **deprecated** — the one-way
+  gap has no pull to reconcile.)
 - **Cross-cutting** — session memory and the knowledge router.
 
 For the full always-current inventory (every skill, agent, command, workflow with a one-line
@@ -35,10 +45,10 @@ surfaces each by its `description:`.
 
 ## Repo layout
 - **`.claude/`** — the asset set (skills, the pre-paste agent, `change-end-to-end` workflow,
-  `pull-reconcile` command, context briefs, memory, operational hooks).
-- **`studio/pulled/`** — code-view YAML pulled from Studio: the baseline the repo mirrors
-  (paste dialect). `studio/pulled-src/` (optional) — a read-only `.pa.yaml` export for whole-app
-  reasoning.
+  context briefs, memory, operational hooks; the `pull-reconcile` command is deprecated).
+- **`studio/`** — **effectively unused under the one-way gap** (`pulled/`, `pulled-src/` assumed
+  a return channel that doesn't exist; nothing is ever pulled from Studio). Kept only as inert
+  scaffolding; do not rely on it as a baseline.
 - **`src/authored/`** — authored control YAML, pending paste. **`src/patches/`** — App-object
   bodies (`App.OnStart`/`App.Formulas`) for the formula bar (no App code view).
 - **`schema/`** — the schema snapshot (true internal names, once columns exist).
@@ -51,7 +61,7 @@ surfaces each by its `description:`.
   Deep-read only what the task needs.
 - **Output contract:** never invent a column name — every field token must resolve to
   `context/schema.md`'s internal names. Nothing is "in the app" until a human pastes it and it
-  validates (see the pulled→authored→landed lifecycle in `studio-transfer`). Route decisions to
+  validates (see the authored→landed lifecycle in `studio-transfer`). Route decisions to
   `session-memory`, not into these briefs.
 
 ## Memory & decisions
@@ -63,8 +73,8 @@ session can't relitigate a settled call.
 
 ## Conventions
 - **Provisioning is manual** (SharePoint UI) → set clean internal names at column creation and
-  record the **true** names in the snapshot; watch `_x0020_` mangling. (`/pull-reconcile`
-  cross-checks.)
+  record the **true** names in the snapshot; watch `_x0020_` mangling. True names are captured
+  **by hand** into `schema/` (the one-way gap means no pull can reconcile them for you).
 - Skill folder name always equals the skill's `name:` frontmatter.
 - Operational hooks are compiled from `.claude/hooks/*.json` into `settings.json` by
   `build-hooks.py`; edit fragments, not `settings.json`.
@@ -75,12 +85,15 @@ each with its rationale — build deliberately, not by default:
 - **Column-token validator** *(strongest)* — on write to authored YAML, grep for column tokens
   and validate against the schema snapshot. "Never invent a column name" is currently prose the
   model can drift past; a hook makes it enforced.
-- **Freshness guard** — warn when authored files change but the last-pull date is stale, nudging
-  a `/pull-reconcile` before more work accretes on an unverified baseline.
 - **Paste-log guard** — flag an authored file marked landed with no matching paste-log entry.
 
+*(A "freshness guard" nudging `/pull-reconcile` was proposed but is moot — the one-way gap has no
+pull to be stale against.)*
+
 ## Compact Instructions
-On compaction, preserve: **the air gap** (clipboard-only; stop-and-pull when unsure), that
+On compaction, preserve: **the air gap** (clipboard-only, **ONE-WAY** repo→Studio; only binary
+"works/doesn't" returns; repo is the authoritative source; resolve unknowns from public sources
+or ship fallbacks — no pull/round-trip exists), that
 **tickets are full ticket-level primary** (delegation/indexing critical), that **provisioning is
 manual** (true internal names, `_x0020_` risk), that **not everyone is Power BI-licensed** (native
 nav + empty state), and that **no Power Fx/`.pa.yaml` is authored yet**.
