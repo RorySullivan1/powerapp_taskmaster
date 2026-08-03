@@ -1,9 +1,33 @@
 # Core-shell — build notes, paste order, and the confirmation gate
 
 Phase-1 shell authored from `docs/screen-map.md` (theme + Table-driven nav + screen
-shells + empty states). **Data-independent** — no `tm*` column tokens, so it is
-paste-ready before any SharePoint list is provisioned. Nothing here is "in the app"
-until a human pastes it and it validates; log each crossing in `../../paste-log.md`.
+shells + empty states), now with a **Phase-2 composition pass** that drops component
+instances onto Home/Reports/Projects with **static** data. **Data-independent** — no
+`tm*` column tokens, so it is paste-ready before any SharePoint list is provisioned.
+Nothing here is "in the app" until a human pastes it and it validates; log each crossing
+in `../../paste-log.md`.
+
+## Phase-2 composition (static data)
+
+`scrHome`, `scrReports`, `scrProjects` now instantiate components (`components/`):
+
+- **scrHome** — `cmpSectionHeader` + three `cmpStatusCard` KPI tiles + a `cmpKpiRing`,
+  plus a `cmpToast` and a full-screen `cmpConfirmDialog` wired to a demo "Archive" button.
+- **scrReports** — three `cmpKpiRing`s as the **licence-free Q2 fallback** (shown when
+  `Not(gHasPowerBiLicence)`), beside the licence card.
+- **scrProjects** — `cmpSectionHeader` + a `cmpSelection` filter strip.
+
+Key facts:
+- **Instance dialect (v3.0):** `Control: CanvasComponent` + `ComponentName: cmpX` +
+  `Properties:` (base props `X/Y/Width/Height` **and** custom props). Instances have **no
+  `Children:`**. The referenced components must **exist in the app first** — recreate them
+  (see `components/_COMPONENTS-NOTES.md`) before pasting these screens.
+- **Demo UI-state globals** (no schema, no `OnStart` — blank is falsy): `gToastMsg`,
+  `gToastTone`, `gConfirmOpen`.
+- **All values are static.** Every live query is a `TODO(Phase-2-data)` comment (KPI counts,
+  ring `Percent`, project filter) — they need provisioned lists + true internal names.
+- **Not yet composed:** the pills (`cmpStatusPill`/`cmpChoicePill`/`cmpUiKit`) and
+  `cmpEditableGrid` are gallery/data-bound — they land when the data galleries are wired.
 
 ## Files
 

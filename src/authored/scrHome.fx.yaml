@@ -1,15 +1,19 @@
 # =============================================================================
-# scrHome  —  personalised landing (screen-map §1). CORE-SHELL: header + nav +
-# empty-state tiles. Data-independent — no tmXxx tokens (Phase 2 wires the
-# my-tasks / my-issues delegable queries).
+# scrHome  —  personalised landing (screen-map §1). PHASE-2 COMPOSITION:
+# header + nav + component instances with STATIC placeholder data. Turns the
+# empty-state shell into a real, clickable screen. Live my-tasks / my-issues
+# queries are marked TODO(Phase-2-data) — they need provisioned lists + true
+# internal names (schema.md is still ⟨capture⟩) so are NOT authored here.
 #
-# DIALECT: modern structured schema (Screens/Children/Control:Type@version),
-# grounded on the example's genuine Studio export. Z-order is POSITIONAL (no
-# ZIndex) — later child = on top. Control version tokens are real; the ONE
-# unconfirmed token is NavGallery's `Variant` (blank vertical gallery) — confirm
-# via the studio-transfer round-trip. See _SHELL-NOTES.md.
-# Depends on App.Formulas (Theme, NavMenu) pasted last, and sibling screens
-# existing so NavMenu's Screen refs resolve.
+# Component INSTANCES use v3.0 dialect: `Control: CanvasComponent` +
+# `ComponentName:` + `Properties:` (base props X/Y/W/H AND custom props;
+# instances have NO Children). The referenced components must exist in the app
+# first (src/authored/components/). Screens CAN read the App.Formulas `Theme`
+# (only components can't), so Theme.* tokens stay here.
+#
+# Demo UI-state globals (no schema, no OnStart — blank is falsy):
+#   gToastMsg / gToastTone  — feed the toast; gConfirmOpen — the confirm modal.
+# DIALECT: modern structured .pa.yaml; gallery `Variant` still round-trip-gated.
 # =============================================================================
 Screens:
   scrHome:
@@ -62,8 +66,6 @@ Screens:
             Y: =Theme.Space.HeaderH
       - NavGallery:
           Control: Gallery@2.15.0
-          # ROUND-TRIP UNKNOWN: replace with the Variant Studio emits for a blank
-          # vertical gallery (insert one, View code, read its `Variant:`).
           Variant: CONFIRM_BlankVertical
           Properties:
             Items: =NavMenu
@@ -73,7 +75,6 @@ Screens:
             Height: =Parent.Height - Theme.Space.HeaderH
             X: =0
             Y: =Theme.Space.HeaderH
-            # Active-screen highlight — self-valid via App.ActiveScreen (T6).
             TemplateFill: =If(ThisItem.Screen = App.ActiveScreen, Theme.Color.Accent, Theme.Color.Surface)
             OnSelect: =Navigate(ThisItem.Screen, ScreenTransition.Fade)
           Children:
@@ -81,7 +82,6 @@ Screens:
                 Control: Classic/Icon@2.5.0
                 Properties:
                   Icon: =ThisItem.Icon
-                  # Grey the Power BI-gated entry for unlicensed users (App.Formulas TODO).
                   Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.Primary)
                   Height: =24
                   Width: =24
@@ -99,50 +99,132 @@ Screens:
                   VerticalAlign: =VerticalAlign.Middle
                   X: =Theme.Space.Gap + 24 + Theme.Space.Gap
                   Width: =Parent.TemplateWidth - Self.X - Theme.Space.Gap
-      # ---- Content area ---------------------------------------------------
-      - ContentTitle:
-          Control: Label@2.5.1
+      # ---- Content: composed component instances (static demo data) --------
+      - hdrMyWork:
+          Control: CanvasComponent
+          ComponentName: cmpSectionHeader
           Properties:
-            Text: ="Good to see you"
-            Font: =Theme.Font
-            FontWeight: =FontWeight.Semibold
-            Size: =Theme.Size.H1
-            Color: =Theme.Color.TextPrimary
             X: =Theme.Space.NavW + Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter
             Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
-            Height: =40
-      - ContentSubtitle:
+            Height: =60
+            Title: ="My work"
+            Subtitle: ="Snapshot — live my-tasks / my-issues connect in Phase 2"
+            ShowAction: =true
+            ActionLabel: ="Show toast"
+            OnAction: =Set(gToastMsg, "Refreshed (demo)"); Set(gToastTone, "Info"); cmpToastHome.Show()
+      # Three KPI cards. TODO(Phase-2-data): replace static Value/Trend with
+      # local aggregates over the delegable-filtered my-tasks collection.
+      - cardOpen:
+          Control: CanvasComponent
+          ComponentName: cmpStatusCard
+          Properties:
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
+            Height: =120
+            Title: ="Open tasks"
+            Value: ="12"
+            Caption: ="assigned to me"
+            Trend: =0.08
+            Accent: =Theme.Color.Primary
+            OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
+      - cardOverdue:
+          Control: CanvasComponent
+          ComponentName: cmpStatusCard
+          Properties:
+            X: =Theme.Space.NavW + Theme.Space.Gutter + ((Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3) + Theme.Space.Gap
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
+            Height: =120
+            Title: ="Overdue"
+            Value: ="3"
+            Caption: ="need attention"
+            Trend: =-0.15
+            Accent: =Theme.Color.Danger
+            OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
+      - cardIssues:
+          Control: CanvasComponent
+          ComponentName: cmpStatusCard
+          Properties:
+            X: =Theme.Space.NavW + Theme.Space.Gutter + 2 * (((Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3) + Theme.Space.Gap)
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
+            Height: =120
+            Title: ="Open issues"
+            Value: ="5"
+            Caption: ="raised by / owned by me"
+            Trend: =0
+            Accent: =Theme.Color.Warning
+            OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
+      # SVG completion ring (licence-free). TODO(Phase-2-data): Percent from a
+      # delegable-filtered, bounded count (done / total) — power-fx-development.
+      - ringHome:
+          Control: CanvasComponent
+          ComponentName: cmpKpiRing
+          Properties:
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter
+            Width: =140
+            Height: =140
+            Percent: =72
+            Label: ="72%"
+            AccentHex: ="#005A9E"
+            TrackHex: ="#E1E5EB"
+      - lblRing:
           Control: Label@2.5.1
           Properties:
-            # gUserEmail comes from App.Formulas; harmless if blank at author time.
-            Text: =gUserEmail
+            Text: ="Overall completion (demo)"
+            Color: =Theme.Color.TextMuted
             Font: =Theme.Font
             Size: =Theme.Size.Body
-            Color: =Theme.Color.TextMuted
-            X: =Theme.Space.NavW + Theme.Space.Gutter
-            Y: =ContentTitle.Y + ContentTitle.Height
-            Width: =ContentTitle.Width
-            Height: =28
-      # ---- Empty-state placeholder card (Phase 2 replaces with my-tasks) ---
-      - EmptyCard:
-          Control: Rectangle@2.3.0
-          Properties:
-            Fill: =Theme.Color.Surface
-            Height: =180
-            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
-            X: =Theme.Space.NavW + Theme.Space.Gutter
-            Y: =ContentSubtitle.Y + ContentSubtitle.Height + Theme.Space.Gap
-      - EmptyCardLabel:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Your open tasks and issues will appear here once the SharePoint lists are connected."
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            Color: =Theme.Color.TextMuted
-            Align: =Align.Center
+            X: =Theme.Space.NavW + Theme.Space.Gutter + 140 + Theme.Space.Gap
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter + 56
+            Width: =260
+            Height: =24
             VerticalAlign: =VerticalAlign.Middle
-            X: =EmptyCard.X
-            Y: =EmptyCard.Y
-            Width: =EmptyCard.Width
-            Height: =EmptyCard.Height
+      # Demo trigger for the confirm dialog (destructive pattern).
+      - btnArchive:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Archive a project…"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.Danger
+            BorderColor: =Theme.Color.Danger
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =40
+            Width: =200
+            X: =Theme.Space.NavW + Theme.Space.Gutter + 140 + Theme.Space.Gap
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter + 90
+            OnSelect: =Set(gConfirmOpen, true)
+      # Toast (bottom-right). Set gToastMsg/gToastTone then call .Show().
+      - cmpToastHome:
+          Control: CanvasComponent
+          ComponentName: cmpToast
+          Properties:
+            X: =Parent.Width - 340 - Theme.Space.Gutter
+            Y: =Parent.Height - 56 - Theme.Space.Gutter
+            Width: =340
+            Height: =56
+            Message: =gToastMsg
+            Tone: =gToastTone
+            Duration: =3000
+      # Confirm modal (full-screen; declared LAST so it layers on top).
+      - cmpConfirmHome:
+          Control: CanvasComponent
+          ComponentName: cmpConfirmDialog
+          Properties:
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Visible: =gConfirmOpen
+            Title: ="Archive this project?"
+            Message: ="It will be hidden from active lists. You can restore it from Admin. (Demo — no data is changed.)"
+            ConfirmLabel: ="Archive"
+            CancelLabel: ="Cancel"
+            Destructive: =true
+            OnConfirm: =Set(gConfirmOpen, false); Set(gToastMsg, "Archived (demo)"); Set(gToastTone, "Danger"); cmpToastHome.Show()
+            OnCancel: =Set(gConfirmOpen, false)

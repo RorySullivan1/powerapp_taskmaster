@@ -8,6 +8,11 @@
   `cmpEditableGrid`, `cmpSectionHeader`, `cmpConfirmDialog`, `cmpToast`, `cmpKpiRing` SVG).
   Data-independent (no `tm*` tokens). All audited → **NOT landed** (paste-log empty).
   See `_SHELL-NOTES.md` + `components/_COMPONENTS-NOTES.md`.
+- **Phase-2 composition done (static data):** `scrHome`/`scrReports`/`scrProjects` now instantiate
+  6 components (cards+ring+toast+confirm on Home, 3 KPI rings as the Q2 fallback on Reports,
+  section-header+selection on Projects). Instance dialect = `Control: CanvasComponent` +
+  `ComponentName:` + `Properties:`, no `Children:`. Live queries left as `TODO(Phase-2-data)`.
+  Real data binding still blocked on provisioning (⟨capture⟩ names) + a pull. Merged PR#2/3/4.
 - **Dialect (learned):** paste target is the **modern structured schema** (`Screens:`/`Children:`/
   `Control: Type@version`, positional z-order, no ZIndex) — NOT `pac canvas unpack`'s retired
   inline `As type:` format. Files converted with real tokens from the example export.
@@ -55,9 +60,11 @@
   (cmpToast), gallery `Variant` placeholders. **Component transfer:** recreate from contract
   tables in the Studio component editor / library — code-view paste unproven for component
   defs. → `components/_COMPONENTS-NOTES.md`.
-- **Wire the 10 components into screens in Phase 2** (starts leaning on `tm*` bindings →
-  post-provisioning). e.g. `cmpStatusCard`/`cmpKpiRing` on Home+Reports, `cmpUiKit` pills in
-  galleries, `cmpEditableGrid` on the Tickets tab, `cmpConfirmDialog`/`cmpToast` app-wide.
+- **Phase-2 component composition DONE for 6/10** (static data on Home/Reports/Projects).
+  Remaining 4 are gallery/data-bound → compose when data galleries wired: `cmpUiKit` pills +
+  `cmpStatusPill`/`cmpChoicePill` in row templates, `cmpEditableGrid` on the Tickets tab.
+- **Phase-2 DATA binding still blocked** on provisioning (true internal names — `schema.md`
+  ⟨capture⟩) + a confirmed pull. Every live query is a `TODO(Phase-2-data)` in the screens.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md
@@ -65,3 +72,4 @@
 - 2026-08-02 1411 | Phase-1 core shell authored (theme + NavMenu + 5 screens); pre-paste audit; dialect corrected to modern structured schema | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-02 1520 | 6 reusable components authored (v3.0 ComponentDefinitions); audit found+fixed cmpSelection double-fire + Output-reads-var | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-02 1545 | merged PR#2 shell + PR#3 components to main; +4 extra components (cmpSectionHeader/ConfirmDialog/Toast/KpiRing SVG), audit PASTE-clean | sessions/2026-08-02-1411-phase1-core-shell.md
+- 2026-08-02 1610 | merged PR#4; Phase-2 composition — component instances (static data) on Home/Reports/Projects; instance dialect grounded; audit clean (only known gates) | sessions/2026-08-02-1411-phase1-core-shell.md

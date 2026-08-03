@@ -88,6 +88,24 @@
 - **pre-paste audit: PASTE — content-clean, zero defects.** Only gate = documented
   `Classic/Timer@2.1.0` token (cmpToast); the other 3 use grounded tokens only. → PR #4.
 
+## Phase-2 composition pass (static data; user chose the unblocked path)
+- Merged PR#4. User said "move on to phase 2"; chose **compose components with static data**
+  (Phase-2 DATA binding is blocked — schema.md ⟨capture⟩, no pull). Branch `feat/phase2-compose-components`.
+- **Grounded the component-INSTANCE dialect** (v3.0, from the schema): `Control: CanvasComponent`
+  + `ComponentName: cmpX` + `Properties:` (base props X/Y/W/H AND custom props). Instances have
+  **NO `Children:`**. Built-in controls keep `Control: Type@version` (+ optional `Variant`/`Group`).
+- Composed 6/10 components: **scrHome** = cmpSectionHeader + 3×cmpStatusCard + cmpKpiRing +
+  cmpToast + cmpConfirmDialog (demo globals gToastMsg/gToastTone/gConfirmOpen; no OnStart —
+  blank is falsy). **scrReports** = 3×cmpKpiRing as the Q2 licence-free fallback (Visible=
+  Not(gHasPowerBiLicence)). **scrProjects** = cmpSectionHeader + cmpSelection filter strip.
+- Remaining 4 (cmpUiKit pills, cmpStatusPill, cmpChoicePill, cmpEditableGrid) are gallery/data-
+  bound → compose when the data galleries are wired (post-provisioning).
+- **Gotcha (3rd time):** colon-space in an inline value — `"Filter: "` inside `OnChange:` — broke
+  YAML parse. Block scalar `|` fixes it. Every live query left as `TODO(Phase-2-data)`.
+- **pre-paste audit: DO-NOT-PASTE but ZERO new content defects** — every instance prop resolves
+  against its definition, all Fx correct, zero tm* tokens. Only the known gates (components must
+  exist first; gallery `Variant`). → PR #5.
+
 ## Open threads
 - **Round-trip test (now the hard blocker):** on the work machine, create the 5 screens named
   `scr{Home,Reports,Projects,Reference,Admin}`, insert one blank vertical gallery → View code →
