@@ -63,6 +63,7 @@
 - [2026-08-03] C1 RESOLVED: multi-person → single `task_supporter`/`project_supporter` (1 extra person, indexed). 'Mine' now fully delegable via `lead.Email = me || supporter.Email = me`; join cost unchanged (tasks 8) — schema/schema.yaml
 - [2026-08-03] C3 RESOLVED: `project_perc_completion` = weighted mean of child task-stage weights (0/10/35/60/85/100, Archived excluded), WRITER = **app-side** — app patches parent on task-stage change. `StageWeights` named formula + write-back snippet in `src/patches/App.Formulas.pa.fx`. Cost: stale if SP edited directly — schema/schema.yaml
 - [2026-08-03] C6 BY DESIGN: three region columns are intentional — approval_region is broad-stroke, project/client_region are granular, never used together. No conformed dimension; separate PBI dimensions; do NOT 'fix' — .claude/context/schema.md
+- [2026-08-03] Phase-2 DATA bound on scrHome/scrProjects/scrReports: one delegable Filter per screen → local aggregation (CountRows/Average never delegate). galProjects uses If-of-independent-Filters so each branch folds. Reports rings deliberately SCOPED (my tasks / active projects) — org-wide counts can't be exact in-app. Trends zeroed, not faked — src/authored/
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -84,7 +85,7 @@
 - **Phase-2 component composition DONE for 6/10** (static data on Home/Reports/Projects).
   Remaining 4 are gallery/data-bound → compose when data galleries wired: `cmpUiKit` pills +
   `cmpStatusPill`/`cmpChoicePill` in row templates, `cmpEditableGrid` on the Tickets tab.
-- **Phase-2 DATA binding still blocked** on provisioning (true internal names — `schema.md`
+- **Phase-2 DATA binding DONE (2026-08-03)** — pre-paste audit in flight. Was blocked on provisioning (true internal names — `schema.md`
   ⟨capture⟩) + a confirmed pull. Every live query is a `TODO(Phase-2-data)` in the screens.
 
 - **Schema intake COMPLETE (7 lists) and promoted to `.claude/context/schema.md`.** Outstanding: `asset_library` schema never supplied (blocks `task_output_asset`).

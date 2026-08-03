@@ -10,6 +10,39 @@ Screens:
   scrReports:
     Properties:
       Fill: =Theme.Color.Bg
+      # ---- PHASE-2 DATA (Q2 licence-free fallback) --------------------------
+      # SCOPE MATTERS: SharePoint cannot count org-wide accurately from the app —
+      # CountRows never delegates, so it only ever counts the rows already pulled
+      # (the data row limit). Every figure here is therefore deliberately scoped
+      # to a set small enough to be exact: YOUR tasks, and the active projects
+      # list. Org-wide analytics stay in Power BI, which imports the lists whole.
+      OnVisible: |
+        =Concurrent(
+            ClearCollect( colMyTasks,
+                Filter( taskmaster_tasks,
+                    ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail )
+                 && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+                   || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+                   || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
+            ClearCollect( colActiveProjects,
+                Filter( taskmaster_projects,
+                    project_phase.Value = "Planning" || project_phase.Value = "Active"
+                 || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" ) )
+        );
+        Set( gRptOpen, Filter(colMyTasks, task_stage.Value <> "Complete") );
+        Set( gRptOnTrack,
+             If( CountRows(gRptOpen) = 0, 0,
+                 RoundDown( CountRows(Filter(gRptOpen, task_status.Value = "Green"))
+                            / CountRows(gRptOpen) * 100, 0 ) ) );
+        Set( gRptAtRisk,
+             If( CountRows(gRptOpen) = 0, 0,
+                 RoundDown( CountRows(Filter(gRptOpen,
+                              task_status.Value = "Amber" || task_status.Value = "Red"))
+                            / CountRows(gRptOpen) * 100, 0 ) ) );
+        Set( gRptPortfolio,
+             If( CountRows(colActiveProjects) = 0, 0,
+                 RoundDown( Average( AddColumns( colActiveProjects, "pc",
+                     Coalesce(project_perc_completion, 0) ), pc ), 0 ) ) )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -136,9 +169,9 @@ Screens:
             Height: =90
             Visible: =Not(gHasPowerBiLicence)
       # ---- Native SVG KPI fallback (Q2 / distillation C1) ------------------
-      # Licence-free headline visuals via cmpKpiRing. Shown to unlicensed users
-      # alongside the card. TODO(Phase-2-data): Percent from delegable-filtered,
-      # bounded counts over the tm* lists (power-fx-development). Static for now.
+      # Licence-free headline visuals via cmpKpiRing, fed by the locals Set in
+      # OnVisible. On track / At risk read task_status (health); the third ring
+      # is the mean of project_perc_completion, the app-side weighted rollup (C3).
       - hdrFallback:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
@@ -149,7 +182,7 @@ Screens:
             Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
             Height: =60
             Title: ="Headline status"
-            Subtitle: ="Drawn natively — no Power BI licence required"
+            Subtitle: ="Drawn natively — no Power BI licence required. Scoped to your tasks and active projects; org-wide analysis lives in Power BI."
             ShowAction: =false
       - ringOnTrack:
           Control: CanvasComponent
@@ -160,8 +193,8 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 220 + Theme.Space.Gutter + 60 + Theme.Space.Gap
             Width: =140
             Height: =140
-            Percent: =72
-            Label: ="On track"
+            Percent: =gRptOnTrack
+            Label: =gRptOnTrack & "% on track"
             AccentHex: ="#31825D"
       - ringAtRisk:
           Control: CanvasComponent
@@ -172,10 +205,10 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 220 + Theme.Space.Gutter + 60 + Theme.Space.Gap
             Width: =140
             Height: =140
-            Percent: =18
-            Label: ="At risk"
+            Percent: =gRptAtRisk
+            Label: =gRptAtRisk & "% at risk"
             AccentHex: ="#D69828"
-      - ringComplete:
+      - ringPortfolio:
           Control: CanvasComponent
           ComponentName: cmpKpiRing
           Properties:
@@ -184,6 +217,6 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 220 + Theme.Space.Gutter + 60 + Theme.Space.Gap
             Width: =140
             Height: =140
-            Percent: =45
-            Label: ="Complete"
+            Percent: =gRptPortfolio
+            Label: =gRptPortfolio & "% complete"
             AccentHex: ="#005A9E"

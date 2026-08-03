@@ -101,8 +101,9 @@ Screens:
             ShowAction: =true
             ActionLabel: ="New project"
             OnAction: =Notify("New project — wired in Phase 2", NotificationType.Information)
-      # Static filter strip. TODO(Phase-2-data): filter the gallery by
-      # selFilter.Selected (All / Active / Archived on IsArchived).
+      # Filter strip — drives galProjects.Items. There is no boolean archive
+      # flag in this model: "Archived" is a value of the project_phase Choice
+      # (schema.md C7), so each branch enumerates phases with an Or of `=`.
       - selFilter:
           Control: CanvasComponent
           ComponentName: cmpSelection
@@ -114,8 +115,7 @@ Screens:
             Items: |
               =Table({ Id: 1, Label: "All" }, { Id: 2, Label: "Active" }, { Id: 3, Label: "Archived" })
             DefaultId: =2
-            OnChange: |
-              =Notify("Filter: " & selFilter.Selected.Label, NotificationType.Information)
+            OnChange: =Reset(SearchBox)
       - SearchBox:
           Control: Classic/TextInput@2.3.2
           Properties:
@@ -127,24 +127,118 @@ Screens:
             Width: =360
             X: =Theme.Space.NavW + Theme.Space.Gutter + 360 + Theme.Space.Gap
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
-      - ProjectsEmpty:
-          Control: Rectangle@2.3.0
+      # ---- Projects gallery (delegable) -----------------------------------
+      # Each If branch is INDEPENDENTLY delegable; the selector is a constant at
+      # evaluation time, so the chosen Filter folds to SharePoint. Written this
+      # way deliberately — embedding selFilter inside one predicate risks the
+      # whole expression failing to fold. Sort on project_name (Text) delegates;
+      # the blank-search guard is the documented StartsWith pattern.
+      - galProjects:
+          Control: Gallery@2.15.0
+          Variant: Vertical
           Properties:
-            Fill: =Theme.Color.Surface
-            Height: =Parent.Height - (SearchBox.Y + SearchBox.Height + Theme.Space.Gap) - Theme.Space.Gutter
+            Items: |
+              =Sort(
+                  If( selFilter.Selected.Id = 3,
+                      Filter( taskmaster_projects,
+                          project_phase.Value = "Archived"
+                       && ( IsBlank(SearchBox.Text) || StartsWith(project_name, SearchBox.Text) ) ),
+                      selFilter.Selected.Id = 2,
+                      Filter( taskmaster_projects,
+                          ( project_phase.Value = "Planning" || project_phase.Value = "Active"
+                         || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" )
+                       && ( IsBlank(SearchBox.Text) || StartsWith(project_name, SearchBox.Text) ) ),
+                      Filter( taskmaster_projects,
+                          IsBlank(SearchBox.Text) || StartsWith(project_name, SearchBox.Text) ) ),
+                  project_name )
+            TemplateSize: =72
+            TemplatePadding: =0
             Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
+            Height: =Parent.Height - (SearchBox.Y + SearchBox.Height + Theme.Space.Gap) - Theme.Space.Gutter
             X: =Theme.Space.NavW + Theme.Space.Gutter
             Y: =SearchBox.Y + SearchBox.Height + Theme.Space.Gap
+            TemplateFill: =If(ThisItem.ID = gSelProject.ID, Theme.Color.Accent, Theme.Color.Surface)
+            OnSelect: =Set(gSelProject, ThisItem)
+          Children:
+            - rowName:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.project_name
+                  Font: =Theme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =Theme.Size.H3
+                  Color: =Theme.Color.TextPrimary
+                  X: =Theme.Space.Gap
+                  Y: =10
+                  Width: =Parent.TemplateWidth * 0.42
+                  Height: =26
+                  VerticalAlign: =VerticalAlign.Middle
+            - rowMeta:
+                Control: Label@2.5.1
+                Properties:
+                  # Person and Choice subfields read locally off the returned row —
+                  # no extra call, so this is not an N+1.
+                  Text: |
+                    =ThisItem.project_phase.Value & "  ·  " & ThisItem.project_priority.Value
+                     & "  ·  " & Coalesce(ThisItem.project_manager.DisplayName, "Unassigned")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  X: =Theme.Space.Gap
+                  Y: =36
+                  Width: =Parent.TemplateWidth * 0.42
+                  Height: =20
+                  VerticalAlign: =VerticalAlign.Middle
+            - rowTarget:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =If( IsBlank(ThisItem.project_date_target), "No target date",
+                         "Target " & Text(ThisItem.project_date_target, "dd mmm yyyy") )
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  # Overdue only counts while the project is still running.
+                  Color: |
+                    =If( !IsBlank(ThisItem.project_date_target)
+                      && ThisItem.project_date_target < Today()
+                      && ThisItem.project_phase.Value <> "Complete"
+                      && ThisItem.project_phase.Value <> "Archived",
+                         Theme.Color.Danger, Theme.Color.TextMuted )
+                  X: =Parent.TemplateWidth * 0.46
+                  Y: =26
+                  Width: =Parent.TemplateWidth * 0.24
+                  Height: =20
+                  VerticalAlign: =VerticalAlign.Middle
+            - rowPercent:
+                Control: Label@2.5.1
+                Properties:
+                  # Weighted rollup maintained app-side (C3). Blank until the
+                  # first in-app stage change writes it.
+                  Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  Align: =Align.Right
+                  X: =Parent.TemplateWidth - 180 - Theme.Space.Gap
+                  Y: =26
+                  Width: =180
+                  Height: =20
+                  VerticalAlign: =VerticalAlign.Middle
+      # Empty state — only when the query genuinely returns nothing.
       - ProjectsEmptyLabel:
           Control: Label@2.5.1
           Properties:
-            Text: ="Projects will list here once tmProjects is connected (Phase 2)."
+            Text: |
+              =If( IsBlank(SearchBox.Text),
+                   "No projects match this filter.",
+                   "No projects start with """ & SearchBox.Text & """." )
             Font: =Theme.Font
             Size: =Theme.Size.Body
             Color: =Theme.Color.TextMuted
             Align: =Align.Center
             VerticalAlign: =VerticalAlign.Middle
-            X: =ProjectsEmpty.X
-            Y: =ProjectsEmpty.Y
-            Width: =ProjectsEmpty.Width
-            Height: =ProjectsEmpty.Height
+            Visible: =IsEmpty(galProjects.AllItems)
+            X: =galProjects.X
+            Y: =galProjects.Y
+            Width: =galProjects.Width
+            Height: =galProjects.Height

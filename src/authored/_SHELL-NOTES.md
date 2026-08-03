@@ -7,7 +7,7 @@ instances onto Home/Reports/Projects with **static** data. **Data-independent** 
 Nothing here is "in the app" until a human pastes it and it validates; log each crossing
 in `../../paste-log.md`.
 
-## Phase-2 composition (static data)
+## Phase-2 composition + data binding
 
 `scrHome`, `scrReports`, `scrProjects` now instantiate components (`components/`):
 
@@ -24,8 +24,16 @@ Key facts:
   (see `components/_COMPONENTS-NOTES.md`) before pasting these screens.
 - **Demo UI-state globals** (no schema, no `OnStart` — blank is falsy): `gToastMsg`,
   `gToastTone`, `gConfirmOpen`.
-- **All values are static.** Every live query is a `TODO(Phase-2-data)` comment (KPI counts,
-  ring `Percent`, project filter) — they need provisioned lists + true internal names.
+- **Data is now bound (2026-08-03).** `scrHome`, `scrProjects` and `scrReports` carry live,
+  delegable queries against `schema/schema.yaml`'s columns. The shape everywhere is
+  **filter server-side → aggregate locally**, because `CountRows`/`Average` never delegate
+  to SharePoint. `scrReference` / `scrAdmin` remain shells.
+- **Prerequisite:** these three screens **cannot paste until the lists are provisioned** and
+  added as data sources — Studio can't bind to a list that doesn't exist. The two shells and
+  the components still paste at any time.
+- **Scope is deliberate on Reports:** an org-wide count can't be exact in-app (it only counts
+  the rows already pulled), so every ring is scoped to your tasks or the active-projects list.
+  Org-wide analysis stays in Power BI.
 - **Not yet composed:** the pills (`cmpStatusPill`/`cmpChoicePill`/`cmpUiKit`) and
   `cmpEditableGrid` are gallery/data-bound — they land when the data galleries are wired.
 
