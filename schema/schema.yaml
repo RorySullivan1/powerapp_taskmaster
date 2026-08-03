@@ -17,7 +17,7 @@
 # =============================================================================
 
 meta:
-  version: 1.8.0
+  version: 1.9.0
   updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
@@ -108,7 +108,13 @@ lists:
       - { name: transaction_sales,      type: Person,   required: true,                  desc: "Sales owner" }
       - { name: transaction_notional,   type: Currency, required: false,                 desc: "Trade notional amount (positive)" }
       - { name: transaction_currency,   type: Choice,   required: true,                  desc: "Currency denomination", values: [USD, EUR, GBP, JPY, CHF] }
-      - { name: transaction_notional_usd, type: Currency, required: false, indexed: true, desc: "Notional normalised to USD at WRITE time — the only column safe to aggregate across currencies" }
+      # SUPERSEDED 2026-08-03 (Q14) — DO NOT PROVISION. Kept here so the decision is
+      # discoverable rather than silently missing. Currency conversion moved to the
+      # REPORT layer: Power BI joins an FX dimension to transaction_currency +
+      # transaction_date. Nothing in the app writes this column, so provisioning it
+      # would leave a permanently blank Currency field that looks like a real figure.
+      # If you ever reinstate it, reinstate a WRITER at the same time.
+      # - { name: transaction_notional_usd, type: Currency, required: false, indexed: true, desc: "Notional normalised to USD at WRITE time" }
       - { name: transaction_date,       type: DateTime, required: true,  indexed: true,  desc: "Actual trade date" }
 
   # ---------------------------------------------------------------------------
@@ -280,8 +286,24 @@ open_recommendations:
     status: APPLIED  # task_date_start is now DateTime, indexed (2026-08-03)
   - id: C5
     what: "no USD-normalised notional → cross-currency totals are not meaningful"
-    options: ["add transaction_notional_usd, normalised at write (recommended)", "aggregate per-currency only", "convert in Power BI with an FX table"]
-    status: APPLIED  # transaction_notional_usd added, indexed (2026-08-03)
+    options: ["add transaction_notional_usd, normalised at write", "aggregate per-currency only", "convert in Power BI with an FX table (CHOSEN)"]
+    status: SUPERSEDED  # 2026-08-03 (Q14) — write-time normalisation REVERSED
+    superseded_by: >-
+      Convert in the REPORT layer. The app stores only transaction_notional +
+      transaction_currency; Power BI joins an FX dimension on currency + date. A
+      write-time rate freezes whatever number the app held on the trade date and
+      nothing downstream can correct it, whereas report-time conversion can be
+      restated, back-dated and audited.
+    app_consequence: >-
+      NO cross-currency figure can be shown anywhere in the app. scrProject's
+      transactions tab now totals PER CURRENCY and says so; the FxToUsd table has
+      been removed from App.Formulas. Do not reintroduce a rate table to "just add
+      a total".
+    reporting_obligation: >-
+      Power BI now OWES this figure. It needs an FX dimension (currency, rate,
+      effective date) and a measure converting transaction_notional at the trade
+      date. Until that exists there is no blended notional anywhere - which is the
+      accepted cost, not an oversight.
   - id: C6
     what: "region modelled three ways — INTENTIONAL. approval_region is broad-stroke; project_region/client_region carry granularity. They are never used in the same setting, so no conformed dimension is needed."
     options: ["leave as-is (chosen)"]

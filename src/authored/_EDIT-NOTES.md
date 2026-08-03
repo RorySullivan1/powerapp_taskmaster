@@ -169,8 +169,11 @@ afterwards.
 
 - **`task_output_asset` is not editable.** `asset_library` has no schema, so there is nothing
   to bind to. The task editor says so on screen instead of offering a control that can't work.
-- **`FxToUsd` rates are static placeholders** (App.Formulas). Every `transaction_notional_usd`
-  is normalised with them at write time, so a stale rate is a wrong number in Power BI.
+- **No cross-currency figure exists in the app** (Q14). The transaction form writes the native
+  notional and its currency only; conversion happens in Power BI against an FX dimension keyed on
+  currency + trade date. `scrProject`'s transactions tab totals per currency and says so. Do not
+  reintroduce a rate table to "just add a total" — a write-time rate freezes a number nothing
+  downstream can correct.
 - **`taskmaster_terms` needs a populator** (Q12). Until it has rows, `cmpTermPicker` shows an
   explicit "no terms loaded" message rather than four empty columns — and required MM means
   no project can be created until then.

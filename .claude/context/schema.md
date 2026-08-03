@@ -169,10 +169,24 @@ value stale until the next in-app change to that project. Accepted.
 creation — so "my week", timelines and "starting soon" filters delegate and sort correctly. No
 column in the model is Calculated any more.
 
-**C5 ✅ Resolved 2026-08-03.** `transaction_notional_usd` (Currency, indexed) is now in the model,
-normalised **at write time**. It is the **only** column safe to aggregate across currencies —
+**C5 ⟲ Reversed 2026-08-03 (Q14) — conversion moved to the REPORT layer.**
+`transaction_notional_usd` was briefly added and normalised at write time. It is now **dropped**:
+the app stores only `transaction_notional` + `transaction_currency`, and Power BI converts against
+an FX dimension keyed on currency and trade date.
+
+Why the reversal: a write-time rate **freezes** whatever number the app happened to hold on the day
+of the trade, and nothing downstream can ever correct it — a wrong rate becomes permanent history.
+Report-time conversion can be restated, back-dated and audited. The app also had no FX source, so
+the rates were a static table that would silently go stale.
+
+**Consequence, and it is real: no cross-currency figure can be shown anywhere in the app.**
 `transaction_notional` is denominated in `transaction_currency` and must never be summed across
-rows. Never FX-convert inside a query: it neither delegates nor reproduces.
+rows. `scrProject`'s transactions tab therefore totals **per currency** and labels itself as such.
+Never FX-convert inside a query either: it neither delegates nor reproduces.
+
+**Power BI now owes this figure.** It needs an FX dimension (currency, rate, effective date) and a
+measure converting at the trade date. Until that exists there is no blended notional anywhere —
+that is the accepted cost of the decision, not an oversight.
 
 **C6 ✅ By design 2026-08-03 — not a defect.** The three region columns serve **different
 purposes** and are **never used in the same setting**: `approval_region` is deliberately
@@ -237,7 +251,7 @@ Create indexes **early** — mandatory above 5,000 items, and they cannot be add
 
 - **tasks** — `task_project_id`, `task_stage`, `task_status`, `task_lead`, `task_date_start`, `task_date_target`, `task_name`
 - **projects** — `project_phase`, `project_manager`, `project_name`, `project_region`, `project_date_target`
-- **transactions** — `transaction_project_id`, `transaction_client_name`, `transaction_date`, `transaction_notional_usd`, `transaction_name`
+- **transactions** — `transaction_project_id`, `transaction_client_name`, `transaction_date`, `transaction_name`
 - **issues** — `issue_project_id`, `issue_status`, `issue_assignee`, `issue_date_target`, `issue_name`
 - **clients** — `client_name`, `client_region` · **products** — `product_uid` ·
   **approval** — `approval_id`, `approval_status`

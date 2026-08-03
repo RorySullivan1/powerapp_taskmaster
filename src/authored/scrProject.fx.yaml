@@ -352,15 +352,17 @@ Screens:
                   Width: =Parent.TemplateWidth * 0.16
                   Height: =44
                   VerticalAlign: =VerticalAlign.Middle
-            - txUsd:
+            - txProduct:
                 Control: Label@2.5.1
                 Properties:
-                  # transaction_notional_usd (C5) is the ONLY cross-currency-safe figure.
-                  Text: ="USD " & Text(Coalesce(ThisItem.transaction_notional_usd, 0), "[$-en-US]#,##0")
+                  # This slot used to hold a USD equivalent. There is no USD column
+                  # any more (Q14 — conversion moved to the report layer), and a
+                  # permanently blank column that looks like a figure is worse than
+                  # no column, so the space shows the product instead.
+                  Text: =ThisItem.transaction_product_id.Value
                   Font: =Theme.Font
-                  Size: =Theme.Size.Body
-                  FontWeight: =FontWeight.Semibold
-                  Color: =Theme.Color.TextPrimary
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
                   Align: =Align.Right
                   X: =Parent.TemplateWidth * 0.80
                   Y: =0
@@ -371,12 +373,31 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Visible: =gProjTab = 2
-            # Sum over the RETURNED PAGE only — CountRows/Sum never delegate to
-            # SharePoint. Labelled as such rather than presented as a true total.
+            # TWO separate caveats, and both matter:
+            #  1. Sum/CountRows never delegate — this is the RETURNED PAGE only.
+            #  2. There is no cross-currency total to show. Since Q14 the app
+            #     stores only the native notional, so a mixed-currency sum would
+            #     be meaningless. Totalling ONE currency at a time is the honest
+            #     thing an app can do; the blended figure belongs to Power BI.
+            # The five currencies are enumerated rather than derived with
+            # Distinct/Concat: transaction_currency is a fixed Choice, and every
+            # construct below is already proven elsewhere in this repo. Under a
+            # one-way gap a novel scope-shadowing construct in a mid-file label
+            # would risk the whole screen's paste to save a few lines.
             Text: |
-              ="Loaded so far: " & CountRows(galTransactions.AllItems) & " transaction(s)  ·  USD " &
-               Text(Sum(galTransactions.AllItems, Coalesce(transaction_notional_usd, 0)), "[$-en-US]#,##0")
-               & "  (grows as you scroll — full totals in Power BI)"
+              =With( { rows: galTransactions.AllItems },
+                  With( { u: Sum(Filter(rows, transaction_currency.Value = "USD"), Coalesce(transaction_notional, 0)),
+                          e: Sum(Filter(rows, transaction_currency.Value = "EUR"), Coalesce(transaction_notional, 0)),
+                          g: Sum(Filter(rows, transaction_currency.Value = "GBP"), Coalesce(transaction_notional, 0)),
+                          j: Sum(Filter(rows, transaction_currency.Value = "JPY"), Coalesce(transaction_notional, 0)),
+                          f: Sum(Filter(rows, transaction_currency.Value = "CHF"), Coalesce(transaction_notional, 0)) },
+                      "Loaded so far: " & CountRows(rows) & " transaction(s)" &
+                      If( u > 0, "   ·   USD " & Text(u, "[$-en-US]#,##0"), "" ) &
+                      If( e > 0, "   ·   EUR " & Text(e, "[$-en-US]#,##0"), "" ) &
+                      If( g > 0, "   ·   GBP " & Text(g, "[$-en-US]#,##0"), "" ) &
+                      If( j > 0, "   ·   JPY " & Text(j, "[$-en-US]#,##0"), "" ) &
+                      If( f > 0, "   ·   CHF " & Text(f, "[$-en-US]#,##0"), "" ) &
+                      "   (page only — blended totals in Power BI)" ) )
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: =Theme.Color.TextMuted

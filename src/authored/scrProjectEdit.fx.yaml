@@ -1048,16 +1048,12 @@ Screens:
             - nxRow:
                 Control: Label@2.5.1
                 Properties:
-                  # The USD figure is shown at STAGING time too, so a wrong
-                  # currency is caught before anything is written (C5).
+                  # Native currency only — no USD equivalent is shown anywhere in
+                  # the app, because none is stored (Q14; conversion is report-side).
                   Text: |
                     =ThisItem.x_name & "   ·   " & ThisItem.x_clientValue & "   ·   " & ThisItem.x_productValue
                      & "   ·   " & ThisItem.x_ccy & " "
                      & If( Len(ThisItem.x_notional) = 0, "—", Text(Value(ThisItem.x_notional), "[$-en-US]#,##0") )
-                     & If( Len(ThisItem.x_notional) = 0, "",
-                           "   ·   ≈ USD " &
-                           Text( Value(ThisItem.x_notional) * Coalesce(LookUp(FxToUsd, Ccy = ThisItem.x_ccy, Rate), 0),
-                                 "[$-en-US]#,##0" ) )
                      & "   ·   " & IfError(Text(DateValue(ThisItem.x_date), "dd mmm yyyy"), "⚠ " & ThisItem.x_date)
                      & "   ·   sales " & ThisItem.x_salesName
                   Font: =Theme.Font
@@ -1428,9 +1424,6 @@ Screens:
                                 transaction_currency:    { Value: x.x_ccy },
                                 transaction_notional:
                                     If( Len(x.x_notional) = 0, Blank(), Value(x.x_notional) ),
-                                transaction_notional_usd:
-                                    If( Len(x.x_notional) = 0, Blank(),
-                                        Value(x.x_notional) * LookUp(FxToUsd, Ccy = x.x_ccy, Rate) ),
                                 transaction_date:        DateValue(x.x_date) } ),
                           Collect( colChildErrors, { Kind: "Transaction", Name: x.x_name, Message: FirstError.Message } ),
                           Collect( colChildOk, { Kind: "Transaction", Sid: x.sid } ) ) );

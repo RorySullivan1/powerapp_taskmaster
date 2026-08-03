@@ -84,18 +84,22 @@
 - [2026-08-03] `scrProjectEdit` stages children locally (required Lookup needs the parent ID, which only exists post-insert) then writes them. On partial failure the parent is ALREADY saved and can't be rolled back → successes leave staging, failures stay + are listed, and the screen FLIPS to Edit mode against the project it just created. That flip is load-bearing: Save again retries only what failed and CANNOT create a second project. `IfError(value, fallback, default)` classifies each row in one pass — src/authored/scrProjectEdit.fx.yaml
 - [2026-08-03] People pickers use `Office365Users.SearchUser` (first-party; returns DisplayName/Mail). Cost = a Studio PREREQUISITE — the Office 365 Users connection must be added BEFORE the edit screens are pasted, or the paste fails on an unrecognised name. Now a numbered HANDOFF step — HANDOFF.md
 - [2026-08-03] C5 write landed on the transaction form: `transaction_notional_usd` is written in the SAME statement as the native notional, from a STATIC `FxToUsd` table in App.Formulas, with the USD figure echoed live. Rates are placeholders and will go stale → raised as **Q14**. Form REFUSES to save a notional whose currency has no rate rather than quietly using 1 — src/patches/App.Formulas.pa.fx
+- [2026-08-03] **Q12 ANSWERED = YES, Power Automate is available.** Unblocks three things that were queued behind it: the scheduled Graph-termStore flow that populates `taskmaster_terms` (C10), the flow-as-list-provisioner route (Q11-bis), and the extract flow (Q7). NOTE the app needs NO flow at runtime — that was the whole point of the C10 cache decision, and it still holds — .claude/context/open-questions.md
+- [2026-08-03] **Q11-bis ADOPTED — flow-as-provisioner supersedes the manual-UI Q11 pick.** Its recommendation was explicitly conditional on Q12, which is now yes. Internal names set explicitly at creation kills the `_x0020_` risk, and it's re-runnable dev→test→prod (helps Q13). Manual UI stays the fallback. TO AUTHOR: the provisioning flow for 9 lists — .claude/context/open-questions.md
+- [2026-08-03] **Q14 ANSWERED — C5 REVERSED. No FX in the app at all.** `transaction_notional_usd` is dropped (commented out in the golden source, DO NOT PROVISION), `FxToUsd` removed from App.Formulas, and the transaction form writes only the native notional + currency. Why: a write-time rate FREEZES whatever number the app held on the trade date and nothing downstream can correct it; report-time conversion can be restated, back-dated and audited. **CONSEQUENCE — no cross-currency figure can be shown ANYWHERE in the app**; scrProject's transactions tab now totals PER CURRENCY (five enumerated Sums, not Distinct/Concat — no novel scope-shadowing construct mid-file under a one-way gap) and the old USD column shows the product instead of a permanently blank number. **Power BI now OWES an FX dimension + a trade-date conversion measure** — schema/schema.yaml v1.9.0
+- [2026-08-03] **Power BI licence gate DECIDED = SOFT GATE.** Reports stays visible but greyed for unlicensed users and still opens, landing on the empty-state card + the three licence-free KPI rings. Never hidden — a hidden feature is one nobody knows to request a licence for. `gHasPowerBiLicence` stays `false` (everyone treated as unlicensed) until a real signal exists; worst case is a licensed user seeing the fallback rings and one extra click, vs. an unlicensed user hitting a broken embed. Nav + Reports both read that one line, so a future signal is a one-line change — src/patches/App.Formulas.pa.fx
 
 ## Threads          (open items; remove when closed)
-- Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
+- Open questions Q3–Q10, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
 - Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
-- **Q11-bis decision pending:** adopt flow-as-provisioner? Blocks on Q12 (Power Automate available?). If yes, supersede the manual-UI Q11 decision. → `.claude/context/open-questions.md`.
 - **Paste order (no round-trip — one-way):** in Studio create screens `scr{Home,Reports,Projects,
   Reference,Admin}`; recreate the components in the component editor; paste screen control-groups
   (one/time) → `App.Formulas` LAST → set Data row limit 2000. Gallery `Variant` is now `Vertical`
   (best-grounded); button-nav is the fallback if a screen paste fails. Need tablet-vs-phone target.
-- **Licence-gate signal (user decision):** `gHasPowerBiLicence` hardcoded `false`; no in-app Power
-  BI API — choose a source (tmLookups flag / Entra group) + hide-vs-grey for the Reports nav entry.
+- **Licence gate SETTLED (soft gate, greyed-but-reachable).** Only optional follow-up left: supply
+  a real signal for `gHasPowerBiLicence` (config allow-list column or Entra group) — a one-line
+  change, since nav and the Reports screen both read it.
 - **Component transfer:** recreate the 10 components from the contract tables in the Studio
   component editor / a library (components are NOT code-view-pasted). Their control tokens
   (`HtmlViewer`, `Classic/Timer`, gallery `Variant`) are spec-only — can't fail a paste. →
@@ -123,10 +127,13 @@
   (Person columns, `ClaimPrefix`) and expanded TAXONOMY (`SPListExpandedTaxonomy` + `WssId: -1`).
   Neither is first-party. Each is isolated in its own `Patch` so a failure can't take a record
   down; the first real save is the test.
-- **Q14 (new): `FxToUsd` rates are static placeholders** in App.Formulas and every
-  `transaction_notional_usd` is normalised with them at write time. Stale rate = wrong number in
-  Power BI that nothing downstream can correct. Maintain by hand, move to a list, or take the rate
-  from a flow (Q12).
+- **Power BI OWES the blended notional (consequence of Q14).** An FX dimension (currency, rate,
+  effective date) + a measure converting `transaction_notional` at the trade date. Until it exists
+  there is no cross-currency figure anywhere — accepted cost, not an oversight.
+- **Two Power Automate flows to author, now unblocked (Q12 = yes):** (1) the list-provisioning
+  flow, 9 lists with explicit internal names — supersedes manual UI; (2) the scheduled Graph
+  termStore walk that fills `taskmaster_terms` (`TermStore.Read.All` is DELEGATED ONLY, so it must
+  run as a signed-in user). Hand-seeding covers (2) in the meantime, so neither blocks.
 - **Studio prerequisite before the edit screens:** add the **Office 365 Users** connection. An
   unrecognised connector name is a PASTE failure, not a runtime one.
 
@@ -138,3 +145,4 @@
 - 2026-08-02 1545 | merged PR#2 shell + PR#3 components to main; +4 extra components (cmpSectionHeader/ConfirmDialog/Toast/KpiRing SVG), audit PASTE-clean | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-02 1610 | merged PR#4; Phase-2 composition — component instances (static data) on Home/Reports/Projects; instance dialect grounded; audit clean (only known gates) | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-03 | schema intake → golden source → data layer → pa-yaml validator → C10 cache decision + cmpTermPicker → four CRUD screens with staged children | sessions/2026-08-03-crud-screens-and-term-picker.md
+- 2026-08-03 | Q12/Q14/licence-gate answered: FX conversion moved to Power BI (C5 reversed), flow-as-provisioner adopted, soft licence gate | sessions/2026-08-03-crud-screens-and-term-picker.md

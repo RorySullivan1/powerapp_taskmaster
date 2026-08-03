@@ -16,9 +16,8 @@
 //   2. Paste THIS file into the App.Formulas formula bar.
 //   3. Only then paste the screen controls (src/authored/scr*.fx.yaml).
 // Step 2 must precede step 3 because scrHome/scrReports OnVisible now reference
-// StageWeights, and the edit screens reference ClaimPrefix / FxToUsd, all defined
-// here. The old "paste App.Formulas last" order would fail validation on those
-// screens.
+// StageWeights, and the edit screens reference ClaimPrefix, both defined here.
+// The old "paste App.Formulas last" order would fail validation on those screens.
 //
 // CONNECTION PREREQUISITE (edit screens only): the four scr*Edit screens call
 // Office365Users.SearchUser for their people pickers. Add the **Office 365 Users**
@@ -77,15 +76,20 @@ NavMenu = Table(
 );
 
 // --- Power BI licence gate (Q2) ---------------------------------------------
-// TODO (design choice — shapes the shell's UX): define how an unlicensed user
-// sees the Reports entry. This flag drives nav-item Visible/DisplayMode AND the
-// Reports screen's empty-state vs. embed. Two defensible options:
-//   (a) hard-gate  = false  -> hide Reports entirely (cleanest, but hides a feature)
-//   (b) soft-gate  = based on a real signal -> show greyed, with the empty-state card
-// There is no in-app Power BI licence API, so this must be sourced deliberately
-// (e.g. a tmLookups/allow-list flag, or an env/user-group check). Set it here so
-// every consumer (nav + Reports screen) reads one source of truth.
-gHasPowerBiLicence = false;   // <-- replace with the chosen signal
+// DECIDED 2026-08-03 — SOFT GATE. An unlicensed user sees the Reports entry
+// GREYED, can still open it, and lands on the empty-state card plus the three
+// licence-free KPI rings. Reports is never hidden: a hidden feature is one nobody
+// knows to ask for a licence for, and the rings are useful on their own.
+//
+// There is no in-app Power BI licence API, so this stays FALSE — everyone is
+// treated as unlicensed until a real signal is supplied. That is the safe default
+// for a soft gate: the worst case is a licensed user seeing the fallback rings
+// and one extra click, not an unlicensed user hitting a broken embed.
+//
+// To supply a signal later, replace this line only — nav and the Reports screen
+// both read it, so nothing else changes. A lookup/config allow-list column or an
+// Entra group check are the two obvious sources.
+gHasPowerBiLicence = false;   // soft gate; see above before changing
 
 // --- Task-stage weights (C3: project completion is a WEIGHTED rollup) --------
 // Golden source for these numbers: schema/schema.yaml -> rollups:
@@ -119,23 +123,22 @@ StageWeights = Table(
 // first paste, this line and the record shape around it are the first suspects.
 ClaimPrefix = "i:0#.f|membership|";
 
-// --- FX rates to USD (C5) ---------------------------------------------------
-// transaction_notional_usd is normalised at WRITE time — it is the only column
-// safe to aggregate across currencies (schema.yaml). That needs a rate at the
-// moment of the write, and this model has no FX source, so the rates live here.
+// --- NO FX TABLE HERE, DELIBERATELY (Q14 decided 2026-08-03) ----------------
+// An `FxToUsd` table briefly lived here so the transaction form could normalise
+// transaction_notional_usd at write time. It has been REMOVED: currency
+// conversion now happens in the REPORT layer, against a proper FX dimension in
+// Power BI, and the app writes only the native `transaction_notional` +
+// `transaction_currency`.
 //
-// THESE ARE PLACEHOLDERS. They are static and WILL go stale. Maintain this table
-// (or replace it with a lookup list) before the figure is trusted for reporting.
-// The currency list matches transaction_currency exactly; the transaction form
-// refuses to save if a currency has no rate here, rather than quietly using 1.
-FxToUsd = Table(
-    { Ccy: "USD", Rate: 1.00 },
-    { Ccy: "EUR", Rate: 1.08 },
-    { Ccy: "GBP", Rate: 1.27 },
-    { Ccy: "JPY", Rate: 0.0064 },
-    { Ccy: "CHF", Rate: 1.12 }
-);
-
+// Why this is the better place for it: a write-time rate freezes whatever number
+// happened to be in the app on the day of the trade, and nothing downstream can
+// ever correct it. Report-time conversion can be restated, back-dated and audited.
+//
+// CONSEQUENCE, and it is a real one: **the app can no longer show a
+// cross-currency total anywhere.** Any figure that mixes currencies must either
+// be shown per-currency or deferred to Power BI — see scrProject's transactions
+// tab, which now totals per currency and says so. Do not reintroduce a rate table
+// to "just add a total".
 // --- Write-back: recompute one project's % (app-side writer, C3) -------------
 // IMPLEMENTED in src/authored/scrTask.fx.yaml -> btnSave.OnSelect. That is the
 // live copy; this block is the reference for any OTHER place a stage can change

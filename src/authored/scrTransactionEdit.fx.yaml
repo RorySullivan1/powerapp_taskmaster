@@ -8,12 +8,15 @@
 # _EDIT-NOTES.md (seed globals in OnVisible and write from them; normalised picker
 # records; overlay galleries declared last; required fields in one Patch).
 #
-# ONE THING IS SPECIFIC TO THIS SCREEN — C5. transaction_notional_usd is the only
-# column in the model that is safe to aggregate across currencies, and it is
-# normalised AT WRITE TIME. The rate comes from the FxToUsd table in
-# src/patches/App.Formulas.pa.fx. Those rates are static placeholders and will go
-# stale; the form therefore refuses to save a notional whose currency has no rate
-# rather than quietly multiplying by 1 and poisoning every downstream total.
+# CURRENCY — read this before adding any total to this screen (Q14, 2026-08-03).
+# This form writes the NATIVE notional and its currency, and nothing else. It does
+# NOT convert to USD: conversion happens in the report layer, against a proper FX
+# dimension in Power BI. A write-time rate freezes whatever number the app happened
+# to hold on the day of the trade and nothing downstream can ever correct it;
+# report-time conversion can be restated, back-dated and audited.
+#
+# The consequence is deliberate: **no cross-currency figure can be shown in the
+# app.** Per-currency is fine; a mixed total is not.
 #
 # CONNECTION PREREQUISITE: Office 365 Users (people picker). See HANDOFF.md.
 # Every column token resolves to schema/schema.yaml (golden source).
@@ -354,18 +357,16 @@ Screens:
             Y: =180
             Width: =220
             Height: =40
-      # Live echo of the USD figure that WILL be written (C5) — the rate is not
-      # hidden from the person entering the trade.
-      - lblTxUsdEcho:
+      # Echo of the figure that WILL be written, in its native currency. No USD
+      # equivalent is shown, because none is stored — see the currency note above.
+      - lblTxNotionalEcho:
           Control: Label@2.5.1
           Properties:
             Text: |
-              =With( { r: LookUp(FxToUsd, Ccy = gTxCurrency, Rate) },
-                  If( Len(txtTxNotional.Text) = 0, "no notional entered",
-                      IsError(Value(txtTxNotional.Text)), "⚠ not a number",
-                      IsBlank(r), "⚠ no FX rate for " & gTxCurrency,
-                      "= USD " & Text(Value(txtTxNotional.Text) * r, "[$-en-US]#,##0")
-                        & "   (rate " & Text(r, "[$-en-US]0.####") & ")" ) )
+              =If( Len(txtTxNotional.Text) = 0, "no notional entered",
+                   IsError(Value(txtTxNotional.Text)), "⚠ not a number",
+                   "= " & gTxCurrency & " " & Text(Value(txtTxNotional.Text), "[$-en-US]#,##0")
+                     & "   (converted to a reporting currency in Power BI, not here)" )
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: |
@@ -445,9 +446,7 @@ Screens:
                  If( Len(txtTxDate.Text) = 0 || IsError(DateValue(txtTxDate.Text)),
                      "a valid trade date   ", "" ) &
                  If( Len(txtTxNotional.Text) > 0 && IsError(Value(txtTxNotional.Text)),
-                     "a numeric notional   ", "" ) &
-                 If( Len(txtTxNotional.Text) > 0 && IsBlank(LookUp(FxToUsd, Ccy = gTxCurrency, Rate)),
-                     "an FX rate for " & gTxCurrency & " (App.Formulas -> FxToUsd)   ", "" ) )
+                     "a numeric notional   ", "" ) )
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: =Theme.Color.Danger
@@ -472,10 +471,9 @@ Screens:
             Width: =220
             X: =24
             Y: =660
-            # Every column on this list is either required or computed here, so a
-            # single Patch covers it — no guarded second pass is needed.
-            # transaction_notional_usd is written in the SAME statement as the
-            # native notional so the two can never disagree.
+            # Every column this form owns is required, so a single Patch covers it
+            # — no guarded second pass is needed. transaction_notional_usd is NOT
+            # written: it has no app-side writer by decision (Q14).
             OnSelect: |
               =Set( gTxErr, "" );
               IfError(
@@ -494,9 +492,6 @@ Screens:
                            transaction_currency:    { Value: gTxCurrency },
                            transaction_notional:
                                If( Len(txtTxNotional.Text) = 0, Blank(), Value(txtTxNotional.Text) ),
-                           transaction_notional_usd:
-                               If( Len(txtTxNotional.Text) = 0, Blank(),
-                                   Value(txtTxNotional.Text) * LookUp(FxToUsd, Ccy = gTxCurrency, Rate) ),
                            transaction_date:        DateValue(txtTxDate.Text) } ),
                   Set( gTxErr, FirstError.Message )
               );

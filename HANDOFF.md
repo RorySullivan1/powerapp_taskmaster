@@ -109,12 +109,12 @@ rejecting. If it did, we know the dialect is right and the rest is mechanical.
 8. Paste `src/patches/App.Formulas.pa.fx` into the **App.Formulas formula bar**. Not code view —
    the App object has none.
 
-   **This is now before the screens, not after.** The data-bound screens reference `StageWeights`,
-   and the edit screens reference `ClaimPrefix` and `FxToUsd` — all defined here.
+   **This is now before the screens, not after.** The data-bound screens reference `StageWeights`
+   and the edit screens reference `ClaimPrefix`, both defined here.
 
-   **Check `FxToUsd` before anyone books a trade.** Those rates are static placeholders. Every
-   `transaction_notional_usd` is normalised with them at write time (C5), so a stale rate is a
-   wrong number in Power BI that nothing downstream can correct.
+   There is deliberately **no FX table** (Q14). The app stores the native notional only; currency
+   conversion belongs to Power BI, against an FX dimension keyed on currency and trade date. If you
+   find yourself wanting a rate table to "just add a total", read the note in the file first.
 
 → **Report back:** did it accept? If `gUserEmail` or the screen references error, that's the
 useful signal.
@@ -125,9 +125,19 @@ useful signal.
    column's `name:` **is** the internal name and freezes at creation. Create the column with that
    exact name, then set a friendly display name if you want one. Apply `indexed: true` while each
    list is small — indexes can't be added past 20,000 items.
-    `taskmaster_terms` is the ninth and is new: it is a flat cache of the term store, and it is
-    what makes the required Managed Metadata columns writable from the app (C10). Nothing can
-    create a project until it has rows in it — see step 10b.
+
+   **Provisioning route: a Power Automate flow, not the UI** (Q11-bis, unblocked now that Q12 is
+   answered). Setting the internal name explicitly at creation removes the `_x0020_` risk that
+   hand-clicking carries, and it is re-runnable for dev → test → prod. Clicking nine lists by hand
+   remains the fallback; if you take it, watch every column name.
+
+   Two notes on specific columns:
+   - `taskmaster_terms` is the ninth list and is new — a flat cache of the term store, and what
+     makes the required Managed Metadata columns writable from the app (C10). Nothing can create a
+     project until it has rows in it; see step 10b.
+   - **Do not create `transaction_notional_usd`.** It is commented out in the golden source (Q14).
+     Nothing writes it, so provisioning it would leave a permanently blank Currency field that
+     looks like a real figure.
 
 10. In the app, **add each list as a data source**.
 
@@ -136,8 +146,10 @@ useful signal.
     **before** pasting them — an unrecognised name is a paste failure, not a runtime one.
 
 10b. **Populate `taskmaster_terms`.** A scheduled Power Automate flow walking the Graph termStore
-    is the intended route (`docs/managed-metadata-picker.md`; blocked on Q12), but for a small
-    vocabulary **hand-entering the rows works and unblocks everything**: one row per term, with
+    is the intended route and is now **unblocked** (Q12 answered — Power Automate is available;
+    `docs/managed-metadata-picker.md` has the endpoints, and note `TermStore.Read.All` is
+    **delegated only**, so the flow must run as a signed-in user). For a small vocabulary
+    **hand-entering the rows works and unblocks everything today**: one row per term, with
     `term_parent_guid` empty at the top level and set to the parent's `term_guid` below it. The
     GUIDs must be the **real** term GUIDs from the term store, because they are what gets written
     into the Managed Metadata column.
@@ -176,7 +188,9 @@ useful signal.
     - Home shows counts (0 is fine on empty lists — it means the queries ran).
     - **Delegation check:** temporarily set the data row limit to **1**. Every figure should still
       be *structurally* right; anything that collapses has a non-delegable clause. Set it back.
-    - Reports shows the licence card and the three rings for an unlicensed user.
+    - Reports shows the licence card and the three rings. `gHasPowerBiLicence` is `false` by
+      decision, so **everyone** sees that state until a real signal is supplied — the Reports nav
+      entry is greyed but still opens. That is the intended soft gate, not a bug.
     - **Create a project end to end**: New project → fill Details → Classification (both pickers
       must reach a leaf before Save enables) → stage a task, a transaction and an issue → Save.
       All three children should appear on the project's tabs, and the completion ring should
@@ -184,6 +198,8 @@ useful signal.
     - **Person write**: check the project manager actually shows a person in SharePoint, not a
       broken chip. If it is broken, `ClaimPrefix` and the expanded-user record shape are the
       suspects (both community-confirmed, not first-party).
+    - **Currency**: the transactions tab totals **per currency**, not blended. There is no USD
+      column and no total across currencies anywhere — that is Q14, working as decided.
 
 ---
 
@@ -211,13 +227,21 @@ Paste **one unit at a time, onto a blank screen**. A rejection then points at on
 | CRUD screens | **Authored, not landed** — `scrProjectEdit`, `scrTaskEdit`, `scrTransactionEdit`, `scrIssueEdit` |
 | Managed-metadata picker | **Authored, not landed** — `cmpTermPicker`; needs `taskmaster_terms` to have rows |
 
-Schema decisions are **complete** (C1, C3, C4, C5, C8, C9, C10 applied; C6 by design). Two
-structural gaps remain, both external to the authored code:
+Schema decisions are **complete** (C1, C3, C4, C8, C9, C10 applied; C5 superseded by Q14; C6 by
+design). Q12, Q14 and the Power BI licence gate were all answered on 2026-08-03.
 
-- **`asset_library`** — its schema was never supplied, so `task_output_asset` has no target. The
-  task editor says so on screen rather than offering a control that cannot work.
-- **`taskmaster_terms` has no populator** — Q12 (Power Automate / custom connector). The app is
-  authored and pastes without it; it just has nothing to pick from until the list has rows, and
-  the picker says exactly that rather than showing four empty columns.
+One structural gap remains, and it is external to the authored code: **`asset_library`** — its
+schema was never supplied, so `task_output_asset` has no target. The task editor says so on screen
+rather than offering a control that cannot work.
+
+Two things Power Automate now owes, both unblocked rather than blocking:
+
+- the **provisioning flow** (nine lists, explicit internal names) — see step 9;
+- the **term-store flow** that fills `taskmaster_terms` — see step 10b. Hand-seeding works until
+  it exists, so nothing is waiting on it.
+
+And one thing **Power BI** now owes: an FX dimension and a measure converting `transaction_notional`
+at the trade date. Since Q14 the app deliberately stores no USD figure, so until that measure
+exists there is no blended notional anywhere. That is the accepted cost of the decision.
 
 Everything else is ready to provision.

@@ -117,11 +117,7 @@ Full pattern in `src/authored/_EDIT-NOTES.md`. The parts worth remembering:
   `DisplayName` / `Mail`. The cost is a Studio prerequisite: the connection must be added
   *before* the edit screens are pasted, or the paste fails on an unrecognised name. That is
   now a numbered step in HANDOFF.
-- **C5 landed here.** The transaction form writes `transaction_notional_usd` in the same
-  statement as the native notional, using a static `FxToUsd` table in `App.Formulas`, and
-  echoes the USD figure live so the rate is not hidden from whoever books the trade. The
-  rates are placeholders and will go stale — raised as **Q14**. The form refuses to save a
-  notional whose currency has no rate rather than quietly multiplying by 1.
+- **C5 landed here, then was reversed the same day — see §7.**
 
 ## 6. `scrProjectEdit` — creating children with the parent
 
@@ -150,3 +146,56 @@ are not provisioned, `taskmaster_terms` has no rows, and the two community-confi
 shapes have never been executed against this tenant. The cheapest way to retire most of that
 risk is one project saved with one region — if that MM write lands, the riskiest construct in
 the app is proven for the price of a single paste.
+
+## 7. Three answers, and one reversal (end of session)
+
+Asked four questions; three came back.
+
+**Q12 — Power Automate is available.** That retires the last thing queued behind it. Two flows
+are now authorable: the **list-provisioning flow** (which also settles Q11-bis — its
+recommendation was explicitly conditional on Q12, so flow-as-provisioner now supersedes the
+manual-UI pick, killing the `_x0020_` internal-name risk and giving repeatable dev→test→prod),
+and the **scheduled Graph termStore walk** that fills `taskmaster_terms`. Worth restating: the
+*app* still needs no flow at runtime. That was the entire point of the C10 cache decision and it
+survives Q12 being answered either way.
+
+**Q14 — no FX in the app at all. C5 is reversed.**
+
+This is the one that changed code rather than documentation. `transaction_notional_usd` is
+dropped: commented out in the golden source with a do-not-provision note, `FxToUsd` removed from
+`App.Formulas`, and the transaction form now writes only `transaction_notional` +
+`transaction_currency`. Power BI converts against an FX dimension keyed on currency and trade
+date.
+
+The reasoning is worth keeping, because C5 had looked settled: a **write-time rate freezes**
+whatever number the app happened to hold on the day of the trade, and nothing downstream can ever
+correct it — a wrong rate becomes permanent history. Report-time conversion can be restated,
+back-dated and audited. The app also had no FX source, so the rates were a static table that would
+go stale silently.
+
+The consequence is real and had to be worked through the UI, not just the write: **no
+cross-currency figure can be shown anywhere in the app.** `scrProject`'s transactions tab used to
+carry a USD column and a USD page-total. The column now shows the product — a permanently blank
+Currency field that looks like a figure is worse than no field — and the total is **per currency**,
+with the caveat spelled out on screen.
+
+That total is deliberately five enumerated `Sum(Filter(...))` terms rather than
+`Concat(Distinct(...))`. `Distinct` yields a column literally named `Value`, which would sit inside
+a `Filter` scope that also has `transaction_currency.Value`, and `Value` is a function name too.
+Under a one-way gap, a novel scope-shadowing construct in a mid-file label risks the whole screen's
+paste to save a few lines — and `transaction_currency` is a fixed five-value Choice anyway.
+
+**Power BI now owes the blended notional.** Until that dimension and measure exist there is no
+cross-currency figure anywhere. Accepted cost, recorded so it isn't later mistaken for an oversight.
+
+**Power BI licence gate — soft gate.** Reports stays visible but greyed for unlicensed users and
+still opens, landing on the empty-state card plus the three licence-free rings. Never hidden: a
+hidden feature is one nobody knows to request a licence for. `gHasPowerBiLicence` stays `false`, so
+everyone is treated as unlicensed until a real signal is supplied — the safe default for a soft
+gate, since the worst case is a licensed user seeing the fallback rings and one extra click rather
+than an unlicensed user hitting a broken embed. Nav and the Reports screen both read that one line,
+so supplying a signal later is a one-line change.
+
+**Unanswered:** how `taskmaster_terms` actually gets seeded (hand-entry now vs waiting for the
+flow). Both routes are documented in HANDOFF step 10b and neither blocks the paste, so it can be
+decided at the keyboard.
