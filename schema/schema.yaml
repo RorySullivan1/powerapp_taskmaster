@@ -17,7 +17,7 @@
 # =============================================================================
 
 meta:
-  version: 1.2.0
+  version: 1.3.0
   updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
@@ -62,11 +62,11 @@ lists:
       - { name: project_requestor,       type: Person,          required: false,                 desc: "Requesting user" }
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  desc: "Lifecycle phase", values: [Planning, Active, Blocked, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
-      - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100", review: "C3 — nothing computes this; needs a Power Automate rollup or manual entry" }
+      - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below", review: "C3 — mechanism agreed (weighted stage count); WEIGHTS are proposed and the WRITER is still undecided" }
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
       - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  desc: "Desired completion date" }
       - { name: project_date_complete,   type: DateTime,        required: false,                 desc: "Actual completion date" }
-      - { name: project_other_resources, type: PersonMulti,     required: false,                 desc: "Additional contributors", review: "C1 — multi-person has NO delegable filter; display-only unless split into fixed slots" }
+      - { name: project_supporter,       type: Person,          required: false, indexed: true,  desc: "Supporting contributor (one extra person beside project_manager)" }
 
   # ---------------------------------------------------------------------------
   taskmaster_tasks:
@@ -82,7 +82,7 @@ lists:
       - { name: task_stage,            type: Choice,          required: false, indexed: true,  desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
       - { name: task_lead,             type: Person,          required: true,  indexed: true,  desc: "Primary owner" }
-      - { name: task_other_resources,  type: PersonMulti,     required: false,                 desc: "Supporting contributors", review: "C1 — multi-person has NO delegable filter" }
+      - { name: task_supporter,        type: Person,          required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
       - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
       - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
       - { name: task_date_completion,  type: DateTime,        required: false,                 desc: "Date completed" }
@@ -141,7 +141,7 @@ lists:
       - { name: client_type,     type: ManagedMetadata, required: true,                 desc: "Client classification", term_set: ClientType }
       - { name: client_coverage, type: ManagedMetadata, required: true,                 desc: "Coverage group", term_set: Coverage }
       - { name: client_sales,    type: Person,          required: true,                 desc: "Primary sales owner" }
-      - { name: client_region,   type: ManagedMetadata, required: true,  indexed: true, desc: "Client region", values: [AMER, EMEA, APAC, JAPAN], review: "C6 — lacks GLOBAL, which project_region and approval_region both have" }
+      - { name: client_region,   type: ManagedMetadata, required: true,  indexed: true, desc: "Client region", values: [AMER, EMEA, APAC, JAPAN] }
       - { name: client_notes,    type: Note,            required: false,                desc: "Free-text notes (display only)" }
 
   # ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ lists:
     join_cost: 0
     columns:
       - { name: approval_id,     type: Text,      required: true, indexed: true, desc: "Approval identifier (e.g. MAW, Legal, Compliance, Brand)" }
-      - { name: approval_region, type: Choice,    required: true,                desc: "Applicable region", values: [GLOBAL, AMER, EMEA, APAC, JAPAN], review: "C6 — Choice here but ManagedMetadata on projects/clients" }
+      - { name: approval_region, type: Choice,    required: true,                desc: "Applicable region — BROAD-STROKE by design; deliberately coarser than project/client region and never used alongside them", values: [GLOBAL, AMER, EMEA, APAC, JAPAN] }
       - { name: approval_status, type: Boolean,   required: false, indexed: true, desc: "Active state (true = active)" }
       - { name: approval_link,   type: Hyperlink, required: false,               desc: "Link to approval guidance (display only)" }
 
@@ -173,6 +173,26 @@ lists:
     columns: []          # SCHEMA NOT SUPPLIED — any binding to this list is blocked.
 
 # =============================================================================
+# Derived values — computed, not stored by SharePoint.
+# =============================================================================
+rollups:
+  project_perc_completion:
+    description: Weighted completion % for a project, from the stages of its child tasks.
+    source_list: taskmaster_tasks
+    parent_key: task_project_id
+    formula: "sum(stage_weight[task_stage]) / count(counted tasks) * 100"
+    # WEIGHTS ARE PROPOSED — confirm or edit. Percent-of-effort per stage.
+    stage_weights:
+      "Not Started":  0
+      "Planning":     10
+      "Drafting":     35
+      "Under Review": 60
+      "Finalizing":   85
+      "Complete":     100
+      "Archived":     null    # null = EXCLUDED from numerator AND denominator
+    writer: undecided         # power-automate | app-side | compute-on-read (not stored)
+
+# =============================================================================
 # Open recommendations — edits proposed but NOT yet applied above.
 # Reasoning for each lives in .claude/context/schema.md §Consequences.
 # =============================================================================
@@ -180,11 +200,11 @@ open_recommendations:
   - id: C1
     what: "project_other_resources / task_other_resources are multi-person → no delegable filter exists"
     options: ["display-only (drive 'mine' off task_lead/project_manager)", "fixed single-Person slots", "write-time text mirror (exact = only)"]
-    status: undecided
+    status: APPLIED  # 2026-08-03 — single-Person task_supporter / project_supporter; "mine" is now fully delegable
   - id: C3
     what: "project_perc_completion has no writer"
     options: ["Power Automate rollup on task change (needs Q12)", "manual entry", "drop the column"]
-    status: undecided
+    status: MECHANISM AGREED  # weighted stage rollup (see rollups:); weights proposed, writer undecided
   - id: C4
     what: "task_date_start is Calculated — cannot be indexed, nothing delegates"
     options: ["convert to DateTime written at creation (recommended)", "keep Calculated and never filter/sort on it"]
@@ -194,9 +214,9 @@ open_recommendations:
     options: ["add transaction_notional_usd, normalised at write (recommended)", "aggregate per-currency only", "convert in Power BI with an FX table"]
     status: APPLIED  # transaction_notional_usd added, indexed (2026-08-03)
   - id: C6
-    what: "region modelled three ways across two value sets"
-    options: ["one Choice everywhere", "one ManagedMetadata term set everywhere", "leave as-is"]
-    status: undecided
+    what: "region modelled three ways — INTENTIONAL. approval_region is broad-stroke; project_region/client_region carry granularity. They are never used in the same setting, so no conformed dimension is needed."
+    options: ["leave as-is (chosen)"]
+    status: BY DESIGN  # regions serve different purposes and are never used together — not a defect, do not "fix"
   - id: C8
     what: "casing anomalies Issue_owner and product_UID; no enforced uniqueness anywhere"
     options: ["rename to issue_owner / product_uid before creation (recommended)", "keep as-is and match exactly in every formula"]

@@ -80,7 +80,7 @@ references, and Managed Metadata only for taxonomies actually governed centrally
 | Managed Metadata | `=` via subfield | **`Sort`** · costs a join |
 | Lookup | `=` via `.Id` / `.Value` | **`Sort`** · costs a join |
 | Person (single) | `=` on `.Email` / `.DisplayName` | other subfields, `Sort` · costs a join |
-| **Person (multi)** | **nothing** | **everything — C1** |
+| Person (multi) | **nothing** | **everything** — no column uses this type any more (C1 resolved) |
 | DateTime · Number · Currency | `=` `<` `>` `<=` `>=`, `Sort` | arithmetic inside the predicate |
 | Yes/No | `=`, `Sort` | — |
 | Calculated | **nothing** | **everything** — no column uses this type any more (C4 resolved) |
@@ -132,17 +132,35 @@ Each is tracked in `schema/schema.yaml` → `open_recommendations`, and flagged 
 affected column via a `review:` key. Now that the repo is the golden source, these are **editable
 decisions**, not fixed constraints.
 
-**C1 ❗ Multi-person has no delegable filter.** `project_other_resources` and
-`task_other_resources` are multi-person; multi-value columns are unsupported for delegation, so any
-filter touching them silently processes only the first 500/2,000 rows. **"Tasks I contribute to"
-cannot be a server-side query.** Options: display-only (drive "mine" off `task_lead` /
-`project_manager` — recommended, no schema change); fixed single-Person slots; or a write-time text
-mirror (exact `=` only). *No contributor filter will be authored until this is settled.*
+**C1 ✅ Resolved 2026-08-03.** The multi-person columns became **single** Person columns —
+`task_supporter` and `project_supporter` (one extra person beside `task_lead` / `project_manager`).
+Both are indexed. **"Mine" is now fully delegable**, because single Person `=` on `.Email` and `Or`
+both delegate:
 
-**C3 ⚠ `project_perc_completion` has no writer.** Typed Number, which is correct — a *Calculated*
-column can't be indexed and never delegates. But nothing computes it: SharePoint won't, and Power
-Fx can't aggregate server-side. Needs a Power Automate rollup on task change (Q12), manual entry,
-or removal. Note tasks carry no per-task %, so a rollup must derive from `task_stage`.
+```powerapps
+Filter(taskmaster_tasks, task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail)
+```
+
+No join cost changed (multi and single Person each cost 1), so tasks stays at 8. The trade is a
+hard cap of two people per task — accepted as sufficient.
+
+**C3 ◐ Mechanism agreed 2026-08-03 — weights proposed, writer still open.**
+`project_perc_completion` is a **weighted rollup of child task stages**, not a plain done/total
+count: each `task_stage` carries a weight, and the project's % is the mean weight across its tasks.
+The formula and the weight table live in `schema/schema.yaml` → `rollups:`.
+
+Proposed weights (percent-of-effort): `Not Started` 0 · `Planning` 10 · `Drafting` 35 ·
+`Under Review` 60 · `Finalizing` 85 · `Complete` 100 · `Archived` **excluded** from both numerator
+and denominator (an archived task shouldn't drag a project down). **Confirm or edit these.**
+
+Two things still to settle:
+1. **The weights themselves** — they're a judgement call about effort distribution.
+2. **Who writes it.** A weighted count still can't be done server-side (no delegable aggregate), so:
+   **Power Automate** on task change (stored, Power-BI-visible, needs Q12); **app-side** patch when
+   a stage changes (no flow needed, but stale if anything edits SharePoint directly); or
+   **compute-on-read** — don't store it at all, derive it in the app per project and let Power BI
+   compute its own from the tasks table. *Compute-on-read can never be stale; the stored column only
+   earns its place if Power BI must read it pre-computed.*
 
 **C4 ✅ Resolved 2026-08-03.** `task_date_start` is now a real **DateTime**, indexed, written at
 creation — so "my week", timelines and "starting soon" filters delegate and sort correctly. No
@@ -153,10 +171,16 @@ normalised **at write time**. It is the **only** column safe to aggregate across
 `transaction_notional` is denominated in `transaction_currency` and must never be summed across
 rows. Never FX-convert inside a query: it neither delegates nor reproduces.
 
-**C6 ⚠ `region` is modelled three ways.** Choice on `asset_approval` (with `GLOBAL`), Managed
-Metadata on `taskmaster_projects` (with `GLOBAL`) and on `taskmaster_clients` (**without**). One
-concept, two types, two domains — a shared slicer can't treat them uniformly and Power BI will
-model them as unrelated dimensions.
+**C6 ✅ By design 2026-08-03 — not a defect.** The three region columns serve **different
+purposes** and are **never used in the same setting**: `approval_region` is deliberately
+**broad-stroke**, while `project_region` and `client_region` carry the granularity their consumers
+need. So the divergence in type and value set is intentional, and no conformed dimension is
+required.
+
+**Operational consequence** (not a problem, just a rule): don't build a single cross-model region
+slicer, and read each with its own idiom — `approval_region.Value` (Choice) versus the Managed
+Metadata subfield on projects/clients. In Power BI, model them as **separate dimensions**; don't
+try to relate them.
 
 **C8 ✅ Resolved 2026-08-03 (casing).** Renamed to **`issue_owner`** (a real Person column,
 distinct from `Created By`) and **`product_uid`**. The whole model is now consistently lowercase

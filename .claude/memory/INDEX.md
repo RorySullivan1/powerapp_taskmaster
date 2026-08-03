@@ -60,6 +60,9 @@
 - [2026-08-02] **`schema/schema.yaml` is the GOLDEN SOURCE** — repo DEFINES the SharePoint lists, SharePoint applies them (`provisioned:` per list). Inverts the old 'capture true names from SP' model; mirrors the one-way gap. context/schema.md keeps shape+costs only, never columns (DRY) — schema/README.md
 - [2026-08-02] `task_stage` values fixed: Not Started, Planning, Drafting, Under Review, Finalizing, Complete, Archived — unblocks the delegable Or-of-equals open-task filter — schema/schema.yaml
 - [2026-08-03] Schema recs C4/C5/C8 APPLIED: `task_date_start` Calculated→DateTime(indexed); added `transaction_notional_usd` (only cross-currency-safe column); renamed `Issue_owner`→`issue_owner`(Person), `product_UID`→`product_uid`. schema.yaml v1.2.0 — schema/schema.yaml
+- [2026-08-03] C1 RESOLVED: multi-person → single `task_supporter`/`project_supporter` (1 extra person, indexed). 'Mine' now fully delegable via `lead.Email = me || supporter.Email = me`; join cost unchanged (tasks 8) — schema/schema.yaml
+- [2026-08-03] C3 mechanism: `project_perc_completion` = WEIGHTED mean of child task-stage weights (see schema.yaml `rollups:`). Weights PROPOSED (0/10/35/60/85/100, Archived excluded); WRITER still open (power-automate | app-side | compute-on-read) — schema/schema.yaml
+- [2026-08-03] C6 BY DESIGN: three region columns are intentional — approval_region is broad-stroke, project/client_region are granular, never used together. No conformed dimension; separate PBI dimensions; do NOT 'fix' — .claude/context/schema.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -85,7 +88,7 @@
   ⟨capture⟩) + a confirmed pull. Every live query is a `TODO(Phase-2-data)` in the screens.
 
 - **Schema intake COMPLETE (7 lists) and promoted to `.claude/context/schema.md`.** Outstanding: `asset_library` schema never supplied (blocks `task_output_asset`).
-- **Schema open_recommendations (now EDITABLE — repo is golden source): C1** multi-person no delegable filter; **C3** perc_completion no writer; **C6** region 3 ways; Settle BEFORE provisioning — names/types freeze at creation. → `schema/schema.yaml` open_recommendations
+- **Schema open_recommendations (now EDITABLE — repo is golden source): C1** multi-person no delegable filter; **C3** perc_completion: confirm stage WEIGHTS + choose WRITER; Settle BEFORE provisioning — names/types freeze at creation. → `schema/schema.yaml` open_recommendations
 - **Schema consequences needing a call** (→ `context/schema.md` §Consequences): **C1** multi-person cols have no delegable filter; **C4** `task_date_start` is Calculated (nothing delegates); **C5** no USD-normalised notional; **C3** no writer for `project_perc_completion`; **C6** region modelled 3 ways; **C8** casing anomalies before provisioning.
 
 ## Log              (append-only pointers)
