@@ -56,6 +56,7 @@
 - [2026-08-02] **Air gap is ONE-WAY** (user-corrected): repo→Studio only; sole return signal is binary "works/doesn't." Kills pull/round-trip/pull-reconcile; repo is authoritative source not mirror. → resolve unknown tokens from PUBLIC sources; ship safe fallbacks; maximise first-try paste success — sessions/2026-08-02-1411-phase1-core-shell.md
 - [2026-08-02] SCHEMA: snake_case `taskmaster_*`/`asset_approval` is canonical, supersedes the PascalCase tm* model (user-confirmed) — schema/incoming-lists.md
 - [2026-08-02] Schema promoted to canonical (7 lists, snake_case). Model uses Lookup + Managed Metadata + multi-Person throughout — accepted as the user's design; consequences documented rather than relitigated — .claude/context/schema.md
+- [2026-08-02] task_status split into TWO Choice cols: `task_status`=health (Green/Amber/Red) + `task_stage`=lifecycle (values TBD); `task_output_format`+`task_client_stage` MM→Choice — why: Choice costs no join & sorts; tasks 11→8 joins, J1 resolved — .claude/context/schema.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -81,7 +82,8 @@
   ⟨capture⟩) + a confirmed pull. Every live query is a `TODO(Phase-2-data)` in the screens.
 
 - **Schema intake COMPLETE (7 lists) and promoted to `.claude/context/schema.md`.** Outstanding: `asset_library` schema never supplied (blocks `task_output_asset`).
-- **Schema consequences needing a call** (→ `context/schema.md` §Consequences): **J1** tasks sits at 11/12 joins (13 with Created By+Modified By → over limit); **C1** multi-person cols have no delegable filter; **C4** `task_date_start` is Calculated (nothing delegates); **C5** no USD-normalised notional; **C2** `task_status` as MM; **C3** no writer for `project_perc_completion`; **C6** region modelled 3 ways; **C8** casing anomalies before provisioning.
+- **BLOCKING: `task_stage` value set unconfirmed** — every 'open tasks' filter enumerates stages explicitly (Or-of-=), so no delegable stage filter can be authored until fixed. Do not invent.
+- **Schema consequences needing a call** (→ `context/schema.md` §Consequences): **C1** multi-person cols have no delegable filter; **C4** `task_date_start` is Calculated (nothing delegates); **C5** no USD-normalised notional; **C3** no writer for `project_perc_completion`; **C6** region modelled 3 ways; **C8** casing anomalies before provisioning.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md

@@ -19,7 +19,7 @@ costs**, not how SharePoint works in general.
 | List | Role | Complex cols (join cost) |
 |---|---|:-:|
 | `taskmaster_projects` | The parent. Everything hangs off it. | 6 |
-| `taskmaster_tasks` | Units of work. **The heaviest list — see J1.** | 11 |
+| `taskmaster_tasks` | Units of work. Heaviest list, but now clear of the join cap (J1). | 8 |
 | `taskmaster_transactions` | Trades, full transaction-level. | 4 |
 | `taskmaster_issues` | Freeform issues. | 5 |
 | `taskmaster_clients` | Client dimension. | 4 |
@@ -67,7 +67,7 @@ taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name, op
 | `project_other_resources` | **Person — MULTI** | N | Contributors. **No delegable filter (C1).** |
 | `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
-## `taskmaster_tasks`  ⚠ heaviest list
+## `taskmaster_tasks`
 
 | Column | Type | Req | Notes |
 |---|---|:-:|---|
@@ -75,7 +75,8 @@ taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name, op
 | `task_project_id` | **Lookup → projects** | **Y** | Parent. Filter `task_project_id.Id = <n>`. |
 | `task_description` | Multi-line text | N | Display only. |
 | `task_category` | Managed Metadata | N | Marketing taxonomy. |
-| `task_status` | **Managed Metadata** | N | Task Status term set. **The most-filtered column in the app — see C2.** |
+| `task_status` | **Choice** | N | **Health (RAG):** Green, Amber, Red. Costs no join; sorts delegably. |
+| `task_stage` | **Choice** | N | **Lifecycle:** Planning, Dev, … — **value set not yet confirmed (C2)**. |
 | `task_priority` | Choice | **Y** | Low, Moderate, High, Critical. |
 | `task_lead` | Person | **Y** | Primary owner. Delegable on `.Email`. |
 | `task_other_resources` | **Person — MULTI** | N | Contributors. **No delegable filter (C1).** |
@@ -84,12 +85,12 @@ taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name, op
 | `task_date_completion` | Date/Time | N | Set on completion. |
 | `task_output_approval` | Lookup → `asset_approval` | N | Approval required for output. |
 | `task_output_language` | Choice | N | EN, FR, DE, ES, IT, JP, … |
-| `task_output_format` | Managed Metadata | N | Flyer, Email, PDF, Webpage, Deck, Video. |
+| `task_output_format` | **Choice** | N | Flyer, Email, PDF, Webpage, Deck, Video. |
 | `task_output_branding` | Choice | N | Barclays, QIS, EXO, Custom. |
 | `task_output_asset` | Lookup → `asset_library` | N | Linked asset. |
 | `task_client_name` | Lookup → clients | N | Associated client. |
 | `task_product_id` | Lookup → products | N | Associated product. |
-| `task_client_stage` | Managed Metadata | N | Prospect, Active, Existing, Post-Trade. |
+| `task_client_stage` | **Choice** | N | Prospect, Active, Existing, Post-Trade. |
 | `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
 ## `taskmaster_transactions`
@@ -165,24 +166,25 @@ Referenced by `task_output_asset`. Schema unknown; any binding to it is blocked.
 
 Ordered by severity. ❗ = breaks or silently returns wrong results. ⚠ = needs a decision.
 
-## J1 ❗ `taskmaster_tasks` is at 11 of the 12-join limit — and 13 with system fields
+## J1 ✅ Join budget on `taskmaster_tasks` — resolved (was 11/12, now 8/12)
 
 Lookup, Person/Group **and** Managed Metadata columns each cost a join, capped at **12 per
-view/query**. On tasks:
+view/query**. Choice columns cost **nothing**. After the 2026-08-02 conversion (C2), tasks carries:
 
 - **5 Lookups** — `task_project_id`, `task_output_approval`, `task_output_asset`,
   `task_client_name`, `task_product_id`
 - **2 Person** — `task_lead`, `task_other_resources`
-- **4 Managed Metadata** — `task_category`, `task_status`, `task_output_format`, `task_client_stage`
+- **1 Managed Metadata** — `task_category`
 
-**= 11.** Add the system Person fields `Created By` + `Modified By` and a view projecting
-everything is at **13 — over the limit**, and SharePoint blocks it.
+**= 8**, or **10** once the system Person fields `Created By` + `Modified By` are projected —
+comfortably under the cap, with room for two more complex columns.
 
-**Consequences:** no single view or query can surface every task column. Keep **Explicit Column
-Selection** on (default) so the app fetches only bound columns; build SharePoint views that project
-a *subset*; and never add another complex column to tasks without removing one. If tasks needs to
-grow, convert fixed-vocabulary MM columns to **Choice** (Choice costs **no join**) — `task_status`,
-`task_output_format` and `task_client_stage` are the obvious candidates and would drop the count to 8.
+*(Before the conversion this was 11, reaching 13 with system fields — over the limit, which would
+have blocked any view projecting every task column.)*
+
+**Rule going forward:** prefer **Choice** for any fixed vocabulary. Reserve Lookup for genuine
+cross-list references and Managed Metadata for taxonomies that are actually governed centrally and
+reused across sites.
 
 ## C1 ❗ Multi-person columns have no delegable filter
 
@@ -198,15 +200,24 @@ So **"tasks/projects I contribute to" cannot be a server-side query.** Options:
 
 **No contributor filter will be authored until this is chosen** — there is no correct one.
 
-## C2 ⚠ `task_status` is Managed Metadata — the app's hottest column
+## C2 ✅ Task status split into health + stage (decided 2026-08-02) — one gap left
 
-Status drives the kanban, "my open tasks", and every count. As MM: **`=` via subfield delegates**
-(so per-status kanban columns work), but **`Sort` never delegates**, it **costs a join**, and the
-term set is hand-maintained (no CSOM/PnP route here → no sync automation).
+`task_status` was Managed Metadata: the app's hottest column (kanban, "my open tasks", every
+count), yet unable to sort server-side and costing a join. It is now **two Choice columns**:
 
-**Recommendation: make `task_status` a Choice.** Identical filtering, no join, sortable, and
-`tmLookups`-style governance isn't needed for a workflow status. Same argument for
-`task_output_format` and `task_client_stage`.
+| Column | Meaning | Values |
+|---|---|---|
+| `task_status` | **Health** | `Green`, `Amber`, `Red` |
+| `task_stage` | **Lifecycle** | `Planning`, `Dev`, … — **NOT YET CONFIRMED** |
+
+Both are Choice: **no join cost, delegable `=`, and sortable**. Separating them means "how is it
+going?" and "where is it?" stop competing for one field — health drives the RAG pill, stage drives
+the kanban columns. `task_output_format` and `task_client_stage` were converted to Choice in the
+same pass.
+
+> ⚠ **`task_stage`'s value set is still open.** Every "open tasks" filter must enumerate the
+> non-terminal stages explicitly (`Or` of `=` — see C7), so no delegable stage filter can be
+> authored until the domain is fixed. Do not invent values.
 
 ## C3 ⚠ `project_perc_completion` has no writer
 
@@ -272,8 +283,8 @@ column would be cheaper, indexable, and simpler.)
 | Column kind | Delegates | Does NOT delegate |
 |---|---|---|
 | Text (`*_name`, `approval_id`, `product_UID`, `project_pathway`) | `=`, `StartsWith`, `Sort` | `<` `>` `<>`, `Search`, `in` |
-| Choice (`*_priority`, `project_phase`, `issue_*`, `approval_region`, `transaction_currency`, `task_output_language/branding`) | `=` via `.Value` | **`Sort`**, `StartsWith` on subfield, `<>` |
-| Managed Metadata (11 across the model) | `=` via subfield | **`Sort`** · costs a join |
+| Choice (`task_status`/`task_stage`, `*_priority`, `project_phase`, `issue_*`, `approval_region`, `transaction_currency`, `task_output_*`, `task_client_stage`) | `=` via `.Value`, **`Sort` on `.Value`** | `StartsWith` on subfield, `<>` |
+| Managed Metadata (8 across the model) | `=` via subfield | **`Sort`** · costs a join |
 | Lookup (11 across the model) | `=` via `.Id` / `.Value` | **`Sort`** · costs a join |
 | Person — single | `=` on `.Email` / `.DisplayName` | other subfields, **`Sort`** · costs a join |
 | **Person — multi** (`*_other_resources`) | **nothing** | **unsupported — C1** |
@@ -300,7 +311,7 @@ task_lead: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpand
 ```
 
 **Index early** (mandatory >5,000 items; can't be added past 20,000):
-`task_project_id`, `task_status`, `task_lead`, `task_date_target` ·
+`task_project_id`, `task_stage`, `task_status`, `task_lead`, `task_date_target` ·
 `project_phase`, `project_manager`, `project_name`, `project_date_target` ·
 `transaction_project_id`, `transaction_date`, `transaction_client_name` ·
 `issue_project_id`, `issue_status`, `issue_assignee` ·
