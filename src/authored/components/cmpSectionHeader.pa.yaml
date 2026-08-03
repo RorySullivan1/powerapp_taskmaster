@@ -1,0 +1,94 @@
+# =============================================================================
+# cmpSectionHeader  —  section title + subtitle + optional action (component)
+# =============================================================================
+# A consistent heading band for content sections (e.g. "My open tasks" with a
+# "New task" action). Screen-level; grounded control tokens only (Label@2.5.1,
+# Classic/Button@2.2.0, Rectangle@2.3.0) — no unconfirmed tokens.
+# The app supplies OnAction, so each instance decides what the button does.
+# Colours inline the Theme palette (component isolation). DIALECT v3.0 pa.yaml.
+# See _COMPONENTS-NOTES.md.
+# =============================================================================
+ComponentDefinitions:
+  cmpSectionHeader:
+    DefinitionType: CanvasComponent
+    Description: Section header — Title, optional Subtitle, optional right-aligned action button.
+    AccessAppScope: false
+    CustomProperties:
+      Title:
+        PropertyKind: Input
+        Description: Section heading text.
+        DataType: Text
+        Default: ="Section"
+      Subtitle:
+        PropertyKind: Input
+        Description: Optional secondary line under the title (hidden when blank).
+        DataType: Text
+        Default: =""
+      ActionLabel:
+        PropertyKind: Input
+        Description: Text of the optional right-aligned action button.
+        DataType: Text
+        Default: ="New"
+      ShowAction:
+        PropertyKind: Input
+        Description: Show the action button.
+        DataType: Boolean
+        Default: =false
+      OnAction:
+        PropertyKind: Event
+        Description: Raised when the action button is tapped.
+        ReturnType: Boolean
+        Parameters: {}
+    Properties:
+      Height: =60
+      Width: =640
+      Fill: =RGBA(0, 0, 0, 0)
+    Children:
+      - lblTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpSectionHeader.Title
+            Color: =RGBA(32, 38, 45, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Size: =20
+            X: =0
+            Y: =6
+            Width: =Parent.Width - 160
+            Height: =28
+            VerticalAlign: =VerticalAlign.Middle
+      - lblSubtitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpSectionHeader.Subtitle
+            Visible: =Len(cmpSectionHeader.Subtitle) > 0
+            Color: =RGBA(110, 120, 130, 1)
+            Font: =Font.'Segoe UI'
+            Size: =12
+            X: =0
+            Y: =34
+            Width: =Parent.Width - 160
+            Height: =18
+      - btnAction:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =cmpSectionHeader.ActionLabel
+            Visible: =cmpSectionHeader.ShowAction
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            Font: =Font.'Segoe UI'
+            Size: =13
+            BorderColor: =RGBA(0, 90, 158, 1)
+            Height: =36
+            Width: =140
+            X: =Parent.Width - 140
+            Y: =(Parent.Height - 36) / 2
+            OnSelect: =cmpSectionHeader.OnAction()
+      - divider:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(225, 229, 235, 1)
+            Height: =1
+            Width: =Parent.Width
+            X: =0
+            Y: =Parent.Height - 1

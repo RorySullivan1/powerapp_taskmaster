@@ -1,6 +1,6 @@
 # Reusable components — contracts, constraints, and transfer
 
-Six reusable UI building blocks for the EQD Taskmaster app, authored in the **v3.0
+Ten reusable UI building blocks for the EQD Taskmaster app, authored in the **v3.0
 `.pa.yaml` `ComponentDefinitions`** schema (grounded on the official schema:
 `microsoft/PowerApps-Tooling` `schemas/pa-yaml/v3.0/pa.schema.yaml`). Data-independent —
 no `tm*` tokens. Colours **inline** the `App.Formulas` `Theme` palette because a component
@@ -16,6 +16,10 @@ is isolated and can't read app globals; keep the hex/RGBA in step with `Theme`.
 | `cmpStatusCard.pa.yaml` | Tappable KPI/summary card | Component | in: `Title,Value,Caption,Trend,Accent`; event: `OnSelect` |
 | `cmpSelection.pa.yaml` | Single-select strip over `Items` | Component | in: `Items,DefaultId`; out: `Selected`; event: `OnChange` |
 | `cmpEditableGrid.pa.yaml` | Editable grid, bulk-save | Component | in: `Items`; out: `EditedItems,RowCount`; action: `AddRow`; event: `OnCommit` |
+| `cmpSectionHeader.pa.yaml` | Section title + subtitle + action | Component | in: `Title,Subtitle,ActionLabel,ShowAction`; event: `OnAction` |
+| `cmpConfirmDialog.pa.yaml` | Modal confirm (scrim + card) | Component | in: `Visible,Title,Message,ConfirmLabel,CancelLabel,Destructive`; events: `OnConfirm,OnCancel` |
+| `cmpToast.pa.yaml` | Self-dismissing toast | Component | in: `Message,Tone,Duration`; action: `Show`; event: `OnDismiss` |
+| `cmpKpiRing.pa.yaml` | SVG percent ring (licence-free) | Component | in: `Percent,Label,AccentHex,TrackHex` |
 
 ## The one rule that shaped the design: **no component inside a gallery/form**
 
@@ -41,14 +45,20 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 
 ## ⚠️ Unconfirmed control tokens (round-trip gated)
 
-Grounded tokens (from the example export) used here: `Rectangle@2.3.0`, `Label@2.5.1`,
-`Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`. Two are **guesses**
-— confirm via the `studio-transfer` round-trip and find/replace:
+Grounded tokens (from the example export) used across the set: `Rectangle@2.3.0`,
+`Label@2.5.1`, `Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`,
+`Image@2.2.3`. Three are **guesses** — confirm via the `studio-transfer` round-trip and
+find/replace:
 
 - **`HtmlViewer@2.1.0`** — the HTML text control token (`cmpStatusPill`, `cmpChoicePill`).
   The example had no HTML control to ground it.
+- **`Classic/Timer@2.1.0`** — the Timer control token (`cmpToast` auto-dismiss). If it won't
+  confirm, drop the Timer and let the app own timing (visual-only toast with `Visible` input).
 - **Gallery `Variant`** — `CONFIRM_BlankVertical` / `CONFIRM_BlankHorizontal` placeholders
   (`cmpSelection`, `cmpEditableGrid`), same unknown as the screen shells.
+
+`cmpKpiRing` uses only the grounded `Image@2.2.3`, and `cmpSectionHeader` / `cmpConfirmDialog`
+use only grounded tokens — those three carry no token risk.
 
 ## ⚠️ Transfer — components do NOT cross the gap like controls
 
@@ -60,7 +70,7 @@ Components are the hardest thing to move across the air gap:
   **component library** for cross-app reuse) from the **contract tables above** — those are
   dialect-independent. This YAML is the **spec of record**, not a guaranteed paste payload.
 - A **component library** can't hold data sources or Power Automate flows — pass data in via
-  Input properties (all six already do).
+  Input properties (all ten already do).
 
 ## Where these plug into the shell (Phase 2)
 
@@ -69,17 +79,24 @@ Components are the hardest thing to move across the air gap:
   real `tmTickets` value columns; do the bulk `Patch` per `power-apps-editable-table`).
 - Any task/issue gallery: `cmpUiKit.StatusPillHtml` + `PersonChipHtml` in the row template.
 - Filter bars / project pickers: `cmpChoicePill`, `cmpSelection`.
+- Every content section: `cmpSectionHeader`. Destructive actions (archive/delete):
+  `cmpConfirmDialog`. Save/patch feedback: `cmpToast`. Reports SVG-fallback for unlicensed
+  users (Q2): `cmpKpiRing` (Percent computed in-app from a delegable-filtered count).
 
 ## Deferred to sibling skills (not in these files)
 
 - Delegation-safe `Patch`/`Collect` for the grid's bulk save, and any real data sourcing →
   `power-fx-development` / `power-apps-editable-table`.
-- The SVG string for a KPI ring (see offered extras) → `power-apps-svg`.
+- The Power Fx that computes a ring's `Percent` (delegable-filtered, bounded count) →
+  `power-fx-development`. The SVG technique itself is grounded on `power-apps-svg`.
 
-## Offered extras (say the word — not yet built)
+## Notes on the four screen-furniture components
 
-- `cmpSectionHeader` — title + subtitle + optional action button (event).
-- `cmpConfirmDialog` — modal confirm; `Show()`/`Hide()` actions, `OnConfirm`/`OnCancel` events.
-- `cmpToast` — transient notification; `Notify(msg,tone)` action.
-- `cmpKpiRing` — SVG progress ring in an Image control (grounds on `power-apps-svg`); the
-  native, licence-free visual for unlicensed Reports users (Q2).
+- `cmpConfirmDialog` — place the instance **full-screen**; the app owns `Visible` and closes
+  it in `OnConfirm`/`OnCancel`. Scrim tap = cancel. `Destructive` reddens the confirm button.
+- `cmpToast` — set `Message`/`Tone`, then call `cmpToast_1.Show()`; internal `_show` var +
+  Timer auto-dismiss after `Duration`. (`_show` is read by child controls only — not by an
+  Output property — so it stays within component rules.)
+- `cmpKpiRing` — colours are **hex text** (`AccentHex`/`TrackHex`) so they drop into the SVG
+  without a Color→hex conversion; the ring uses the circumference-100 `stroke-dasharray` trick.
+- `cmpSectionHeader` — grounded tokens only; `ShowAction`/`OnAction` make the button optional.

@@ -1,0 +1,69 @@
+# =============================================================================
+# cmpKpiRing  —  SVG progress ring / donut KPI (component; screen-level)
+# =============================================================================
+# A crisp percent ring drawn as SVG in an Image control (data URI) — no image
+# assets, no PCF, NO POWER BI LICENCE. This is the native fallback visual for
+# unlicensed Reports users (Q2). Technique per the power-apps-svg skill:
+# stroke-dasharray='<pct> <100-pct>' on a circumference-100 circle (r=15.9155).
+#
+# Colours are passed as HEX TEXT (AccentHex/TrackHex) so they drop straight into
+# the SVG — avoids Power Fx Color->hex conversion. If you prefer a Color input,
+# convert to hex in the app and pass the string. NOTE: AccentHex/TrackHex are
+# injected UNENCODED (they are app-trusted constants). Do NOT bind them to
+# arbitrary list data; if you ever must, EncodeHTML them first. The Percent value is computed in
+# the app (delegable-filtered, bounded count) and passed in — power-fx-development
+# owns that math. Grounded token Image@2.2.3. DIALECT v3.0 pa.yaml.
+# See _COMPONENTS-NOTES.md.
+# =============================================================================
+ComponentDefinitions:
+  cmpKpiRing:
+    DefinitionType: CanvasComponent
+    Description: SVG percent ring (Image data URI) — Percent, centre Label, AccentHex/TrackHex.
+    AccessAppScope: false
+    CustomProperties:
+      Percent:
+        PropertyKind: Input
+        Description: Progress 0-100 (clamped internally).
+        DataType: Number
+        Default: =0
+      Label:
+        PropertyKind: Input
+        Description: Centre label; blank shows the clamped percent (e.g. "72%").
+        DataType: Text
+        Default: =""
+      AccentHex:
+        PropertyKind: Input
+        Description: Progress-arc colour as a hex string, e.g. "#005A9E".
+        DataType: Text
+        Default: ="#005A9E"
+      TrackHex:
+        PropertyKind: Input
+        Description: Background track colour as a hex string.
+        DataType: Text
+        Default: ="#E1E5EB"
+    Properties:
+      Height: =120
+      Width: =120
+      Fill: =RGBA(0, 0, 0, 0)
+    Children:
+      - imgRing:
+          Control: Image@2.2.3
+          Properties:
+            ImagePosition: =ImagePosition.Fit
+            Height: =Parent.Height
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+            Image: |
+              =With(
+                  { pct: Min(100, Max(0, RoundDown(cmpKpiRing.Percent, 0))) },
+                  With(
+                      { lbl: If(Len(cmpKpiRing.Label) > 0, cmpKpiRing.Label, Text(pct) & "%") },
+                      "data:image/svg+xml," & EncodeUrl(
+                          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" &
+                          "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='" & cmpKpiRing.TrackHex & "' stroke-width='3'/>" &
+                          "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='" & cmpKpiRing.AccentHex & "' stroke-width='3' stroke-dasharray='" & pct & " " & (100 - pct) & "' stroke-dashoffset='25' stroke-linecap='round' transform='rotate(-90 18 18)'/>" &
+                          "<text x='18' y='20.5' text-anchor='middle' font-size='7' font-family='Segoe UI, sans-serif' fill='#20262D'>" & EncodeHTML(lbl) & "</text>" &
+                          "</svg>")
+                  )
+              )
