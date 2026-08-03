@@ -128,7 +128,7 @@ do first — seven screens use it, and four of them are the editors.
 """)
 
     for f in files:
-        doc = yaml.load(f.read_text())
+        doc = yaml.load(f.read_text(encoding="utf-8"))
         defs = doc.get("ComponentDefinitions", {})
         for name, body in defs.items():
             props = body.get("Properties", {}) or {}
@@ -153,7 +153,7 @@ do first — seven screens use it, and four of them are the editors.
                 buf = io.StringIO()
                 # Round-trip through a plain load to strip comments, then re-dump.
                 yaml.dump(clean(_pyyaml.safe_load(_dump(yaml, children))), buf)
-                out.write_text(header + buf.getvalue())
+                out.write_text(header + buf.getvalue(), encoding="utf-8")
 
             # ---- build sheet section ----
             sheet.append(f"\n---\n\n## `{name}`\n")
@@ -186,9 +186,14 @@ do first — seven screens use it, and four of them are the editors.
                         val = scalar(p.get("Default"))
                     params = p.get("Parameters")
                     if params:
-                        plist = ", ".join(
-                            f"`{q.get('Name')}`: {q.get('DataType','')}" for q in params
-                        )
+                        # Each entry is a single-key map: {<param-name>: {DataType, ...}}
+                        # (pa-yaml v3.0 — Parameters is a sequence, not a mapping).
+                        def _param_desc(q):
+                            (pname, pdef), = dict(q).items()
+                            pdef = pdef or {}
+                            opt = " (optional)" if pdef.get("IsOptional") else ""
+                            return f"`{pname}`: {pdef.get('DataType','')}{opt}"
+                        plist = ", ".join(_param_desc(q) for q in params)
                         val = (val + f"<br>**Parameters:** {plist}") if val else f"**Parameters:** {plist}"
                     sheet.append(
                         f"| {i} | `{pname}` | {kind} | {dtype} | `{val}` | {where} |\n"
@@ -214,7 +219,7 @@ do first — seven screens use it, and four of them are the editors.
                 for k, v in backing.items():
                     sheet.append(f"| `{k}` | `{scalar(v)}` |\n")
 
-    (SRC / "BUILD-SHEET.md").write_text("".join(sheet))
+    (SRC / "BUILD-SHEET.md").write_text("".join(sheet), encoding="utf-8")
     print(f"wrote {SRC / 'BUILD-SHEET.md'}")
     print(f"wrote {len(list(BODIES.glob('*.pa.yaml')))} body file(s) to {BODIES}")
     return 0

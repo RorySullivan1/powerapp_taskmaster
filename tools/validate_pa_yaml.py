@@ -103,7 +103,7 @@ def rel(p: pathlib.Path) -> str:
         return str(p)
 
 def main() -> int:
-    validator = Draft7Validator(yaml.safe_load(SCHEMA.read_text()))
+    validator = Draft7Validator(yaml.safe_load(SCHEMA.read_text(encoding="utf-8")))
     files = targets(sys.argv[1:])
     if not files:
         print("no files to validate"); return 0
@@ -111,7 +111,7 @@ def main() -> int:
     bad = 0
     for f in files:
         try:
-            doc = yaml.safe_load(f.read_text())
+            doc = yaml.safe_load(f.read_text(encoding="utf-8"))
         except yaml.YAMLError as e:
             print(f"FAIL {rel(f)}\n  YAML parse error: {e}\n"); bad += 1; continue
         if doc is None:

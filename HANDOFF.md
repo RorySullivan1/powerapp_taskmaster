@@ -3,6 +3,17 @@
 **Start here on the work machine.** This is the single ordered entry point for getting everything
 in this repo into Power Apps Studio.
 
+> **Building it now? Use `BUILD-BOOK.md`** — a linear, tick-as-you-go checklist with every
+> component contract inlined, so you don't cross-reference files while building. This file is the
+> *why/how/state* overview behind it.
+
+**Channel facts (validated 2026-08-03):** code-view paste of screens **works** (`scrAdmin` landed,
+and a `pac`-packed shell `.msapp` opened cleanly). `App.Formulas` goes in the **formula bar**.
+Component **bodies** paste; component **contracts** (custom properties) are **Studio-only, typed by
+hand** — packing them into an `.msapp` is impossible (`pac` returns `PA3004: … use Power Apps Studio
+to edit component definitions`). So the build is a hybrid: paste everything that can cross, hand-type
+only the ~40 component custom-property definitions. Do **not** try to `pac`-pack the components.
+
 ## How the transfer works
 
 ```
