@@ -98,3 +98,10 @@ flow is needed: the app reads the term store directly (C10).
 *(Q12 and Q14 were answered on 2026-08-03 — see the Answered section above.)*
 - **Q13 Solution-aware?** If the app moves dev → test → prod it needs **environment variables**,
   not hardcoded connections/list references.
+- **Q15 Is Azure DevOps available, and can this app live in a Dataverse solution? (2026-08-03)**
+  This is the only route that would retire the clipboard: **Power Platform Git integration** stores
+  canvas source as `.pa.yaml` and supports *minor* edits made directly in the repo, restored on
+  pull — a genuine two-way channel, and the only supported one. It needs **Azure DevOps** (the
+  GitHub canvas integration is retired) and a solution. Packaging a `.msapp` by hand is a dead end
+  and is not the alternative — see `docs/msapp-and-git-integration.md`. Not blocking: the code-view
+  paste channel is proven and the build ships without this.
