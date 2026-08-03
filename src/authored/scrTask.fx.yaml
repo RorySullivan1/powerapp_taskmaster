@@ -19,10 +19,19 @@ Screens:
   scrTask:
     Properties:
       Fill: =Theme.Color.Bg
-      # Seed the editors from the selected record. Blank-safe: every Choice is
-      # required with a default (C9), so Selected always resolves.
+      # Seed the edit state into GLOBALS, and write from those — never from the
+      # cmpSelection instances. A component's internal gallery selection is user
+      # state that Reset() cannot reach from outside, so after editing task A and
+      # opening task B the strip may still hold A's pick (and Selected falls back
+      # to First(Items) = "Not Started"). Whether navigation clears it is exactly
+      # what a one-way gap cannot verify — and the failure mode is a silent wrong
+      # write to a required Choice column. Re-seeding here makes the WRITE correct
+      # regardless of what the strip is displaying.
       OnVisible: |
-        =Set( gTaskDirty, false )
+        =Set( gTaskDirty, false );
+        Set( gTaskStage,    gSelTask.task_stage.Value );
+        Set( gTaskHealth,   gSelTask.task_status.Value );
+        Set( gTaskPriority, gSelTask.task_priority.Value )
     Children:
       # ---- Header ----------------------------------------------------------
       - HeaderBar:
@@ -108,7 +117,7 @@ Screens:
               =Switch( gSelTask.task_stage.Value,
                        "Not Started", 1, "Planning", 2, "Drafting", 3,
                        "Under Review", 4, "Finalizing", 5, "Complete", 6, 7 )
-            OnChange: =Set(gTaskDirty, true)
+            OnChange: =Set(gTaskStage, selStage.Selected.Label); Set(gTaskDirty, true)
       # ---- Editable: health -------------------------------------------------
       - lblHealth:
           Control: Label@2.5.1
@@ -133,7 +142,7 @@ Screens:
               =Table({ Id: 1, Label: "Green" }, { Id: 2, Label: "Amber" }, { Id: 3, Label: "Red" })
             DefaultId: |
               =Switch( gSelTask.task_status.Value, "Green", 1, "Amber", 2, 3 )
-            OnChange: =Set(gTaskDirty, true)
+            OnChange: =Set(gTaskHealth, selHealth.Selected.Label); Set(gTaskDirty, true)
       # ---- Editable: priority ----------------------------------------------
       - lblPriority:
           Control: Label@2.5.1
@@ -159,7 +168,7 @@ Screens:
                      { Id: 3, Label: "High" }, { Id: 4, Label: "Critical" })
             DefaultId: |
               =Switch( gSelTask.task_priority.Value, "Low", 1, "Moderate", 2, "High", 3, 4 )
-            OnChange: =Set(gTaskDirty, true)
+            OnChange: =Set(gTaskPriority, selPriority.Selected.Label); Set(gTaskDirty, true)
       # ---- Read-only context ------------------------------------------------
       - lblContext:
           Control: Label@2.5.1
@@ -206,18 +215,24 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 412
             # Order is load-bearing: the task must be written BEFORE the rollup
             # is recalculated, or the rollup reads the pre-edit stage.
+            #
+            # Success is NOT assumed. Errors() returns a TABLE (empty when clean),
+            # so `IsError(Errors(...))` is always false and would never gate
+            # anything — the test has to be IsEmpty(). Everything that tells the
+            # user it worked lives inside that branch.
             OnSelect: |
               =IfError(
                   Patch( taskmaster_tasks, gSelTask,
                       { task_name:     txtTaskName.Text,
-                        task_stage:    { Value: selStage.Selected.Label },
-                        task_status:   { Value: selHealth.Selected.Label },
-                        task_priority: { Value: selPriority.Selected.Label } } ),
+                        task_stage:    { Value: gTaskStage },
+                        task_status:   { Value: gTaskHealth },
+                        task_priority: { Value: gTaskPriority } } ),
                   Notify("Couldn't save the task: " & FirstError.Message, NotificationType.Error)
               );
-              If( Not(IsError(Errors(taskmaster_tasks, gSelTask))),
+              If( IsEmpty(Errors(taskmaster_tasks, gSelTask)),
                   With( { pid: gSelTask.task_project_id.Id },
-                      With( { scored:
+                      With( { proj: LookUp(taskmaster_projects, ID = pid),
+                              scored:
                                 AddColumns(
                                     Filter( taskmaster_tasks,
                                         task_project_id.Id = pid
@@ -225,22 +240,31 @@ Screens:
                                        || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
                                        || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
                                     "wgt", Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
-                          IfError(
-                              Set( gSelProject,
-                                  Patch( taskmaster_projects,
-                                         LookUp(taskmaster_projects, ID = pid),
-                                         { project_perc_completion:
-                                               If( CountRows(scored) = 0, 0,
-                                                   RoundDown(Average(scored, wgt), 0) ) } ) ),
-                              Notify("Task saved, but the project rollup didn't update: " & FirstError.Message,
-                                     NotificationType.Warning)
+                          If( IsBlank(proj),
+                              Notify("Task saved. Parent project not found, so completion was left unchanged.",
+                                     NotificationType.Warning),
+                              CountRows(scored) >= 2000,
+                              // The average is computed LOCALLY over the returned page. Past the
+                              // row limit it would be a truncated number written back to
+                              // SharePoint and read by Power BI — refuse rather than persist it.
+                              Notify("Task saved. This project has too many tasks to compute completion accurately, so it was left unchanged.",
+                                     NotificationType.Warning),
+                              IfError(
+                                  Set( gSelProject,
+                                      Patch( taskmaster_projects, proj,
+                                             { project_perc_completion:
+                                                   If( CountRows(scored) = 0, 0,
+                                                       RoundDown(Average(scored, wgt), 0) ) } ) ),
+                                  Notify("Task saved, but the project rollup didn't update: " & FirstError.Message,
+                                         NotificationType.Warning)
+                              )
                           )
                       )
-                  )
-              );
-              Set(gTaskDirty, false);
-              Notify("Saved", NotificationType.Success);
-              Back()
+                  );
+                  Set(gTaskDirty, false);
+                  Notify("Saved", NotificationType.Success);
+                  Back()
+              )
       - btnCancel:
           Control: Classic/Button@2.2.0
           Properties:

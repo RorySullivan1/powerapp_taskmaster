@@ -4,14 +4,15 @@
 #
 # The three tabs are genuinely different UIs over THREE SEPARATE
 # project-filtered queries — never one shared query:
-#   Tasks        -> kanban (stage columns)
+#   Tasks        -> flat list grouped by stage (kanban variant kept in variants/)
 #   Transactions -> dense numeric table
 #   Issues       -> card feed
 #
 # DELEGATION SHAPE: each tab's source is one delegable Filter on the indexed
-# Lookup FK (`*_project_id.Id = gSelProject.ID`). The tasks kanban then splits
-# LOCALLY by stage — `colProjectTasks` is already narrowed to one project, so
-# the per-column filters are in-memory and cost nothing.
+# Lookup FK (`*_project_id.Id = gSelProject.ID`). The tasks list then sorts and
+# groups LOCALLY — `colProjectTasks` is already narrowed to one project, so that
+# costs nothing at the data layer. Archived tasks are excluded server-side by
+# enumerating the six live stages, and their count is surfaced separately.
 #
 # Column tokens resolve to schema/schema.yaml (golden source).
 # =============================================================================
@@ -19,12 +20,19 @@ Screens:
   scrProject:
     Properties:
       Fill: =Theme.Color.Bg
-      # One delegable pull per tab. Tasks are collected (the kanban needs to
-      # split them locally); transactions and issues bind straight to the
-      # gallery so SharePoint pages them.
+      # One delegable pull per tab. Tasks are collected (so the list can sort and
+      # group locally); transactions and issues bind straight to their gallery so
+      # SharePoint pages them — transactions is the largest list in the model.
       OnVisible: |
         =ClearCollect( colProjectTasks,
-            Filter( taskmaster_tasks, task_project_id.Id = gSelProject.ID ) );
+            Filter( taskmaster_tasks,
+                task_project_id.Id = gSelProject.ID
+             && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+               || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+               || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) );
+        Set( gProjArchived,
+             CountRows( Filter( taskmaster_tasks,
+                 task_project_id.Id = gSelProject.ID && task_stage.Value = "Archived" ) ) );
         Set( gProjTab, 1 )
     Children:
       # ---- Header band ----------------------------------------------------
@@ -116,112 +124,117 @@ Screens:
             DefaultId: =1
             OnChange: =Set(gProjTab, selTab.Selected.Id)
       # =====================================================================
-      # TAB 1 — TASKS as a kanban: outer gallery = stage columns, inner
-      # gallery = that stage's cards. The inner Items filter runs against the
-      # already-narrowed LOCAL collection, so no delegation concern.
-      # FALLBACK if the nested gallery is rejected on paste: replace galKanban
-      # with a single vertical gallery over
-      #   Sort(colProjectTasks, task_stage.Value)
-      # and show the stage as a pill on each row. Same data, flat layout.
+      # TAB 1 — TASKS, a flat list grouped by stage.
+      #
+      # This is the LANDING-SAFE form. `Variant: Vertical` is the only gallery
+      # variant with positive evidence; the nicer horizontal-column kanban needs
+      # `Variant: Horizontal`, which nothing has confirmed — and it would sit
+      # mid-file in a large paste unit gating this whole tab. The kanban is kept
+      # ready to swap in at src/authored/variants/scrProject.tasks-kanban.fx.yaml.txt
+      # once a Horizontal gallery is known to paste.
+      #
+      # Sorting by task_stage.Value groups the stages together; each row carries
+      # its stage and a RAG stripe, so the board reads much like columns would.
       # =====================================================================
-      - galKanban:
+      - galTasks:
           Control: Gallery@2.15.0
-          Variant: Horizontal
+          Variant: Vertical
           Properties:
             Visible: =gProjTab = 1
-            Items: |
-              =Table( { Stage: "Not Started" }, { Stage: "Planning" }, { Stage: "Drafting" },
-                      { Stage: "Under Review" }, { Stage: "Finalizing" }, { Stage: "Complete" } )
-            TemplateSize: =260
-            TemplatePadding: =Theme.Space.Gap
+            # Local sort over the already-narrowed collection.
+            Items: =Sort(colProjectTasks, task_stage.Value)
+            TemplateSize: =64
+            TemplatePadding: =4
             X: =Theme.Space.Gutter
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 24
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
-            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap) - Theme.Space.Gutter
-            ShowScrollbar: =true
+            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 24) - Theme.Space.Gutter
+            # Selection lives on the GALLERY so the whole row is the target —
+            # putting it on a child rectangle leaves the title area inert.
+            OnSelect: =Set(gSelTask, ThisItem); Navigate(scrTask, ScreenTransition.Cover)
           Children:
-            - colHeader:
+            - rowFill:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =Theme.Color.Surface
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 8
+                  Height: =60
+            - rowHealth:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: |
+                    =Switch( ThisItem.task_status.Value,
+                             "Green", Theme.Color.Success,
+                             "Amber", Theme.Color.Warning,
+                             "Red",   Theme.Color.Danger,
+                             Theme.Color.Border )
+                  X: =0
+                  Y: =0
+                  Width: =4
+                  Height: =60
+            - rowStage:
                 Control: Label@2.5.1
                 Properties:
-                  Text: |
-                    =ThisItem.Stage & "  (" &
-                     CountRows(Filter(colProjectTasks, task_stage.Value = ThisItem.Stage)) & ")"
+                  Text: =ThisItem.task_stage.Value
                   Font: =Theme.Font
                   FontWeight: =FontWeight.Semibold
                   Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  X: =0
-                  Y: =0
-                  Width: =240
-                  Height: =28
+                  Color: =Theme.Color.Primary
+                  X: =16
+                  Y: =8
+                  Width: =150
+                  Height: =20
                   VerticalAlign: =VerticalAlign.Middle
-            - galStageCards:
-                Control: Gallery@2.15.0
-                Variant: Vertical
+            - rowTitle:
+                Control: Label@2.5.1
                 Properties:
-                  # LOCAL filter over the project's tasks — colProjectTasks is
-                  # already scoped by the delegable OnVisible query.
-                  Items: =Filter(colProjectTasks, task_stage.Value = ThisItem.Stage)
-                  TemplateSize: =84
-                  TemplatePadding: =6
-                  X: =0
-                  Y: =32
-                  Width: =240
-                  Height: =Parent.TemplateHeight - 40
-                Children:
-                  - cardFill:
-                      Control: Rectangle@2.3.0
-                      Properties:
-                        Fill: =Theme.Color.Surface
-                        X: =0
-                        Y: =0
-                        Width: =236
-                        Height: =78
-                        OnSelect: =Set(gSelTask, ThisItem); Navigate(scrTask, ScreenTransition.Cover)
-                  - cardHealth:
-                      Control: Rectangle@2.3.0
-                      Properties:
-                        # RAG stripe from task_status (health).
-                        Fill: |
-                          =Switch( ThisItem.task_status.Value,
-                                   "Green", Theme.Color.Success,
-                                   "Amber", Theme.Color.Warning,
-                                   "Red",   Theme.Color.Danger,
-                                   Theme.Color.Border )
-                        X: =0
-                        Y: =0
-                        Width: =4
-                        Height: =78
-                  - cardTitle:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.task_name
-                        Font: =Theme.Font
-                        FontWeight: =FontWeight.Semibold
-                        Size: =Theme.Size.Body
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =8
-                        Width: =216
-                        Height: =36
-                  - cardWho:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =Coalesce(ThisItem.task_lead.DisplayName, "Unassigned")
-                           & If( IsBlank(ThisItem.task_date_target), "",
-                                 "  ·  " & Text(ThisItem.task_date_target, "dd mmm") )
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: |
-                          =If( !IsBlank(ThisItem.task_date_target)
-                            && ThisItem.task_date_target < Today()
-                            && ThisItem.task_stage.Value <> "Complete",
-                               Theme.Color.Danger, Theme.Color.TextMuted )
-                        X: =12
-                        Y: =48
-                        Width: =216
-                        Height: =20
+                  Text: =ThisItem.task_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  X: =16
+                  Y: =28
+                  Width: =Parent.TemplateWidth * 0.45
+                  Height: =24
+                  VerticalAlign: =VerticalAlign.Middle
+            - rowWho:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =Coalesce(ThisItem.task_lead.DisplayName, "Unassigned")
+                     & If( IsBlank(ThisItem.task_date_target), "",
+                           "   ·   due " & Text(ThisItem.task_date_target, "dd mmm yyyy") )
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: |
+                    =If( !IsBlank(ThisItem.task_date_target)
+                      && ThisItem.task_date_target < Today()
+                      && ThisItem.task_stage.Value <> "Complete",
+                         Theme.Color.Danger, Theme.Color.TextMuted )
+                  X: =Parent.TemplateWidth * 0.5
+                  Y: =20
+                  Width: =Parent.TemplateWidth * 0.45
+                  Height: =20
+                  VerticalAlign: =VerticalAlign.Middle
+      - lblTasksMeta:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gProjTab = 1
+            # Archived tasks are excluded from the board by the OnVisible filter;
+            # say so rather than letting them silently disappear.
+            Text: |
+              =CountRows(colProjectTasks) & " active task(s)" &
+               If( gProjArchived > 0, "   ·   " & gProjArchived & " archived (hidden)", "" )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =24
+            VerticalAlign: =VerticalAlign.Middle
       # =====================================================================
       # TAB 2 — TRANSACTIONS, dense numeric table. Bound straight to the
       # delegable Filter so SharePoint pages it (this is the largest list).
@@ -316,9 +329,9 @@ Screens:
             # Sum over the RETURNED PAGE only — CountRows/Sum never delegate to
             # SharePoint. Labelled as such rather than presented as a true total.
             Text: |
-              ="Shown: " & CountRows(galTransactions.AllItems) & " transaction(s)  ·  USD " &
+              ="Loaded so far: " & CountRows(galTransactions.AllItems) & " transaction(s)  ·  USD " &
                Text(Sum(galTransactions.AllItems, Coalesce(transaction_notional_usd, 0)), "[$-en-US]#,##0")
-               & "  (page total — full totals in Power BI)"
+               & "  (grows as you scroll — full totals in Power BI)"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: =Theme.Color.TextMuted

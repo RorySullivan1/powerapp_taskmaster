@@ -17,7 +17,7 @@
 # =============================================================================
 
 meta:
-  version: 1.6.0
+  version: 1.6.1
   updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
@@ -180,7 +180,7 @@ rollups:
     description: Weighted completion % for a project, from the stages of its child tasks.
     source_list: taskmaster_tasks
     parent_key: task_project_id
-    formula: "sum(stage_weight[task_stage]) / count(counted tasks) * 100"
+    formula: "mean(stage_weight[task_stage]) over counted tasks   # weights are already 0-100, so do NOT multiply by 100 again"
     # WEIGHTS ARE PROPOSED — confirm or edit. Percent-of-effort per stage.
     stage_weights:
       "Not Started":  0

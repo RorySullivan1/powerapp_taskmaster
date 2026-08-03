@@ -20,10 +20,16 @@ SCHEMA = ROOT / "tools" / "pa.schema.v3.0.yaml"
 
 def targets(argv):
     if argv:
-        return [pathlib.Path(a) for a in argv]
+        return [pathlib.Path(a).resolve() for a in argv]
     src = ROOT / "src" / "authored"
     return sorted([*src.glob("*.fx.yaml"), *src.glob("*.pa.yaml"),
                    *(src / "components").glob("*.pa.yaml")])
+
+def rel(p: pathlib.Path) -> str:
+    try:
+        return str(p.resolve().relative_to(ROOT))
+    except ValueError:
+        return str(p)
 
 def main() -> int:
     validator = Draft7Validator(yaml.safe_load(SCHEMA.read_text()))
@@ -36,16 +42,16 @@ def main() -> int:
         try:
             doc = yaml.safe_load(f.read_text())
         except yaml.YAMLError as e:
-            print(f"FAIL {f.relative_to(ROOT)}\n  YAML parse error: {e}\n"); bad += 1; continue
+            print(f"FAIL {rel(f)}\n  YAML parse error: {e}\n"); bad += 1; continue
         if doc is None:
-            print(f"SKIP {f.relative_to(ROOT)} (empty)"); continue
+            print(f"SKIP {rel(f)} (empty)"); continue
 
         errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
         if not errors:
-            print(f"ok   {f.relative_to(ROOT)}")
+            print(f"ok   {rel(f)}")
             continue
         bad += 1
-        print(f"FAIL {f.relative_to(ROOT)}")
+        print(f"FAIL {rel(f)}")
         seen = set()
         for e in errors:
             path = "/".join(str(p) for p in e.absolute_path) or "<root>"
