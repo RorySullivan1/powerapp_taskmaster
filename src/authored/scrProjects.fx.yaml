@@ -87,7 +87,35 @@ Screens:
                   VerticalAlign: =VerticalAlign.Middle
                   X: =Theme.Space.Gap + 24 + Theme.Space.Gap
                   Width: =Parent.TemplateWidth - Self.X - Theme.Space.Gap
-      # ---- Content: search + empty gallery placeholder --------------------
+      # ---- Content: header + filter strip + search + empty gallery --------
+      - hdrProjects:
+          Control: CanvasComponent
+          ComponentName: cmpSectionHeader
+          Properties:
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
+            Height: =60
+            Title: ="Projects"
+            Subtitle: ="Browse and open a project"
+            ShowAction: =true
+            ActionLabel: ="New project"
+            OnAction: =Notify("New project — wired in Phase 2", NotificationType.Information)
+      # Static filter strip. TODO(Phase-2-data): filter the gallery by
+      # selFilter.Selected (All / Active / Archived on IsArchived).
+      - selFilter:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            Width: =360
+            Height: =40
+            Items: |
+              =Table({ Id: 1, Label: "All" }, { Id: 2, Label: "Active" }, { Id: 3, Label: "Archived" })
+            DefaultId: =2
+            OnChange: |
+              =Notify("Filter: " & selFilter.Selected.Label, NotificationType.Information)
       - SearchBox:
           Control: Classic/TextInput@2.3.2
           Properties:
@@ -97,8 +125,8 @@ Screens:
             Size: =Theme.Size.Body
             Height: =40
             Width: =360
-            X: =Theme.Space.NavW + Theme.Space.Gutter
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+            X: =Theme.Space.NavW + Theme.Space.Gutter + 360 + Theme.Space.Gap
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
       - ProjectsEmpty:
           Control: Rectangle@2.3.0
           Properties:

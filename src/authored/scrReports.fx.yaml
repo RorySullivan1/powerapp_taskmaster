@@ -135,3 +135,55 @@ Screens:
             Width: =LicenceHeading.Width
             Height: =90
             Visible: =Not(gHasPowerBiLicence)
+      # ---- Native SVG KPI fallback (Q2 / distillation C1) ------------------
+      # Licence-free headline visuals via cmpKpiRing. Shown to unlicensed users
+      # alongside the card. TODO(Phase-2-data): Percent from delegable-filtered,
+      # bounded counts over the tm* lists (power-fx-development). Static for now.
+      - hdrFallback:
+          Control: CanvasComponent
+          ComponentName: cmpSectionHeader
+          Properties:
+            Visible: =Not(gHasPowerBiLicence)
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 220 + Theme.Space.Gutter
+            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
+            Height: =60
+            Title: ="Headline status"
+            Subtitle: ="Drawn natively — no Power BI licence required"
+            ShowAction: =false
+      - ringOnTrack:
+          Control: CanvasComponent
+          ComponentName: cmpKpiRing
+          Properties:
+            Visible: =Not(gHasPowerBiLicence)
+            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 220 + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            Width: =140
+            Height: =140
+            Percent: =72
+            Label: ="On track"
+            AccentHex: ="#31825D"
+      - ringAtRisk:
+          Control: CanvasComponent
+          ComponentName: cmpKpiRing
+          Properties:
+            Visible: =Not(gHasPowerBiLicence)
+            X: =Theme.Space.NavW + Theme.Space.Gutter + 140 + Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 220 + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            Width: =140
+            Height: =140
+            Percent: =18
+            Label: ="At risk"
+            AccentHex: ="#D69828"
+      - ringComplete:
+          Control: CanvasComponent
+          ComponentName: cmpKpiRing
+          Properties:
+            Visible: =Not(gHasPowerBiLicence)
+            X: =Theme.Space.NavW + Theme.Space.Gutter + 2 * (140 + Theme.Space.Gutter)
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 220 + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            Width: =140
+            Height: =140
+            Percent: =45
+            Label: ="Complete"
+            AccentHex: ="#005A9E"
