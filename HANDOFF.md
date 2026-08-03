@@ -55,7 +55,7 @@ Before building anything, prove that a paste from this repo actually lands in yo
    **View code**.
 3. Allow clipboard access for `https://make.powerapps.com` when the browser prompts.
 4. Create a blank screen, rename it **`scrReference`**.
-5. Paste `src/authored/scrReference.fx.yaml` into it via right-click → **Paste code**.
+5. Paste `src/authored/scrReference.pa.yaml` into it via right-click → **Paste code**.
 
 **Why this one:** `scrReference` and `scrAdmin` are pure shells — no components, no data sources,
 no `App.Formulas` dependency. They are the only units that can land with nothing else in place, so
@@ -77,7 +77,7 @@ rejecting. If it did, we know the dialect is right and the rest is mechanical.
 
    The five nav screens must exist before `App.Formulas`, which holds live screen references. The
    detail and edit screens aren't in the nav menu, but must exist before any screen that navigates
-   to them. Paste `scrAdmin.fx.yaml` now; leave the rest empty for Stage 4.
+   to them. Paste `scrAdmin.pa.yaml` now; leave the rest empty for Stage 4.
 7. **Build the components in two steps** — see `src/authored/components/BUILD-SHEET.md`.
 
    A component is a **contract** (custom properties) plus a **body** (controls), and Studio takes
@@ -174,15 +174,15 @@ useful signal.
 
     | # | Screen | Navigates to |
     |---|---|---|
-    | a | `scrIssueEdit.fx.yaml` | — (leaf) |
-    | b | `scrTransactionEdit.fx.yaml` | — (leaf) |
-    | c | `scrTaskEdit.fx.yaml` | — (leaf) |
-    | d | `scrProjectEdit.fx.yaml` | `scrProject` |
-    | e | `scrTask.fx.yaml` | `scrTaskEdit` |
-    | f | `scrProject.fx.yaml` | `scrTask`, `scrProjectEdit`, `scrTaskEdit`, `scrTransactionEdit`, `scrIssueEdit` |
-    | g | `scrProjects.fx.yaml` | `scrProject`, `scrProjectEdit` |
-    | h | `scrHome.fx.yaml` | `scrProjects` |
-    | i | `scrReports.fx.yaml` | — |
+    | a | `scrIssueEdit.pa.yaml` | — (leaf) |
+    | b | `scrTransactionEdit.pa.yaml` | — (leaf) |
+    | c | `scrTaskEdit.pa.yaml` | — (leaf) |
+    | d | `scrProjectEdit.pa.yaml` | `scrProject` |
+    | e | `scrTask.pa.yaml` | `scrTaskEdit` |
+    | f | `scrProject.pa.yaml` | `scrTask`, `scrProjectEdit`, `scrTaskEdit`, `scrTransactionEdit`, `scrIssueEdit` |
+    | g | `scrProjects.pa.yaml` | `scrProject`, `scrProjectEdit` |
+    | h | `scrHome.pa.yaml` | `scrProjects` |
+    | i | `scrReports.pa.yaml` | — |
 
     `scrProjectEdit` and `scrProject` navigate to each other, so one of them will be pasted while
     its target is still an empty screen. That is fine — the screen only has to **exist**.

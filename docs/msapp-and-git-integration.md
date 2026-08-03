@@ -67,17 +67,22 @@ clipboard entirely and make the gap two-way. It cannot be settled from this side
 
 ## Recommendation
 
-**Keep pasting.** The code-view channel is *proven* — `scrAdmin` landed, and components landed
-after the dialect fix. Trading a working channel for an unproven packaging exercise is a bad bet,
-especially when the failure mode is silent.
+**Keep pasting.** The code-view channel works — `scrAdmin` landed through it. Components have
+since regressed (see `paste-log.md`), and the response to that is to split each one into a typed
+contract and a pasteable body, not to abandon the channel: a packaging route whose failure mode is
+a file Studio silently refuses to open is strictly worse than one that at least reports an error.
 
-## A naming inconsistency worth knowing about
+## A naming inconsistency — found here, since fixed
 
-This repo names screens `scr*.fx.yaml` and components `cmp*.pa.yaml`. **Both contain pa-yaml v3.0**
-and both validate against `tools/pa.schema.v3.0.yaml`. But `*.fx.yaml` is the file extension of the
-**retired experimental format** used by `pac canvas unpack` — so the screen files are named after a
-format they are not. Cosmetic today; genuinely misleading to a future reader. Renaming them to
-`.pa.yaml` is a mechanical change plus doc references.
+Screens used to be named `scr*.fx.yaml`. But `*.fx.yaml` is the extension of the **retired
+experimental format** used by `pac canvas unpack`, and these files have always contained pa-yaml
+v3.0 — so they were named after a format they are not. Harmless until you know what the extension
+means, then actively misleading.
+
+**Renamed to `*.pa.yaml` on 2026-08-03.** Every authored file now carries the extension of the one
+schema version that is still active, matching what Git integration and the `\Src` folder of a
+`.msapp` use. `App.Formulas.pa.fx` keeps its own extension deliberately: it is a Power Fx snippet
+for the formula bar, not YAML and not a paste payload.
 
 ## Sources
 

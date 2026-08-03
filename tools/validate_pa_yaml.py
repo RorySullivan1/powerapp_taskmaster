@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate authored *.pa.yaml / *.fx.yaml against Microsoft's official
+"""Validate authored *.pa.yaml against Microsoft's official
 Power Apps source schema (pa-yaml v3.0).
 
 The air gap is one-way: a malformed file comes back only as "it didn't work".
@@ -22,7 +22,7 @@ def targets(argv):
     if argv:
         return [pathlib.Path(a).resolve() for a in argv]
     src = ROOT / "src" / "authored"
-    return sorted([*src.glob("*.fx.yaml"), *src.glob("*.pa.yaml"),
+    return sorted([*src.glob("*.pa.yaml"),
                    *(src / "components").glob("*.pa.yaml")])
 
 def rel(p: pathlib.Path) -> str:

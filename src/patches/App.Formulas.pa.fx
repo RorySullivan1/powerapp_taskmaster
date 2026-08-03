@@ -14,7 +14,7 @@
 //      (NavMenu below holds live Screen references, so the names must exist. The
 //       detail and edit screens are NOT in NavMenu — they are reached by Navigate.)
 //   2. Paste THIS file into the App.Formulas formula bar.
-//   3. Only then paste the screen controls (src/authored/scr*.fx.yaml).
+//   3. Only then paste the screen controls (src/authored/scr*.pa.yaml).
 // Step 2 must precede step 3 because scrHome/scrReports OnVisible now reference
 // StageWeights, and the edit screens reference ClaimPrefix, both defined here.
 // The old "paste App.Formulas last" order would fail validation on those screens.
@@ -140,7 +140,7 @@ ClaimPrefix = "i:0#.f|membership|";
 // tab, which now totals per currency and says so. Do not reintroduce a rate table
 // to "just add a total".
 // --- Write-back: recompute one project's % (app-side writer, C3) -------------
-// IMPLEMENTED in src/authored/scrTask.fx.yaml -> btnSave.OnSelect. That is the
+// IMPLEMENTED in src/authored/scrTask.pa.yaml -> btnSave.OnSelect. That is the
 // live copy; this block is the reference for any OTHER place a stage can change
 // (a kanban drag, the editable grid's save). Substitute the project's ID for <pid>.
 //

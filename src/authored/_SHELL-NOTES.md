@@ -42,13 +42,13 @@ Key facts:
 | File | Transfer path | What it is |
 |---|---|---|
 | `../patches/App.Formulas.pa.fx` | **Formula bar only** (App object has no code view) | `gUserEmail`, `Theme`, `NavMenu`, `gHasPowerBiLicence` |
-| `scrHome.fx.yaml` | Code view | Landing shell — the reference header+nav template |
-| `scrReports.fx.yaml` | Code view | Reports shell + the Q2 unlicensed empty-state card |
-| `scrProjects.fx.yaml` | Code view | Projects shell + search box + empty placeholder |
-| `scrReference.fx.yaml` | Code view | Clients/Products/Indices shell placeholder |
-| `scrAdmin.fx.yaml` | Code view | Admin shell placeholder |
-| `scrProject.fx.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
-| `scrTask.fx.yaml` | Code view | **Task detail + edit** — and the live home of the C3 rollup write-back |
+| `scrHome.pa.yaml` | Code view | Landing shell — the reference header+nav template |
+| `scrReports.pa.yaml` | Code view | Reports shell + the Q2 unlicensed empty-state card |
+| `scrProjects.pa.yaml` | Code view | Projects shell + search box + empty placeholder |
+| `scrReference.pa.yaml` | Code view | Clients/Products/Indices shell placeholder |
+| `scrAdmin.pa.yaml` | Code view | Admin shell placeholder |
+| `scrProject.pa.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
+| `scrTask.pa.yaml` | Code view | **Task detail + edit** — and the live home of the C3 rollup write-back |
 
 ## Paste order (dependencies are real)
 
