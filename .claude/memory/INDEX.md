@@ -55,6 +55,7 @@
 - [2026-08-02] Components authored in v3.0 `.pa.yaml` `ComponentDefinitions`; display pills/chips delivered as `cmpUiKit` OutputFunction HTML-builders (canvas components CAN'T sit in a gallery), interactive chip stays a component; components inline Theme (can't read app globals) — sessions/2026-08-02-1411-phase1-core-shell.md
 - [2026-08-02] **Air gap is ONE-WAY** (user-corrected): repo→Studio only; sole return signal is binary "works/doesn't." Kills pull/round-trip/pull-reconcile; repo is authoritative source not mirror. → resolve unknown tokens from PUBLIC sources; ship safe fallbacks; maximise first-try paste success — sessions/2026-08-02-1411-phase1-core-shell.md
 - [2026-08-02] SCHEMA: snake_case `taskmaster_*`/`asset_approval` is canonical, supersedes the PascalCase tm* model (user-confirmed) — schema/incoming-lists.md
+- [2026-08-02] Schema promoted to canonical (7 lists, snake_case). Model uses Lookup + Managed Metadata + multi-Person throughout — accepted as the user's design; consequences documented rather than relitigated — .claude/context/schema.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -79,8 +80,8 @@
 - **Phase-2 DATA binding still blocked** on provisioning (true internal names — `schema.md`
   ⟨capture⟩) + a confirmed pull. Every live query is a `TODO(Phase-2-data)` in the screens.
 
-- **Schema intake in progress:** 5 of 7 lists captured (approval, clients, issues, products, projects); awaiting `taskmaster_tasks` + `taskmaster_transactions`. Then promote staging → `.claude/context/schema.md` and clear `TODO(Phase-2-data)`. → `schema/incoming-lists.md`
-- **Schema consequences needing a call:** F1 multi-person `project_other_resources` (no delegable contributor filter); F6 `project_perc_completion` has no writer (needs Power Automate rollup, Q12); F5 region modelled 3 ways; F7 casing anomalies (`Issue_owner`, `product_UID`) must be confirmed before provisioning freezes names.
+- **Schema intake COMPLETE (7 lists) and promoted to `.claude/context/schema.md`.** Outstanding: `asset_library` schema never supplied (blocks `task_output_asset`).
+- **Schema consequences needing a call** (→ `context/schema.md` §Consequences): **J1** tasks sits at 11/12 joins (13 with Created By+Modified By → over limit); **C1** multi-person cols have no delegable filter; **C4** `task_date_start` is Calculated (nothing delegates); **C5** no USD-normalised notional; **C2** `task_status` as MM; **C3** no writer for `project_perc_completion`; **C6** region modelled 3 ways; **C8** casing anomalies before provisioning.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md

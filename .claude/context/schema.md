@@ -1,232 +1,307 @@
-# Data model — the eight `tm*` SharePoint lists
+# Data model — the SharePoint lists (canonical)
 
-Reference for the SharePoint-list backend behind the EQD desk-work Power App. This brief is
-the **concrete instance**: which lists and columns exist, their types, and the decisions
-behind them. The *how-to* of list design — column-type trade-offs, the 5,000-item threshold,
-indexing playbook, the 12-join wall — is the **`sharepoint-list-architecture`** skill; the
-delegation rules the column types serve are **`power-fx-development`** (matrix in its
-`delegation.md`). This doc does not re-teach those; it records what *this* model is and why.
+The concrete backend for the canvas app. **snake_case is canonical** (user-confirmed 2026-08-02);
+this supersedes the earlier PascalCase `tm*` design entirely.
 
-> **Provisioning is manual (SharePoint UI).** Internal names are therefore **not yet known**
-> and are at risk of `_x0020_` mangling. Every "internal name" below is marked **⟨capture⟩**
-> until the column is actually created; the **schema snapshot** (`schema/` + this doc) must
-> then record the **true** internal name, not the intended one. See `open-questions.md` and
-> the `pull-reconcile` command's internal-name cross-check. Set clean internal names at
-> creation (create the column named simply, then rename the display label) — the internal
-> name is frozen at creation and every formula, view, and Graph/Power Query call binds to it.
+Transcribed from schema screenshots supplied by the user — the only channel, since the air gap is
+**one-way** (`context/air-gap.md`). Provenance and the raw capture log live in
+`schema/incoming-lists.md`. The *how-to* of list design (column types, thresholds, indexing, the
+join budget) is the **`sharepoint-list-architecture`** skill; the delegation matrix is
+`power-fx-development/delegation.md`. This brief records **what this model is** and **what it
+costs**, not how SharePoint works in general.
 
-## Shape of the model
+> **Names are frozen at creation.** Everything below binds by **internal name**, exactly as
+> written — including the casing anomalies `Issue_owner` and `product_UID`. Confirm those two
+> before provisioning; a rename afterwards changes only the display label.
 
-A **Project is the parent.** Three *different kinds* of record hang off it — they are **not**
-variants of one thing (see `decisions` in `.claude/memory/`):
+## The lists
 
-| | What it is | Status | Assigned | Drives progress |
-|---|---|:-:|:-:|:-:|
-| **Task** | a unit of work | ✓ | ✓ | ✓ (the only roll-up) |
-| **Ticket** | a trade — numerical | lifecycle only | ✗ | ✗ |
-| **Issue** | freeform information | light | optional | ✗ |
+| List | Role | Complex cols (join cost) |
+|---|---|:-:|
+| `taskmaster_projects` | The parent. Everything hangs off it. | 6 |
+| `taskmaster_tasks` | Units of work. **The heaviest list — see J1.** | 11 |
+| `taskmaster_transactions` | Trades, full transaction-level. | 4 |
+| `taskmaster_issues` | Freeform issues. | 5 |
+| `taskmaster_clients` | Client dimension. | 4 |
+| `taskmaster_products` | Product reference. | 1 |
+| `asset_approval` | Approval reference (tasks point at it). | 0 |
+| `asset_library` | **Referenced by `task_output_asset` — schema not yet supplied.** | ? |
 
-Three lists, not one discriminated list. Only **Tasks** roll up into completion; Tickets and
-Issues surface *alongside*, never inside. There is **no snapshot/metrics list** — Power BI
-imports the lists whole, so the reason one would exist is gone; do not reintroduce it.
+**Relationships** (all via SharePoint **Lookup** columns — records, not integers):
 
-## Cross-cutting policies (apply to every list)
+```
+taskmaster_projects ──< taskmaster_tasks         (task_project_id)
+                    ──< taskmaster_transactions  (transaction_project_id)
+                    ──< taskmaster_issues        (issue_project_id, required)
 
-- **Keys derive from the built-in `ID`.** e.g. `TaskKey = ProjectKey & "-T-" & ID`, patched in
-  a **second write** (SharePoint has no atomic increment; a per-project counter races).
-- **Column-type policy** (follows from delegation): **Text** for anything sorted, plus a
-  **Number rank** column where ordered sort matters (Text sorts delegably but Choice/Person do
-  not); **Choice** only where filtered and never sorted; **Person** for people, filtered on
-  `.Email`; **no Lookup columns at all** — integer FKs to the built-in `ID`, joined
-  client-side. **No Managed Metadata** columns (see below).
-- **Person columns** are patched as a full record with lowercase **`Claims`**
-  (`"i:0#.f|membership|" & Lower(email)`), never an email string (silent failure otherwise).
-  Bind pickers to **Office365Users**. `Author` and `Created` are **system fields — never
-  patch them.** (Patching *mechanics* live in `power-fx-development`.)
-- **Index every column used in a filter or sort.** Mandatory above 5,000 items. Set the app's
-  **Data row limit to 2,000** — a ceiling to stay under, not a budget to spend.
-- **Denormalisation is deliberate and minimal.** `OwnerEmailTxt` exists only because Person
-  can't sort. `BusinessUnit` lives on **projects alone** (the in-app-aggregation
-  denormalisations were removed with the snapshot list).
-
-> **Decision in force — full ticket-level rows as the primary store** (approved 2026-07-26).
-> `tmTickets` holds every trade row and drives figures directly. Consequence: it is the list
-> most exposed to the 5,000-threshold and to delegation — **indexing is mandatory** on its
-> filter/sort columns, and every query against it must be delegable. See `open-questions.md`
-> Q9 (scale) — sizing at 12/36 months is still open and directly governs the index plan.
+taskmaster_clients  ──< taskmaster_tasks         (task_client_name)
+                    ──< taskmaster_transactions  (transaction_client_name)
+taskmaster_products ──< taskmaster_tasks         (task_product_id)
+                    ──< taskmaster_transactions  (transaction_product_id)
+asset_approval      ──< taskmaster_tasks         (task_output_approval)
+asset_library       ──< taskmaster_tasks         (task_output_asset)
+taskmaster_tasks    ──< taskmaster_issues        (issue_task_name, optional)
+taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name, optional)
+```
 
 ---
 
-## `tmProjects` — the parent (small; reference/parent list)
+## `taskmaster_projects`
 
-| Column (display) | Internal | Type | Indexed | Notes / decision |
-|---|---|---|:-:|---|
-| Title | `Title` | Text | yes | Project name (built-in Title, repurposed). |
-| ProjectKey | ⟨capture⟩ | Text | yes | Human key; unique by convention. |
-| Status | ⟨capture⟩ | Choice | – | Filtered, not sorted. |
-| Health | ⟨capture⟩ | Choice | – | |
-| Priority | ⟨capture⟩ | Choice | – | Paired with a rank for ordered sort. |
-| PriorityRank | ⟨capture⟩ | Number | – | Sortable rank behind Priority. |
-| Workstream | ⟨capture⟩ | Choice | – | |
-| **BusinessUnit** | ⟨capture⟩ | Text (from lookups, not free text) | yes | **Primary reporting dimension.** Sourced from a controlled list (see Q3 — can a project span two? if so this needs its own list + junction). Lives on projects only. |
-| Owner | ⟨capture⟩ | Person | – | Filter on `.Email`. |
-| StartDate | ⟨capture⟩ | Date | – | |
-| TargetDate | ⟨capture⟩ | Date | – | |
-| Description | ⟨capture⟩ | Multi-line text | – | Display only; never filtered. |
-| IsArchived | ⟨capture⟩ | Yes/No | yes | Delegable boolean for "not archived" filters (Text `<>` doesn't delegate). |
-| SortOrder | ⟨capture⟩ | Number | – | Manual ordering. |
-| *(optional)* rollup counters | ⟨capture⟩ | Number | – | Write-time counters for in-app progress bars, **if** Power Automate is available (Q12). Not a substitute for Power BI. |
+| Column | Type | Req | Notes |
+|---|---|:-:|---|
+| `project_name` | Text | **Y** | User-facing title; "unique enough for identification" (not enforced). Delegable `=`/`StartsWith`/`Sort`. |
+| `project_manager` | Person | **Y** | Accountable owner. Filter on `.Email`. |
+| `project_coverage` | Managed Metadata | N | Coverage term set. |
+| `project_description` | Multi-line text | N | Display only — never filter/sort/index. |
+| `project_region` | Managed Metadata | **Y** | AMER, EMEA, APAC, JAPAN, GLOBAL. |
+| `project_pathway` | Text | N | SharedDrive folder path. |
+| `project_type` | Managed Metadata | **Y** | Production, Campaign, Platform, Event, Operational. |
+| `project_requestor` | Person | N | Requesting user. |
+| `project_phase` | Choice | **Y** | Planning, Active, Blocked, Complete, **Archived**. |
+| `project_priority` | Choice | **Y** | Lowest, Low, Moderate, High, Critical. |
+| `project_perc_completion` | Number | N | 0–100. "Calculated" by description — **nothing computes it (C3)**. |
+| `project_date_start` | Date/Time | N | Default = Created. |
+| `project_date_target` | Date/Time | N | Desired completion. |
+| `project_date_complete` | Date/Time | N | Set when complete. |
+| `project_other_resources` | **Person — MULTI** | N | Contributors. **No delegable filter (C1).** |
+| `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
-## `tmTasks` — the only work items (large; child)
+## `taskmaster_tasks`  ⚠ heaviest list
 
-Always set `ProjectId`. Two fixed backup columns (not one multi-person column): multi-select
-Person is unsupported, and a delimited email column needs a `contains` match, which doesn't
-delegate — but **`Or` does**, so *owner-or-backup* stays one server-side query.
+| Column | Type | Req | Notes |
+|---|---|:-:|---|
+| `task_name` | Text | **Y** | Task title. |
+| `task_project_id` | **Lookup → projects** | **Y** | Parent. Filter `task_project_id.Id = <n>`. |
+| `task_description` | Multi-line text | N | Display only. |
+| `task_category` | Managed Metadata | N | Marketing taxonomy. |
+| `task_status` | **Managed Metadata** | N | Task Status term set. **The most-filtered column in the app — see C2.** |
+| `task_priority` | Choice | **Y** | Low, Moderate, High, Critical. |
+| `task_lead` | Person | **Y** | Primary owner. Delegable on `.Email`. |
+| `task_other_resources` | **Person — MULTI** | N | Contributors. **No delegable filter (C1).** |
+| `task_date_start` | **Calculated** | Sys | Derived. **Cannot be filtered, sorted or indexed delegably (C4).** |
+| `task_date_target` | Date/Time | N | Due date. |
+| `task_date_completion` | Date/Time | N | Set on completion. |
+| `task_output_approval` | Lookup → `asset_approval` | N | Approval required for output. |
+| `task_output_language` | Choice | N | EN, FR, DE, ES, IT, JP, … |
+| `task_output_format` | Managed Metadata | N | Flyer, Email, PDF, Webpage, Deck, Video. |
+| `task_output_branding` | Choice | N | Barclays, QIS, EXO, Custom. |
+| `task_output_asset` | Lookup → `asset_library` | N | Linked asset. |
+| `task_client_name` | Lookup → clients | N | Associated client. |
+| `task_product_id` | Lookup → products | N | Associated product. |
+| `task_client_stage` | Managed Metadata | N | Prospect, Active, Existing, Post-Trade. |
+| `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
-| Column (display) | Internal | Type | Indexed | Notes / decision |
-|---|---|---|:-:|---|
-| Title | `Title` | Text | – | Task summary. |
-| TaskKey | ⟨capture⟩ | Text | yes | `ProjectKey & "-T-" & ID`, second write. |
-| **ProjectId** | ⟨capture⟩ | Number (FK→`ID`) | **yes** | Always set; the parent link (client-side join). |
-| **TicketId** | ⟨capture⟩ | Number (FK→`ID`) | yes | Optional — the transaction this work services; **`0` = project level.** (Q6: can a task serve >1 ticket? this assumes one.) |
-| ParentTaskId | ⟨capture⟩ | Number (FK→`ID`) | – | One level of same-type nesting **only**. |
-| Status | ⟨capture⟩ | Choice | **yes** | Primary filter. |
-| StatusRank | ⟨capture⟩ | Number | – | Ordered sort behind Status. |
-| Priority / PriorityRank | ⟨capture⟩ | Choice / Number | – | |
-| **Owner / BackupPrimary / BackupSecondary** | ⟨capture⟩ | Person ×3 | Owner: yes | All Person. "My open tasks" = `Owner.Email = me OR BackupPrimary.Email = me OR BackupSecondary.Email = me` (delegable `Or`). |
-| OwnerEmailTxt | ⟨capture⟩ | Text | yes | **Denormalised** — only because Person can't sort. |
-| DueDate / StartDate / CompletedDate | ⟨capture⟩ | Date ×3 | DueDate: **yes** | Date range filters delegate; index DueDate. |
-| EstimateHours / ActualHours / PercentComplete | ⟨capture⟩ | Number ×3 | – | PercentComplete drives the Task roll-up. |
-| Description | ⟨capture⟩ | Multi-line text | – | Display only. |
-| Tags | ⟨capture⟩ | Text | – | |
-| IsArchived | ⟨capture⟩ | Yes/No | yes | |
-| SortOrder | ⟨capture⟩ | Number | – | |
+## `taskmaster_transactions`
 
-## `tmTickets` — trades (**large, primary transactional store**)
+| Column | Type | Req | Notes |
+|---|---|:-:|---|
+| `transaction_name` | Text | **Y** | Label. |
+| `transaction_project_id` | Lookup → projects | **Y** | Parent. |
+| `transaction_client_name` | Lookup → clients | **Y** | Client. |
+| `transaction_product_id` | Lookup → products | **Y** | Product. |
+| `transaction_sales` | Person | **Y** | Sales owner. |
+| `transaction_notional` | **Currency** | N | Positive. Numeric underneath → delegable comparisons, indexable. |
+| `transaction_currency` | Choice | **Y** | USD, EUR, GBP, JPY, CHF, … **No normalised USD column (C5).** |
+| `transaction_date` | Date/Time | **Y** | Actual trade date. |
+| `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
-The only value columns are Notional/Currency/NotionalUSD. **Normalise USD at write time** —
-FX-converting in a query is neither delegable nor reproducible. `SalesRep` (commercial
-attribution) is distinct from `Author` (who keyed it in).
+## `taskmaster_issues`
 
-| Column (display) | Internal | Type | Indexed | Notes / decision |
-|---|---|---|:-:|---|
-| Title | `Title` | Text | – | |
-| TicketRef | ⟨capture⟩ | Text | yes | Points at the real booking system. |
-| ProjectId | ⟨capture⟩ | Number (FK) | **yes** | |
-| ClientId | ⟨capture⟩ | Number (FK→`tmClients.ID`) | yes | |
-| **SalesRep** | ⟨capture⟩ | Person | – | Commercial attribution; ≠ `Author`. |
-| InstrumentType | ⟨capture⟩ | Choice (Product/Index) | yes | |
-| InstrumentId | ⟨capture⟩ | Number (FK→Product/Index `ID`) | yes | Resolves via ISIN/ticker join key. |
-| TicketStatus | ⟨capture⟩ | Choice | **yes** | Lifecycle only. |
-| TradeDate / SettleDate | ⟨capture⟩ | Date ×2 | TradeDate: **yes** | |
-| Direction | ⟨capture⟩ | Choice | – | |
-| **Notional / Currency / NotionalUSD** | ⟨capture⟩ | Number / Choice / Number | – | The only value columns. `NotionalUSD` normalised at write. **Known bias:** Notional favours large low-margin trades — correct if the measure is issuance volume (decision, `.claude/memory/`). |
-| Notes | ⟨capture⟩ | Multi-line text | – | |
-| IsArchived | ⟨capture⟩ | Yes/No | yes | |
+| Column | Type | Req | Notes |
+|---|---|:-:|---|
+| `issue_name` | Text | **Y** | Summary. |
+| `issue_description` | Multi-line text | N | Display only. |
+| `issue_project_id` | Lookup → projects | **Y** | Parent. |
+| `issue_task_name` | Lookup → tasks | N | Related task. |
+| `issue_transaction_name` | Lookup → transactions | N | Related transaction. |
+| `issue_assignee` | Person | **Y** | Resolver. |
+| `issue_status` | Choice | N | Open, Review, Waiting, Blocked, Closed. |
+| `issue_type` | Choice | N | Approval, Process, Compliance, Branding, Technical. |
+| `issue_impact` | Choice | N | Low, Moderate, High, Critical. |
+| `issue_date_open` | Date/Time | N | Default = Created. |
+| `issue_date_target` | Date/Time | N | Expected resolution. |
+| `issue_date_close` | Date/Time | N | Set on closure. |
+| `Issue_owner` *(capital I — sic)* | System | — | "Business Owner". Type ambiguous — Author, or a Person column? **Confirm.** |
+| `Created` `Modified` `Modified By` | System | — | No `Created By` listed on this list. |
 
-## `tmProducts` — deliberately a stub (not a product master)
+## `taskmaster_clients`
 
-Economics live in the existing ISIN-keyed structured-product database; sync is one-directional
-**in**; **ISIN is the egress contract**.
+| Column | Type | Req | Notes |
+|---|---|:-:|---|
+| `client_name` | Text | **Y** | Display name. |
+| `client_type` | Managed Metadata | **Y** | Internal taxonomy. |
+| `client_coverage` | Managed Metadata | **Y** | Coverage taxonomy. |
+| `client_sales` | Person | **Y** | Primary sales owner. |
+| `client_region` | Managed Metadata | **Y** | AMER, EMEA, APAC, JAPAN — **no GLOBAL (C6)**. |
+| `client_notes` | Multi-line text | N | Display only. |
+| `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
-| Column | Internal | Type | Notes |
-|---|---|---|---|
-| Title | `Title` | Text | |
-| **ISIN** | ⟨capture⟩ | Text (indexed) | **The join key.** |
-| Issuer | ⟨capture⟩ | Text | |
-| ProductType | ⟨capture⟩ | Choice | Coarse. |
-| Currency | ⟨capture⟩ | Choice | |
-| MaturityDate | ⟨capture⟩ | Date | |
-| IsActive | ⟨capture⟩ | Yes/No | Deprecate with `false`, don't delete. |
+## `taskmaster_products`
 
-## `tmIndices` — same principle, keyed on ticker
+| Column | Type | Req | Notes |
+|---|---|:-:|---|
+| `product_UID` *(capital UID — sic)* | Text | **Y** | Business key (ISIN / Ticker / Internal ID). Uniqueness not enforced. |
+| `product_type` | Managed Metadata | **Y** | Product taxonomy. |
+| `product_description` | Multi-line text | **Y** | Display only. |
+| `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
-| Column | Internal | Type | Notes |
-|---|---|---|---|
-| Title | `Title` | Text | |
-| **IndexTicker** | ⟨capture⟩ | Text (indexed) | Join key. |
-| Sponsor | ⟨capture⟩ | Text | |
-| AssetClass | ⟨capture⟩ | Choice | **Taxonomy source unresolved** — the desk's strategy vocabulary is *not* in claudeBrain (see `open-questions.md` Q5). Do not invent terms; values TBD. |
-| RiskPremium | ⟨capture⟩ | Choice | Same — taxonomy TBD. |
-| IsActive | ⟨capture⟩ | Yes/No | |
+## `asset_approval`
 
-> Q5 is open: **is there an index master?** If not, `tmIndices` is a *real* list rather than a
-> stub, which changes the seeding route (Q4).
+| Column | Type | Req | Notes |
+|---|---|:-:|---|
+| `approval_id` | Text | **Y** | Business key (e.g. MAW, Legal, Compliance, Brand). |
+| `approval_region` | **Choice** | **Y** | GLOBAL, AMER, EMEA, APAC, JAPAN — **Choice here, MM elsewhere (C6)**. |
+| `approval_status` | Yes/No | N | True = Active. Delegable + indexable. |
+| `approval_link` | Hyperlink | N | Display only — never a query key. |
+| `Created` `Modified` `Created By` `Modified By` | System | — | **Never patch.** |
 
-## `tmClients` — minimal (a slicing dimension, not a CRM)
-
-| Column | Internal | Type | Notes |
-|---|---|---|---|
-| Title | `Title` | Text | |
-| ClientCode | ⟨capture⟩ | Text (indexed) | |
-| ClientType | ⟨capture⟩ | Choice | |
-| Region | ⟨capture⟩ | Choice | |
-| Coverage | ⟨capture⟩ | Person | |
-| IsActive | ⟨capture⟩ | Yes/No | |
-
-## `tmIssues` — freeform, deliberately loose
-
-| Column | Internal | Type | Indexed | Notes |
-|---|---|---|:-:|---|
-| Title | `Title` | Text | – | |
-| IssueKey | ⟨capture⟩ | Text | yes | |
-| ProjectId | ⟨capture⟩ | Number (FK) | yes | |
-| IssueType | ⟨capture⟩ | Choice | – | (Q8: which types need a lifecycle — drives `NA`/triage.) |
-| IssueStatus | ⟨capture⟩ | Choice | yes | Includes **`NA`** — a plain note has no lifecycle. |
-| Impact / ImpactRank | ⟨capture⟩ | Choice / Number | – | |
-| Body | ⟨capture⟩ | Multi-line text | – | |
-| RaisedBy / Owner | ⟨capture⟩ | Person ×2 | – | |
-| RaisedDate / ResolvedDate | ⟨capture⟩ | Date ×2 | – | |
-| AttributesJson | ⟨capture⟩ | Multi-line text | – | JSON blob for read-only, never-sliced fields (see "adding depth"). |
-| Tags | ⟨capture⟩ | Text | – | |
-| IsArchived | ⟨capture⟩ | Yes/No | yes | |
-
-## `tmComments` — polymorphic
-
-`EntityType` + `EntityId` across Project/Task/Ticket/Issue; `ProjectId` denormalised; `Body`;
-`Author` (Person); `CommentType`.
-
-## `tmLinks` — relationships
-
-`FromType`/`FromId`, `ToType`/`ToId`, `LinkType` (Blocks/RelatesTo/Duplicates/Affects). Cycle
-detection on **Blocks** is app logic.
-
-## `tmUserPrefs` — one row per user
-
-`PinnedProjectIds`, `HomeWidgetOrder`, `DefaultView`, `Theme`.
-
-## `tmLookups` — vocabularies so nothing is hardcoded
-
-`LookupType`, `Value`, `DisplayName`, `ColorHex`, `SortOrder`, `IsActive`. Includes a
-**FieldVisibility** row set driving conditional form fields. **Cached whole at startup.**
+## `asset_library` — **not yet supplied**
+Referenced by `task_output_asset`. Schema unknown; any binding to it is blocked.
 
 ---
 
-## Adding depth — the rule to encode
+# Consequences — what this model costs
 
-Separate two decisions that get conflated. Conditional visibility is always the right
-*presentation* answer but says nothing about *storage*.
+Ordered by severity. ❗ = breaks or silently returns wrong results. ⚠ = needs a decision.
 
-1. **Does this field already have a home?** If it's analysed outside the app and lives in
-   another system, store the **join key** and nothing else. Two copies diverge, and SharePoint
-   is the copy that loses.
-2. Then: **will you ever filter, sort, group, or aggregate on it in the app?**
-   - **Yes** → a **real column**, revealed conditionally. Sparse columns are cheap.
-   - **No, a human just reads it** → a **JSON blob** (`AttributesJson`).
-   - **"Maybe later"** → a **real column** — promoting JSON later means backfilling by hand.
-- **Never build a generic attribute table** (`EntityId`/`AttrKey`/`AttrValue`): it delegates,
-  but every value is a string (no typed comparison, no aggregation) and every read grows a join.
-- **Reporting test:** anything you'd slice a Power BI visual by must be a real column. Power BI
-  reads JSON only via Power Query parsing, which breaks silently on a missing key.
+## J1 ❗ `taskmaster_tasks` is at 11 of the 12-join limit — and 13 with system fields
 
-## No managed-metadata columns
+Lookup, Person/Group **and** Managed Metadata columns each cost a join, capped at **12 per
+view/query**. On tasks:
 
-Term-store vocabularies sync **down into `tmLookups` as plain Text** instead. Managed metadata
-is Complex (never sorts), multi-value is unsupported, Graph doesn't fully support the columns,
-and it's excluded from Dataverse virtual tables. **Sync via CSOM or PnP — not Graph** — keyed
-on `TermGuid` so upstream renames reconcile; deprecate with `IsActive = false` rather than
-deleting, or historical rows lose their labels.
+- **5 Lookups** — `task_project_id`, `task_output_approval`, `task_output_asset`,
+  `task_client_name`, `task_product_id`
+- **2 Person** — `task_lead`, `task_other_resources`
+- **4 Managed Metadata** — `task_category`, `task_status`, `task_output_format`, `task_client_stage`
 
-> **Gap:** claudeBrain has **no PnP/CSOM skill** and provisioning here is **manual UI**, so
-> there is currently no automated term-store sync route. Until one is chosen (Q11/Q12),
-> `tmLookups` (and the `tmIndices` taxonomy) are seeded and maintained **by hand**.
+**= 11.** Add the system Person fields `Created By` + `Modified By` and a view projecting
+everything is at **13 — over the limit**, and SharePoint blocks it.
+
+**Consequences:** no single view or query can surface every task column. Keep **Explicit Column
+Selection** on (default) so the app fetches only bound columns; build SharePoint views that project
+a *subset*; and never add another complex column to tasks without removing one. If tasks needs to
+grow, convert fixed-vocabulary MM columns to **Choice** (Choice costs **no join**) — `task_status`,
+`task_output_format` and `task_client_stage` are the obvious candidates and would drop the count to 8.
+
+## C1 ❗ Multi-person columns have no delegable filter
+
+`project_other_resources` and `task_other_resources` are **multi-person**. Multi-value columns are
+**unsupported for delegation** by the SharePoint connector — any filter touching them evaluates
+locally over the first 500/2,000 rows and **silently omits the rest**.
+
+So **"tasks/projects I contribute to" cannot be a server-side query.** Options:
+1. Treat them as **display-only**, and drive "mine" off `task_lead` / `project_manager`
+   (single-Person, delegable on `.Email`). ← recommended, zero schema change
+2. Fixed single-Person slots (`task_resource_1/2/3`) if server-side "am I on it?" is required.
+3. A write-time text mirror — but `contains` on it still won't delegate; only exact `=` would.
+
+**No contributor filter will be authored until this is chosen** — there is no correct one.
+
+## C2 ⚠ `task_status` is Managed Metadata — the app's hottest column
+
+Status drives the kanban, "my open tasks", and every count. As MM: **`=` via subfield delegates**
+(so per-status kanban columns work), but **`Sort` never delegates**, it **costs a join**, and the
+term set is hand-maintained (no CSOM/PnP route here → no sync automation).
+
+**Recommendation: make `task_status` a Choice.** Identical filtering, no join, sortable, and
+`tmLookups`-style governance isn't needed for a workflow status. Same argument for
+`task_output_format` and `task_client_stage`.
+
+## C3 ⚠ `project_perc_completion` has no writer
+
+Typed **Number** — correct (a *Calculated* column can't be indexed and never delegates). But
+nothing computes it: SharePoint won't, and Power Fx can't aggregate server-side. It needs a
+**Power Automate rollup** on task change (**Q12**) or it stays blank/stale. Note tasks carry no
+per-task completion %, so a rollup must derive from `task_status` values.
+
+## C4 ❗ `task_date_start` is a Calculated column
+
+Calculated columns **cannot be indexed** and **nothing about them delegates**. Any filter or sort
+on `task_date_start` (a "my week" view, a timeline, "starting soon") will process only the first
+500/2,000 rows and be silently wrong.
+
+**Recommendation: make it a real Date/Time column** written at creation (default = Created, or
+copied from the project's start), exactly as `project_date_start` already is.
+
+## C5 ⚠ No normalised-USD column on transactions
+
+`transaction_notional` (Currency) + `transaction_currency` (Choice) with **no `transaction_notional_usd`**.
+Mixed-currency values **cannot be meaningfully summed or compared** — and FX-converting inside a
+query is neither delegable nor reproducible. Since transactions are the full transaction-level
+primary store and notional is the value column, any total is wrong unless every row shares a
+currency.
+
+**Recommendation:** add a **`transaction_notional_usd` (Currency/Number)** normalised at write
+time, and aggregate on that (in Power BI, or locally over a delegably-filtered set).
+
+## C6 ⚠ `region` is modelled three ways across two domains
+
+| List | Column | Type | Values |
+|---|---|---|---|
+| `asset_approval` | `approval_region` | **Choice** | GLOBAL, AMER, EMEA, APAC, JAPAN |
+| `taskmaster_projects` | `project_region` | **Managed Metadata** | AMER, EMEA, APAC, JAPAN, GLOBAL |
+| `taskmaster_clients` | `client_region` | **Managed Metadata** | AMER, EMEA, APAC, JAPAN *(no GLOBAL)* |
+
+One concept, two types, two value sets. A shared region slicer can't treat them uniformly and Power
+BI will model them as unrelated dimensions. Recommend one type and one domain.
+
+## C7 ⚠ "Not archived" / "open" have no delegable form
+
+There is no boolean archive flag; `Archived` is a value of the **Choice** `project_phase`. A
+`.Value <> "Archived"` predicate is a **Text `<>`** → **does not delegate**. Delegable rewrite:
+
+```powerapps
+Filter(taskmaster_projects,
+    project_phase.Value = "Planning" || project_phase.Value = "Active"
+ || project_phase.Value = "Blocked"  || project_phase.Value = "Complete")
+```
+Verbose but server-side. Same pattern for open issues on `issue_status`. (A Yes/No `is_archived`
+column would be cheaper, indexable, and simpler.)
+
+## C8 ⚠ Casing anomalies and unenforced keys
+- **`Issue_owner`** (capital I) and **`product_UID`** (capital UID) break the lowercase convention.
+  Formulas must match exactly. Fix before provisioning or accept them permanently.
+- **No uniqueness is enforced** anywhere. `approval_id`, `product_UID` and `project_name` are
+  business keys by convention only — **join on the built-in `ID`** (always indexed, fastest lookup).
+
+---
+
+# Delegation reference (this model)
+
+| Column kind | Delegates | Does NOT delegate |
+|---|---|---|
+| Text (`*_name`, `approval_id`, `product_UID`, `project_pathway`) | `=`, `StartsWith`, `Sort` | `<` `>` `<>`, `Search`, `in` |
+| Choice (`*_priority`, `project_phase`, `issue_*`, `approval_region`, `transaction_currency`, `task_output_language/branding`) | `=` via `.Value` | **`Sort`**, `StartsWith` on subfield, `<>` |
+| Managed Metadata (11 across the model) | `=` via subfield | **`Sort`** · costs a join |
+| Lookup (11 across the model) | `=` via `.Id` / `.Value` | **`Sort`** · costs a join |
+| Person — single | `=` on `.Email` / `.DisplayName` | other subfields, **`Sort`** · costs a join |
+| **Person — multi** (`*_other_resources`) | **nothing** | **unsupported — C1** |
+| Date/Time (`*_date_*`) | `=` `<` `>` `<=` `>=`, `Sort` | arithmetic in the predicate |
+| Number / Currency (`project_perc_completion`, `transaction_notional`) | `=` `<` `>` `<=` `>=`, `Sort` | — |
+| Yes/No (`approval_status`) | `=`, `Sort` | — |
+| **Calculated** (`task_date_start`) | **nothing** | **everything — C4** |
+| Multi-line text (`*_description`, `client_notes`) | **nothing** | not filterable/indexable |
+| Hyperlink (`approval_link`) | **nothing** | display only |
+| System (`Created`, `Modified`, `Created By`, `Modified By`) | — | **never patch** |
+
+**Aggregates never delegate to SharePoint** (`Sum`, `Average`, `CountRows`, `CountIf`, `Max`,
+`Min`). Filter delegably to a bounded set, then aggregate locally — or aggregate in Power BI.
+
+**Writing Lookup and Person columns** — records, never scalars:
+```powerapps
+// Lookup
+task_project_id: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedReference",
+                   Id: gSelProject.ID, Value: gSelProject.project_name }
+// Person
+task_lead: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+             Claims: "i:0#.f|membership|" & Lower(gUserEmail),
+             DisplayName: …, Email: … }
+```
+
+**Index early** (mandatory >5,000 items; can't be added past 20,000):
+`task_project_id`, `task_status`, `task_lead`, `task_date_target` ·
+`project_phase`, `project_manager`, `project_name`, `project_date_target` ·
+`transaction_project_id`, `transaction_date`, `transaction_client_name` ·
+`issue_project_id`, `issue_status`, `issue_assignee` ·
+`client_name`, `client_region` · `product_UID` · `approval_id`, `approval_status`.
