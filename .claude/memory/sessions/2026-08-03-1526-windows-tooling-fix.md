@@ -54,6 +54,22 @@
 - Delivered to `build/` with a README + reproducible `build/smoke-src/*.fx.yaml`.
 - **STILL UNCONFIRMED: whether Studio opens it** — that's the user's binary test (one-way gap).
 
+## Part 3 — component-library .msapp: researched, then definitively closed
+- User confirmed the SQL-free shell app; asked (via the earlier choice) to research the
+  Experimental `.fx.yaml` component format before attempting a component-library build.
+- Found real references in microsoft/PowerApps-Tooling: `SrcBaseline/ComponentFunction_Test.fx.yaml`
+  and the `ComponentTest.msapp` test app (downloaded via raw URL, unpacked Experimental).
+- GROUNDED the format: per component, TWO files — `<Name>.fx.yaml` (`<Name> As CanvasComponent:`
+  + base props + custom-prop default formulas + `As <type>:` child controls, explicit ZIndex,
+  functions as `Fn(p As Type):` + nested `ThisProperty.Default`) AND a companion `<Name>.json`
+  with `CustomProperties[]` = {Category (0 Input/1 Output/2 Behavior), PropertyDataTypeKey,
+  version-stamped Type descriptor}. Also: single-line `.fx.yaml` values with `#` throw PA3003 —
+  hex needs a `|-` block scalar.
+- Spiked cmpKpiRing into the ComponentTest slot and packed → **Error PA3004: pac "does not
+  support adding new custom properties to components. Please use Power Apps Studio."** Hard,
+  tool-enforced refusal. Component-library .msapp route is IMPOSSIBLE with pac. Closed for good.
+- Fallback stands: components via code-view body paste + BUILD-SHEET contract (fixed in Part 1).
+
 ## Open threads
 - Two control tokens still UNVERIFIED (validator NOTEs them): `HtmlViewer@2.1.0`,
   `Classic/Timer@2.1.0` — example has neither to ground them.
