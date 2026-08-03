@@ -47,6 +47,8 @@ Key facts:
 | `scrProjects.fx.yaml` | Code view | Projects shell + search box + empty placeholder |
 | `scrReference.fx.yaml` | Code view | Clients/Products/Indices shell placeholder |
 | `scrAdmin.fx.yaml` | Code view | Admin shell placeholder |
+| `scrProject.fx.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
+| `scrTask.fx.yaml` | Code view | **Task detail + edit** — and the live home of the C3 rollup write-back |
 
 ## Paste order (dependencies are real)
 

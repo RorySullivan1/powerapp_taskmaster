@@ -6,8 +6,9 @@
 // formula bar by hand — never through Paste code.
 //
 // PASTE ORDER (matters — and it CHANGED once the screens gained data):
-//   1. Create five BLANK screens, named exactly:
+//   1. Create SEVEN blank screens, named exactly:
 //        scrHome / scrReports / scrProjects / scrReference / scrAdmin
+//        scrProject / scrTask        <- detail screens, not in NavMenu
 //      (NavMenu below holds live Screen references, so the names must exist.)
 //   2. Paste THIS file into the App.Formulas formula bar.
 //   3. Only then paste the screen controls (src/authored/scr*.fx.yaml).
@@ -96,9 +97,9 @@ StageWeights = Table(
 );
 
 // --- Write-back: recompute one project's % (app-side writer, C3) -------------
-// PASTE THIS INTO A BEHAVIOUR PROPERTY, not here. Run it wherever a task's
-// stage can change: the task form's OnSuccess, a kanban drop, the editable
-// grid's save. Substitute the project's ID for <pid>.
+// IMPLEMENTED in src/authored/scrTask.fx.yaml -> btnSave.OnSelect. That is the
+// live copy; this block is the reference for any OTHER place a stage can change
+// (a kanban drag, the editable grid's save). Substitute the project's ID for <pid>.
 //
 //   With(
 //       { scored:

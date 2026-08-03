@@ -57,9 +57,11 @@ rejecting. If it did, we know the dialect is right and the rest is mechanical.
 
 ## Stage 2 — the rest of the shells and the components
 
-6. Create and name the remaining four screens **exactly**: `scrHome`, `scrReports`,
-   `scrProjects`, `scrAdmin`. (Names must exist before `App.Formulas`, which holds live screen
-   references.) Paste `scrAdmin.fx.yaml` now; leave the other three empty for Stage 4.
+6. Create and name the remaining six screens **exactly**: `scrHome`, `scrReports`,
+   `scrProjects`, `scrAdmin`, `scrProject`, `scrTask`. (The first five must exist before
+   `App.Formulas`, which holds live screen references; `scrProject`/`scrTask` are detail screens
+   reached by `Navigate`, so they aren't in the nav menu but must exist before the screens that
+   navigate to them.) Paste `scrAdmin.fx.yaml` now; leave the rest empty for Stage 4.
 7. **Build the components by hand** — see `src/authored/components/_COMPONENTS-NOTES.md`.
    Canvas components are **not** code-view-pasteable; each is recreated in the component editor
    from its contract table. This is the slowest part of the whole job.
@@ -71,6 +73,8 @@ rejecting. If it did, we know the dialect is right and the rest is mechanical.
    | `cmpSectionHeader`, `cmpStatusCard`, `cmpKpiRing`, `cmpToast`, `cmpConfirmDialog` | `scrHome` |
    | `cmpSectionHeader`, `cmpKpiRing` | `scrReports` |
    | `cmpSectionHeader`, `cmpSelection` | `scrProjects` |
+   | `cmpSelection`, `cmpKpiRing` | `scrProject` |
+   | `cmpSelection` | `scrTask` |
    | `cmpUiKit`, `cmpStatusPill`, `cmpChoicePill`, `cmpEditableGrid` | not yet composed — skip |
 
    Note `cmpConfirmDialog`'s input is **`IsOpen`**, not `Visible` — a custom property named
@@ -94,8 +98,16 @@ useful signal.
    exact name, then set a friendly display name if you want one. Apply `indexed: true` while each
    list is small — indexes can't be added past 20,000 items.
 10. In the app, **add each list as a data source**.
-11. Paste the three data-bound screens: `scrHome.fx.yaml`, `scrProjects.fx.yaml`,
-    `scrReports.fx.yaml`.
+11. Paste the five data-bound screens. **Order matters** — paste a screen before the one that
+    navigates to it, so the target exists:
+
+    | # | Screen | Navigates to |
+    |---|---|---|
+    | a | `scrTask.fx.yaml` | — (leaf) |
+    | b | `scrProject.fx.yaml` | `scrTask` |
+    | c | `scrProjects.fx.yaml` | `scrProject` |
+    | d | `scrHome.fx.yaml` | `scrProjects` |
+    | e | `scrReports.fx.yaml` | — |
 
     These **cannot** paste before step 10 — Studio won't bind to a list that doesn't exist.
 

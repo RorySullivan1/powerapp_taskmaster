@@ -1,0 +1,429 @@
+# =============================================================================
+# scrProject  —  project detail, THREE TABS (screen-map §4). Reached from the
+# scrProjects gallery, which sets gSelProject.
+#
+# The three tabs are genuinely different UIs over THREE SEPARATE
+# project-filtered queries — never one shared query:
+#   Tasks        -> kanban (stage columns)
+#   Transactions -> dense numeric table
+#   Issues       -> card feed
+#
+# DELEGATION SHAPE: each tab's source is one delegable Filter on the indexed
+# Lookup FK (`*_project_id.Id = gSelProject.ID`). The tasks kanban then splits
+# LOCALLY by stage — `colProjectTasks` is already narrowed to one project, so
+# the per-column filters are in-memory and cost nothing.
+#
+# Column tokens resolve to schema/schema.yaml (golden source).
+# =============================================================================
+Screens:
+  scrProject:
+    Properties:
+      Fill: =Theme.Color.Bg
+      # One delegable pull per tab. Tasks are collected (the kanban needs to
+      # split them locally); transactions and issues bind straight to the
+      # gallery so SharePoint pages them.
+      OnVisible: |
+        =ClearCollect( colProjectTasks,
+            Filter( taskmaster_tasks, task_project_id.Id = gSelProject.ID ) );
+        Set( gProjTab, 1 )
+    Children:
+      # ---- Header band ----------------------------------------------------
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="EQD Taskmaster"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =360
+      - BackIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Back
+            Color: =Theme.Color.OnPrimary
+            Height: =24
+            Width: =24
+            X: =Parent.Width - 24 - Theme.Space.Gutter
+            Y: =(Theme.Space.HeaderH - 24) / 2
+            OnSelect: =Back()
+      # ---- Project summary -------------------------------------------------
+      - ProjName:
+          Control: Label@2.5.1
+          Properties:
+            Text: =gSelProject.project_name
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H1
+            Color: =Theme.Color.TextPrimary
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+            Width: =Parent.Width - (Theme.Space.Gutter * 2) - 200
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - ProjMeta:
+          Control: Label@2.5.1
+          Properties:
+            # Person / Choice subfields read locally off the passed record.
+            Text: |
+              =gSelProject.project_phase.Value & "  ·  " & gSelProject.project_priority.Value
+               & "  ·  " & Coalesce(gSelProject.project_manager.DisplayName, "Unassigned")
+               & If( IsBlank(gSelProject.project_date_target), "",
+                     "  ·  target " & Text(gSelProject.project_date_target, "dd mmm yyyy") )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 36
+            Width: =Parent.Width - (Theme.Space.Gutter * 2) - 200
+            Height: =20
+            VerticalAlign: =VerticalAlign.Middle
+      - ringProject:
+          Control: CanvasComponent
+          ComponentName: cmpKpiRing
+          Properties:
+            # The app-side weighted rollup (C3), maintained by scrTask.
+            X: =Parent.Width - 140 - Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gap
+            Width: =110
+            Height: =110
+            Percent: =Coalesce(gSelProject.project_perc_completion, 0)
+            Label: =Coalesce(gSelProject.project_perc_completion, 0) & "%"
+            AccentHex: ="#005A9E"
+      # ---- Tab strip -------------------------------------------------------
+      - selTab:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64
+            Width: =420
+            Height: =40
+            Items: |
+              =Table({ Id: 1, Label: "Tasks" }, { Id: 2, Label: "Transactions" }, { Id: 3, Label: "Issues" })
+            DefaultId: =1
+            OnChange: =Set(gProjTab, selTab.Selected.Id)
+      # =====================================================================
+      # TAB 1 — TASKS as a kanban: outer gallery = stage columns, inner
+      # gallery = that stage's cards. The inner Items filter runs against the
+      # already-narrowed LOCAL collection, so no delegation concern.
+      # FALLBACK if the nested gallery is rejected on paste: replace galKanban
+      # with a single vertical gallery over
+      #   Sort(colProjectTasks, task_stage.Value)
+      # and show the stage as a pill on each row. Same data, flat layout.
+      # =====================================================================
+      - galKanban:
+          Control: Gallery@2.15.0
+          Variant: Horizontal
+          Properties:
+            Visible: =gProjTab = 1
+            Items: |
+              =Table( { Stage: "Not Started" }, { Stage: "Planning" }, { Stage: "Drafting" },
+                      { Stage: "Under Review" }, { Stage: "Finalizing" }, { Stage: "Complete" } )
+            TemplateSize: =260
+            TemplatePadding: =Theme.Space.Gap
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap) - Theme.Space.Gutter
+            ShowScrollbar: =true
+          Children:
+            - colHeader:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.Stage & "  (" &
+                     CountRows(Filter(colProjectTasks, task_stage.Value = ThisItem.Stage)) & ")"
+                  Font: =Theme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  X: =0
+                  Y: =0
+                  Width: =240
+                  Height: =28
+                  VerticalAlign: =VerticalAlign.Middle
+            - galStageCards:
+                Control: Gallery@2.15.0
+                Variant: Vertical
+                Properties:
+                  # LOCAL filter over the project's tasks — colProjectTasks is
+                  # already scoped by the delegable OnVisible query.
+                  Items: =Filter(colProjectTasks, task_stage.Value = ThisItem.Stage)
+                  TemplateSize: =84
+                  TemplatePadding: =6
+                  X: =0
+                  Y: =32
+                  Width: =240
+                  Height: =Parent.TemplateHeight - 40
+                Children:
+                  - cardFill:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =Theme.Color.Surface
+                        X: =0
+                        Y: =0
+                        Width: =236
+                        Height: =78
+                        OnSelect: =Set(gSelTask, ThisItem); Navigate(scrTask, ScreenTransition.Cover)
+                  - cardHealth:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        # RAG stripe from task_status (health).
+                        Fill: |
+                          =Switch( ThisItem.task_status.Value,
+                                   "Green", Theme.Color.Success,
+                                   "Amber", Theme.Color.Warning,
+                                   "Red",   Theme.Color.Danger,
+                                   Theme.Color.Border )
+                        X: =0
+                        Y: =0
+                        Width: =4
+                        Height: =78
+                  - cardTitle:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =ThisItem.task_name
+                        Font: =Theme.Font
+                        FontWeight: =FontWeight.Semibold
+                        Size: =Theme.Size.Body
+                        Color: =Theme.Color.TextPrimary
+                        X: =12
+                        Y: =8
+                        Width: =216
+                        Height: =36
+                  - cardWho:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          =Coalesce(ThisItem.task_lead.DisplayName, "Unassigned")
+                           & If( IsBlank(ThisItem.task_date_target), "",
+                                 "  ·  " & Text(ThisItem.task_date_target, "dd mmm") )
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: |
+                          =If( !IsBlank(ThisItem.task_date_target)
+                            && ThisItem.task_date_target < Today()
+                            && ThisItem.task_stage.Value <> "Complete",
+                               Theme.Color.Danger, Theme.Color.TextMuted )
+                        X: =12
+                        Y: =48
+                        Width: =216
+                        Height: =20
+      # =====================================================================
+      # TAB 2 — TRANSACTIONS, dense numeric table. Bound straight to the
+      # delegable Filter so SharePoint pages it (this is the largest list).
+      # =====================================================================
+      - galTransactions:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: =gProjTab = 2
+            Items: |
+              =Sort( Filter( taskmaster_transactions,
+                         transaction_project_id.Id = gSelProject.ID ),
+                     transaction_date, SortOrder.Descending )
+            TemplateSize: =44
+            TemplatePadding: =0
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 28
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 28) - Theme.Space.Gutter
+          Children:
+            - txName:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.transaction_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth * 0.26
+                  Height: =44
+                  VerticalAlign: =VerticalAlign.Middle
+            - txClient:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.transaction_client_name.Value
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  X: =Parent.TemplateWidth * 0.27
+                  Y: =0
+                  Width: =Parent.TemplateWidth * 0.20
+                  Height: =44
+                  VerticalAlign: =VerticalAlign.Middle
+            - txDate:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =Text(ThisItem.transaction_date, "dd mmm yyyy")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  X: =Parent.TemplateWidth * 0.48
+                  Y: =0
+                  Width: =Parent.TemplateWidth * 0.14
+                  Height: =44
+                  VerticalAlign: =VerticalAlign.Middle
+            - txNotional:
+                Control: Label@2.5.1
+                Properties:
+                  # Native denomination — NEVER summed across rows (mixed currency).
+                  Text: |
+                    =ThisItem.transaction_currency.Value & " " &
+                     Text(ThisItem.transaction_notional, "[$-en-US]#,##0")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  Align: =Align.Right
+                  X: =Parent.TemplateWidth * 0.63
+                  Y: =0
+                  Width: =Parent.TemplateWidth * 0.16
+                  Height: =44
+                  VerticalAlign: =VerticalAlign.Middle
+            - txUsd:
+                Control: Label@2.5.1
+                Properties:
+                  # transaction_notional_usd (C5) is the ONLY cross-currency-safe figure.
+                  Text: ="USD " & Text(Coalesce(ThisItem.transaction_notional_usd, 0), "[$-en-US]#,##0")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FontWeight: =FontWeight.Semibold
+                  Color: =Theme.Color.TextPrimary
+                  Align: =Align.Right
+                  X: =Parent.TemplateWidth * 0.80
+                  Y: =0
+                  Width: =Parent.TemplateWidth * 0.18
+                  Height: =44
+                  VerticalAlign: =VerticalAlign.Middle
+      - lblTxTotal:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gProjTab = 2
+            # Sum over the RETURNED PAGE only — CountRows/Sum never delegate to
+            # SharePoint. Labelled as such rather than presented as a true total.
+            Text: |
+              ="Shown: " & CountRows(galTransactions.AllItems) & " transaction(s)  ·  USD " &
+               Text(Sum(galTransactions.AllItems, Coalesce(transaction_notional_usd, 0)), "[$-en-US]#,##0")
+               & "  (page total — full totals in Power BI)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =24
+            VerticalAlign: =VerticalAlign.Middle
+      # =====================================================================
+      # TAB 3 — ISSUES as a card feed.
+      # =====================================================================
+      - galIssues:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: =gProjTab = 3
+            Items: |
+              =Sort( Filter( taskmaster_issues,
+                         issue_project_id.Id = gSelProject.ID ),
+                     issue_date_target )
+            TemplateSize: =92
+            TemplatePadding: =8
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap) - Theme.Space.Gutter
+          Children:
+            - issFill:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =Theme.Color.Surface
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 8
+                  Height: =84
+            - issImpact:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: |
+                    =Switch( ThisItem.issue_impact.Value,
+                             "Critical", Theme.Color.Danger,
+                             "High",     Theme.Color.Warning,
+                             "Moderate", Theme.Color.Accent,
+                             Theme.Color.Border )
+                  X: =0
+                  Y: =0
+                  Width: =4
+                  Height: =84
+            - issTitle:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.issue_name
+                  Font: =Theme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  X: =16
+                  Y: =8
+                  Width: =Parent.TemplateWidth * 0.6
+                  Height: =24
+                  VerticalAlign: =VerticalAlign.Middle
+            - issMeta:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.issue_status.Value & "  ·  " & ThisItem.issue_type.Value
+                     & "  ·  " & Coalesce(ThisItem.issue_assignee.DisplayName, "Unassigned")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  X: =16
+                  Y: =34
+                  Width: =Parent.TemplateWidth * 0.6
+                  Height: =20
+                  VerticalAlign: =VerticalAlign.Middle
+            - issBody:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.issue_description
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  X: =16
+                  Y: =56
+                  Width: =Parent.TemplateWidth * 0.9
+                  Height: =22
+      # ---- Shared empty state for whichever tab is active -------------------
+      - lblTabEmpty:
+          Control: Label@2.5.1
+          Properties:
+            Visible: |
+              =Or( gProjTab = 1 && IsEmpty(colProjectTasks),
+                   gProjTab = 2 && IsEmpty(galTransactions.AllItems),
+                   gProjTab = 3 && IsEmpty(galIssues.AllItems) )
+            Text: |
+              =Switch( gProjTab,
+                       1, "No tasks on this project yet.",
+                       2, "No transactions booked against this project.",
+                          "No issues raised on this project." )
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Color: =Theme.Color.TextMuted
+            Align: =Align.Center
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 180
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =60
