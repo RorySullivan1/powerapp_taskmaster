@@ -56,9 +56,12 @@ is a failed paste, reported back only as "it didn't work".
 
 - Grounded tokens (from the example export): `Rectangle@2.3.0`, `Label@2.5.1`,
   `Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`, `Image@2.2.3`.
-- **Gallery `Variant`** — resolved to `Vertical` (`cmpEditableGrid`) / `Horizontal`
-  (`cmpSelection`) from public evidence, matching the screens. (Version suffixes are optional —
-  Studio uses the current version if omitted.)
+- **Gallery `Variant`** — now **`Vertical` everywhere**. `cmpSelection` used `Horizontal`, which
+  its own comment flagged as unconfirmed; with seven screens instantiating it, that was the single
+  highest-leverage paste risk in the repo. It is now a vertical gallery with
+  `WrapCount = CountRows(Items)`, which lays every item across one row — a horizontal strip built
+  from the only variant that has actually landed. (`scrAdmin`, the one confirmed crossing, used
+  `Gallery@2.15.0` vertical.)
 - **`HtmlViewer@2.1.0`** (`cmpStatusPill`/`cmpChoicePill`) and **`Classic/Timer@2.1.0`**
   (`cmpToast`) are best-effort names for the "HTML text" and "Timer" controls. **Under the
   correction above these are now a real risk**, not free: if either component is rejected, the
@@ -66,16 +69,44 @@ is a failed paste, reported back only as "it didn't work".
   if the Timer token is wrong: drop it and let the app own timing (visual-only toast +
   `Visible`).
 
-## Transfer — components DO cross by paste
+## Transfer — a component crosses in TWO parts
 
-**Corrected 2026-08-03 from a Studio report: these files are paste payloads.** Paste each one
-the same way as a screen, via code view. Several have already landed this way.
+This section has now been wrong in both directions, so here is the settled version.
+
+- First it said components can't be pasted at all and must be rebuilt by hand. **Too pessimistic.**
+- Then, after a Studio report that several had landed, it said the files are paste payloads.
+  **Too optimistic** — that stopped working, which is what forced the distinction below.
+
+A component definition is **two things**, and Studio takes them through two different channels:
+
+| Part | What it is | How it gets in |
+|---|---|---|
+| **Contract** | custom properties, plus the component-level formulas backing the Output / OutputFunction / Action ones | **Typed** into the property pane. There is no paste gesture for a custom property — nothing in this YAML can shortcut it |
+| **Body** | the child controls | **Pasted** via code view, exactly like a screen |
+
+Pasting a whole `ComponentDefinitions:` document asks one channel to carry both. That is the
+most likely reason a whole-file paste fails while the controls inside it are perfectly valid.
+
+**So use the split, not the raw file:**
+- `BUILD-SHEET.md` — every custom property, its kind, type and formula, in creation order.
+- `bodies/<name>.children.pa.yaml` — the control body alone, comment-free, ready to paste.
+
+Both are **generated** from the `.pa.yaml` files here, which stay the source of record:
+
+```
+python tools/split_components.py
+```
+
+**Add the custom properties before pasting the body.** The controls reference them by name
+(`cmpSelection.Items`), and a reference to a property that doesn't exist yet fails the paste.
 
 What that changes:
 - **The dialect matters.** These are `ComponentDefinitions` in pa-yaml v3.0, and Studio validates
   them at paste time — which is exactly how the `Parameters`-must-be-a-sequence error was found.
   Run `python tools/validate_pa_yaml.py` before carrying anything across.
 - **Paste one at a time** and report the outcome, so a rejection points at one component.
+- **`cmpUiKit` has no controls at all** — it is pure OutputFunction properties. There is nothing to
+  paste; it is built entirely from the build sheet.
 - A **component library** can't hold data sources or Power Automate flows — pass data in via
   Input properties (all eleven already do).
 - Since nothing returns to the repo, these files remain the **authoritative source**: if you

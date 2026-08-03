@@ -54,10 +54,22 @@ ComponentDefinitions:
       Fill: =RGBA(0, 0, 0, 0)
       Selected: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
     Children:
+      # A HORIZONTAL STRIP BUILT FROM A VERTICAL GALLERY (changed 2026-08-03).
+      #
+      # This was `Variant: Horizontal`, which its own comment flagged as
+      # UNCONFIRMED — and `Variant: Vertical` is the only variant with positive
+      # evidence, being what `scrAdmin` used when it landed. Since seven screens
+      # instantiate this component, one unconfirmed token here is the single
+      # highest-leverage paste risk in the whole repo.
+      #
+      # `WrapCount` removes the need for it: a vertical gallery with WrapCount = N
+      # lays N items across before wrapping, so setting it to the row count gives
+      # exactly one row — a horizontal strip, from the proven variant. TemplateSize
+      # is the item HEIGHT in a vertical gallery, hence Parent.Height rather than
+      # the per-item width it meant before.
       - galSel:
           Control: Gallery@2.15.0
-          # UNCONFIRMED: blank HORIZONTAL gallery variant (round-trip). See notes.
-          Variant: Horizontal
+          Variant: Vertical
           Properties:
             Items: =cmpSelection.Items
             # Seed the initial selection from DefaultId (no hand-managed variable).
@@ -66,7 +78,8 @@ ComponentDefinitions:
             Width: =Parent.Width
             X: =0
             Y: =0
-            TemplateSize: =Max(96, Parent.Width / Max(CountRows(cmpSelection.Items), 1))
+            WrapCount: =Max(CountRows(cmpSelection.Items), 1)
+            TemplateSize: =Parent.Height
             TemplatePadding: =4
           Children:
             - optBtn:

@@ -78,11 +78,19 @@ rejecting. If it did, we know the dialect is right and the rest is mechanical.
    The five nav screens must exist before `App.Formulas`, which holds live screen references. The
    detail and edit screens aren't in the nav menu, but must exist before any screen that navigates
    to them. Paste `scrAdmin.fx.yaml` now; leave the rest empty for Stage 4.
-7. **Paste the components** — see `src/authored/components/_COMPONENTS-NOTES.md`.
-   They cross by code view exactly like screens do, and several have already landed. Paste one at
-   a time and report the outcome, so a rejection points at a single component.
+7. **Build the components in two steps** — see `src/authored/components/BUILD-SHEET.md`.
 
-   Paste only what the screens you want actually need:
+   A component is a **contract** (custom properties) plus a **body** (controls), and Studio takes
+   those through different channels. Pasting the whole definition asks one channel to carry both,
+   which is the likeliest reason a whole-file paste fails.
+
+   For each component: create it, add every custom property from the build sheet **first**, set the
+   component-level formulas, then paste `bodies/<name>.children.pa.yaml` into its canvas. The body
+   references the properties by name, so the order isn't optional.
+
+   `cmpUiKit` is the exception — no controls at all, built entirely from the sheet.
+
+   Build only what the screens you want actually need:
 
    | Component | Needed by |
    |---|---|
