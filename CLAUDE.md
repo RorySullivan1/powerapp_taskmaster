@@ -51,16 +51,17 @@ surfaces each by its `description:`.
   scaffolding; do not rely on it as a baseline.
 - **`src/authored/`** — authored control YAML, pending paste. **`src/patches/`** — App-object
   bodies (`App.OnStart`/`App.Formulas`) for the formula bar (no App code view).
-- **`schema/`** — the schema snapshot (true internal names, once columns exist).
+- **`schema/`** — **`schema.yaml` is the GOLDEN SOURCE** for the SharePoint backend (repo defines, SharePoint applies); `incoming-lists.md` is provenance.
 - **`paste-log.md`** — every crossing: date, target, intended name, Studio's suffix, outcome.
 - **`docs/`** — project docs (e.g. the claudeBrain inventory).
 
 ## Reference & output contract
-- **Reference:** `.claude/context/README.md` indexes the briefs — `schema.md` (the `tm*` data
-  model), `app-structure.md` (screens + the licence-gated Power BI surface), `open-questions.md`.
+- **Reference:** `.claude/context/README.md` indexes the briefs — `schema.md` (model shape,
+  delegation/join costs, open consequences), `app-structure.md` (screens + the licence-gated Power
+  BI surface), `open-questions.md`.
   Deep-read only what the task needs.
-- **Output contract:** never invent a column name — every field token must resolve to
-  `context/schema.md`'s internal names. Nothing is "in the app" until a human pastes it and it
+- **Output contract:** never invent a column name — every field token must resolve to a `name:`
+  in **`schema/schema.yaml`** (the golden source). Nothing is "in the app" until a human pastes it and it
   validates (see the authored→landed lifecycle in `studio-transfer`). Route decisions to
   `session-memory`, not into these briefs.
 
@@ -72,9 +73,9 @@ would not survive. **Decisions with reasoning live here**, not in a context doc,
 session can't relitigate a settled call.
 
 ## Conventions
-- **Provisioning is manual** (SharePoint UI) → set clean internal names at column creation and
-  record the **true** names in the snapshot; watch `_x0020_` mangling. True names are captured
-  **by hand** into `schema/` (the one-way gap means no pull can reconcile them for you).
+- **The schema is defined here, not discovered.** `schema/schema.yaml` is the golden source;
+  SharePoint is provisioned to match it and `provisioned:` tracks which lists are live. Internal
+  names freeze at creation, so settle `open_recommendations` **before** provisioning.
 - Skill folder name always equals the skill's `name:` frontmatter.
 - Operational hooks are compiled from `.claude/hooks/*.json` into `settings.json` by
   `build-hooks.py`; edit fragments, not `settings.json`.
@@ -94,6 +95,5 @@ pull to be stale against.)*
 On compaction, preserve: **the air gap** (clipboard-only, **ONE-WAY** repo→Studio; only binary
 "works/doesn't" returns; repo is the authoritative source; resolve unknowns from public sources
 or ship fallbacks — no pull/round-trip exists), that
-**tickets are full ticket-level primary** (delegation/indexing critical), that **provisioning is
-manual** (true internal names, `_x0020_` risk), that **not everyone is Power BI-licensed** (native
+**transactions are full transaction-level primary** (delegation/indexing critical), that **`schema/schema.yaml` is the golden source** (repo defines, SharePoint applies), that **not everyone is Power BI-licensed** (native
 nav + empty state), and that **no Power Fx/`.pa.yaml` is authored yet**.

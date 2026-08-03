@@ -19,7 +19,7 @@ Two tiers:
 | File | What it's for | Paired skill (how-to) |
 |---|---|---|
 | `air-gap.md` | The **one-way** transfer model (repo → Studio; only binary confirmation returns; repo is the authoritative source). Governs every authoring/hand-off decision. | `studio-transfer` |
-| `schema.md` | The eight `tm*` SharePoint lists — columns, types, indexing, and the decisions behind them (the concrete data model). | `sharepoint-list-architecture` |
+| `schema.md` | Model shape, delegation/join costs, and open consequences. **Columns live in `schema/schema.yaml` (golden source)** — this brief points there, never repeats it. | `sharepoint-list-architecture` |
 | `app-structure.md` | Screens, components, and the Power BI reporting surface (licence-gated). | `power-apps-components` |
 | `open-questions.md` | Unresolved decisions still shaping schema/app/provisioning. Answered ones live in `.claude/memory/`. | — |
 
