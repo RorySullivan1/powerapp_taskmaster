@@ -74,7 +74,9 @@ manual-UI pick isn't treated as final. If adopted, supersede the Q11 decision in
   decision.
 - **Q10 Users — desk only or wider?** Item-level permissions do **not** delegate; "show only
   mine" should be a single indexed `Owner`/`Author` filter, not per-item unique permissions.
-- **Q12 Power Automate availability.** Needed for the extract flow, optional write-time rollup
+- **Q12 Power Automate availability — NOW BLOCKING (2026-08-03).** Required MM columns mean no
+  project can be created from the app without a term source; a scheduled flow (or a custom
+  connector) is the only route. See `docs/managed-metadata-picker.md`. Originally: Needed for the extract flow, optional write-time rollup
   counters, and any term-store sync. With manual provisioning and no PnP/CSOM, this is the only
   automation lever in scope.
 - **Q13 Solution-aware?** If the app moves dev → test → prod it needs **environment variables**,

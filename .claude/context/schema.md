@@ -185,6 +185,31 @@ slicer, and read each with its own idiom — `approval_region.Value` (Choice) ve
 Metadata subfield on projects/clients. In Power BI, model them as **separate dimensions**; don't
 try to relate them.
 
+**C10 ◐ Managed Metadata stays — cascading term picker validated 2026-08-03.**
+`project_region` and `project_type` are **required** MM, so no project can be created from the app
+without a way to write MM. Decision: **keep MM**, and build a cascading picker that walks the term
+hierarchy and writes the leaf term's **GUID**.
+
+Validated (full write-up + sources: `docs/managed-metadata-picker.md`):
+- **Reading the hierarchy is first-party supported.** Graph's **termStore** API (GA Aug 2021)
+  exposes `…/termStore/sets/{set}/children` and `…/terms/{term}/children`, so nesting detection
+  falls out of the API — non-empty children means render another level. Permission is
+  `TermStore.Read.All`, **delegated only; app-only is not supported.**
+- **The earlier "Graph doesn't support managed metadata" note still stands but is narrower than it
+  read:** it applies to the *list column value*, not the term store. Read terms with Graph, write
+  the column with the SharePoint connector.
+- **Writing** uses `'@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy"`
+  with `TermGuid`, `Label`, `Path` and **`WssId: -1`** (resolve by GUID, not site cache). This shape
+  is **community-confirmed, not first-party** — the single riskiest construct in the app.
+
+Recommended architecture: **cache the term store into a flat `taskmaster_terms` list** (a scheduled
+flow walks Graph), and drive the cascade from delegable `Filter`s on `term_parent_guid`. That keeps
+the create form's runtime dependency at zero, versus a flow round-trip per dropdown level.
+
+**Blocked on:** a term source — Power Automate or a custom connector (**Q12**), now blocking rather
+than optional. **Cheapest first test:** one button that patches a single hard-coded `TermGuid` — if
+it writes, the design is unblocked for one paste instead of a whole create flow.
+
 **C8 ✅ Resolved 2026-08-03 (casing).** Renamed to **`issue_owner`** (a real Person column,
 distinct from `Created By`) and **`product_uid`**. The whole model is now consistently lowercase
 snake_case.

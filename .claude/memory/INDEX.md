@@ -72,6 +72,8 @@
 - [2026-08-03] scrAdmin LANDED — screen dialect + grounded control tokens CONFIRMED. Unstyled theme is expected (App.Formulas not yet pasted) — paste-log.md
 - [2026-08-03] Kanban DEMOTED to a swap-in variant; scrProject ships a flat stage-grouped Vertical gallery. Why: `Variant: Horizontal` is ungrounded and sat mid-file gating the whole Tasks tab — under a one-way gap that risks the entire screen for a nicer layout. Kanban preserved at `src/authored/variants/` with swap instructions — src/authored/scrProject.fx.yaml
 - [2026-08-03] 2nd audit fixed: `IsError(Errors(...))` NEVER gates (Errors returns a TABLE → use IsEmpty); success Notify+Back() were unconditional (failed save said 'Saved' and navigated away); edit state now seeded into GLOBALS in OnVisible rather than trusting cmpSelection's internal selection (Reset can't reach inside a component instance → silent wrong write); rollup now REFUSES to write past the row limit rather than persisting a truncated average — src/authored/scrTask.fx.yaml
+- [2026-08-03] C10 — MM STAYS (user decision). Cascading term picker VALIDATED: Graph termStore `children` endpoints (GA Aug-2021) walk the hierarchy and yield term GUIDs → nesting detection falls out of the API; `TermStore.Read.All` is **DELEGATED ONLY** (app-only unsupported). The old 'Graph can't do MM' note is narrower than it read — it's the list-column VALUE, not the term store. WRITE via SharePoint connector `SPListExpandedTaxonomy` + `WssId:-1` is COMMUNITY-confirmed only = riskiest construct in the app. Recommend caching terms into a flat `taskmaster_terms` list so the cascade is delegable Filters with ZERO runtime dependency — docs/managed-metadata-picker.md
+- [2026-08-03] Q12 (Power Automate / custom connector) is now **BLOCKING** — two required MM columns mean no project can be created from the app without a term source — .claude/context/open-questions.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -102,6 +104,8 @@
 
 
 - **Next physical step:** HANDOFF.md Stage 1 smoke test (paste scrReference) — proves the channel before the expensive component build.
+
+- **C10 next:** decide `taskmaster_terms` cache list (recommended) vs live-Graph-per-level, and settle Q12. Cheapest first test = one button patching a hard-coded TermGuid, to prove the SPListExpandedTaxonomy shape before building the create flow.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md

@@ -17,7 +17,7 @@
 # =============================================================================
 
 meta:
-  version: 1.6.1
+  version: 1.7.0
   updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
@@ -204,6 +204,23 @@ rollups:
 # Reasoning for each lives in .claude/context/schema.md §Consequences.
 # =============================================================================
 open_recommendations:
+  - id: C10
+    what: >-
+      project_region and project_type are REQUIRED Managed Metadata, so nothing can create a project
+      from the app without an MM write path. Decision: keep MM; build a cascading term picker that
+      walks the hierarchy and writes the leaf term's GUID.
+    validated: docs/managed-metadata-picker.md
+    findings:
+      - "READ is first-party: Graph termStore children endpoints (GA 2021-08); nesting detection falls out of the API. TermStore.Read.All, DELEGATED ONLY - app-only unsupported."
+      - "Graph still cannot set an MM column VALUE on a list item - read terms via Graph, write the column via the SharePoint connector."
+      - "WRITE shape (COMMUNITY-CONFIRMED, not first-party - riskiest construct in the app): '@odata.type' #Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy with TermGuid, Label, Path, WssId -1."
+    recommended: >-
+      Cache the term store into a flat taskmaster_terms list (term_guid, term_label, term_set,
+      term_parent_guid, term_path, term_depth, term_is_leaf) via a scheduled flow, and drive the
+      cascade from delegable Filters on term_parent_guid. Zero runtime dependency, versus a flow
+      round-trip per dropdown level.
+    blocked_on: "Q12 - Power Automate or a custom connector. Now BLOCKING, not optional."
+    status: VALIDATED - awaiting the taskmaster_terms decision + Q12
   - id: C9
     what: >-
       task_stage, task_status and issue_status are optional, so rows with a blank value match
