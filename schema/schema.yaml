@@ -17,8 +17,8 @@
 # =============================================================================
 
 meta:
-  version: 1.1.0
-  updated: 2026-08-02
+  version: 1.2.0
+  updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
   source: user-supplied schema screenshots (see incoming-lists.md), then edited here
@@ -83,7 +83,7 @@ lists:
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
       - { name: task_lead,             type: Person,          required: true,  indexed: true,  desc: "Primary owner" }
       - { name: task_other_resources,  type: PersonMulti,     required: false,                 desc: "Supporting contributors", review: "C1 — multi-person has NO delegable filter" }
-      - { name: task_date_start,       type: Calculated,      required: false,                 desc: "Start date (derived)", review: "C4 — Calculated cannot be indexed and NOTHING delegates; recommend converting to DateTime written at creation" }
+      - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
       - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
       - { name: task_date_completion,  type: DateTime,        required: false,                 desc: "Date completed" }
       - { name: task_output_approval,  type: Lookup,          required: false,                 desc: "Approval required for output", lookup: { list: asset_approval, show: approval_id } }
@@ -92,7 +92,7 @@ lists:
       - { name: task_output_branding,  type: Choice,          required: false,                 desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
       - { name: task_output_asset,     type: Lookup,          required: false,                 desc: "Linked asset", lookup: { list: asset_library, show: TBD }, review: "asset_library schema not yet supplied — this binding is blocked" }
       - { name: task_client_name,      type: Lookup,          required: false,                 desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
-      - { name: task_product_id,       type: Lookup,          required: false,                 desc: "Associated product", lookup: { list: taskmaster_products, show: product_UID } }
+      - { name: task_product_id,       type: Lookup,          required: false,                 desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
       - { name: task_client_stage,     type: Choice,          required: false,                 desc: "Client lifecycle stage", values: [Prospect, Active, Existing, "Post-Trade"] }
 
   # ---------------------------------------------------------------------------
@@ -104,13 +104,12 @@ lists:
       - { name: transaction_name,       type: Text,     required: true,  indexed: true,  desc: "Transaction label" }
       - { name: transaction_project_id, type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: transaction_client_name, type: Lookup,  required: true,  indexed: true,  desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
-      - { name: transaction_product_id, type: Lookup,   required: true,                  desc: "Associated product", lookup: { list: taskmaster_products, show: product_UID } }
+      - { name: transaction_product_id, type: Lookup,   required: true,                  desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
       - { name: transaction_sales,      type: Person,   required: true,                  desc: "Sales owner" }
       - { name: transaction_notional,   type: Currency, required: false,                 desc: "Trade notional amount (positive)" }
       - { name: transaction_currency,   type: Choice,   required: true,                  desc: "Currency denomination", values: [USD, EUR, GBP, JPY, CHF] }
+      - { name: transaction_notional_usd, type: Currency, required: false, indexed: true, desc: "Notional normalised to USD at WRITE time — the only column safe to aggregate across currencies" }
       - { name: transaction_date,       type: DateTime, required: true,  indexed: true,  desc: "Actual trade date" }
-      # PROPOSED — not yet in the supplied schema. See C5.
-      # - { name: transaction_notional_usd, type: Currency, required: false, indexed: true, desc: "Notional normalised to USD at write time (enables cross-currency totals)" }
 
   # ---------------------------------------------------------------------------
   taskmaster_issues:
@@ -130,7 +129,7 @@ lists:
       - { name: issue_date_open,        type: DateTime, required: false,                 desc: "Date opened (default = Created)" }
       - { name: issue_date_target,      type: DateTime, required: false, indexed: true,  desc: "Expected resolution date" }
       - { name: issue_date_close,       type: DateTime, required: false,                 desc: "Resolution date" }
-      - { name: Issue_owner,            type: Person,   required: false,                 desc: "Issue owner / business owner", review: "C8 — capital I breaks convention; and typed 'System' in the source doc. Confirm: rename to issue_owner, and is it a real Person column or just Created By?" }
+      - { name: issue_owner,            type: Person,   required: false,                 desc: "Issue owner / business owner (distinct from Created By)" }
 
   # ---------------------------------------------------------------------------
   taskmaster_clients:
@@ -151,7 +150,7 @@ lists:
     provisioned: pending
     join_cost: 1
     columns:
-      - { name: product_UID,         type: Text,            required: true, indexed: true, desc: "Product identifier (ISIN / Ticker / Internal ID)", review: "C8 — capital UID breaks convention; confirm or rename to product_uid before creation" }
+      - { name: product_uid,         type: Text,            required: true, indexed: true, desc: "Product identifier (ISIN / Ticker / Internal ID). Business key — uniqueness by convention, not enforced" }
       - { name: product_type,        type: ManagedMetadata, required: true,                desc: "Product classification", term_set: Product }
       - { name: product_description, type: Note,            required: true,                desc: "Description (display only)" }
 
@@ -189,11 +188,11 @@ open_recommendations:
   - id: C4
     what: "task_date_start is Calculated — cannot be indexed, nothing delegates"
     options: ["convert to DateTime written at creation (recommended)", "keep Calculated and never filter/sort on it"]
-    status: undecided
+    status: APPLIED  # task_date_start is now DateTime, indexed (2026-08-03)
   - id: C5
     what: "no USD-normalised notional → cross-currency totals are not meaningful"
     options: ["add transaction_notional_usd, normalised at write (recommended)", "aggregate per-currency only", "convert in Power BI with an FX table"]
-    status: undecided
+    status: APPLIED  # transaction_notional_usd added, indexed (2026-08-03)
   - id: C6
     what: "region modelled three ways across two value sets"
     options: ["one Choice everywhere", "one ManagedMetadata term set everywhere", "leave as-is"]
@@ -201,4 +200,4 @@ open_recommendations:
   - id: C8
     what: "casing anomalies Issue_owner and product_UID; no enforced uniqueness anywhere"
     options: ["rename to issue_owner / product_uid before creation (recommended)", "keep as-is and match exactly in every formula"]
-    status: undecided
+    status: APPLIED  # renamed to issue_owner / product_uid (2026-08-03); uniqueness still by convention only

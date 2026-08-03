@@ -83,7 +83,7 @@ references, and Managed Metadata only for taxonomies actually governed centrally
 | **Person (multi)** | **nothing** | **everything — C1** |
 | DateTime · Number · Currency | `=` `<` `>` `<=` `>=`, `Sort` | arithmetic inside the predicate |
 | Yes/No | `=`, `Sort` | — |
-| **Calculated** | **nothing** | **everything — C4** |
+| Calculated | **nothing** | **everything** — no column uses this type any more (C4 resolved) |
 | Note (multi-line) · Hyperlink | **nothing** | not filterable, sortable or indexable |
 
 **Aggregates never delegate to SharePoint** (`Sum`, `Average`, `CountRows`, `CountIf`, `Max`,
@@ -144,27 +144,26 @@ column can't be indexed and never delegates. But nothing computes it: SharePoint
 Fx can't aggregate server-side. Needs a Power Automate rollup on task change (Q12), manual entry,
 or removal. Note tasks carry no per-task %, so a rollup must derive from `task_stage`.
 
-**C4 ❗ `task_date_start` is Calculated.** Cannot be indexed, and *nothing* about it delegates —
-so any "my week", timeline, or "starting soon" filter/sort is silently wrong past the row limit.
-**Recommend converting to a real DateTime** written at creation, exactly as `project_date_start`
-already is.
+**C4 ✅ Resolved 2026-08-03.** `task_date_start` is now a real **DateTime**, indexed, written at
+creation — so "my week", timelines and "starting soon" filters delegate and sort correctly. No
+column in the model is Calculated any more.
 
-**C5 ⚠ No USD-normalised notional.** `transaction_notional` + `transaction_currency` with no
-`transaction_notional_usd`. Mixed-currency values can't meaningfully be summed or compared, and
-FX-converting inside a query is neither delegable nor reproducible. **Recommend adding
-`transaction_notional_usd`**, normalised at write time (a commented-out stub sits in the YAML).
+**C5 ✅ Resolved 2026-08-03.** `transaction_notional_usd` (Currency, indexed) is now in the model,
+normalised **at write time**. It is the **only** column safe to aggregate across currencies —
+`transaction_notional` is denominated in `transaction_currency` and must never be summed across
+rows. Never FX-convert inside a query: it neither delegates nor reproduces.
 
 **C6 ⚠ `region` is modelled three ways.** Choice on `asset_approval` (with `GLOBAL`), Managed
 Metadata on `taskmaster_projects` (with `GLOBAL`) and on `taskmaster_clients` (**without**). One
 concept, two types, two domains — a shared slicer can't treat them uniformly and Power BI will
 model them as unrelated dimensions.
 
-**C8 ⚠ Casing anomalies and unenforced keys.** `Issue_owner` (capital I) and `product_UID` (capital
-UID) break the lowercase convention; formulas must match exactly, so **fix them before creation** —
-names freeze then. `Issue_owner` is also typed "System" in the source doc: confirm whether it's a
-real Person column or just `Created By`. No uniqueness is enforced anywhere, so `approval_id`,
-`product_UID` and `project_name` are business keys **by convention only** — join on the built-in
-`ID`, which is always indexed and the fastest possible lookup.
+**C8 ✅ Resolved 2026-08-03 (casing).** Renamed to **`issue_owner`** (a real Person column,
+distinct from `Created By`) and **`product_uid`**. The whole model is now consistently lowercase
+snake_case.
+**Still true:** no uniqueness is enforced anywhere — `approval_id`, `product_uid` and
+`project_name` are business keys **by convention only**. Join on the built-in `ID`, which is always
+indexed and the fastest possible lookup.
 
 ---
 
@@ -173,9 +172,9 @@ real Person column or just `Created By`. No uniqueness is enforced anywhere, so 
 Create indexes **early** — mandatory above 5,000 items, and they cannot be added once a list passes
 20,000. The `indexed: true` flags in `schema/schema.yaml` are authoritative; the shortlist:
 
-- **tasks** — `task_project_id`, `task_stage`, `task_status`, `task_lead`, `task_date_target`, `task_name`
+- **tasks** — `task_project_id`, `task_stage`, `task_status`, `task_lead`, `task_date_start`, `task_date_target`, `task_name`
 - **projects** — `project_phase`, `project_manager`, `project_name`, `project_region`, `project_date_target`
-- **transactions** — `transaction_project_id`, `transaction_client_name`, `transaction_date`, `transaction_name`
+- **transactions** — `transaction_project_id`, `transaction_client_name`, `transaction_date`, `transaction_notional_usd`, `transaction_name`
 - **issues** — `issue_project_id`, `issue_status`, `issue_assignee`, `issue_date_target`, `issue_name`
-- **clients** — `client_name`, `client_region` · **products** — `product_UID` ·
+- **clients** — `client_name`, `client_region` · **products** — `product_uid` ·
   **approval** — `approval_id`, `approval_status`
