@@ -87,6 +87,7 @@
 - [2026-08-03] **Q12 ANSWERED = YES, Power Automate is available.** Unblocks three things that were queued behind it: the scheduled Graph-termStore flow that populates `taskmaster_terms` (C10), the flow-as-list-provisioner route (Q11-bis), and the extract flow (Q7). NOTE the app needs NO flow at runtime — that was the whole point of the C10 cache decision, and it still holds — .claude/context/open-questions.md
 - [2026-08-03] **Q11-bis ADOPTED — flow-as-provisioner supersedes the manual-UI Q11 pick.** Its recommendation was explicitly conditional on Q12, which is now yes. Internal names set explicitly at creation kills the `_x0020_` risk, and it's re-runnable dev→test→prod (helps Q13). Manual UI stays the fallback. TO AUTHOR: the provisioning flow for 9 lists — .claude/context/open-questions.md
 - [2026-08-03] **Q14 ANSWERED — C5 REVERSED. No FX in the app at all.** `transaction_notional_usd` is dropped (commented out in the golden source, DO NOT PROVISION), `FxToUsd` removed from App.Formulas, and the transaction form writes only the native notional + currency. Why: a write-time rate FREEZES whatever number the app held on the trade date and nothing downstream can correct it; report-time conversion can be restated, back-dated and audited. **CONSEQUENCE — no cross-currency figure can be shown ANYWHERE in the app**; scrProject's transactions tab now totals PER CURRENCY (five enumerated Sums, not Distinct/Concat — no novel scope-shadowing construct mid-file under a one-way gap) and the old USD column shows the product instead of a permanently blank number. **Power BI now OWES an FX dimension + a trade-date conversion measure** — schema/schema.yaml v1.9.0
+- [2026-08-03] **CORRECTION (user-reported from Studio): components ARE code-view-pasteable, and several LANDED.** The repo had asserted the opposite since Phase 1 — that canvas components must be rebuilt by hand in the component editor and that their control tokens were therefore "documentation, not a paste payload". Both wrong. Consequence: component tokens are held to the same standard as screen tokens — `HtmlViewer@2.1.0` and `Classic/Timer@2.1.0` are now real paste risks and the first suspects if `cmpStatusPill`/`cmpChoicePill`/`cmpToast` are rejected — paste-log.md
 - [2026-08-03] **C10 REVISED SAME DAY — the `taskmaster_terms` cache list is DELETED.** User challenged the double-store; they were right. `Choices([@list].mmColumn)` returns the term set from the term store with **Label, Path, Guid, WssId**, and **`Path` is the FULL hierarchical path** (`EMEA;UK;London`) — so the hierarchy is already in the data and the cascade is prefix matching (`StartsWith(childPath, parentPath & ";")`). No mirror, no refresh flow, no drift; term store stays the single source of truth. My delegation argument for the cache didn't survive either: a term set small enough to use is small enough to hold in memory — schema/schema.yaml v2.0.0
 - [2026-08-03] **MM WRITE now hands the connector its OWN record back:** `LookUp(Choices([@list].col), Path = <picked path>)`. This RETIRES the hand-built `SPListExpandedTaxonomy` + `WssId:-1` literal that was the least-proven construct in the app, and sidesteps the live `Guid` vs `TermGuid` field-name ambiguity since nothing we author names it. Person is now the ONLY hand-built complex shape left (no `Choices()` exists for Person) — docs/managed-metadata-picker.md
 - [2026-08-03] **The one real MM limit: `Choices()` on an MM column is capped at 20 TERMS** by the connector, not configurable (multiple independent sources + an open MS Ideas request). If a set outgrows it, swap ONE binding for a flow-fed collection in the same `{Label, Path}` shape — component unchanged, and it's an in-memory collection, still not a second store. **`Path` delimiter (`;`) is NOT first-party documented** → it's a `PathDelimiter` component input and the picker prints a raw path on screen, so first paste settles it — src/authored/components/cmpTermPicker.pa.yaml
@@ -97,16 +98,17 @@
 - Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
 - **Paste order (no round-trip — one-way):** in Studio create screens `scr{Home,Reports,Projects,
-  Reference,Admin}`; recreate the components in the component editor; paste screen control-groups
+  Reference,Admin}`; PASTE the components via code view (they are pasteable); paste screen control-groups
   (one/time) → `App.Formulas` LAST → set Data row limit 2000. Gallery `Variant` is now `Vertical`
   (best-grounded); button-nav is the fallback if a screen paste fails. Need tablet-vs-phone target.
 - **Licence gate SETTLED (soft gate, greyed-but-reachable).** Only optional follow-up left: supply
   a real signal for `gHasPowerBiLicence` (config allow-list column or Entra group) — a one-line
   change, since nav and the Reports screen both read it.
-- **Component transfer:** recreate the 10 components from the contract tables in the Studio
-  component editor / a library (components are NOT code-view-pasted). Their control tokens
-  (`HtmlViewer`, `Classic/Timer`, gallery `Variant`) are spec-only — can't fail a paste. →
-  `components/_COMPONENTS-NOTES.md`.
+- **Component transfer CORRECTED 2026-08-03:** components **ARE** code-view-pasteable and several
+  have LANDED. The repo had assumed the opposite (rebuild by hand in the component editor) — wrong,
+  and wrong in the expensive direction. Consequence: their control tokens are a **real paste
+  payload**, so `HtmlViewer@2.1.0` / `Classic/Timer@2.1.0` / gallery `Variant` are genuine risks,
+  not documentation. → `components/_COMPONENTS-NOTES.md`.
 - **Follow-up:** run `/reindex` to regenerate CATALOG (pull-reconcile now deprecated). Minor
   incidental two-way mentions left in `build-hooks.py`/`claudebrain-inventory.md`.
 - **Phase-2 component composition DONE for 6/10** (static data on Home/Reports/Projects).

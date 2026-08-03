@@ -78,11 +78,11 @@ rejecting. If it did, we know the dialect is right and the rest is mechanical.
    The five nav screens must exist before `App.Formulas`, which holds live screen references. The
    detail and edit screens aren't in the nav menu, but must exist before any screen that navigates
    to them. Paste `scrAdmin.fx.yaml` now; leave the rest empty for Stage 4.
-7. **Build the components by hand** — see `src/authored/components/_COMPONENTS-NOTES.md`.
-   Canvas components are **not** code-view-pasteable; each is recreated in the component editor
-   from its contract table. This is the slowest part of the whole job.
+7. **Paste the components** — see `src/authored/components/_COMPONENTS-NOTES.md`.
+   They cross by code view exactly like screens do, and several have already landed. Paste one at
+   a time and report the outcome, so a rejection points at a single component.
 
-   Build only what the screens you want actually need:
+   Paste only what the screens you want actually need:
 
    | Component | Needed by |
    |---|---|
@@ -222,7 +222,7 @@ Paste **one unit at a time, onto a blank screen**. A rejection then points at on
 |---|---|
 | Channel | **PROVEN** — `scrAdmin` landed 2026-08-03. The screen dialect and control tokens are correct. |
 | Lists provisioned | **No** — every list is `provisioned: pending` in `schema/schema.yaml` |
-| Components built | **No** — first attempt was rejected; all 10 have since been corrected against Microsoft's official schema and now validate. Retry. |
+| Components | **Partly landed** — the first batch was rejected on a dialect error, since fixed; several have since landed (exact names not reported). All 11 validate. |
 | App.Formulas landed | **No** (this is why `scrAdmin` rendered unstyled — `Theme.*` is undefined until it lands) |
 | Screens landed | `scrAdmin` only |
 | CRUD screens | **Authored, not landed** — `scrProjectEdit`, `scrTaskEdit`, `scrTransactionEdit`, `scrIssueEdit` |
