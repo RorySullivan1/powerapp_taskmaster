@@ -17,7 +17,7 @@
 # =============================================================================
 
 meta:
-  version: 1.5.0
+  version: 1.6.0
   updated: 2026-08-03
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
@@ -78,8 +78,8 @@ lists:
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
       - { name: task_category,         type: ManagedMetadata, required: false,                 desc: "Task classification", term_set: Marketing }
-      - { name: task_status,           type: Choice,          required: false, indexed: true,  desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
-      - { name: task_stage,            type: Choice,          required: false, indexed: true,  desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
+      - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
+      - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
       - { name: task_lead,             type: Person,          required: true,  indexed: true,  desc: "Primary owner" }
       - { name: task_supporter,        type: Person,          required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
@@ -123,7 +123,7 @@ lists:
       - { name: issue_task_name,        type: Lookup,   required: false,                 desc: "Related task", lookup: { list: taskmaster_tasks, show: task_name } }
       - { name: issue_transaction_name, type: Lookup,   required: false,                 desc: "Related transaction", lookup: { list: taskmaster_transactions, show: transaction_name } }
       - { name: issue_assignee,         type: Person,   required: true,  indexed: true,  desc: "Responsible resolver" }
-      - { name: issue_status,           type: Choice,   required: false, indexed: true,  desc: "Current status", values: [Open, Review, Waiting, Blocked, Closed] }
+      - { name: issue_status,           type: Choice,   required: true,  indexed: true,  default: Open,          desc: "Current status", values: [Open, Review, Waiting, Blocked, Closed] }
       - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue", values: [Approval, Process, Compliance, Branding, Technical] }
       - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact", values: [Low, Moderate, High, Critical] }
       - { name: issue_date_open,        type: DateTime, required: false,                 desc: "Date opened (default = Created)" }
@@ -213,7 +213,7 @@ open_recommendations:
       - "make each required with a default (task_stage='Not Started', task_status='Green', issue_status='Open') — recommended, fixes it at source"
       - "add `|| col.Value = Blank()` to every filter — verbose, and Blank() on a Choice subfield is an unverified delegable construct"
       - "accept the undercount and label it"
-    status: undecided   # raised 2026-08-03 by the pre-paste audit
+    status: APPLIED  # 2026-08-03 — all three now required with defaults; no blank-value gap remains
   - id: C1
     what: "project_other_resources / task_other_resources are multi-person → no delegable filter exists"
     options: ["display-only (drive 'mine' off task_lead/project_manager)", "fixed single-Person slots", "write-time text mirror (exact = only)"]

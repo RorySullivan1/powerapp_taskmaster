@@ -66,6 +66,8 @@
 - [2026-08-03] Phase-2 DATA bound on scrHome/scrProjects/scrReports: one delegable Filter per screen → local aggregation (CountRows/Average never delegate). galProjects uses If-of-independent-Filters so each branch folds. Reports rings deliberately SCOPED (my tasks / active projects) — org-wide counts can't be exact in-app. Trends zeroed, not faked — src/authored/
 - [2026-08-03] Pre-paste audit → DO-NOT-PASTE; 6 real defects fixed: `Sort(If(..))` does NOT fold (Sort moved INSIDE each branch); unscoped colActiveProjects → scoped to my projects; redundant+risky IsBlank search guard dropped; Navigate-to-self doesn't re-fire OnVisible (refresh now inlines the collects); PASTE ORDER now App.Formulas BEFORE data screens (they need StageWeights); cmpConfirmDialog custom prop `Visible` collided with the base prop → renamed `IsOpen` — src/authored/
 - [2026-08-03] C9 raised: task_stage/task_status/issue_status are OPTIONAL → blank rows drop out of every enumerated Choice filter (silent undercount). Recommend required-with-default. UNDECIDED — schema/schema.yaml
+- [2026-08-03] C9 APPLIED: task_stage/task_status/issue_status now REQUIRED with defaults (Not Started/Green/Open) — no blank-value gap; green%+amber-red% now sum to 100 — schema/schema.yaml v1.6.0
+- [2026-08-03] Added `HANDOFF.md` — the one-way delivery runbook (repo→work machine→Studio). Stage 1 is a SMOKE TEST using scrReference/scrAdmin (only units needing no components, no App.Formulas, no data sources) to isolate the channel before anything else. **Claude maintains `paste-log.md`** — the human cannot write to this repo, so entries come from their chat reports — HANDOFF.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -94,7 +96,8 @@
 - **Schema open_recommendations (now EDITABLE — repo is golden source): C1** multi-person no delegable filter;  Settle BEFORE provisioning — names/types freeze at creation. → `schema/schema.yaml` open_recommendations
 - **Schema consequences needing a call** (→ `context/schema.md` §Consequences): **C1** multi-person cols have no delegable filter; **C4** `task_date_start` is Calculated (nothing delegates); **C5** no USD-normalised notional; **C3** no writer for `project_perc_completion`; **C6** region modelled 3 ways; **C8** casing anomalies before provisioning.
 
-- **C9 pending:** make the three optional Choice cols required-with-default, or accept the undercount. → `schema/schema.yaml`
+
+- **Next physical step:** HANDOFF.md Stage 1 smoke test (paste scrReference) — proves the channel before the expensive component build.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md

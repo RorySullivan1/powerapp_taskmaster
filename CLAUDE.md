@@ -52,7 +52,9 @@ surfaces each by its `description:`.
 - **`src/authored/`** — authored control YAML, pending paste. **`src/patches/`** — App-object
   bodies (`App.OnStart`/`App.Formulas`) for the formula bar (no App code view).
 - **`schema/`** — **`schema.yaml` is the GOLDEN SOURCE** for the SharePoint backend (repo defines, SharePoint applies); `incoming-lists.md` is provenance.
+- **`HANDOFF.md`** — the ordered delivery runbook for the work machine (start there).
 - **`paste-log.md`** — every crossing: date, target, intended name, Studio's suffix, outcome.
+  **The human cannot write to this repo**, so *Claude* maintains this log from their chat reports.
 - **`docs/`** — project docs (e.g. the claudeBrain inventory).
 
 ## Reference & output contract
