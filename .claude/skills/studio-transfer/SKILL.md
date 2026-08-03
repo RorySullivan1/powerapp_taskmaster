@@ -24,20 +24,25 @@ description: >
 You move canvas-app source across a **manual clipboard air gap**: Power Apps Studio runs on
 a work machine; this repo lives on a personal machine; there is no connector, MCP server,
 tenant auth, CI, or linter between them. **The only channel is the clipboard, moved by a
-human, one paste at a time.** Your job is to make each crossing deliberate, small enough to
-diagnose, and recorded — so the repo stays a faithful mirror of a Studio that you cannot
-query. Lead with the mechanics that matter for *this* crossing; never assume the repo
-matches the live app.
+human, one paste at a time — and it runs ONE WAY: repo → Studio.** Nothing comes back but the
+human's binary "it worked / it didn't." Your job is to make each crossing deliberate, small
+enough to diagnose, and recorded — the repo is the **authoritative source**, not a mirror of a
+Studio you cannot query. Lead with the mechanics that matter for *this* crossing.
 
 ## Core principles (these are rules)
 
-1. **Studio is the source of truth; the repo is a mirror.** The running app is authoritative.
-   The repo reflects what was *pulled* or *landed*, nothing more. A confident answer against
-   stale repo state is worse than no answer.
-2. **When unsure whether the repo matches the live app, stop and ask for a fresh pull.**
-   Do not reason about, edit, or audit formulas you can't confirm are current. Uncertainty
-   about freshness is a full stop, not a caveat.
-3. **Every round trip costs human effort.** Few large *correct* pastes beat many small
+1. **The gap is ONE-WAY: repo → Studio. The repo is the authoritative source; Studio is the
+   downstream apply-target.** Authored source flows out (a human pastes it); **nothing comes
+   back** — no pull, no export, no code-view sample. The only return signal is the human's
+   binary **"it works / it doesn't."** Anything edited directly in Studio is invisible drift,
+   lost to the repo forever — so author here and treat these files as the truth.
+2. **No round-trip, so resolve unknowns yourself — don't defer to a pull that can't happen.**
+   Unknown paste tokens or dialect can't be confirmed by a returned sample. Resolve them from
+   **public sources** (MS Learn, the `microsoft/PowerApps-Tooling` repo, public `.msapp`
+   exports), or ship a **grounded fallback**. A wrong guess is a failed manual paste the human
+   reports only as "didn't work," after which you revise blind — so **maximise first-try
+   correctness** and prefer grounded constructs over nicer-but-unverified ones.
+3. **Every paste costs human effort.** Few large *correct* pastes beat many small
    speculative ones. Get the formula right (and audited — see the pre-paste-review agent)
    *before* asking a human to paste it.
 4. **Studio's paste-time validation is the only check that exists.** Keep each paste small
@@ -46,20 +51,22 @@ matches the live app.
 5. **Record every crossing in the paste log.** An unlogged paste is a drift you can't
    reconstruct. The log is how a future session knows what actually landed and under what name.
 
-## The round-trip test — run this before trusting the channel
+## No round-trip test — the channel is one-way
 
-Do this **first**, once, on this app, before authoring anything for paste. It establishes
-empirically what today's Studio actually emits and accepts:
+A round-trip test (copy a control out of Studio, commit it, paste it back) is **impossible
+here**: Studio's output cannot reach the repo. Do not instruct the human to "View code and drop
+the sample into `studio/pulled/`" — that assumes a return channel that does not exist.
 
-1. Pick one simple existing control in Studio. Right-click it → **View code**, **Copy code**.
-2. Paste it into `studio/pulled/` here, unchanged. This is your reference sample.
-3. Paste the same YAML back into Studio (any screen) → confirm it lands as a new control and
-   validates.
-4. Only once that clean round trip works do you trust the channel for authored changes.
+Instead, establish paste-readiness *before* the human ever pastes:
 
-If a control survives copy-out-and-paste-back unchanged, the code-view dialect is stable for
-this app. If it doesn't, narrow to the smallest control that does and treat that as the unit
-of transfer.
+1. **Ground every token from public sources.** Control names/versions and gallery `Variant`
+   values come from the example `.msapp` already in the repo, MS Learn, or the
+   `microsoft/PowerApps-Tooling` schema — not from a pull. (Version suffixes are optional;
+   Studio uses the current version if omitted, so only the control *name* and `Variant` matter.)
+2. **For anything still uncertain, author the grounded fallback**, and keep the risky-but-nicer
+   variant documented as an alternative to try if the first paste is rejected.
+3. **The human's feedback is binary** — "it pasted / it didn't." Design each paste so a failure
+   is cheap to recover: small units, one control-group at a time, with the fallback ready.
 
 ## The channel — code view mechanics
 
@@ -101,39 +108,40 @@ There are two YAML surfaces and they are **not** interchangeable. Grounded on Mi
 | **`*.pa.yaml` source** | The single **active** source-control schema, in the `\Src` of an exported `.msapp` (or a Git-integration repo). **Read-only** — "not used when an app is loading"; changes to the file are ignored/lost. Editing, merging, conflict resolution supported **only in Power Platform Git Integration**, and only after you **publish**. | **No** — it's a *review* artifact, not a paste source. Don't try to paste `.pa.yaml` through code view. |
 
 Consequences for this repo:
-- `studio/pulled/` holds **code-view YAML** — the paste-dialect reference you imitate when
-  authoring changes.
-- If you also export a `.msapp` and run **`pac canvas download`** (current CLI path;
-  `pac canvas unpack`/pack and the `.fx.yaml` experimental format are **retired** — do not
-  build on them), the extracted `\Src\*.pa.yaml` is a **complete, read-only** reference for
-  *reasoning* about the whole app. Keep it separate from the paste-dialect folder.
-- The `.pa.yaml` schema is in active development and may change — treat it as reference, and
-  re-pull rather than trusting an old export.
+- The **code-view dialect** is what you author toward for control paste. Ground it from the
+  example `.msapp` in `/example`, MS Learn, or the `microsoft/PowerApps-Tooling` schema — **not**
+  from a pull (there is none). The modern versioned form (`Control: Type@version`) is what
+  current Studio uses; the retired `pac canvas unpack` inline (`Name As type:`) format is **not**
+  the target — do not author to it.
+- The `\Src\*.pa.yaml` inside an exported `.msapp` is a useful **read-only reference** for
+  *reasoning* about a whole app (that's how `/example` was mined), but it is **not** a paste
+  source and, crucially, **you never receive one from the work machine** — so it's only ever a
+  public sample you bring in, not the live app's state.
 
-## The pulled → authored → landed lifecycle
+## The authored → landed lifecycle
 
-1. **Pulled** (`studio/pulled/`) — code-view YAML copied out of Studio, unchanged. The
-   baseline the repo mirrors. Stamp it with the pull date (in `CLAUDE.local.md`).
-2. **Authored** (`src/authored/`, `src/patches/`) — the change, written here against the
-   pulled baseline, using the paste dialect. Not yet in the app. Formula *content* follows
-   `power-fx-development`; App-level bodies go to `src/patches/` for the formula bar.
-3. **Audited** — run the **pre-paste-review agent** on the authored change. It returns a
+1. **Authored** (`src/authored/`, `src/patches/`) — the change, written here in the paste
+   dialect. The repo is the source of record. Formula *content* follows `power-fx-development`;
+   App-level bodies go to `src/patches/` for the formula bar.
+2. **Audited** — run the **pre-paste-review agent** on the authored change. It returns a
    paste / do-not-paste verdict. Do not hand a human a paste that hasn't passed.
-4. **Landed** — a human pastes it into Studio; it validates and creates the control; they
-   rename it; you **record the paste** (date, target, intended name, Studio's suffix,
-   outcome) in the paste log. Only now is it real.
-5. **Reconciled** — on the next pull, the `pull-reconcile` command diffs the fresh pull
-   against the prior snapshot and flags any authored file that never landed or any drift.
+3. **Landed** — a human pastes it into Studio; it validates and creates the control; they
+   rename it and tell you **whether it worked** (the only signal that returns). You **record the
+   crossing** (date, target, intended name, Studio's suffix, outcome) in the paste log. Only now
+   is it real.
 
-An authored file that has not landed is **not** in the app. Never describe the app as if
-authored-but-unlanded work is live.
+There is no "pulled" stage before and no "reconciled" stage after — nothing flows back. An
+authored file that has not landed is **not** in the app. Studio-only edits are drift you will
+never see; never describe the app as if authored-but-unlanded work is live.
 
 ## Watch Out
 
-1. **Assuming the repo is current.** It reflects the last pull/land, not the live app. If you
-   can't point to the pull that proves a formula is current, stop and ask for a fresh pull.
-2. **Big speculative pastes.** A large paste that Studio rejects wastes a human round trip and
-   hides the cause. Author small, audited units; let validation point at one thing.
+1. **Waiting on a pull/round-trip that can't happen.** Nothing returns from Studio but a binary
+   "worked/didn't." Don't defer a decision to "confirm on the next pull" — resolve it from public
+   sources or ship a fallback now.
+2. **Big speculative pastes.** A large paste that Studio rejects wastes a human's effort and
+   hides the cause — and you only learn "it didn't work." Author small, audited units; let
+   validation point at one thing; keep a fallback ready.
 3. **Forgetting the App-object exception.** Trying to paste `App.OnStart` through code view
    fails silently to exist — there's no App code view. It's formula-bar-only.
 4. **Losing the rename.** Paste names collide-suffix (`_1`). If you don't rename and log

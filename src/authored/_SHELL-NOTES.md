@@ -67,7 +67,7 @@ export**:
 | Label | `Label@2.5.1` | none |
 | Icon | `Classic/Icon@2.5.0` | none |
 | Text input | `Classic/TextInput@2.3.2` | none |
-| Gallery | `Gallery@2.15.0` | **`CONFIRM_BlankVertical`** ⟵ only unknown |
+| Gallery | `Gallery@2.15.0` | `Vertical` (resolved from public evidence) |
 
 Two dialect rules applied during conversion:
 - **No `ZIndex`** — z-order is **positional** (later child in `Children:` renders on top).
@@ -75,34 +75,40 @@ Two dialect rules applied during conversion:
 - Modern controls (Rectangle/Label) carry no `Variant`; Classic controls here (Icon/TextInput)
   also declared without one, matching the export.
 
-## ⚠️ Confirmation gate — ONE token remains unconfirmed
+## The one paste-critical token — resolved, with a fallback (one-way gap)
 
-`NavGallery`'s `Variant: CONFIRM_BlankVertical` is a placeholder. The example only contains
-a *browse-template* gallery variant (`BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0`),
-which carries predefined template controls — wrong for our custom nav rows.
+The air gap is **one-way** (repo → Studio; only binary "works/doesn't" returns), so there is
+**no round-trip** to confirm a token against — unknowns must be resolved from **public sources**
+or shipped as **grounded fallbacks**. The only token that gates a screen paste is the
+`NavGallery` `Variant`:
 
-**Before pasting the nav:** on the work machine insert **one blank vertical gallery**,
-**View code → Copy code**, drop it into `studio/pulled/`, read its real `Variant:`, and
-find/replace `CONFIRM_BlankVertical` across the five files. (Also treat this as the app's
-`studio-transfer` round-trip test — the first confirmation that code-view paste round-trips
-on this app at all.) This is the "few large *correct* pastes" discipline — confirm once, not
-five rejected pastes.
+- **Resolved to `Vertical`** (with the versioned `Gallery@2.15.0`) from public evidence: the
+  modern source-code format pairs `Gallery@2.15.0` with `Variant: Vertical` for a plain vertical
+  gallery. (The older/code-view value some sources show is `galleryVertical` — if `Vertical` is
+  rejected, that is the one alternative to try.)
+- **Grounded fallback if the gallery paste fails:** rebuild the nav from plain
+  `Classic/Button@2.2.0` controls (`OnSelect: =Navigate(scrX, ScreenTransition.Fade)`) — a fully
+  grounded token, paste-safest of all. It loses `NavMenu`-driven DRY (5 buttons per screen), but
+  guarantees a navigable shell. Since a failed screen paste can only be reported as "didn't work,"
+  this is the instant recovery — no revise-blind loop.
 
-**Zero-risk fallback if the gallery proves troublesome:** the example navigates with plain
-`Classic/Button@2.2.0` controls (`OnSelect: =Navigate(scrX, ScreenTransition.Fade)`) —
-fully-grounded tokens, paste-safest of all. The nav would stop being `NavMenu`-driven (DRY),
-but it unblocks a navigable shell immediately. Prefer the gallery once its variant is confirmed.
+Everything else the screens use is a **grounded token** read from the real example export
+(`Rectangle@2.3.0`, `Label@2.5.1`, `Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`,
+`Classic/Button@2.2.0`, `Image@2.2.3`). Version suffixes are optional — Studio uses the current
+version if omitted — so a version mismatch is not a failure mode; only the control *name* and
+`Variant` matter.
 
 ## Deliberate deviations from the blueprint (rationale)
 
 - **Nav is a per-screen gallery bound to `NavMenu`, not a reusable component.**
-  `screen-map.md` calls for one nav *component* (T6). Components are the **hardest thing
-  to paste across the air gap** (custom-property/definition transfer), and the channel is
-  unproven. The `NavMenu` named formula already delivers T6's real intent — *screen refs
-  as data, one source of truth for menu items* — with far lower paste risk. The header +
-  nav block is duplicated across the five screens as the cost of this.
-  **Upgrade path:** once the round-trip channel is proven, lift the nav gallery into a
-  component and place it on each screen; `NavMenu` stays as its Items source unchanged.
+  `screen-map.md` calls for one nav *component* (T6). A canvas component can't code-view-paste
+  across the one-way gap at all (it's hand-recreated in the component editor), whereas the
+  screen — with its inline nav gallery — *does* paste. The `NavMenu` named formula already
+  delivers T6's real intent — *screen refs as data, one source of truth for menu items* — with
+  far lower transfer risk. The header + nav block is duplicated across the five screens as the
+  cost of this.
+  **Upgrade path (optional):** once you're comfortable recreating components by hand, lift the
+  nav gallery into a component and place it on each screen; `NavMenu` stays as its Items source.
 
 - **Absolute positioning tied to `Parent.Width/Height` + `Theme.Space.*`**, not nested
   responsive containers (T15). Simpler to paste one control at a time and diagnose. Revisit

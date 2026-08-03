@@ -20,8 +20,18 @@
   ⟨capture⟩ placeholders in `context/schema.md` until columns exist; snapshot must hold TRUE names.
 - **Reporting:** Power BI embedded, **licence-gated** — native nav is primary, empty state for
   unlicensed. Tickets are **full ticket-level, primary store** → delegation/indexing critical.
-- **Air gap:** Studio (work machine) ↔ repo (personal machine) via **manual clipboard only**.
-  When unsure the repo mirrors the live app → stop, ask for a fresh pull (`/pull-reconcile`).
+- **Air gap is ONE-WAY (corrected 2026-08-02):** repo → clipboard → Studio only. The work
+  machine's output CANNOT come back into the repo/Claude's view — the ONLY return signal is the
+  user's binary "it works / it doesn't." So: **no pulls, no returned code-view samples, no
+  round-trip.** `studio/pulled/`, `/pull-reconcile`, and "repo mirrors Studio / Studio is source
+  of truth" are premised on a return channel that does NOT exist → treat the **repo as the
+  authoritative authored source**, Studio as a downstream apply-target (Studio-only edits are
+  invisible drift, lost forever). Consequences: (1) unknown tokens (gallery `Variant`,
+  `HtmlViewer@2.1.0`, `Classic/Timer@2.1.0`) must be resolved by ME from PUBLIC sources (MS Learn,
+  PowerApps-Tooling repo, public .msapp) — they can't be confirmed by a return sample; (2) every
+  manual paste is costly and returns only works/doesn't → **maximise first-try correctness; prefer
+  grounded constructs, ship safe FALLBACKS for anything unverifiable** (e.g. button nav vs the
+  gallery). The `studio-transfer` skill + CLAUDE.md still describe a two-way gap — they need fixing.
 - **Template:** PM-tracker (SQL-backed) is the **screen/nav blueprint** only — rebuild on our
   SharePoint schema (`docs/screen-map.md`). Pattern candidates in `docs/powerapp-patterns-distillation.md`.
 
@@ -43,23 +53,25 @@
 - [2026-08-02] Phase-1 nav built as per-screen gallery bound to `NavMenu`, NOT a reusable component — why: components are hardest to paste across the air gap; NavMenu already gives T6's DRY intent. Component upgrade deferred until channel proven — sessions/2026-08-02-1411-phase1-core-shell.md
 - [2026-08-02] Paste/code-view dialect = modern STRUCTURED schema (Control:Type@version, positional z-order, no ZIndex); `pac canvas unpack`'s inline `As type:` is the RETIRED format — do not author to it — sessions/2026-08-02-1411-phase1-core-shell.md
 - [2026-08-02] Components authored in v3.0 `.pa.yaml` `ComponentDefinitions`; display pills/chips delivered as `cmpUiKit` OutputFunction HTML-builders (canvas components CAN'T sit in a gallery), interactive chip stays a component; components inline Theme (can't read app globals) — sessions/2026-08-02-1411-phase1-core-shell.md
+- [2026-08-02] **Air gap is ONE-WAY** (user-corrected): repo→Studio only; sole return signal is binary "works/doesn't." Kills pull/round-trip/pull-reconcile; repo is authoritative source not mirror. → resolve unknown tokens from PUBLIC sources; ship safe fallbacks; maximise first-try paste success — sessions/2026-08-02-1411-phase1-core-shell.md
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
 - Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
 - **Q11-bis decision pending:** adopt flow-as-provisioner? Blocks on Q12 (Power Automate available?). If yes, supersede the manual-UI Q11 decision. → `.claude/context/open-questions.md`.
-- **Phase-1 shell HARD-BLOCKED on the round-trip test:** on the work machine create screens
-  `scr{Home,Reports,Projects,Reference,Admin}`, insert one blank vertical gallery → View code →
-  drop into `studio/pulled/`, read its `Variant:`, find/replace `CONFIRM_BlankVertical` in the 5
-  files. Then paste screens (one/time) → `App.Formulas` LAST → set Data row limit 2000. Also need
-  tablet-vs-phone target. → `src/authored/_SHELL-NOTES.md`, `docs/screen-map.md`.
+- **Paste order (no round-trip — one-way):** in Studio create screens `scr{Home,Reports,Projects,
+  Reference,Admin}`; recreate the components in the component editor; paste screen control-groups
+  (one/time) → `App.Formulas` LAST → set Data row limit 2000. Gallery `Variant` is now `Vertical`
+  (best-grounded); button-nav is the fallback if a screen paste fails. Need tablet-vs-phone target.
 - **Licence-gate signal (user decision):** `gHasPowerBiLicence` hardcoded `false`; no in-app Power
   BI API — choose a source (tmLookups flag / Entra group) + hide-vs-grey for the Reports nav entry.
-- **Component unconfirmed tokens (round-trip):** `HtmlViewer@2.1.0`, `Classic/Timer@2.1.0`
-  (cmpToast), gallery `Variant` placeholders. **Component transfer:** recreate from contract
-  tables in the Studio component editor / library — code-view paste unproven for component
-  defs. → `components/_COMPONENTS-NOTES.md`.
+- **Component transfer:** recreate the 10 components from the contract tables in the Studio
+  component editor / a library (components are NOT code-view-pasted). Their control tokens
+  (`HtmlViewer`, `Classic/Timer`, gallery `Variant`) are spec-only — can't fail a paste. →
+  `components/_COMPONENTS-NOTES.md`.
+- **Follow-up:** run `/reindex` to regenerate CATALOG (pull-reconcile now deprecated). Minor
+  incidental two-way mentions left in `build-hooks.py`/`claudebrain-inventory.md`.
 - **Phase-2 component composition DONE for 6/10** (static data on Home/Reports/Projects).
   Remaining 4 are gallery/data-bound → compose when data galleries wired: `cmpUiKit` pills +
   `cmpStatusPill`/`cmpChoicePill` in row templates, `cmpEditableGrid` on the Tickets tab.

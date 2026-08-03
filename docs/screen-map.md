@@ -11,8 +11,9 @@ per-screen **data bindings + nav + template lineage + build order**.
 
 **Air-gap note:** the bindings below are *authoring intent*, not paste payloads. Each screen is
 authored in `src/authored/`, audited by `pre-paste-review`, then pasted via code view against a
-confirmed dialect (`studio-transfer`). Nothing binds to a real column until provisioning + a pull
-confirms the internal name.
+public-grounded dialect (`studio-transfer`). Nothing binds to a real column until provisioning —
+and the true internal name is captured **by hand** into the snapshot (the one-way gap has no pull
+to confirm it).
 
 **Named formulas assumed** (`App.Formulas`, data-independent — build first):
 `gUserEmail = User().Email`; `Theme = {…}` colour/type tokens (fed from `tmLookups` later).
@@ -113,15 +114,16 @@ Automate flow, carries ISIN/IndexTicker), Triage, My Week, Global Search (`Start
 
 ## Build order (respects the air gap + schema dependency)
 
-- **Phase 0 — work machine (unblocks everything):** create the blank canvas app; run the
-  `studio-transfer` **round-trip test** (paste one control's code-view YAML into `studio/pulled/`);
-  start provisioning the 8 lists and capture true internal names into `schema/`.
+- **Phase 0 — work machine (unblocks everything):** create the blank canvas app; enable the
+  Power Fx formula bar; start provisioning the 8 lists and capture true internal names into
+  `schema/` **by hand** (the gap is one-way — no pull brings them back). No round-trip test:
+  paste tokens are grounded from public sources, not confirmed by a return sample.
 - **Phase 1 — author now, data-independent:** `App.Formulas` **theme**; the **nav component** (T6);
   screen **shells** + **empty states**; component **contracts** (status badge, task/issue card,
   ticket row, person chip, confirm dialog, toast); the **SVG gauge** component (C1) with a static
   input. All paste-ready without provisioning.
-- **Phase 2 — after provisioning + a confirmed pull:** wire the **delegable data bindings** per
-  screen above; Person patching; key second-writes; forms. Audit every unit with `pre-paste-review`
-  (schema tokens + delegation) before hand-off.
+- **Phase 2 — after provisioning (true names captured by hand):** wire the **delegable data
+  bindings** per screen above; Person patching; key second-writes; forms. Audit every unit with
+  `pre-paste-review` (schema tokens + delegation) before hand-off.
 - **Phase 3 — reporting & automation:** Power BI embed + SVG fallback; the extract/blotter (Power
   Automate); admin. Depends on Q2b (workspace/refresh/embed) and Q12 (Power Automate).

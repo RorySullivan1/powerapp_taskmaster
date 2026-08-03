@@ -15,17 +15,18 @@ safely: confirm freshness, author, audit, choose the transfer mechanism, hand of
 for paste, and record what landed. The orchestration is the value — the work lives in the
 skills, the agent, and the command it invokes.
 
-**Inputs:** a described change to the app, and a repo whose `studio/pulled/` baseline is (or
-can be made) current.
+**Inputs:** a described change to the app. (No "current baseline" precondition — the gap is
+**one-way**, the repo *is* the source; there is nothing to be stale against.)
 **Output:** an authored, audited change either **landed** in Studio and recorded in the paste
 log, or **stopped** before a wasted paste — with the reason and the next step.
 
 ## Steps
 
-1. **Confirm freshness.** Check the last-pull date (`CLAUDE.local.md`) and the paste log
-   against the change's scope. If the repo may not mirror the live app for the controls being
-   touched, **stop and ask the human for a fresh pull** (run `/pull-reconcile` when it
-   arrives). Freshness is a precondition, not a nicety. → hand-off: a baseline you trust.
+1. **Ground the paste, don't confirm freshness.** There is no pull and no baseline to check —
+   the repo is authoritative. Instead, resolve any uncertain paste token/dialect from **public
+   sources** (the `/example` `.msapp`, MS Learn, the PowerApps-Tooling schema) or pick a
+   **grounded fallback**, per `studio-transfer`. → hand-off: a paste approach you can defend
+   without a return sample.
 
 2. **Author the change.** Apply the **`power-fx-development`** skill to write the formulas and
    the **`studio-transfer`** skill for the paste-dialect shape; put control YAML in
@@ -52,9 +53,9 @@ log, or **stopped** before a wasted paste — with the reason and the next step.
 
 ## Control flow / STOP conditions
 
-- **Bail (freshness):** step 1 finds the baseline may be stale for the touched controls →
-  **stop**; request a fresh pull and run `/pull-reconcile`. Never author against state you
-  can't confirm.
+- **Bail (unverifiable token):** step 1 can't ground a paste token and has no safe fallback →
+  **stop**; surface the uncertainty rather than shipping a blind guess a failed paste can't
+  diagnose. (There is no pull to request — the gap is one-way.)
 - **Loop (audit):** step 3 returns **DO-NOT-PASTE** → return to step 2 with the agent's fixes;
   re-audit. Repeat until PASTE. Never hand a human a paste that hasn't passed. Terminal state:
   a PASTE verdict (or the human explicitly overrides, recorded).

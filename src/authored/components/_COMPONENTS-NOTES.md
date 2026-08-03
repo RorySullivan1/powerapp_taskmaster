@@ -43,34 +43,34 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 > functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
 > because you asked for components and it packages them as one importable unit.
 
-## ⚠️ Unconfirmed control tokens (round-trip gated)
+## Control tokens — and why they don't gate a paste here
 
-Grounded tokens (from the example export) used across the set: `Rectangle@2.3.0`,
-`Label@2.5.1`, `Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`,
-`Image@2.2.3`. Three are **guesses** — confirm via the `studio-transfer` round-trip and
-find/replace:
+The air gap is **one-way** (repo → Studio; only binary "works/doesn't" returns). But
+**components are never code-view-pasted** — you recreate each in the Studio component editor
+by adding controls from the UI (see Transfer, below). So a component's control **tokens are
+documentation, not a paste payload**: picking "HTML text" or "Timer" from the control list in
+Studio uses whatever the current version is, regardless of what this YAML says.
 
-- **`HtmlViewer@2.1.0`** — the HTML text control token (`cmpStatusPill`, `cmpChoicePill`).
-  The example had no HTML control to ground it.
-- **`Classic/Timer@2.1.0`** — the Timer control token (`cmpToast` auto-dismiss). If it won't
-  confirm, drop the Timer and let the app own timing (visual-only toast with `Visible` input).
-- **Gallery `Variant`** — `CONFIRM_BlankVertical` / `CONFIRM_BlankHorizontal` placeholders
-  (`cmpSelection`, `cmpEditableGrid`), same unknown as the screen shells.
+- Grounded tokens (from the example export): `Rectangle@2.3.0`, `Label@2.5.1`,
+  `Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`, `Image@2.2.3`.
+- **Gallery `Variant`** — resolved to `Vertical` (`cmpEditableGrid`) / `Horizontal`
+  (`cmpSelection`) from public evidence, matching the screens. (Version suffixes are optional —
+  Studio uses the current version if omitted.)
+- **`HtmlViewer@2.1.0`** (`cmpStatusPill`/`cmpChoicePill`) and **`Classic/Timer@2.1.0`**
+  (`cmpToast`) are best-effort names for the "HTML text" and "Timer" controls. Because you add
+  those from the control list by hand, the exact token can't fail anything. Fallback for the
+  toast if a Timer is awkward: drop it and let the app own timing (visual-only toast + `Visible`).
 
-`cmpKpiRing` uses only the grounded `Image@2.2.3`, and `cmpSectionHeader` / `cmpConfirmDialog`
-use only grounded tokens — those three carry no token risk.
+## ⚠️ Transfer — components do NOT cross the one-way gap by paste
 
-## ⚠️ Transfer — components do NOT cross the gap like controls
-
-Components are the hardest thing to move across the air gap:
-- **Code-view copy/paste historically used a now-retired "early preview" dialect** (per MS
-  Learn), which differs from this v3.0 source. Whether today's code view round-trips a
-  component definition is **unproven on this app** — test it in the round-trip.
-- **Most reliable path:** recreate each component in the **Studio component editor** (or a
-  **component library** for cross-app reuse) from the **contract tables above** — those are
-  dialect-independent. This YAML is the **spec of record**, not a guaranteed paste payload.
+A canvas component definition is **not** something you paste via code view. Recreate each one:
+- In the **Studio component editor** (or a **component library** for cross-app reuse), building
+  it from the **contract tables above** and the control bodies in each file — both are
+  dialect-independent. This YAML is the **spec of record**, not a paste payload.
 - A **component library** can't hold data sources or Power Automate flows — pass data in via
   Input properties (all ten already do).
+- Since nothing here returns to the repo, treat these files as the **authoritative source**:
+  if you tweak a component in Studio, mirror the change back here by hand or it's lost.
 
 ## Where these plug into the shell (Phase 2)
 
