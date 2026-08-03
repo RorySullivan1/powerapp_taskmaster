@@ -100,7 +100,14 @@ Screens:
             Subtitle: ="Browse and open a project"
             ShowAction: =true
             ActionLabel: ="New project"
-            OnAction: =Notify("New project — wired in Phase 2", NotificationType.Information)
+            # gSelProject is cleared too: the child edit screens pre-attach to it,
+            # and a stale selection would silently parent the next new item to the
+            # last project the user happened to open.
+            OnAction: |
+              =Set( gEditMode, "New" );
+               Set( gEditProject, Blank() );
+               Set( gSelProject, Blank() );
+               Navigate( scrProjectEdit, ScreenTransition.Cover )
       # Filter strip — drives galProjects.Items. There is no boolean archive
       # flag in this model: "Archived" is a value of the project_phase Choice
       # (schema.md, the Or-of-equals pattern), so each branch enumerates phases with an Or of `=`.

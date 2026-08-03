@@ -1,0 +1,1272 @@
+# =============================================================================
+# scrTaskEdit  —  create / edit a task, full field set.
+#
+# Entered with:  Set(gEditMode, "New" | "Edit");  Set(gEditTask, <record>)
+# If gSelProject is set, a NEW task is pre-attached to that project.
+#
+# RELATIONSHIP TO scrTask: scrTask is the QUICK edit reached from a project's
+# task list — name, stage, health, priority, and the C3 rollup. This screen is
+# the full editor. BOTH can change task_stage, so BOTH must rewrite the parent
+# project's weighted completion; the block at the end of btnTaskSave.OnSelect is
+# the same one documented in App.Formulas and implemented in scrTask. If it is
+# ever changed in one place it must be changed in the other.
+#
+# TWO TABS, because a canvas screen does not scroll and the task list carries
+# twenty columns: "Task" (identity, ownership, lifecycle, dates, category) and
+# "Output" (the approval / language / format / branding / client block).
+#
+# task_output_asset is DELIBERATELY ABSENT: asset_library has no schema
+# (schema.yaml -> asset_library, columns: []), so any binding to it is blocked.
+#
+# Follows the shared edit-screen pattern — see scrIssueEdit's header and
+# _EDIT-NOTES.md. CONNECTION PREREQUISITE: Office 365 Users. See HANDOFF.md.
+# Every column token resolves to schema/schema.yaml (golden source).
+# =============================================================================
+Screens:
+  scrTaskEdit:
+    Properties:
+      Fill: =Theme.Color.Bg
+      OnVisible: |
+        =Set( gTaskEditTab, 1 );
+        Set( gTkProject,
+              If( gEditMode = "Edit",
+                  { Id: gEditTask.task_project_id.Id, Value: gEditTask.task_project_id.Value },
+                  gSelProject.ID > 0,
+                  { Id: gSelProject.ID, Value: gSelProject.project_name },
+                  { Id: 0, Value: "" } ) );
+        Set( gTkLead,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditTask.task_lead.DisplayName, ""),
+                    Mail:        Coalesce(gEditTask.task_lead.Email, "") },
+                  { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
+        Set( gTkSupporter,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditTask.task_supporter.DisplayName, ""),
+                    Mail:        Coalesce(gEditTask.task_supporter.Email, "") },
+                  { DisplayName: "", Mail: "" } ) );
+        Set( gTkApproval,
+              If( gEditMode = "Edit" && gEditTask.task_output_approval.Id > 0,
+                  { Id: gEditTask.task_output_approval.Id, Value: gEditTask.task_output_approval.Value },
+                  { Id: 0, Value: "" } ) );
+        Set( gTkClient,
+              If( gEditMode = "Edit" && gEditTask.task_client_name.Id > 0,
+                  { Id: gEditTask.task_client_name.Id, Value: gEditTask.task_client_name.Value },
+                  { Id: 0, Value: "" } ) );
+        Set( gTkProduct,
+              If( gEditMode = "Edit" && gEditTask.task_product_id.Id > 0,
+                  { Id: gEditTask.task_product_id.Id, Value: gEditTask.task_product_id.Value },
+                  { Id: 0, Value: "" } ) );
+        Set( gTkStage,    If( gEditMode = "Edit", Coalesce(gEditTask.task_stage.Value, "Not Started"), "Not Started" ) );
+        Set( gTkStatus,   If( gEditMode = "Edit", Coalesce(gEditTask.task_status.Value, "Green"), "Green" ) );
+        Set( gTkPriority, If( gEditMode = "Edit", Coalesce(gEditTask.task_priority.Value, "Moderate"), "Moderate" ) );
+        Set( gTkLanguage, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_language.Value, "(none)"), "(none)" ) );
+        Set( gTkFormat,   If( gEditMode = "Edit", Coalesce(gEditTask.task_output_format.Value, "(none)"), "(none)" ) );
+        Set( gTkBranding, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_branding.Value, "(none)"), "(none)" ) );
+        Set( gTkClientStage, If( gEditMode = "Edit", Coalesce(gEditTask.task_client_stage.Value, "(none)"), "(none)" ) );
+        // Managed metadata (C10). The GUID cannot be recovered from the record the
+        // SharePoint connector returns, so on EDIT these start empty and the column
+        // is left untouched unless the user actively re-picks. The current label is
+        // shown read-only beside the picker so nothing looks lost.
+        Set( gTkCatGuid, "" ); Set( gTkCatLabel, "" ); Set( gTkCatPath, "" ); Set( gTkCatDone, false );
+        ClearCollect( colTermTaskCategory,
+            ShowColumns( Filter( taskmaster_terms, term_set.Value = "Marketing" ),
+                         "term_guid", "term_label", "term_parent_guid", "term_path", "term_is_leaf" ) );
+        Reset( txtTkName ); Reset( txtTkDesc );
+        Reset( txtTkStart ); Reset( txtTkTarget ); Reset( txtTkDone );
+        Reset( txtTkProjectSearch ); Reset( txtTkLeadSearch ); Reset( txtTkSupporterSearch );
+        Reset( txtTkApprovalSearch ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch )
+    Children:
+      # ---- Header ----------------------------------------------------------
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If(gEditMode = "Edit", "Edit task", "New task")
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =400
+      - BackIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.OnPrimary
+            Height: =24
+            Width: =24
+            X: =Parent.Width - 24 - Theme.Space.Gutter
+            Y: =(Theme.Space.HeaderH - 24) / 2
+            OnSelect: =Back()
+      - selTaskTab:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =24
+            Y: =84
+            Width: =300
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Task" }, { Id: 2, Label: "Output" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gTaskEditTab, selTaskTab.Selected.Id)
+      # ================= TAB 1 — TASK ======================================
+      - lblTkNameCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Task name  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =140
+            Width: =520
+            Height: =18
+      - txtTkName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Default: |
+              =If(gEditMode = "Edit", gEditTask.task_name, "")
+            HintText: ="What needs doing?"
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =24
+            Y: =160
+            Width: =520
+            Height: =40
+      - lblTkProjCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Project  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =210
+            Width: =520
+            Height: =18
+      - txtTkProjectSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            HintText: ="Type to find a project…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =230
+            Width: =280
+            Height: =36
+      - lblTkProjChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: |
+              =If(gTkProject.Id > 0, gTkProject.Value, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gTkProject.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =230
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTkProjClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gTaskEditTab = 1 && gTkProject.Id > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =240
+            OnSelect: |
+              =Set(gTkProject, { Id: 0, Value: "" })
+      - lblTkDescCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Description"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =276
+            Width: =520
+            Height: =18
+      - txtTkDesc:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Default: |
+              =If(gEditMode = "Edit", gEditTask.task_description, "")
+            Mode: =TextMode.MultiLine
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =296
+            Width: =520
+            Height: =84
+      - lblTkLeadCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Lead  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =390
+            Width: =520
+            Height: =18
+      - txtTkLeadSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            HintText: ="Search people…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =410
+            Width: =280
+            Height: =36
+      - lblTkLeadChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: |
+              =If(Len(gTkLead.Mail) > 0, gTkLead.DisplayName, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(Len(gTkLead.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =410
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTkLeadClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gTaskEditTab = 1 && Len(gTkLead.Mail) > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =420
+            OnSelect: |
+              =Set(gTkLead, { DisplayName: "", Mail: "" })
+      - lblTkSuppCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            # C1: ONE extra person, not a multi-person column — that is what keeps
+            # "show me my work" delegable (schema.md).
+            Text: ="Supporter  (one extra person)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =456
+            Width: =520
+            Height: =18
+      - txtTkSupporterSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            HintText: ="Search people…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =476
+            Width: =280
+            Height: =36
+      - lblTkSuppChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: |
+              =If(Len(gTkSupporter.Mail) > 0, gTkSupporter.DisplayName, "— none —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(Len(gTkSupporter.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =476
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTkSuppClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gTaskEditTab = 1 && Len(gTkSupporter.Mail) > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =486
+            OnSelect: |
+              =Set(gTkSupporter, { DisplayName: "", Mail: "" })
+      # ---- Right side of tab 1: lifecycle, dates, category ------------------
+      - lblTkStageCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Stage  *  —  changing this recalculates the project's completion"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =140
+            Width: =760
+            Height: =18
+      - selTkStage:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gTaskEditTab = 1
+            X: =580
+            Y: =160
+            Width: =760
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Not Started" }, { Id: 2, Label: "Planning" },
+                      { Id: 3, Label: "Drafting" },    { Id: 4, Label: "Under Review" },
+                      { Id: 5, Label: "Finalizing" },  { Id: 6, Label: "Complete" },
+                      { Id: 7, Label: "Archived" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTask.task_stage.Value, "Not Started"), "Not Started"),
+                       "Not Started", 1, "Planning", 2, "Drafting", 3,
+                       "Under Review", 4, "Finalizing", 5, "Complete", 6, 7 )
+            OnChange: |
+              =Set(gTkStage, selTkStage.Selected.Label)
+      - lblTkStatusCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Health  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =210
+            Width: =300
+            Height: =18
+      - selTkStatus:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gTaskEditTab = 1
+            X: =580
+            Y: =230
+            Width: =300
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Green" }, { Id: 2, Label: "Amber" }, { Id: 3, Label: "Red" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTask.task_status.Value, "Green"), "Green"),
+                       "Green", 1, "Amber", 2, 3 )
+            OnChange: |
+              =Set(gTkStatus, selTkStatus.Selected.Label)
+      - lblTkPriorityCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Priority  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =900
+            Y: =210
+            Width: =440
+            Height: =18
+      - selTkPriority:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gTaskEditTab = 1
+            X: =900
+            Y: =230
+            Width: =440
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Low" }, { Id: 2, Label: "Moderate" },
+                      { Id: 3, Label: "High" }, { Id: 4, Label: "Critical" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTask.task_priority.Value, "Moderate"), "Moderate"),
+                       "Low", 1, "Moderate", 2, "High", 3, 4 )
+            OnChange: |
+              =Set(gTkPriority, selTkPriority.Selected.Label)
+      - lblTkStartCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            # C4: task_date_start is a real DateTime written at creation, not a
+            # Calculated column — that is what makes it indexable and sortable.
+            Text: ="Start date"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =282
+            Width: =240
+            Height: =18
+      - txtTkStart:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Default: |
+              =If( gEditMode = "Edit",
+                   If( IsBlank(gEditTask.task_date_start), "",
+                       Text(gEditTask.task_date_start, "dd/mm/yyyy") ),
+                   Text(Today(), "dd/mm/yyyy") )
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =580
+            Y: =302
+            Width: =160
+            Height: =36
+      - lblTkStartEcho:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: |
+              =If( Len(txtTkStart.Text) = 0, "not set",
+                   IfError( Text(DateValue(txtTkStart.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtTkStart.Text) > 0 && IsError(DateValue(txtTkStart.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =748
+            Y: =302
+            Width: =160
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - lblTkTargetCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Due date"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =920
+            Y: =282
+            Width: =240
+            Height: =18
+      - txtTkTarget:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Default: |
+              =If( gEditMode = "Edit" && !IsBlank(gEditTask.task_date_target),
+                   Text(gEditTask.task_date_target, "dd/mm/yyyy"), "" )
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =920
+            Y: =302
+            Width: =160
+            Height: =36
+      - lblTkTargetEcho:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: |
+              =If( Len(txtTkTarget.Text) = 0, "not set",
+                   IfError( Text(DateValue(txtTkTarget.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtTkTarget.Text) > 0 && IsError(DateValue(txtTkTarget.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =1088
+            Y: =302
+            Width: =160
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - lblTkDoneCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: ="Completion date"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =348
+            Width: =240
+            Height: =18
+      - txtTkDone:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Default: |
+              =If( gEditMode = "Edit" && !IsBlank(gEditTask.task_date_completion),
+                   Text(gEditTask.task_date_completion, "dd/mm/yyyy"), "" )
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =580
+            Y: =368
+            Width: =160
+            Height: =36
+      - lblTkDoneEcho:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: |
+              =If( Len(txtTkDone.Text) = 0, "not set",
+                   IfError( Text(DateValue(txtTkDone.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtTkDone.Text) > 0 && IsError(DateValue(txtTkDone.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =748
+            Y: =368
+            Width: =200
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      # ---- Category (Managed Metadata, C10) --------------------------------
+      - lblTkCatCurrent:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 1
+            Text: |
+              =If( gEditMode = "Edit" && Len(gTkCatGuid) = 0,
+                   "Currently: " & Coalesce(gEditTask.task_category.Value, "not set")
+                     & "   —   leave the picker alone to keep it",
+                   Len(gTkCatGuid) > 0,
+                   "Will be set to: " & gTkCatLabel,
+                   "" )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =414
+            Width: =760
+            Height: =18
+      - pickTkCategory:
+          Control: CanvasComponent
+          ComponentName: cmpTermPicker
+          Properties:
+            Visible: =gTaskEditTab = 1
+            X: =580
+            Y: =434
+            Width: =760
+            Height: =180
+            Caption: ="Category"
+            Terms: =colTermTaskCategory
+            OnChange: |
+              =Set( gTkCatGuid,  pickTkCategory.TermGuid );
+              Set( gTkCatLabel, pickTkCategory.TermLabel );
+              Set( gTkCatPath,  pickTkCategory.TermPath );
+              Set( gTkCatDone,  pickTkCategory.IsComplete )
+      # ================= TAB 2 — OUTPUT ====================================
+      - lblTkApprovalCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: ="Approval required  (active approvals only)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =140
+            Width: =520
+            Height: =18
+      - txtTkApprovalSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 2
+            HintText: ="e.g. MAW, Legal, Compliance…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =160
+            Width: =280
+            Height: =36
+      - lblTkApprovalChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: |
+              =If(gTkApproval.Id > 0, gTkApproval.Value, "— none —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gTkApproval.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =160
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTkApprovalClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gTaskEditTab = 2 && gTkApproval.Id > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =170
+            OnSelect: |
+              =Set(gTkApproval, { Id: 0, Value: "" })
+      - lblTkClientCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: ="Client"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =206
+            Width: =520
+            Height: =18
+      - txtTkClientSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 2
+            HintText: ="Type to find a client…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =226
+            Width: =280
+            Height: =36
+      - lblTkClientChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: |
+              =If(gTkClient.Id > 0, gTkClient.Value, "— none —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gTkClient.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =226
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTkClientClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gTaskEditTab = 2 && gTkClient.Id > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =236
+            OnSelect: |
+              =Set(gTkClient, { Id: 0, Value: "" })
+      - lblTkProductCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: ="Product"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =272
+            Width: =520
+            Height: =18
+      - txtTkProductSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gTaskEditTab = 2
+            HintText: ="Type an ISIN / ticker / internal id…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =292
+            Width: =280
+            Height: =36
+      - lblTkProductChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: |
+              =If(gTkProduct.Id > 0, gTkProduct.Value, "— none —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gTkProduct.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =292
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTkProductClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gTaskEditTab = 2 && gTkProduct.Id > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =302
+            OnSelect: |
+              =Set(gTkProduct, { Id: 0, Value: "" })
+      - lblTkAssetNote:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            # Honest gap rather than a broken control: asset_library has no schema.
+            Text: |
+              ="Linked asset (task_output_asset) is not editable here — asset_library has no schema yet, so any binding to it is blocked. See schema/schema.yaml."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =344
+            Width: =520
+            Height: =40
+      - lblTkLangCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: ="Output language"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =140
+            Width: =700
+            Height: =18
+      - selTkLanguage:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gTaskEditTab = 2
+            X: =580
+            Y: =160
+            Width: =700
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "EN" }, { Id: 3, Label: "FR" },
+                      { Id: 4, Label: "DE" }, { Id: 5, Label: "ES" }, { Id: 6, Label: "IT" },
+                      { Id: 7, Label: "JP" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTask.task_output_language.Value, "(none)"), "(none)"),
+                       "EN", 2, "FR", 3, "DE", 4, "ES", 5, "IT", 6, "JP", 7, 1 )
+            OnChange: |
+              =Set(gTkLanguage, selTkLanguage.Selected.Label)
+      - lblTkFormatCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: ="Content format"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =210
+            Width: =700
+            Height: =18
+      - selTkFormat:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gTaskEditTab = 2
+            X: =580
+            Y: =230
+            Width: =700
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "Flyer" }, { Id: 3, Label: "Email" },
+                      { Id: 4, Label: "PDF" }, { Id: 5, Label: "Webpage" }, { Id: 6, Label: "Deck" },
+                      { Id: 7, Label: "Video" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTask.task_output_format.Value, "(none)"), "(none)"),
+                       "Flyer", 2, "Email", 3, "PDF", 4, "Webpage", 5, "Deck", 6, "Video", 7, 1 )
+            OnChange: |
+              =Set(gTkFormat, selTkFormat.Selected.Label)
+      - lblTkBrandCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: ="Branding"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =280
+            Width: =560
+            Height: =18
+      - selTkBranding:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gTaskEditTab = 2
+            X: =580
+            Y: =300
+            Width: =560
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "Barclays" },
+                      { Id: 3, Label: "QIS" }, { Id: 4, Label: "EXO" }, { Id: 5, Label: "Custom" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTask.task_output_branding.Value, "(none)"), "(none)"),
+                       "Barclays", 2, "QIS", 3, "EXO", 4, "Custom", 5, 1 )
+            OnChange: |
+              =Set(gTkBranding, selTkBranding.Selected.Label)
+      - lblTkClientStageCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gTaskEditTab = 2
+            Text: ="Client lifecycle stage"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =350
+            Width: =620
+            Height: =18
+      - selTkClientStage:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gTaskEditTab = 2
+            X: =580
+            Y: =370
+            Width: =620
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "Prospect" },
+                      { Id: 3, Label: "Active" }, { Id: 4, Label: "Existing" },
+                      { Id: 5, Label: "Post-Trade" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTask.task_client_stage.Value, "(none)"), "(none)"),
+                       "Prospect", 2, "Active", 3, "Existing", 4, "Post-Trade", 5, 1 )
+            OnChange: |
+              =Set(gTkClientStage, selTkClientStage.Selected.Label)
+      # ---- What is still missing (both tabs) -------------------------------
+      - lblTkMissingCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Still required:"
+            Visible: =Len(lblTkMissing.Text) > 0
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =634
+            Width: =760
+            Height: =18
+      - lblTkMissing:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =Trim(
+                 If( Len(Trim(txtTkName.Text)) = 0, "task name   ", "" ) &
+                 If( gTkProject.Id <= 0,            "project   ",   "" ) &
+                 If( Len(gTkLead.Mail) = 0,         "lead   ",      "" ) &
+                 If( Len(gTkCatGuid) > 0 && !gTkCatDone,
+                     "a full category path (keep picking until the last column is empty)   ", "" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.Danger
+            X: =580
+            Y: =652
+            Width: =760
+            Height: =40
+            Visible: =Len(Self.Text) > 0
+      # ---- Save / Cancel ----------------------------------------------------
+      - btnTkSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: |
+              =If(gEditMode = "Edit", "Save task", "Create task")
+            DisplayMode: |
+              =If(Len(lblTkMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =200
+            X: =24
+            Y: =660
+            # Required + always-writable fields first; optional ones after, each
+            # guarded (see pattern 4). Then the C3 rollup — LAST, because it must
+            # read the task's post-save stage, not the pre-edit one.
+            OnSelect: |
+              =Set( gTkSaved, Blank() );
+              Set( gTkErr, "" );
+              IfError(
+                  Set( gTkSaved,
+                      Patch( taskmaster_tasks,
+                             If( gEditMode = "Edit", gEditTask, Defaults(taskmaster_tasks) ),
+                             { task_name:            Trim(txtTkName.Text),
+                               task_project_id:      { Id: gTkProject.Id, Value: gTkProject.Value },
+                               task_description:     txtTkDesc.Text,
+                               task_stage:           { Value: gTkStage },
+                               task_status:          { Value: gTkStatus },
+                               task_priority:        { Value: gTkPriority },
+                               task_lead:
+                                   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                     Claims:      ClaimPrefix & Lower(gTkLead.Mail),
+                                     DisplayName: gTkLead.DisplayName,
+                                     Email:       gTkLead.Mail,
+                                     Department: "", JobTitle: "", Picture: "" },
+                               task_date_start:      IfError( DateValue(txtTkStart.Text),  Blank() ),
+                               task_date_target:     IfError( DateValue(txtTkTarget.Text), Blank() ),
+                               task_date_completion: IfError( DateValue(txtTkDone.Text),   Blank() ) } ) ),
+                  Set( gTkErr, FirstError.Message )
+              );
+              If( Len(gTkErr) > 0,
+                  Notify("Couldn't save the task: " & gTkErr, NotificationType.Error) );
+              If( Len(gTkErr) = 0,
+                  // --- optional fields, one guarded Patch each ---------------
+                  If( Len(gTkSupporter.Mail) > 0,
+                      IfError( Patch(taskmaster_tasks, gTkSaved,
+                                     { task_supporter:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                           Claims:      ClaimPrefix & Lower(gTkSupporter.Mail),
+                                           DisplayName: gTkSupporter.DisplayName,
+                                           Email:       gTkSupporter.Mail,
+                                           Department: "", JobTitle: "", Picture: "" } }),
+                               Notify("Task saved; the supporter didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      gEditMode = "Edit",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_supporter: Blank() }),
+                               Notify("Task saved; the supporter didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                  // Managed metadata (C10). THE RISKIEST WRITE IN THE APP: the
+                  // SPListExpandedTaxonomy shape is community-confirmed, not
+                  // first-party. It is deliberately its own Patch so a failure
+                  // here cannot lose the rest of the task.
+                  If( Len(gTkCatGuid) > 0 && gTkCatDone,
+                      IfError( Patch(taskmaster_tasks, gTkSaved,
+                                     { task_category:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
+                                           TermGuid: gTkCatGuid,
+                                           Label:    gTkCatLabel,
+                                           WssId:    -1,
+                                           Path:     gTkCatPath,
+                                           Value:    gTkCatLabel } }),
+                               Notify("Task saved; the category didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gTkApproval.Id > 0,
+                      IfError( Patch(taskmaster_tasks, gTkSaved,
+                                     { task_output_approval: { Id: gTkApproval.Id, Value: gTkApproval.Value } }),
+                               Notify("Task saved; the approval link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gTkClient.Id > 0,
+                      IfError( Patch(taskmaster_tasks, gTkSaved,
+                                     { task_client_name: { Id: gTkClient.Id, Value: gTkClient.Value } }),
+                               Notify("Task saved; the client link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gTkProduct.Id > 0,
+                      IfError( Patch(taskmaster_tasks, gTkSaved,
+                                     { task_product_id: { Id: gTkProduct.Id, Value: gTkProduct.Value } }),
+                               Notify("Task saved; the product link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gTkLanguage <> "(none)",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_language: { Value: gTkLanguage } }),
+                               Notify("Task saved; the language didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      gEditMode = "Edit",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_language: Blank() }),
+                               Notify("Task saved; the language didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gTkFormat <> "(none)",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_format: { Value: gTkFormat } }),
+                               Notify("Task saved; the format didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      gEditMode = "Edit",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_format: Blank() }),
+                               Notify("Task saved; the format didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gTkBranding <> "(none)",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_branding: { Value: gTkBranding } }),
+                               Notify("Task saved; the branding didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      gEditMode = "Edit",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_branding: Blank() }),
+                               Notify("Task saved; the branding didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gTkClientStage <> "(none)",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_client_stage: { Value: gTkClientStage } }),
+                               Notify("Task saved; the client stage didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      gEditMode = "Edit",
+                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_client_stage: Blank() }),
+                               Notify("Task saved; the client stage didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                  // --- C3: rewrite the parent project's weighted completion ---
+                  // Identical to scrTask's block. Delegable Filter on the indexed
+                  // FK plus an Or-of-equals over the six live stages (`<> "Archived"`
+                  // is a Text <> and would NOT delegate). Average/CountRows then run
+                  // LOCALLY over one project's page — which is only exact below the
+                  // row limit, hence the refusal below.
+                  With( { pid: gTkProject.Id },
+                      With( { proj: LookUp(taskmaster_projects, ID = pid),
+                              scored:
+                                AddColumns(
+                                    Filter( taskmaster_tasks,
+                                        task_project_id.Id = pid
+                                     && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+                                       || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+                                       || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
+                                    "wgt", Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
+                          If( IsBlank(proj),
+                              Notify("Task saved. Parent project not found, so completion was left unchanged.",
+                                     NotificationType.Warning),
+                              CountRows(scored) >= 2000,
+                              Notify("Task saved. This project has too many tasks to compute completion accurately, so it was left unchanged.",
+                                     NotificationType.Warning),
+                              IfError(
+                                  Set( gSelProject,
+                                      Patch( taskmaster_projects, proj,
+                                             { project_perc_completion:
+                                                   If( CountRows(scored) = 0, 0,
+                                                       RoundDown(Average(scored, wgt), 0) ) } ) ),
+                                  Notify("Task saved, but the project rollup didn't update: " & FirstError.Message,
+                                         NotificationType.Warning) ) ) ) );
+                  Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success );
+                  Back()
+              )
+      - btnTkCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.TextPrimary
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =140
+            X: =240
+            Y: =660
+            OnSelect: =Back()
+      # =====================================================================
+      # OVERLAY PICKERS — declared last so they float above the fields below.
+      # =====================================================================
+      - galTkProject:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gTaskEditTab = 1 && Len(txtTkProjectSearch.Text) >= 2 && gTkProject.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_projects,
+                         StartsWith(project_name, txtTkProjectSearch.Text) ),
+                     project_name )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =268
+            Width: =280
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTkProject, { Id: ThisItem.ID, Value: ThisItem.project_name })
+          Children:
+            - rowTkProject:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.project_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTkLead:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gTaskEditTab = 1 && Len(txtTkLeadSearch.Text) >= 2 && Len(gTkLead.Mail) = 0
+            Items: |
+              =Office365Users.SearchUser({ searchTerm: txtTkLeadSearch.Text, top: 8 })
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =448
+            Width: =360
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTkLead, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+          Children:
+            - rowTkLead:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTkSupporter:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gTaskEditTab = 1 && Len(txtTkSupporterSearch.Text) >= 2 && Len(gTkSupporter.Mail) = 0
+            Items: |
+              =Office365Users.SearchUser({ searchTerm: txtTkSupporterSearch.Text, top: 8 })
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =514
+            Width: =360
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTkSupporter, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+          Children:
+            - rowTkSupporter:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTkApproval:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gTaskEditTab = 2 && Len(txtTkApprovalSearch.Text) >= 2 && gTkApproval.Id <= 0
+            # approval_status is a Yes/No; `= true` delegates on an indexed Boolean,
+            # so retired approvals never reach the picker.
+            Items: |
+              =Sort( Filter( asset_approval,
+                         approval_status = true
+                      && StartsWith(approval_id, txtTkApprovalSearch.Text) ),
+                     approval_id )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =198
+            Width: =280
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTkApproval, { Id: ThisItem.ID, Value: ThisItem.approval_id })
+          Children:
+            - rowTkApproval:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.approval_id & "  ·  " & ThisItem.approval_region.Value
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTkClient:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gTaskEditTab = 2 && Len(txtTkClientSearch.Text) >= 2 && gTkClient.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_clients,
+                         StartsWith(client_name, txtTkClientSearch.Text) ),
+                     client_name )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =264
+            Width: =280
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTkClient, { Id: ThisItem.ID, Value: ThisItem.client_name })
+          Children:
+            - rowTkClient:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.client_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTkProduct:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gTaskEditTab = 2 && Len(txtTkProductSearch.Text) >= 2 && gTkProduct.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_products,
+                         StartsWith(product_uid, txtTkProductSearch.Text) ),
+                     product_uid )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =330
+            Width: =280
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTkProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid })
+          Children:
+            - rowTkProduct:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.product_uid
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle

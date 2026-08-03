@@ -202,13 +202,24 @@ Validated (full write-up + sources: `docs/managed-metadata-picker.md`):
   with `TermGuid`, `Label`, `Path` and **`WssId: -1`** (resolve by GUID, not site cache). This shape
   is **community-confirmed, not first-party** — the single riskiest construct in the app.
 
-Recommended architecture: **cache the term store into a flat `taskmaster_terms` list** (a scheduled
-flow walks Graph), and drive the cascade from delegable `Filter`s on `term_parent_guid`. That keeps
-the create form's runtime dependency at zero, versus a flow round-trip per dropdown level.
+**Architecture DECIDED 2026-08-03 — the cache, not live Graph.** `taskmaster_terms` is now a real
+list in the golden source: a flat row per term (`term_guid`, `term_label`, `term_set`,
+`term_parent_guid`, `term_path`, `term_depth`, `term_is_leaf`), refilled by a scheduled flow. The
+cascade is then ordinary delegable Power Fx — `=` on the indexed `term_parent_guid` — with **zero
+runtime dependency**. A flow round-trip per dropdown level would have made every create form depend
+on a flow being healthy, which is the one thing that cannot be debugged across this gap; with the
+cache, a dead refresh degrades to a stale vocabulary rather than an unusable form.
 
-**Blocked on:** a term source — Power Automate or a custom connector (**Q12**), now blocking rather
-than optional. **Cheapest first test:** one button that patches a single hard-coded `TermGuid` — if
-it writes, the design is unblocked for one paste instead of a whole create flow.
+**Implemented** in `src/authored/components/cmpTermPicker.pa.yaml` — four progressively-revealed
+levels, a `"— select —"` sentinel row per level (a gallery's `Selected` returns its first row until
+touched, which would otherwise auto-pick a path the user never chose into a *required* column), and
+chain validation so a stale deeper pick that is no longer a child of the level above is discarded
+rather than written. `IsComplete` counts children rather than trusting the cached `term_is_leaf`.
+
+**Still blocked on Q12 for POPULATION only.** The app is authored and pastes without it; it just has
+nothing to pick from until the list has rows, and the picker says so explicitly instead of showing
+four empty columns. Hand-seeding a small vocabulary is a valid stopgap. **Cheapest first test:** one
+project saved with a single region — if that MM write lands, the riskiest construct is proven.
 
 **C8 ✅ Resolved 2026-08-03 (casing).** Renamed to **`issue_owner`** (a real Person column,
 distinct from `Created By`) and **`product_uid`**. The whole model is now consistently lowercase

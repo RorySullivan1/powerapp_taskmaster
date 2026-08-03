@@ -65,6 +65,26 @@ Screens:
             X: =Parent.Width - 24 - Theme.Space.Gutter
             Y: =(Theme.Space.HeaderH - 24) / 2
             OnSelect: =Back()
+      # This screen is the QUICK edit — name, stage, health, priority. Everything
+      # else on the task (dates, owners, the output block, category) lives on
+      # scrTaskEdit, which also maintains the same C3 rollup.
+      - btnFullEditor:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="All fields…"
+            Fill: =Theme.Color.PrimaryDark
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.PrimaryDark
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Height: =32
+            Width: =150
+            X: =Parent.Width - 24 - Theme.Space.Gutter - 166
+            Y: =(Theme.Space.HeaderH - 32) / 2
+            OnSelect: |
+              =Set( gEditMode, "Edit" );
+               Set( gEditTask, gSelTask );
+               Navigate( scrTaskEdit, ScreenTransition.Cover )
       # ---- Editable: name --------------------------------------------------
       - lblName:
           Control: Label@2.5.1

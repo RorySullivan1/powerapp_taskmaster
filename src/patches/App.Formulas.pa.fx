@@ -6,15 +6,24 @@
 // formula bar by hand — never through Paste code.
 //
 // PASTE ORDER (matters — and it CHANGED once the screens gained data):
-//   1. Create SEVEN blank screens, named exactly:
+//   1. Create ELEVEN blank screens, named exactly:
 //        scrHome / scrReports / scrProjects / scrReference / scrAdmin
-//        scrProject / scrTask        <- detail screens, not in NavMenu
-//      (NavMenu below holds live Screen references, so the names must exist.)
+//        scrProject / scrTask                                  <- detail screens
+//        scrProjectEdit / scrTaskEdit / scrTransactionEdit / scrIssueEdit
+//                                                              <- create / edit screens
+//      (NavMenu below holds live Screen references, so the names must exist. The
+//       detail and edit screens are NOT in NavMenu — they are reached by Navigate.)
 //   2. Paste THIS file into the App.Formulas formula bar.
 //   3. Only then paste the screen controls (src/authored/scr*.fx.yaml).
 // Step 2 must precede step 3 because scrHome/scrReports OnVisible now reference
-// StageWeights, which is defined here. The old "paste App.Formulas last" order
-// would fail validation on those screens.
+// StageWeights, and the edit screens reference ClaimPrefix / FxToUsd, all defined
+// here. The old "paste App.Formulas last" order would fail validation on those
+// screens.
+//
+// CONNECTION PREREQUISITE (edit screens only): the four scr*Edit screens call
+// Office365Users.SearchUser for their people pickers. Add the **Office 365 Users**
+// connection in Studio (Data -> Add data -> Office 365 Users) BEFORE pasting them,
+// or the paste fails on an unrecognised name. See HANDOFF.md.
 //
 // Data-independent: no tmXxx column tokens — nothing here binds to SharePoint,
 // so it is paste-ready before any list is provisioned (screen-map Phase 1).
@@ -94,6 +103,37 @@ StageWeights = Table(
     { Stage: "Complete",     Weight: 100 }
     // "Archived" is deliberately ABSENT — archived tasks are excluded from both
     // numerator and denominator, so a shelved task can't drag a project down.
+);
+
+// --- Person-column claims prefix --------------------------------------------
+// A SharePoint Person column is patched as an expanded-user record whose Claims
+// string is this prefix plus the LOWERCASED user principal name. One definition
+// so the four edit screens cannot drift from each other:
+//
+//   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+//     Claims: ClaimPrefix & Lower(<mail>), DisplayName: ..., Email: ...,
+//     Department: "", JobTitle: "", Picture: "" }
+//
+// COMMUNITY-CONFIRMED shape, not first-party — same risk class as the managed-
+// metadata write (docs/managed-metadata-picker.md §2). If a Person write fails on
+// first paste, this line and the record shape around it are the first suspects.
+ClaimPrefix = "i:0#.f|membership|";
+
+// --- FX rates to USD (C5) ---------------------------------------------------
+// transaction_notional_usd is normalised at WRITE time — it is the only column
+// safe to aggregate across currencies (schema.yaml). That needs a rate at the
+// moment of the write, and this model has no FX source, so the rates live here.
+//
+// THESE ARE PLACEHOLDERS. They are static and WILL go stale. Maintain this table
+// (or replace it with a lookup list) before the figure is trusted for reporting.
+// The currency list matches transaction_currency exactly; the transaction form
+// refuses to save if a currency has no rate here, rather than quietly using 1.
+FxToUsd = Table(
+    { Ccy: "USD", Rate: 1.00 },
+    { Ccy: "EUR", Rate: 1.08 },
+    { Ccy: "GBP", Rate: 1.27 },
+    { Ccy: "JPY", Rate: 0.0064 },
+    { Ccy: "CHF", Rate: 1.12 }
 );
 
 // --- Write-back: recompute one project's % (app-side writer, C3) -------------

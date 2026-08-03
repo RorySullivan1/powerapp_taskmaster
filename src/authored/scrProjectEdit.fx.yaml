@@ -1,0 +1,1704 @@
+# =============================================================================
+# scrProjectEdit  —  create / edit a project, AND stage its tasks, transactions
+# and issues in the same pass.
+#
+# Entered with:  Set(gEditMode, "New" | "Edit");  Set(gEditProject, <record>)
+#
+# WHY THE CHILDREN ARE STAGED, NOT WRITTEN AS YOU GO
+# A task, transaction or issue cannot exist before its parent does — every one of
+# them carries a REQUIRED Lookup to taskmaster_projects, and a Lookup needs the
+# parent's ID, which SharePoint only assigns on insert. So the child rows are
+# collected LOCALLY (colNewTasks / colNewTransactions / colNewIssues) while the
+# form is open, and written only after the project's Patch returns a record with
+# an ID. That is the whole reason this screen exists in the shape it does.
+#
+# WHAT HAPPENS WHEN A CHILD FAILS
+# The parent is already saved by then, so a failure cannot be rolled back — and
+# pretending otherwise would silently drop the user's work. Instead: successful
+# children are REMOVED from the staging collection, failures STAY in it and are
+# listed on-screen, and the screen flips to Edit mode against the project it just
+# created. Pressing Save again therefore retries only what failed and cannot
+# create a second project. That mode flip is load-bearing, not cosmetic.
+#
+# FIVE TABS, because a canvas screen does not scroll:
+#   Details · Classification (the managed-metadata pickers) · Tasks · Transactions · Issues
+#
+# Follows the shared edit-screen pattern — see scrIssueEdit's header and
+# _EDIT-NOTES.md. CONNECTION PREREQUISITE: Office 365 Users. See HANDOFF.md.
+# Every column token resolves to schema/schema.yaml (golden source).
+# =============================================================================
+Screens:
+  scrProjectEdit:
+    Properties:
+      Fill: =Theme.Color.Bg
+      OnVisible: |
+        =Set( gPrTab, 1 );
+        Set( gPrManager,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditProject.project_manager.DisplayName, ""),
+                    Mail:        Coalesce(gEditProject.project_manager.Email, "") },
+                  { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
+        Set( gPrRequestor,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditProject.project_requestor.DisplayName, ""),
+                    Mail:        Coalesce(gEditProject.project_requestor.Email, "") },
+                  { DisplayName: "", Mail: "" } ) );
+        Set( gPrSupporter,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditProject.project_supporter.DisplayName, ""),
+                    Mail:        Coalesce(gEditProject.project_supporter.Email, "") },
+                  { DisplayName: "", Mail: "" } ) );
+        Set( gPrPhase,    If( gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, "Planning"), "Planning" ) );
+        Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
+        // Managed metadata (C10). Empty on entry in BOTH modes: the term GUID is
+        // not recoverable from what the SharePoint connector returns, so on Edit
+        // the columns are left untouched unless the user actively re-picks. The
+        // current labels are shown beside the pickers so nothing looks lost.
+        Set( gPrRegionGuid, "" ); Set( gPrRegionLabel, "" ); Set( gPrRegionPath, "" ); Set( gPrRegionDone, false );
+        Set( gPrTypeGuid,   "" ); Set( gPrTypeLabel,   "" ); Set( gPrTypePath,   "" ); Set( gPrTypeDone,   false );
+        Set( gPrCovGuid,    "" ); Set( gPrCovLabel,    "" ); Set( gPrCovPath,    "" ); Set( gPrCovDone,    false );
+        // One delegable pull per vocabulary (`=` on the indexed term_set Choice),
+        // reshaped to exactly the five columns cmpTermPicker expects.
+        ClearCollect( colTermRegion,
+            ShowColumns( Filter( taskmaster_terms, term_set.Value = "Region" ),
+                         "term_guid", "term_label", "term_parent_guid", "term_path", "term_is_leaf" ) );
+        ClearCollect( colTermProjectType,
+            ShowColumns( Filter( taskmaster_terms, term_set.Value = "ProjectType" ),
+                         "term_guid", "term_label", "term_parent_guid", "term_path", "term_is_leaf" ) );
+        ClearCollect( colTermCoverage,
+            ShowColumns( Filter( taskmaster_terms, term_set.Value = "Coverage" ),
+                         "term_guid", "term_label", "term_parent_guid", "term_path", "term_is_leaf" ) );
+        // Staging areas. Cleared on every visit — a half-entered child list left
+        // over from the previous project would be written to THIS one.
+        Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
+        Clear( colChildErrors ); Clear( colChildOk );
+        Set( gNtPriority, "Moderate" ); Set( gNtLeadWho, "Manager" );
+        Set( gNxCcy, "USD" ); Set( gNxSalesWho, "Manager" );
+        Set( gNxClient,  { Id: 0, Value: "" } );
+        Set( gNxProduct, { Id: 0, Value: "" } );
+        Set( gNiStatus, "Open" ); Set( gNiImpact, "(none)" ); Set( gNiAssigneeWho, "Manager" );
+        Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
+        Reset( txtPrStart ); Reset( txtPrTarget ); Reset( txtPrComplete );
+        Reset( txtPrManagerSearch ); Reset( txtPrRequestorSearch ); Reset( txtPrSupporterSearch );
+        Reset( txtNtName ); Reset( txtNtTarget );
+        Reset( txtNxName ); Reset( txtNxNotional ); Reset( txtNxDate );
+        Reset( txtNxClientSearch ); Reset( txtNxProductSearch );
+        Reset( txtNiName )
+    Children:
+      # ---- Header ----------------------------------------------------------
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If(gEditMode = "Edit", "Edit project", "New project")
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =400
+      - lblPrStagedCount:
+          Control: Label@2.5.1
+          Properties:
+            # The staged children are the point of this screen — keep the count in
+            # the header so it is visible from every tab.
+            Text: |
+              =CountRows(colNewTasks) & " task(s) · " & CountRows(colNewTransactions)
+               & " transaction(s) · " & CountRows(colNewIssues) & " issue(s) staged"
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Align: =Align.Right
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - 500 - Theme.Space.Gutter
+            Y: =0
+            Width: =460
+      - BackIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.OnPrimary
+            Height: =24
+            Width: =24
+            X: =Parent.Width - 24 - Theme.Space.Gutter
+            Y: =(Theme.Space.HeaderH - 24) / 2
+            OnSelect: =Back()
+      - selPrTab:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =24
+            Y: =84
+            Width: =760
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Details" }, { Id: 2, Label: "Classification" },
+                      { Id: 3, Label: "Tasks" },   { Id: 4, Label: "Transactions" },
+                      { Id: 5, Label: "Issues" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gPrTab, selPrTab.Selected.Id)
+      # =====================================================================
+      # TAB 1 — DETAILS
+      # =====================================================================
+      - lblPrNameCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Project name  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =140
+            Width: =520
+            Height: =18
+      - txtPrName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            Default: |
+              =If(gEditMode = "Edit", gEditProject.project_name, "")
+            HintText: ="What is this project called?"
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =24
+            Y: =160
+            Width: =520
+            Height: =40
+      - lblPrPathCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Shared-drive path"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =210
+            Width: =520
+            Height: =18
+      - txtPrPathway:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            Default: |
+              =If(gEditMode = "Edit", gEditProject.project_pathway, "")
+            # Power Fx has no backslash escape — a UNC path is written literally.
+            HintText: ="\\share\eqd\projects\…"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =230
+            Width: =520
+            Height: =36
+      - lblPrDescCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Description"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =276
+            Width: =520
+            Height: =18
+      - txtPrDesc:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            Default: |
+              =If(gEditMode = "Edit", gEditProject.project_description, "")
+            Mode: =TextMode.MultiLine
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =296
+            Width: =520
+            Height: =100
+      - lblPrMgrCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Project manager  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =406
+            Width: =520
+            Height: =18
+      - txtPrManagerSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            HintText: ="Search people…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =426
+            Width: =280
+            Height: =36
+      - lblPrMgrChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: |
+              =If(Len(gPrManager.Mail) > 0, gPrManager.DisplayName, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(Len(gPrManager.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =426
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoPrMgrClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gPrTab = 1 && Len(gPrManager.Mail) > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =436
+            OnSelect: |
+              =Set(gPrManager, { DisplayName: "", Mail: "" })
+      - lblPrReqCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Requestor"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =472
+            Width: =520
+            Height: =18
+      - txtPrRequestorSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            HintText: ="Search people…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =492
+            Width: =280
+            Height: =36
+      - lblPrReqChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: |
+              =If(Len(gPrRequestor.Mail) > 0, gPrRequestor.DisplayName, "— none —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(Len(gPrRequestor.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =492
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoPrReqClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gPrTab = 1 && Len(gPrRequestor.Mail) > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =502
+            OnSelect: |
+              =Set(gPrRequestor, { DisplayName: "", Mail: "" })
+      - lblPrSuppCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            # C1: one extra person, single-valued — keeps "my projects" delegable.
+            Text: ="Supporter  (one extra person)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =538
+            Width: =520
+            Height: =18
+      - txtPrSupporterSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            HintText: ="Search people…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =558
+            Width: =280
+            Height: =36
+      - lblPrSuppChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: |
+              =If(Len(gPrSupporter.Mail) > 0, gPrSupporter.DisplayName, "— none —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(Len(gPrSupporter.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =312
+            Y: =558
+            Width: =208
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoPrSuppClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gPrTab = 1 && Len(gPrSupporter.Mail) > 0
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =524
+            Y: =568
+            OnSelect: |
+              =Set(gPrSupporter, { DisplayName: "", Mail: "" })
+      # ---- Details, right column -------------------------------------------
+      - lblPrPhaseCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Phase  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =140
+            Width: =760
+            Height: =18
+      - selPrPhase:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 1
+            X: =580
+            Y: =160
+            Width: =700
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Planning" }, { Id: 2, Label: "Active" },
+                      { Id: 3, Label: "Blocked" },  { Id: 4, Label: "Complete" },
+                      { Id: 5, Label: "Archived" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, "Planning"), "Planning"),
+                       "Planning", 1, "Active", 2, "Blocked", 3, "Complete", 4, 5 )
+            OnChange: |
+              =Set(gPrPhase, selPrPhase.Selected.Label)
+      - lblPrPriorityCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Priority  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =210
+            Width: =760
+            Height: =18
+      - selPrPriority:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 1
+            X: =580
+            Y: =230
+            Width: =700
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "Lowest" }, { Id: 2, Label: "Low" },
+                      { Id: 3, Label: "Moderate" }, { Id: 4, Label: "High" },
+                      { Id: 5, Label: "Critical" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate"),
+                       "Lowest", 1, "Low", 2, "Moderate", 3, "High", 4, 5 )
+            OnChange: |
+              =Set(gPrPriority, selPrPriority.Selected.Label)
+      - lblPrStartCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Start date"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =282
+            Width: =240
+            Height: =18
+      - txtPrStart:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            Default: |
+              =If( gEditMode = "Edit",
+                   If( IsBlank(gEditProject.project_date_start), "",
+                       Text(gEditProject.project_date_start, "dd/mm/yyyy") ),
+                   Text(Today(), "dd/mm/yyyy") )
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =580
+            Y: =302
+            Width: =160
+            Height: =36
+      - lblPrStartEcho:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: |
+              =If( Len(txtPrStart.Text) = 0, "not set",
+                   IfError( Text(DateValue(txtPrStart.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtPrStart.Text) > 0 && IsError(DateValue(txtPrStart.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =748
+            Y: =302
+            Width: =160
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - lblPrTargetCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Target date"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =920
+            Y: =282
+            Width: =240
+            Height: =18
+      - txtPrTarget:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            Default: |
+              =If( gEditMode = "Edit" && !IsBlank(gEditProject.project_date_target),
+                   Text(gEditProject.project_date_target, "dd/mm/yyyy"), "" )
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =920
+            Y: =302
+            Width: =160
+            Height: =36
+      - lblPrTargetEcho:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: |
+              =If( Len(txtPrTarget.Text) = 0, "not set",
+                   IfError( Text(DateValue(txtPrTarget.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtPrTarget.Text) > 0 && IsError(DateValue(txtPrTarget.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =1088
+            Y: =302
+            Width: =160
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - lblPrCompleteCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: ="Completion date"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =348
+            Width: =240
+            Height: =18
+      - txtPrComplete:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 1
+            Default: |
+              =If( gEditMode = "Edit" && !IsBlank(gEditProject.project_date_complete),
+                   Text(gEditProject.project_date_complete, "dd/mm/yyyy"), "" )
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =580
+            Y: =368
+            Width: =160
+            Height: =36
+      - lblPrCompleteEcho:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            Text: |
+              =If( Len(txtPrComplete.Text) = 0, "not set",
+                   IfError( Text(DateValue(txtPrComplete.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtPrComplete.Text) > 0 && IsError(DateValue(txtPrComplete.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =748
+            Y: =368
+            Width: =200
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - lblPrPercNote:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 1
+            # C3: the app is the writer, and it writes from task stages — so the
+            # field is deliberately not editable here.
+            Text: |
+              ="Completion % is not entered by hand — it is a weighted rollup of this project's task stages, rewritten whenever a task is saved. Currently "
+               & If( gEditMode = "Edit", Coalesce(gEditProject.project_perc_completion, 0) & "%", "0% (new project)" ) & "."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =580
+            Y: =418
+            Width: =700
+            Height: =40
+      # =====================================================================
+      # TAB 2 — CLASSIFICATION (managed metadata, C10)
+      # =====================================================================
+      - lblPrClassNote:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 2
+            Text: |
+              ="Region and Type are REQUIRED by the list. Keep picking across the columns until no further column appears — the last term you pick is the one written."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =134
+            Width: =760
+            Height: =18
+      - pickPrRegion:
+          Control: CanvasComponent
+          ComponentName: cmpTermPicker
+          Properties:
+            Visible: =gPrTab = 2
+            X: =24
+            Y: =156
+            Width: =760
+            Height: =150
+            Caption: ="Region  *"
+            Terms: =colTermRegion
+            OnChange: |
+              =Set( gPrRegionGuid,  pickPrRegion.TermGuid );
+              Set( gPrRegionLabel, pickPrRegion.TermLabel );
+              Set( gPrRegionPath,  pickPrRegion.TermPath );
+              Set( gPrRegionDone,  pickPrRegion.IsComplete )
+      - lblPrRegionState:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 2
+            Text: |
+              =If( Len(gPrRegionGuid) > 0,
+                   If( gPrRegionDone, "✓ " & gPrRegionLabel, "… " & gPrRegionLabel & " — keep going, this term has children" ),
+                   gEditMode = "Edit",
+                   "Currently: " & Coalesce(gEditProject.project_region.Value, "not set") & "   (leave alone to keep it)",
+                   "Nothing picked yet" )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(gPrRegionGuid) > 0 && !gPrRegionDone, Theme.Color.Warning, Theme.Color.TextMuted )
+            X: =804
+            Y: =176
+            Width: =520
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - pickPrType:
+          Control: CanvasComponent
+          ComponentName: cmpTermPicker
+          Properties:
+            Visible: =gPrTab = 2
+            X: =24
+            Y: =318
+            Width: =760
+            Height: =150
+            Caption: ="Project type  *"
+            Terms: =colTermProjectType
+            OnChange: |
+              =Set( gPrTypeGuid,  pickPrType.TermGuid );
+              Set( gPrTypeLabel, pickPrType.TermLabel );
+              Set( gPrTypePath,  pickPrType.TermPath );
+              Set( gPrTypeDone,  pickPrType.IsComplete )
+      - lblPrTypeState:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 2
+            Text: |
+              =If( Len(gPrTypeGuid) > 0,
+                   If( gPrTypeDone, "✓ " & gPrTypeLabel, "… " & gPrTypeLabel & " — keep going, this term has children" ),
+                   gEditMode = "Edit",
+                   "Currently: " & Coalesce(gEditProject.project_type.Value, "not set") & "   (leave alone to keep it)",
+                   "Nothing picked yet" )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(gPrTypeGuid) > 0 && !gPrTypeDone, Theme.Color.Warning, Theme.Color.TextMuted )
+            X: =804
+            Y: =338
+            Width: =520
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - pickPrCoverage:
+          Control: CanvasComponent
+          ComponentName: cmpTermPicker
+          Properties:
+            Visible: =gPrTab = 2
+            X: =24
+            Y: =480
+            Width: =760
+            Height: =150
+            Caption: ="Coverage"
+            Terms: =colTermCoverage
+            OnChange: |
+              =Set( gPrCovGuid,  pickPrCoverage.TermGuid );
+              Set( gPrCovLabel, pickPrCoverage.TermLabel );
+              Set( gPrCovPath,  pickPrCoverage.TermPath );
+              Set( gPrCovDone,  pickPrCoverage.IsComplete )
+      - lblPrCovState:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 2
+            Text: |
+              =If( Len(gPrCovGuid) > 0,
+                   If( gPrCovDone, "✓ " & gPrCovLabel, "… " & gPrCovLabel & " — keep going, this term has children" ),
+                   gEditMode = "Edit",
+                   "Currently: " & Coalesce(gEditProject.project_coverage.Value, "not set") & "   (leave alone to keep it)",
+                   "Nothing picked yet" )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(gPrCovGuid) > 0 && !gPrCovDone, Theme.Color.Warning, Theme.Color.TextMuted )
+            X: =804
+            Y: =500
+            Width: =520
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      # =====================================================================
+      # TAB 3 — TASKS to create with the project
+      # =====================================================================
+      - lblNtCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 3
+            Text: |
+              ="Add tasks now; they are written after the project is created and its ID exists."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =134
+            Width: =900
+            Height: =18
+      - txtNtName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 3
+            HintText: ="Task name"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =158
+            Width: =300
+            Height: =36
+      - txtNtTarget:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 3
+            HintText: ="Due dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =332
+            Y: =158
+            Width: =140
+            Height: =36
+      - selNtPriority:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 3
+            X: =480
+            Y: =158
+            Width: =380
+            Height: =36
+            Items: |
+              =Table( { Id: 1, Label: "Low" }, { Id: 2, Label: "Moderate" },
+                      { Id: 3, Label: "High" }, { Id: 4, Label: "Critical" } )
+            DefaultId: =2
+            OnChange: |
+              =Set(gNtPriority, selNtPriority.Selected.Label)
+      - selNtLeadWho:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 3
+            # A full people picker per staged row would be four more overlay
+            # galleries on an already dense screen. The two owners that actually
+            # matter at creation time are the manager and whoever is filling the
+            # form in; anything else is a one-click change on the task afterwards.
+            X: =868
+            Y: =158
+            Width: =260
+            Height: =36
+            Items: |
+              =Table( { Id: 1, Label: "Manager" }, { Id: 2, Label: "Me" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gNtLeadWho, selNtLeadWho.Selected.Label)
+      - btnNtAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gPrTab = 3
+            Text: ="Add task"
+            DisplayMode: |
+              =If( Len(Trim(txtNtName.Text)) > 0
+                && Len( If(gNtLeadWho = "Me", Coalesce(User().Email, ""), gPrManager.Mail) ) > 0,
+                   DisplayMode.Edit, DisplayMode.Disabled )
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Height: =36
+            Width: =140
+            X: =1136
+            Y: =158
+            # sid is a stable local key: it survives removals (unlike a row index)
+            # and is what the save loop uses to delete rows that were written.
+            # The lead is RESOLVED HERE, not at save time, so a later change of
+            # project manager cannot silently reassign already-staged tasks.
+            OnSelect: |
+              =Collect( colNewTasks,
+                  { sid:        If( IsEmpty(colNewTasks), 1, Max(colNewTasks, sid) + 1 ),
+                    t_name:     Trim(txtNtName.Text),
+                    t_stage:    "Not Started",
+                    t_priority: gNtPriority,
+                    t_leadName: If( gNtLeadWho = "Me", Coalesce(User().FullName, ""), gPrManager.DisplayName ),
+                    t_leadMail: If( gNtLeadWho = "Me", Coalesce(User().Email, ""),    gPrManager.Mail ),
+                    t_target:   txtNtTarget.Text } );
+              Reset( txtNtName ); Reset( txtNtTarget )
+      - galNewTasks:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: =gPrTab = 3
+            Items: =colNewTasks
+            TemplateSize: =36
+            TemplatePadding: =0
+            X: =24
+            Y: =210
+            Width: =1252
+            Height: =400
+            TemplateFill: =Theme.Color.Surface
+          Children:
+            - ntRow:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.t_name & "   ·   " & ThisItem.t_priority
+                     & "   ·   lead " & ThisItem.t_leadName
+                     & If( Len(ThisItem.t_target) = 0, "",
+                           "   ·   due " & IfError(Text(DateValue(ThisItem.t_target), "dd mmm yyyy"), "⚠ " & ThisItem.t_target) )
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 60
+                  Height: =36
+                  VerticalAlign: =VerticalAlign.Middle
+            - ntRemove:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =Icon.Trash
+                  Color: =Theme.Color.TextMuted
+                  Height: =16
+                  Width: =16
+                  X: =Parent.TemplateWidth - 36
+                  Y: =10
+                  OnSelect: |
+                    =RemoveIf(colNewTasks, sid = ThisItem.sid)
+      # =====================================================================
+      # TAB 4 — TRANSACTIONS to create with the project
+      # =====================================================================
+      - lblNxCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 4
+            Text: |
+              ="Client, product, currency and trade date are required on every transaction, so all four must be set before a row can be staged."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =134
+            Width: =1000
+            Height: =18
+      - txtNxName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 4
+            HintText: ="Transaction label"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =158
+            Width: =240
+            Height: =36
+      - txtNxClientSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 4
+            HintText: ="Client…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =272
+            Y: =158
+            Width: =180
+            Height: =36
+      - lblNxClientChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 4
+            Text: |
+              =If(gNxClient.Id > 0, gNxClient.Value, "— client —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gNxClient.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =272
+            Y: =196
+            Width: =180
+            Height: =20
+            VerticalAlign: =VerticalAlign.Middle
+            OnSelect: |
+              =Set(gNxClient, { Id: 0, Value: "" })
+      - txtNxProductSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 4
+            HintText: ="Product…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =460
+            Y: =158
+            Width: =180
+            Height: =36
+      - lblNxProductChip:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 4
+            Text: |
+              =If(gNxProduct.Id > 0, gNxProduct.Value, "— product —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gNxProduct.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =460
+            Y: =196
+            Width: =180
+            Height: =20
+            VerticalAlign: =VerticalAlign.Middle
+            OnSelect: |
+              =Set(gNxProduct, { Id: 0, Value: "" })
+      - txtNxNotional:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 4
+            HintText: ="Notional"
+            Format: =TextFormat.Number
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =648
+            Y: =158
+            Width: =140
+            Height: =36
+      - selNxCcy:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 4
+            X: =796
+            Y: =158
+            Width: =260
+            Height: =36
+            Items: |
+              =Table( { Id: 1, Label: "USD" }, { Id: 2, Label: "EUR" }, { Id: 3, Label: "GBP" },
+                      { Id: 4, Label: "JPY" }, { Id: 5, Label: "CHF" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gNxCcy, selNxCcy.Selected.Label)
+      - txtNxDate:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 4
+            Default: |
+              =Text(Today(), "dd/mm/yyyy")
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =1064
+            Y: =158
+            Width: =120
+            Height: =36
+      - selNxSalesWho:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 4
+            X: =24
+            Y: =196
+            Width: =240
+            Height: =24
+            Items: |
+              =Table( { Id: 1, Label: "Manager" }, { Id: 2, Label: "Me" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gNxSalesWho, selNxSalesWho.Selected.Label)
+      - btnNxAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gPrTab = 4
+            Text: ="Add"
+            DisplayMode: |
+              =If( Len(Trim(txtNxName.Text)) > 0
+                && gNxClient.Id > 0 && gNxProduct.Id > 0
+                && Len(txtNxDate.Text) > 0 && !IsError(DateValue(txtNxDate.Text))
+                && ( Len(txtNxNotional.Text) = 0 || !IsError(Value(txtNxNotional.Text)) )
+                && Len( If(gNxSalesWho = "Me", Coalesce(User().Email, ""), gPrManager.Mail) ) > 0,
+                   DisplayMode.Edit, DisplayMode.Disabled )
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Height: =36
+            Width: =92
+            X: =1192
+            Y: =158
+            OnSelect: |
+              =Collect( colNewTransactions,
+                  { sid:           If( IsEmpty(colNewTransactions), 1, Max(colNewTransactions, sid) + 1 ),
+                    x_name:        Trim(txtNxName.Text),
+                    x_clientId:    gNxClient.Id,
+                    x_clientValue: gNxClient.Value,
+                    x_productId:   gNxProduct.Id,
+                    x_productValue: gNxProduct.Value,
+                    x_ccy:         gNxCcy,
+                    x_notional:    txtNxNotional.Text,
+                    x_date:        txtNxDate.Text,
+                    x_salesName:   If( gNxSalesWho = "Me", Coalesce(User().FullName, ""), gPrManager.DisplayName ),
+                    x_salesMail:   If( gNxSalesWho = "Me", Coalesce(User().Email, ""),    gPrManager.Mail ) } );
+              Reset( txtNxName ); Reset( txtNxNotional );
+              Reset( txtNxClientSearch ); Reset( txtNxProductSearch );
+              Set( gNxClient,  { Id: 0, Value: "" } );
+              Set( gNxProduct, { Id: 0, Value: "" } )
+      - galNewTransactions:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: =gPrTab = 4
+            Items: =colNewTransactions
+            TemplateSize: =36
+            TemplatePadding: =0
+            X: =24
+            Y: =232
+            Width: =1252
+            Height: =380
+            TemplateFill: =Theme.Color.Surface
+          Children:
+            - nxRow:
+                Control: Label@2.5.1
+                Properties:
+                  # The USD figure is shown at STAGING time too, so a wrong
+                  # currency is caught before anything is written (C5).
+                  Text: |
+                    =ThisItem.x_name & "   ·   " & ThisItem.x_clientValue & "   ·   " & ThisItem.x_productValue
+                     & "   ·   " & ThisItem.x_ccy & " "
+                     & If( Len(ThisItem.x_notional) = 0, "—", Text(Value(ThisItem.x_notional), "[$-en-US]#,##0") )
+                     & If( Len(ThisItem.x_notional) = 0, "",
+                           "   ·   ≈ USD " &
+                           Text( Value(ThisItem.x_notional) * Coalesce(LookUp(FxToUsd, Ccy = ThisItem.x_ccy, Rate), 0),
+                                 "[$-en-US]#,##0" ) )
+                     & "   ·   " & IfError(Text(DateValue(ThisItem.x_date), "dd mmm yyyy"), "⚠ " & ThisItem.x_date)
+                     & "   ·   sales " & ThisItem.x_salesName
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 60
+                  Height: =36
+                  VerticalAlign: =VerticalAlign.Middle
+            - nxRemove:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =Icon.Trash
+                  Color: =Theme.Color.TextMuted
+                  Height: =16
+                  Width: =16
+                  X: =Parent.TemplateWidth - 36
+                  Y: =10
+                  OnSelect: |
+                    =RemoveIf(colNewTransactions, sid = ThisItem.sid)
+      # =====================================================================
+      # TAB 5 — ISSUES to create with the project
+      # =====================================================================
+      - lblNiCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gPrTab = 5
+            Text: |
+              ="Issues raised at kick-off — known risks, dependencies, outstanding approvals."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =134
+            Width: =900
+            Height: =18
+      - txtNiName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Visible: =gPrTab = 5
+            HintText: ="Issue summary"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =158
+            Width: =320
+            Height: =36
+      - selNiStatus:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 5
+            X: =352
+            Y: =158
+            Width: =400
+            Height: =36
+            Items: |
+              =Table( { Id: 1, Label: "Open" }, { Id: 2, Label: "Review" },
+                      { Id: 3, Label: "Waiting" }, { Id: 4, Label: "Blocked" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gNiStatus, selNiStatus.Selected.Label)
+      - selNiImpact:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 5
+            X: =760
+            Y: =158
+            Width: =400
+            Height: =36
+            Items: |
+              =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "Low" },
+                      { Id: 3, Label: "Moderate" }, { Id: 4, Label: "High" },
+                      { Id: 5, Label: "Critical" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gNiImpact, selNiImpact.Selected.Label)
+      - selNiAssigneeWho:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            Visible: =gPrTab = 5
+            X: =24
+            Y: =196
+            Width: =240
+            Height: =24
+            Items: |
+              =Table( { Id: 1, Label: "Manager" }, { Id: 2, Label: "Me" } )
+            DefaultId: =1
+            OnChange: |
+              =Set(gNiAssigneeWho, selNiAssigneeWho.Selected.Label)
+      - btnNiAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gPrTab = 5
+            Text: ="Add issue"
+            DisplayMode: |
+              =If( Len(Trim(txtNiName.Text)) > 0
+                && Len( If(gNiAssigneeWho = "Me", Coalesce(User().Email, ""), gPrManager.Mail) ) > 0,
+                   DisplayMode.Edit, DisplayMode.Disabled )
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Height: =36
+            Width: =140
+            X: =1168
+            Y: =158
+            OnSelect: |
+              =Collect( colNewIssues,
+                  { sid:            If( IsEmpty(colNewIssues), 1, Max(colNewIssues, sid) + 1 ),
+                    i_name:         Trim(txtNiName.Text),
+                    i_status:       gNiStatus,
+                    i_impact:       gNiImpact,
+                    i_assigneeName: If( gNiAssigneeWho = "Me", Coalesce(User().FullName, ""), gPrManager.DisplayName ),
+                    i_assigneeMail: If( gNiAssigneeWho = "Me", Coalesce(User().Email, ""),    gPrManager.Mail ) } );
+              Reset( txtNiName )
+      - galNewIssues:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: =gPrTab = 5
+            Items: =colNewIssues
+            TemplateSize: =36
+            TemplatePadding: =0
+            X: =24
+            Y: =232
+            Width: =1252
+            Height: =380
+            TemplateFill: =Theme.Color.Surface
+          Children:
+            - niRow:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.i_name & "   ·   " & ThisItem.i_status
+                     & If( ThisItem.i_impact = "(none)", "", "   ·   " & ThisItem.i_impact & " impact" )
+                     & "   ·   " & ThisItem.i_assigneeName
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 60
+                  Height: =36
+                  VerticalAlign: =VerticalAlign.Middle
+            - niRemove:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =Icon.Trash
+                  Color: =Theme.Color.TextMuted
+                  Height: =16
+                  Width: =16
+                  X: =Parent.TemplateWidth - 36
+                  Y: =10
+                  OnSelect: |
+                    =RemoveIf(colNewIssues, sid = ThisItem.sid)
+      # =====================================================================
+      # ALWAYS VISIBLE — validation, failures, save
+      # =====================================================================
+      - lblPrMissingCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =Len(lblPrMissing.Text) > 0
+            Text: ="Still required:"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =540
+            Y: =622
+            Width: =740
+            Height: =18
+      - lblPrMissing:
+          Control: Label@2.5.1
+          Properties:
+            # Region and Type are required by the LIST, so on a New project the
+            # form must have a complete leaf for each or the insert cannot succeed.
+            # On Edit they are only required if the user started re-picking and
+            # stopped part-way — an untouched picker means "keep what is there".
+            Text: |
+              =Trim(
+                 If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
+                 If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
+                 If( gEditMode = "New" && !gPrRegionDone, "a full Region path (Classification tab)   ", "" ) &
+                 If( gEditMode = "New" && !gPrTypeDone,   "a full Project type path (Classification tab)   ", "" ) &
+                 If( gEditMode = "Edit" && Len(gPrRegionGuid) > 0 && !gPrRegionDone,
+                     "finish the Region path or clear it   ", "" ) &
+                 If( gEditMode = "Edit" && Len(gPrTypeGuid) > 0 && !gPrTypeDone,
+                     "finish the Project type path or clear it   ", "" ) &
+                 If( Len(gPrCovGuid) > 0 && !gPrCovDone,
+                     "finish the Coverage path or clear it   ", "" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.Danger
+            X: =540
+            Y: =640
+            Width: =740
+            Height: =40
+            Visible: =Len(Self.Text) > 0
+      - btnPrSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: |
+              =If( gEditMode = "Edit", "Save project", "Create project" ) &
+               If( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) > 0,
+                   " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) ) & " item(s)", "" )
+            DisplayMode: |
+              =If(Len(lblPrMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =340
+            X: =24
+            Y: =660
+            # ---------------------------------------------------------------
+            # ORDER IS THE DESIGN:
+            #   1. parent   — New and Edit take different branches, because the
+            #                 required MM columns MUST be in the insert but must
+            #                 NOT be rewritten on an edit the user didn't make.
+            #   2. optional parent fields — guarded, one Patch each.
+            #   3. children — each writes with the parent's real ID; successes are
+            #                 removed from staging, failures stay and are listed.
+            #   4. flip to Edit mode — so a retry cannot create a second project.
+            #   5. rollup   — read back from the server, after the tasks exist.
+            # ---------------------------------------------------------------
+            OnSelect: |
+              =Set( gPrSaved, Blank() );
+              Set( gPrErr, "" );
+              If( gEditMode = "New",
+                  IfError(
+                      Set( gPrSaved,
+                          Patch( taskmaster_projects, Defaults(taskmaster_projects),
+                              { project_name:        Trim(txtPrName.Text),
+                                project_description: txtPrDesc.Text,
+                                project_pathway:     txtPrPathway.Text,
+                                project_phase:       { Value: gPrPhase },
+                                project_priority:    { Value: gPrPriority },
+                                project_manager:
+                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                      Claims:      ClaimPrefix & Lower(gPrManager.Mail),
+                                      DisplayName: gPrManager.DisplayName,
+                                      Email:       gPrManager.Mail,
+                                      Department: "", JobTitle: "", Picture: "" },
+                                project_region:
+                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
+                                      TermGuid: gPrRegionGuid, Label: gPrRegionLabel,
+                                      WssId: -1, Path: gPrRegionPath, Value: gPrRegionLabel },
+                                project_type:
+                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
+                                      TermGuid: gPrTypeGuid, Label: gPrTypeLabel,
+                                      WssId: -1, Path: gPrTypePath, Value: gPrTypeLabel },
+                                project_date_start:    IfError( DateValue(txtPrStart.Text),    Blank() ),
+                                project_date_target:   IfError( DateValue(txtPrTarget.Text),   Blank() ),
+                                project_date_complete: IfError( DateValue(txtPrComplete.Text), Blank() ) } ) ),
+                      Set( gPrErr, FirstError.Message ) ),
+                  IfError(
+                      Set( gPrSaved,
+                          Patch( taskmaster_projects, gEditProject,
+                              { project_name:        Trim(txtPrName.Text),
+                                project_description: txtPrDesc.Text,
+                                project_pathway:     txtPrPathway.Text,
+                                project_phase:       { Value: gPrPhase },
+                                project_priority:    { Value: gPrPriority },
+                                project_manager:
+                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                      Claims:      ClaimPrefix & Lower(gPrManager.Mail),
+                                      DisplayName: gPrManager.DisplayName,
+                                      Email:       gPrManager.Mail,
+                                      Department: "", JobTitle: "", Picture: "" },
+                                project_date_start:    IfError( DateValue(txtPrStart.Text),    Blank() ),
+                                project_date_target:   IfError( DateValue(txtPrTarget.Text),   Blank() ),
+                                project_date_complete: IfError( DateValue(txtPrComplete.Text), Blank() ) } ) ),
+                      Set( gPrErr, FirstError.Message ) ) );
+              If( Len(gPrErr) > 0,
+                  Notify( If(gEditMode = "New", "Couldn't create the project: ", "Couldn't save the project: ")
+                            & gPrErr,
+                          NotificationType.Error ) );
+              If( Len(gPrErr) = 0,
+                  // --- 2. optional / re-picked parent fields ----------------
+                  If( Len(gPrRequestor.Mail) > 0,
+                      IfError( Patch(taskmaster_projects, gPrSaved,
+                                     { project_requestor:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                           Claims:      ClaimPrefix & Lower(gPrRequestor.Mail),
+                                           DisplayName: gPrRequestor.DisplayName,
+                                           Email:       gPrRequestor.Mail,
+                                           Department: "", JobTitle: "", Picture: "" } }),
+                               Notify("Project saved; the requestor didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      gEditMode = "Edit",
+                      IfError( Patch(taskmaster_projects, gPrSaved, { project_requestor: Blank() }),
+                               Notify("Project saved; the requestor didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( Len(gPrSupporter.Mail) > 0,
+                      IfError( Patch(taskmaster_projects, gPrSaved,
+                                     { project_supporter:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                           Claims:      ClaimPrefix & Lower(gPrSupporter.Mail),
+                                           DisplayName: gPrSupporter.DisplayName,
+                                           Email:       gPrSupporter.Mail,
+                                           Department: "", JobTitle: "", Picture: "" } }),
+                               Notify("Project saved; the supporter didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      gEditMode = "Edit",
+                      IfError( Patch(taskmaster_projects, gPrSaved, { project_supporter: Blank() }),
+                               Notify("Project saved; the supporter didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                  // Managed metadata on EDIT only — on New these went in with the
+                  // insert. Each is its own Patch: SPListExpandedTaxonomy is the
+                  // riskiest shape in the app and must not take the rest down.
+                  If( gEditMode = "Edit" && Len(gPrRegionGuid) > 0 && gPrRegionDone,
+                      IfError( Patch(taskmaster_projects, gPrSaved,
+                                     { project_region:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
+                                           TermGuid: gPrRegionGuid, Label: gPrRegionLabel,
+                                           WssId: -1, Path: gPrRegionPath, Value: gPrRegionLabel } }),
+                               Notify("Project saved; the region didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( gEditMode = "Edit" && Len(gPrTypeGuid) > 0 && gPrTypeDone,
+                      IfError( Patch(taskmaster_projects, gPrSaved,
+                                     { project_type:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
+                                           TermGuid: gPrTypeGuid, Label: gPrTypeLabel,
+                                           WssId: -1, Path: gPrTypePath, Value: gPrTypeLabel } }),
+                               Notify("Project saved; the type didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                  If( Len(gPrCovGuid) > 0 && gPrCovDone,
+                      IfError( Patch(taskmaster_projects, gPrSaved,
+                                     { project_coverage:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedTaxonomy",
+                                           TermGuid: gPrCovGuid, Label: gPrCovLabel,
+                                           WssId: -1, Path: gPrCovPath, Value: gPrCovLabel } }),
+                               Notify("Project saved; the coverage didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                  // --- 3. children ------------------------------------------
+                  // IfError's third argument is the value returned when NOTHING
+                  // errored, which is how each row records success or failure
+                  // without a second pass over the data.
+                  Clear( colChildErrors ); Clear( colChildOk );
+                  ForAll( colNewTasks As t,
+                      IfError(
+                          Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
+                              { task_name:       t.t_name,
+                                task_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                task_stage:      { Value: t.t_stage },
+                                task_status:     { Value: "Green" },
+                                task_priority:   { Value: t.t_priority },
+                                task_lead:
+                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                      Claims:      ClaimPrefix & Lower(t.t_leadMail),
+                                      DisplayName: t.t_leadName,
+                                      Email:       t.t_leadMail,
+                                      Department: "", JobTitle: "", Picture: "" },
+                                task_date_start:  Now(),
+                                task_date_target: IfError( DateValue(t.t_target), Blank() ) } ),
+                          Collect( colChildErrors, { Kind: "Task", Name: t.t_name, Message: FirstError.Message } ),
+                          Collect( colChildOk, { Kind: "Task", Sid: t.sid } ) ) );
+                  ForAll( colNewTransactions As x,
+                      IfError(
+                          Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
+                              { transaction_name:        x.x_name,
+                                transaction_project_id:  { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
+                                transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
+                                transaction_sales:
+                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                      Claims:      ClaimPrefix & Lower(x.x_salesMail),
+                                      DisplayName: x.x_salesName,
+                                      Email:       x.x_salesMail,
+                                      Department: "", JobTitle: "", Picture: "" },
+                                transaction_currency:    { Value: x.x_ccy },
+                                transaction_notional:
+                                    If( Len(x.x_notional) = 0, Blank(), Value(x.x_notional) ),
+                                transaction_notional_usd:
+                                    If( Len(x.x_notional) = 0, Blank(),
+                                        Value(x.x_notional) * LookUp(FxToUsd, Ccy = x.x_ccy, Rate) ),
+                                transaction_date:        DateValue(x.x_date) } ),
+                          Collect( colChildErrors, { Kind: "Transaction", Name: x.x_name, Message: FirstError.Message } ),
+                          Collect( colChildOk, { Kind: "Transaction", Sid: x.sid } ) ) );
+                  ForAll( colNewIssues As i,
+                      IfError(
+                          Patch( taskmaster_issues, Defaults(taskmaster_issues),
+                              { issue_name:       i.i_name,
+                                issue_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                issue_status:     { Value: i.i_status },
+                                issue_date_open:  Now(),
+                                issue_assignee:
+                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                      Claims:      ClaimPrefix & Lower(i.i_assigneeMail),
+                                      DisplayName: i.i_assigneeName,
+                                      Email:       i.i_assigneeMail,
+                                      Department: "", JobTitle: "", Picture: "" } } ),
+                          Collect( colChildErrors, { Kind: "Issue", Name: i.i_name, Message: FirstError.Message } ),
+                          Collect( colChildOk, { Kind: "Issue", Sid: i.sid } ) ) );
+                  // Written rows leave staging; failures stay so Save retries them.
+                  RemoveIf( colNewTasks,
+                            sid in ShowColumns( Filter(colChildOk, Kind = "Task"), "Sid" ) );
+                  RemoveIf( colNewTransactions,
+                            sid in ShowColumns( Filter(colChildOk, Kind = "Transaction"), "Sid" ) );
+                  RemoveIf( colNewIssues,
+                            sid in ShowColumns( Filter(colChildOk, Kind = "Issue"), "Sid" ) );
+                  // --- 4. the project now EXISTS. Never insert it twice. -----
+                  Set( gEditProject, gPrSaved );
+                  Set( gEditMode, "Edit" );
+                  Set( gSelProject, gPrSaved );
+                  // --- 5. C3 rollup, read back from the server ---------------
+                  With( { pid: gPrSaved.ID },
+                      With( { scored:
+                                AddColumns(
+                                    Filter( taskmaster_tasks,
+                                        task_project_id.Id = pid
+                                     && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+                                       || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+                                       || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
+                                    "wgt", Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
+                          If( CountRows(scored) >= 2000,
+                              Notify("Project saved. It has too many tasks to compute completion accurately, so it was left unchanged.",
+                                     NotificationType.Warning),
+                              IfError(
+                                  Set( gSelProject,
+                                      Patch( taskmaster_projects, gPrSaved,
+                                             { project_perc_completion:
+                                                   If( CountRows(scored) = 0, 0,
+                                                       RoundDown(Average(scored, wgt), 0) ) } ) ),
+                                  Notify("Project saved, but the completion rollup didn't update: " & FirstError.Message,
+                                         NotificationType.Warning) ) ) ) );
+                  If( IsEmpty(colChildErrors),
+                      Notify("Project saved with everything attached.", NotificationType.Success);
+                      Navigate( scrProject, ScreenTransition.Cover ),
+                      Notify( CountRows(colChildErrors) & " item(s) could not be created — they are still listed below, press Save to retry.",
+                              NotificationType.Error ) )
+              )
+      - btnPrCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.TextPrimary
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =140
+            X: =380
+            Y: =660
+            OnSelect: =Back()
+      # ---- Failures from the last save --------------------------------------
+      - galChildErrors:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: =!IsEmpty(colChildErrors)
+            Items: =colChildErrors
+            TemplateSize: =28
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Danger
+            BorderThickness: =1
+            X: =24
+            Y: =470
+            Width: =1252
+            Height: =140
+            TemplateFill: =Theme.Color.Surface
+          Children:
+            - ceRow:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.Kind & "  “" & ThisItem.Name & "”  —  " & ThisItem.Message
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.Danger
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =28
+                  VerticalAlign: =VerticalAlign.Middle
+      # =====================================================================
+      # OVERLAY PICKERS — declared last so they float above everything else.
+      # =====================================================================
+      - galPrManager:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gPrTab = 1 && Len(txtPrManagerSearch.Text) >= 2 && Len(gPrManager.Mail) = 0
+            Items: |
+              =Office365Users.SearchUser({ searchTerm: txtPrManagerSearch.Text, top: 8 })
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =464
+            Width: =360
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gPrManager, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+          Children:
+            - rowPrManager:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galPrRequestor:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gPrTab = 1 && Len(txtPrRequestorSearch.Text) >= 2 && Len(gPrRequestor.Mail) = 0
+            Items: |
+              =Office365Users.SearchUser({ searchTerm: txtPrRequestorSearch.Text, top: 8 })
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =530
+            Width: =360
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gPrRequestor, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+          Children:
+            - rowPrRequestor:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galPrSupporter:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gPrTab = 1 && Len(txtPrSupporterSearch.Text) >= 2 && Len(gPrSupporter.Mail) = 0
+            Items: |
+              =Office365Users.SearchUser({ searchTerm: txtPrSupporterSearch.Text, top: 8 })
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =596
+            Width: =360
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gPrSupporter, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+          Children:
+            - rowPrSupporter:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galNxClient:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gPrTab = 4 && Len(txtNxClientSearch.Text) >= 2 && gNxClient.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_clients,
+                         StartsWith(client_name, txtNxClientSearch.Text) ),
+                     client_name )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =272
+            Y: =196
+            Width: =240
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gNxClient, { Id: ThisItem.ID, Value: ThisItem.client_name })
+          Children:
+            - rowNxClient:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.client_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galNxProduct:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =gPrTab = 4 && Len(txtNxProductSearch.Text) >= 2 && gNxProduct.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_products,
+                         StartsWith(product_uid, txtNxProductSearch.Text) ),
+                     product_uid )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =460
+            Y: =196
+            Width: =240
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gNxProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid })
+          Children:
+            - rowNxProduct:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.product_uid
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle

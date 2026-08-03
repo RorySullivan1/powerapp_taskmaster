@@ -1,0 +1,661 @@
+# =============================================================================
+# scrTransactionEdit  —  create / edit a transaction.
+#
+# Entered with:  Set(gEditMode, "New" | "Edit");  Set(gEditTransaction, <record>)
+# If gSelProject is set, a NEW transaction is pre-attached to that project.
+#
+# Follows the shared edit-screen pattern documented in scrIssueEdit's header and
+# _EDIT-NOTES.md (seed globals in OnVisible and write from them; normalised picker
+# records; overlay galleries declared last; required fields in one Patch).
+#
+# ONE THING IS SPECIFIC TO THIS SCREEN — C5. transaction_notional_usd is the only
+# column in the model that is safe to aggregate across currencies, and it is
+# normalised AT WRITE TIME. The rate comes from the FxToUsd table in
+# src/patches/App.Formulas.pa.fx. Those rates are static placeholders and will go
+# stale; the form therefore refuses to save a notional whose currency has no rate
+# rather than quietly multiplying by 1 and poisoning every downstream total.
+#
+# CONNECTION PREREQUISITE: Office 365 Users (people picker). See HANDOFF.md.
+# Every column token resolves to schema/schema.yaml (golden source).
+# =============================================================================
+Screens:
+  scrTransactionEdit:
+    Properties:
+      Fill: =Theme.Color.Bg
+      OnVisible: |
+        =Set( gTxProject,
+              If( gEditMode = "Edit",
+                  { Id: gEditTransaction.transaction_project_id.Id, Value: gEditTransaction.transaction_project_id.Value },
+                  gSelProject.ID > 0,
+                  { Id: gSelProject.ID, Value: gSelProject.project_name },
+                  { Id: 0, Value: "" } ) );
+        Set( gTxClient,
+              If( gEditMode = "Edit",
+                  { Id: gEditTransaction.transaction_client_name.Id, Value: gEditTransaction.transaction_client_name.Value },
+                  { Id: 0, Value: "" } ) );
+        Set( gTxProduct,
+              If( gEditMode = "Edit",
+                  { Id: gEditTransaction.transaction_product_id.Id, Value: gEditTransaction.transaction_product_id.Value },
+                  { Id: 0, Value: "" } ) );
+        Set( gTxSales,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
+                    Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
+                  { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
+        Set( gTxCurrency,
+              If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
+        Reset( txtTxName ); Reset( txtTxNotional ); Reset( txtTxDate );
+        Reset( txtTxProjectSearch ); Reset( txtTxClientSearch );
+        Reset( txtTxProductSearch ); Reset( txtTxSalesSearch )
+    Children:
+      # ---- Header ----------------------------------------------------------
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            Height: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            X: =0
+            Y: =0
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If(gEditMode = "Edit", "Edit transaction", "New transaction")
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            FontWeight: =FontWeight.Semibold
+            Size: =Theme.Size.H2
+            Height: =Theme.Space.HeaderH
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =400
+      - BackIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.OnPrimary
+            Height: =24
+            Width: =24
+            X: =Parent.Width - 24 - Theme.Space.Gutter
+            Y: =(Theme.Space.HeaderH - 24) / 2
+            OnSelect: =Back()
+      # ================= LEFT COLUMN =======================================
+      - lblTxNameCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Transaction label  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =88
+            Width: =560
+            Height: =18
+      - txtTxName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: |
+              =If(gEditMode = "Edit", gEditTransaction.transaction_name, "")
+            HintText: ="e.g. QIS-2026-0417 EMEA autocall"
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =24
+            Y: =108
+            Width: =560
+            Height: =40
+      # ---- Project (Lookup, required) --------------------------------------
+      - lblTxProjCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Project  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =160
+            Width: =560
+            Height: =18
+      - txtTxProjectSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            HintText: ="Type to find a project…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =180
+            Width: =300
+            Height: =36
+      - lblTxProjChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If(gTxProject.Id > 0, gTxProject.Value, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gTxProject.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =332
+            Y: =180
+            Width: =228
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTxProjClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Visible: =gTxProject.Id > 0
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =564
+            Y: =190
+            OnSelect: |
+              =Set(gTxProject, { Id: 0, Value: "" })
+      # ---- Client (Lookup, required) ---------------------------------------
+      - lblTxClientCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Client  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =226
+            Width: =560
+            Height: =18
+      - txtTxClientSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            HintText: ="Type to find a client…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =246
+            Width: =300
+            Height: =36
+      - lblTxClientChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If(gTxClient.Id > 0, gTxClient.Value, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gTxClient.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =332
+            Y: =246
+            Width: =228
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTxClientClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Visible: =gTxClient.Id > 0
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =564
+            Y: =256
+            OnSelect: |
+              =Set(gTxClient, { Id: 0, Value: "" })
+      # ---- Product (Lookup, required) --------------------------------------
+      - lblTxProductCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Product  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =292
+            Width: =560
+            Height: =18
+      - txtTxProductSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            HintText: ="Type an ISIN / ticker / internal id…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =312
+            Width: =300
+            Height: =36
+      - lblTxProductChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If(gTxProduct.Id > 0, gTxProduct.Value, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(gTxProduct.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =332
+            Y: =312
+            Width: =228
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTxProductClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Visible: =gTxProduct.Id > 0
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =564
+            Y: =322
+            OnSelect: |
+              =Set(gTxProduct, { Id: 0, Value: "" })
+      # ---- Sales owner (Person, required) ----------------------------------
+      - lblTxSalesCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Sales owner  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =24
+            Y: =358
+            Width: =560
+            Height: =18
+      - txtTxSalesSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            HintText: ="Search people…"
+            DelayOutput: =true
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24
+            Y: =378
+            Width: =300
+            Height: =36
+      - lblTxSalesChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If(Len(gTxSales.Mail) > 0, gTxSales.DisplayName, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If(Len(gTxSales.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+            X: =332
+            Y: =378
+            Width: =228
+            Height: =36
+            VerticalAlign: =VerticalAlign.Middle
+      - icoTxSalesClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Visible: =Len(gTxSales.Mail) > 0
+            Color: =Theme.Color.TextMuted
+            Height: =16
+            Width: =16
+            X: =564
+            Y: =388
+            OnSelect: |
+              =Set(gTxSales, { DisplayName: "", Mail: "" })
+      # ================= RIGHT COLUMN ======================================
+      - lblTxCcyCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Currency  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =620
+            Y: =88
+            Width: =560
+            Height: =18
+      - selTxCurrency:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =620
+            Y: =108
+            Width: =560
+            Height: =40
+            Items: |
+              =Table( { Id: 1, Label: "USD" }, { Id: 2, Label: "EUR" }, { Id: 3, Label: "GBP" },
+                      { Id: 4, Label: "JPY" }, { Id: 5, Label: "CHF" } )
+            DefaultId: |
+              =Switch( If(gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD"),
+                       "USD", 1, "EUR", 2, "GBP", 3, "JPY", 4, 5 )
+            OnChange: |
+              =Set(gTxCurrency, selTxCurrency.Selected.Label)
+      - lblTxNotionalCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Notional (native currency)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =620
+            Y: =160
+            Width: =560
+            Height: =18
+      - txtTxNotional:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: |
+              =If( gEditMode = "Edit" && !IsBlank(gEditTransaction.transaction_notional),
+                   Text(gEditTransaction.transaction_notional, "[$-en-US]0.##"), "" )
+            HintText: ="e.g. 25000000"
+            Format: =TextFormat.Number
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =620
+            Y: =180
+            Width: =220
+            Height: =40
+      # Live echo of the USD figure that WILL be written (C5) — the rate is not
+      # hidden from the person entering the trade.
+      - lblTxUsdEcho:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =With( { r: LookUp(FxToUsd, Ccy = gTxCurrency, Rate) },
+                  If( Len(txtTxNotional.Text) = 0, "no notional entered",
+                      IsError(Value(txtTxNotional.Text)), "⚠ not a number",
+                      IsBlank(r), "⚠ no FX rate for " & gTxCurrency,
+                      "= USD " & Text(Value(txtTxNotional.Text) * r, "[$-en-US]#,##0")
+                        & "   (rate " & Text(r, "[$-en-US]0.####") & ")" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtTxNotional.Text) > 0 && IsError(Value(txtTxNotional.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =852
+            Y: =180
+            Width: =400
+            Height: =40
+            VerticalAlign: =VerticalAlign.Middle
+      - lblTxDateCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Trade date  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =620
+            Y: =232
+            Width: =560
+            Height: =18
+      - txtTxDate:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: |
+              =If( gEditMode = "Edit" && !IsBlank(gEditTransaction.transaction_date),
+                   Text(gEditTransaction.transaction_date, "dd/mm/yyyy"),
+                   Text(Today(), "dd/mm/yyyy") )
+            HintText: ="dd/mm/yyyy"
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =620
+            Y: =252
+            Width: =220
+            Height: =40
+      - lblTxDateEcho:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If( Len(txtTxDate.Text) = 0, "⚠ required",
+                   IfError( Text(DateValue(txtTxDate.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: |
+              =If( Len(txtTxDate.Text) = 0 || IsError(DateValue(txtTxDate.Text)),
+                   Theme.Color.Danger, Theme.Color.TextMuted )
+            X: =852
+            Y: =252
+            Width: =260
+            Height: =40
+            VerticalAlign: =VerticalAlign.Middle
+      # ---- What is still missing -------------------------------------------
+      - lblTxMissingCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Still required:"
+            Visible: =Len(lblTxMissing.Text) > 0
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =620
+            Y: =312
+            Width: =560
+            Height: =18
+      - lblTxMissing:
+          Control: Label@2.5.1
+          Properties:
+            # Also blocks the two ways a numeric field can be wrong rather than
+            # missing: an unparseable notional, and a currency with no FX rate.
+            Text: |
+              =Trim(
+                 If( Len(Trim(txtTxName.Text)) = 0,  "label   ",   "" ) &
+                 If( gTxProject.Id <= 0,             "project   ", "" ) &
+                 If( gTxClient.Id  <= 0,             "client   ",  "" ) &
+                 If( gTxProduct.Id <= 0,             "product   ", "" ) &
+                 If( Len(gTxSales.Mail) = 0,         "sales owner   ", "" ) &
+                 If( Len(txtTxDate.Text) = 0 || IsError(DateValue(txtTxDate.Text)),
+                     "a valid trade date   ", "" ) &
+                 If( Len(txtTxNotional.Text) > 0 && IsError(Value(txtTxNotional.Text)),
+                     "a numeric notional   ", "" ) &
+                 If( Len(txtTxNotional.Text) > 0 && IsBlank(LookUp(FxToUsd, Ccy = gTxCurrency, Rate)),
+                     "an FX rate for " & gTxCurrency & " (App.Formulas -> FxToUsd)   ", "" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.Danger
+            X: =620
+            Y: =330
+            Width: =560
+            Height: =60
+            Visible: =Len(Self.Text) > 0
+      # ---- Save / Cancel ----------------------------------------------------
+      - btnTxSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: |
+              =If(gEditMode = "Edit", "Save transaction", "Create transaction")
+            DisplayMode: |
+              =If(Len(lblTxMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =220
+            X: =24
+            Y: =660
+            # Every column on this list is either required or computed here, so a
+            # single Patch covers it — no guarded second pass is needed.
+            # transaction_notional_usd is written in the SAME statement as the
+            # native notional so the two can never disagree.
+            OnSelect: |
+              =Set( gTxErr, "" );
+              IfError(
+                  Patch( taskmaster_transactions,
+                         If( gEditMode = "Edit", gEditTransaction, Defaults(taskmaster_transactions) ),
+                         { transaction_name:        Trim(txtTxName.Text),
+                           transaction_project_id:  { Id: gTxProject.Id, Value: gTxProject.Value },
+                           transaction_client_name: { Id: gTxClient.Id,  Value: gTxClient.Value },
+                           transaction_product_id:  { Id: gTxProduct.Id, Value: gTxProduct.Value },
+                           transaction_sales:
+                               { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                 Claims:      ClaimPrefix & Lower(gTxSales.Mail),
+                                 DisplayName: gTxSales.DisplayName,
+                                 Email:       gTxSales.Mail,
+                                 Department: "", JobTitle: "", Picture: "" },
+                           transaction_currency:    { Value: gTxCurrency },
+                           transaction_notional:
+                               If( Len(txtTxNotional.Text) = 0, Blank(), Value(txtTxNotional.Text) ),
+                           transaction_notional_usd:
+                               If( Len(txtTxNotional.Text) = 0, Blank(),
+                                   Value(txtTxNotional.Text) * LookUp(FxToUsd, Ccy = gTxCurrency, Rate) ),
+                           transaction_date:        DateValue(txtTxDate.Text) } ),
+                  Set( gTxErr, FirstError.Message )
+              );
+              If( Len(gTxErr) > 0,
+                  Notify("Couldn't save the transaction: " & gTxErr, NotificationType.Error) );
+              If( Len(gTxErr) = 0,
+                  Notify( If(gEditMode = "Edit", "Transaction saved", "Transaction created"),
+                          NotificationType.Success );
+                  Back() )
+      - btnTxCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.TextPrimary
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Height: =44
+            Width: =140
+            X: =260
+            Y: =660
+            OnSelect: =Back()
+      # =====================================================================
+      # OVERLAY PICKERS — declared last so they float above the fields below.
+      # =====================================================================
+      - galTxProject:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =Len(txtTxProjectSearch.Text) >= 2 && gTxProject.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_projects,
+                         StartsWith(project_name, txtTxProjectSearch.Text) ),
+                     project_name )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =218
+            Width: =300
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTxProject, { Id: ThisItem.ID, Value: ThisItem.project_name })
+          Children:
+            - rowTxProject:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.project_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTxClient:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =Len(txtTxClientSearch.Text) >= 2 && gTxClient.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_clients,
+                         StartsWith(client_name, txtTxClientSearch.Text) ),
+                     client_name )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =284
+            Width: =300
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTxClient, { Id: ThisItem.ID, Value: ThisItem.client_name })
+          Children:
+            - rowTxClient:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.client_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTxProduct:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =Len(txtTxProductSearch.Text) >= 2 && gTxProduct.Id <= 0
+            Items: |
+              =Sort( Filter( taskmaster_products,
+                         StartsWith(product_uid, txtTxProductSearch.Text) ),
+                     product_uid )
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =350
+            Width: =300
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTxProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid })
+          Children:
+            - rowTxProduct:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.product_uid
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle
+      - galTxSales:
+          Control: Gallery@2.15.0
+          Variant: Vertical
+          Properties:
+            Visible: |
+              =Len(txtTxSalesSearch.Text) >= 2 && Len(gTxSales.Mail) = 0
+            Items: |
+              =Office365Users.SearchUser({ searchTerm: txtTxSalesSearch.Text, top: 8 })
+            TemplateSize: =32
+            TemplatePadding: =0
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =24
+            Y: =416
+            Width: =360
+            Height: =132
+            TemplateFill: =Theme.Color.Surface
+            OnSelect: |
+              =Set(gTxSales, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+          Children:
+            - rowTxSales:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+                  VerticalAlign: =VerticalAlign.Middle

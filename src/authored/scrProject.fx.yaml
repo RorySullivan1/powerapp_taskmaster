@@ -110,6 +110,25 @@ Screens:
             Percent: =Coalesce(gSelProject.project_perc_completion, 0)
             Label: =Coalesce(gSelProject.project_perc_completion, 0) & "%"
             AccentHex: ="#005A9E"
+      # ---- Edit this project ------------------------------------------------
+      - btnEditProject:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Edit project"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.Primary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Height: =36
+            Width: =150
+            X: =Parent.Width - 140 - Theme.Space.Gutter - 166
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+            OnSelect: |
+              =Set( gEditMode, "Edit" );
+               Set( gEditProject, gSelProject );
+               Navigate( scrProjectEdit, ScreenTransition.Cover )
       # ---- Tab strip -------------------------------------------------------
       - selTab:
           Control: CanvasComponent
@@ -123,6 +142,28 @@ Screens:
               =Table({ Id: 1, Label: "Tasks" }, { Id: 2, Label: "Transactions" }, { Id: 3, Label: "Issues" })
             DefaultId: =1
             OnChange: =Set(gProjTab, selTab.Selected.Id)
+      # One "new" button that follows the active tab, rather than three that only
+      # differ in which screen they open. gSelProject is already set, so each edit
+      # screen pre-attaches the new child to this project.
+      - btnNewChild:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: |
+              =Switch( gProjTab, 1, "New task", 2, "New transaction", "New issue" )
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Height: =40
+            Width: =180
+            X: =Theme.Space.Gutter + 440
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64
+            OnSelect: |
+              =Set( gEditMode, "New" );
+               Switch( gProjTab,
+                       1, Navigate( scrTaskEdit,        ScreenTransition.Cover ),
+                       2, Navigate( scrTransactionEdit, ScreenTransition.Cover ),
+                          Navigate( scrIssueEdit,       ScreenTransition.Cover ) )
       # =====================================================================
       # TAB 1 — TASKS, a flat list grouped by stage.
       #
@@ -254,6 +295,10 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 28
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
             Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 28) - Theme.Space.Gutter
+            OnSelect: |
+              =Set( gEditMode, "Edit" );
+               Set( gEditTransaction, ThisItem );
+               Navigate( scrTransactionEdit, ScreenTransition.Cover )
           Children:
             - txName:
                 Control: Label@2.5.1
@@ -358,6 +403,10 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
             Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap) - Theme.Space.Gutter
+            OnSelect: |
+              =Set( gEditMode, "Edit" );
+               Set( gEditIssue, ThisItem );
+               Navigate( scrIssueEdit, ScreenTransition.Cover )
           Children:
             - issFill:
                 Control: Rectangle@2.3.0

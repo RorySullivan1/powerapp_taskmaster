@@ -32,6 +32,9 @@
   manual paste is costly and returns only works/doesn't → **maximise first-try correctness; prefer
   grounded constructs, ship safe FALLBACKS for anything unverifiable** (e.g. button nav vs the
   gallery). The `studio-transfer` skill + CLAUDE.md still describe a two-way gap — they need fixing.
+- **Phase-3 CRUD AUTHORED (2026-08-03):** 4 edit screens + `cmpTermPicker` (11 components, 11
+  screens, 22/22 valid). Managed metadata is writable (C10 cache route). **Nothing landed** —
+  blocked on provisioning, `taskmaster_terms` rows, and the Office 365 Users connection.
 - **Template:** PM-tracker (SQL-backed) is the **screen/nav blueprint** only — rebuild on our
   SharePoint schema (`docs/screen-map.md`). Pattern candidates in `docs/powerapp-patterns-distillation.md`.
 
@@ -74,6 +77,13 @@
 - [2026-08-03] 2nd audit fixed: `IsError(Errors(...))` NEVER gates (Errors returns a TABLE → use IsEmpty); success Notify+Back() were unconditional (failed save said 'Saved' and navigated away); edit state now seeded into GLOBALS in OnVisible rather than trusting cmpSelection's internal selection (Reset can't reach inside a component instance → silent wrong write); rollup now REFUSES to write past the row limit rather than persisting a truncated average — src/authored/scrTask.fx.yaml
 - [2026-08-03] C10 — MM STAYS (user decision). Cascading term picker VALIDATED: Graph termStore `children` endpoints (GA Aug-2021) walk the hierarchy and yield term GUIDs → nesting detection falls out of the API; `TermStore.Read.All` is **DELEGATED ONLY** (app-only unsupported). The old 'Graph can't do MM' note is narrower than it read — it's the list-column VALUE, not the term store. WRITE via SharePoint connector `SPListExpandedTaxonomy` + `WssId:-1` is COMMUNITY-confirmed only = riskiest construct in the app. Recommend caching terms into a flat `taskmaster_terms` list so the cascade is delegable Filters with ZERO runtime dependency — docs/managed-metadata-picker.md
 - [2026-08-03] Q12 (Power Automate / custom connector) is now **BLOCKING** — two required MM columns mean no project can be created from the app without a term source — .claude/context/open-questions.md
+- [2026-08-03] C10 ARCHITECTURE DECIDED = **cache, not live Graph**. `taskmaster_terms` is now a real list in the golden source (flat, parent-pointer); the cascade is delegable `Filter`s on indexed `term_parent_guid`. Deciding argument was NOT speed — a flow call per dropdown level makes every create form depend on a flow being healthy at RUNTIME, the one thing this gap can't debug. Cache degrades to a stale vocabulary instead. **Narrows Q12 to population only** — the app pastes with no flow at all — schema/schema.yaml v1.8.0
+- [2026-08-03] `cmpTermPicker` authored — 4 progressively-revealed vertical galleries. TWO load-bearing decisions: (1) a `"— select —"` SENTINEL row per level, because a gallery's `Selected` returns its first row until touched and would otherwise auto-pick a path the user never chose into a REQUIRED column (Coalesce treats `""` as blank, hence the empty-string guid); (2) CHAIN VALIDATION — a level's value counts only if that row is really a child of the level above, so a stale deeper pick after re-picking level 1 is discarded rather than written. Resolution runs once on a hidden `lblPick` label; all 4 outputs read it (a custom prop referencing another custom prop of the same component is unverified). `IsComplete` COUNTS children rather than trusting cached `term_is_leaf` — src/authored/components/cmpTermPicker.pa.yaml
+- [2026-08-03] Four CRUD screens authored (`scrProjectEdit`/`scrTaskEdit`/`scrTransactionEdit`/`scrIssueEdit`) — shared pattern in `src/authored/_EDIT-NOTES.md`: seed globals in OnVisible + write from them; normalised picker records ({DisplayName,Mail} / {Id,Value}, empty-record null state, never IsBlank on a Blank()-inferred type); overlay galleries declared LAST (positional z-order = dropdown behaviour without an ungrounded ComboBox); dates typed + `DateValue()` + echo label; optional fields as separate GUARDED patches (Power Fx can't conditionally omit a record field, and `{Value:""}` isn't legal) — src/authored/_EDIT-NOTES.md
+- [2026-08-03] SAVE-GATE pattern corrected repo-wide: `FirstError` exists ONLY inside `IfError`'s fallback, so the fallback stashes `FirstError.Message` into `g*Err` and success sits behind `Len(g*Err) = 0`. Every `IfError` argument is a SINGLE statement — no `;` chains inside a function argument (unverified across the gap). Supersedes the `IsBlank(gSaved)` gate — src/authored/
+- [2026-08-03] `scrProjectEdit` stages children locally (required Lookup needs the parent ID, which only exists post-insert) then writes them. On partial failure the parent is ALREADY saved and can't be rolled back → successes leave staging, failures stay + are listed, and the screen FLIPS to Edit mode against the project it just created. That flip is load-bearing: Save again retries only what failed and CANNOT create a second project. `IfError(value, fallback, default)` classifies each row in one pass — src/authored/scrProjectEdit.fx.yaml
+- [2026-08-03] People pickers use `Office365Users.SearchUser` (first-party; returns DisplayName/Mail). Cost = a Studio PREREQUISITE — the Office 365 Users connection must be added BEFORE the edit screens are pasted, or the paste fails on an unrecognised name. Now a numbered HANDOFF step — HANDOFF.md
+- [2026-08-03] C5 write landed on the transaction form: `transaction_notional_usd` is written in the SAME statement as the native notional, from a STATIC `FxToUsd` table in App.Formulas, with the USD figure echoed live. Rates are placeholders and will go stale → raised as **Q14**. Form REFUSES to save a notional whose currency has no rate rather than quietly using 1 — src/patches/App.Formulas.pa.fx
 
 ## Threads          (open items; remove when closed)
 - Open questions Q3–Q10, Q12, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
@@ -105,7 +115,20 @@
 
 - **Next physical step:** HANDOFF.md Stage 1 smoke test (paste scrReference) — proves the channel before the expensive component build.
 
-- **C10 next:** decide `taskmaster_terms` cache list (recommended) vs live-Graph-per-level, and settle Q12. Cheapest first test = one button patching a hard-coded TermGuid, to prove the SPListExpandedTaxonomy shape before building the create flow.
+- **C10 DECIDED (cache) and IMPLEMENTED.** What remains is DATA, not design: `taskmaster_terms`
+  has no populator (Q12 — a scheduled flow walking Graph termStore; hand-seeding is a valid
+  stopgap for a small vocabulary). Cheapest first test = save ONE project with ONE region; if that
+  MM write lands, the riskiest construct in the app is proven for one paste.
+- **Two community-confirmed write shapes are still UNEXECUTED against this tenant:** expanded USER
+  (Person columns, `ClaimPrefix`) and expanded TAXONOMY (`SPListExpandedTaxonomy` + `WssId: -1`).
+  Neither is first-party. Each is isolated in its own `Patch` so a failure can't take a record
+  down; the first real save is the test.
+- **Q14 (new): `FxToUsd` rates are static placeholders** in App.Formulas and every
+  `transaction_notional_usd` is normalised with them at write time. Stale rate = wrong number in
+  Power BI that nothing downstream can correct. Maintain by hand, move to a list, or take the rate
+  from a flow (Q12).
+- **Studio prerequisite before the edit screens:** add the **Office 365 Users** connection. An
+  unrecognised connector name is a PASTE failure, not a runtime one.
 
 ## Log              (append-only pointers)
 - 2026-07-26 1726 | repo init: adopt + author .claude asset set; foundational decisions | sessions/2026-07-26-1726-repo-init-decisions.md
@@ -114,3 +137,4 @@
 - 2026-08-02 1520 | 6 reusable components authored (v3.0 ComponentDefinitions); audit found+fixed cmpSelection double-fire + Output-reads-var | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-02 1545 | merged PR#2 shell + PR#3 components to main; +4 extra components (cmpSectionHeader/ConfirmDialog/Toast/KpiRing SVG), audit PASTE-clean | sessions/2026-08-02-1411-phase1-core-shell.md
 - 2026-08-02 1610 | merged PR#4; Phase-2 composition — component instances (static data) on Home/Reports/Projects; instance dialect grounded; audit clean (only known gates) | sessions/2026-08-02-1411-phase1-core-shell.md
+- 2026-08-03 | schema intake → golden source → data layer → pa-yaml validator → C10 cache decision + cmpTermPicker → four CRUD screens with staged children | sessions/2026-08-03-crud-screens-and-term-picker.md

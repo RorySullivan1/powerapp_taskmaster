@@ -74,10 +74,20 @@ manual-UI pick isn't treated as final. If adopted, supersede the Q11 decision in
   decision.
 - **Q10 Users — desk only or wider?** Item-level permissions do **not** delegate; "show only
   mine" should be a single indexed `Owner`/`Author` filter, not per-item unique permissions.
-- **Q12 Power Automate availability — NOW BLOCKING (2026-08-03).** Required MM columns mean no
-  project can be created from the app without a term source; a scheduled flow (or a custom
-  connector) is the only route. See `docs/managed-metadata-picker.md`. Originally: Needed for the extract flow, optional write-time rollup
-  counters, and any term-store sync. With manual provisioning and no PnP/CSOM, this is the only
-  automation lever in scope.
+- **Q12 Power Automate availability — blocking for DATA, not for code (narrowed 2026-08-03).**
+  The architecture is decided: `taskmaster_terms` caches the term store and the app cascades
+  through it (`cmpTermPicker`), so the create forms are authored and paste without any flow. What
+  Q12 still gates is **populating that list** — a scheduled flow walking Graph termStore is the
+  intended route, and until it exists (or the vocabulary is hand-seeded) required MM means no
+  project can be created. See `docs/managed-metadata-picker.md` and `src/authored/_EDIT-NOTES.md`.
+  Originally: needed for the extract flow, optional write-time rollup counters, and any
+  term-store sync. With manual provisioning and no PnP/CSOM, this is the only automation lever in
+  scope.
+- **Q14 FX rates for `transaction_notional_usd` (raised 2026-08-03).** C5 normalises at write time
+  and the app now does that write, but the model has no FX source, so the rates are a static
+  `FxToUsd` table in `App.Formulas`. They **will** go stale, and a stale rate is a wrong number in
+  Power BI that nothing downstream can correct. Options: maintain the table by hand, move it to a
+  rates list, or take a rate from a flow at write time (Q12). Not blocking — the app refuses to
+  save a notional whose currency has no rate rather than quietly using 1.
 - **Q13 Solution-aware?** If the app moves dev → test → prod it needs **environment variables**,
   not hardcoded connections/list references.
