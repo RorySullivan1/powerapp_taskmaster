@@ -74,25 +74,28 @@ ComponentDefinitions:
               IsOptional: false
               Description: Display name.
     Properties:
+      # `in` membership, not IsMatch — see cmpStatusPill for why the regex was
+      # wrong (IsMatch defaults to MatchOptions.Complete, which already anchors).
+      # These two must stay in step: a component can't call another component.
       StatusPillHtml: |
         =With(
-            { t:
-                If( tone <> "auto",
-                    tone,
-                    Switch( true,
-                        IsMatch(label, "(?i)^\s*(done|complete|completed|closed|approved|active|on track)\s*$"), "Success",
-                        IsMatch(label, "(?i)^\s*(blocked|overdue|rejected|failed|error|breach)\s*$"),            "Danger",
-                        IsMatch(label, "(?i)^\s*(at risk|pending|review|waiting|on hold|hold)\s*$"),             "Warning",
-                        IsMatch(label, "(?i)^\s*(in progress|open|new|todo|to do)\s*$"),                          "Info",
-                        "Neutral"
-                    )
-                )
-            },
+            { s: Trim(label) },
             With(
-                { c: Switch(t, "Success","#31825D", "Warning","#D69828", "Danger","#C53A3A", "Info","#005A9E", "#6E7882") },
-                "<span style='display:inline-block;background:" & c &
-                ";color:#fff;padding:2px 10px;border-radius:11px;font:600 12px Segoe UI,Arial,sans-serif'>" &
-                EncodeHTML(label) & "</span>"
+                { t: If( tone <> "auto",
+                         tone,
+                         Switch( true,
+                             s in ["done", "complete", "completed", "closed", "approved", "active", "on track"], "Success",
+                             s in ["blocked", "overdue", "rejected", "failed", "error", "breach"], "Danger",
+                             s in ["at risk", "pending", "review", "waiting", "on hold", "hold"], "Warning",
+                             s in ["in progress", "open", "new", "todo", "to do"], "Info",
+                             "Neutral"
+                         ) ) },
+                With(
+                    { c: Switch(t, "Success","#31825D", "Warning","#D69828", "Danger","#C53A3A", "Info","#005A9E", "#6E7882") },
+                    "<span style='display:inline-block;background:" & c &
+                    ";color:#fff;padding:2px 10px;border-radius:11px;font:600 12px Segoe UI,Arial,sans-serif'>" &
+                    EncodeHTML(s) & "</span>"
+                )
             )
         )
       ChoicePillHtml: |

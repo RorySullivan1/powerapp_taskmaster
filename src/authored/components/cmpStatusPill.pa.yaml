@@ -37,24 +37,39 @@ ComponentDefinitions:
             Width: =Parent.Width
             X: =0
             Y: =0
+            # TONE MATCHING USES `in`, NOT A REGEX (changed 2026-08-03).
+            #
+            # This was four IsMatch calls with `"(?i)^\s*(word|word)\s*$"`, and
+            # Studio rejected them. The trap is that IsMatch in Power Apps defaults
+            # to MatchOptions.Complete, which ALREADY wraps the pattern in `^...$` —
+            # so supplying our own anchors double-anchors the expression.
+            #
+            # But the deeper point is that this was never a pattern match. It is a
+            # set-membership test against a fixed word list, and Power Fx has an
+            # operator for exactly that. `in` on a single-column table is membership
+            # and is case-insensitive by default (`exactin` is the case-sensitive
+            # variant), so `(?i)` isn't needed either; Trim replaces `\s*`.
+            #
+            # Keep in step with cmpUiKit.StatusPillHtml, which duplicates this logic
+            # because a component cannot call another component.
             HtmlText: |
               =With(
-                  { t:
-                      If( cmpStatusPill.Tone <> "auto",
-                          cmpStatusPill.Tone,
-                          Switch( true,
-                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(done|complete|completed|closed|approved|active|on track)\s*$"), "Success",
-                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(blocked|overdue|rejected|failed|error|breach)\s*$"),            "Danger",
-                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(at risk|pending|review|waiting|on hold|hold)\s*$"),             "Warning",
-                              IsMatch(cmpStatusPill.Label, "(?i)^\s*(in progress|open|new|todo|to do)\s*$"),                          "Info",
-                              "Neutral"
-                          )
-                      )
-                  },
+                  { s: Trim(cmpStatusPill.Label) },
                   With(
-                      { c: Switch(t, "Success","#31825D", "Warning","#D69828", "Danger","#C53A3A", "Info","#005A9E", "#6E7882") },
-                      "<span style='display:inline-block;background:" & c &
-                      ";color:#fff;padding:2px 10px;border-radius:11px;font:600 12px Segoe UI,Arial,sans-serif'>" &
-                      EncodeHTML(cmpStatusPill.Label) & "</span>"
+                      { t: If( cmpStatusPill.Tone <> "auto",
+                               cmpStatusPill.Tone,
+                               Switch( true,
+                                   s in ["done", "complete", "completed", "closed", "approved", "active", "on track"], "Success",
+                                   s in ["blocked", "overdue", "rejected", "failed", "error", "breach"], "Danger",
+                                   s in ["at risk", "pending", "review", "waiting", "on hold", "hold"], "Warning",
+                                   s in ["in progress", "open", "new", "todo", "to do"], "Info",
+                                   "Neutral"
+                               ) ) },
+                      With(
+                          { c: Switch(t, "Success","#31825D", "Warning","#D69828", "Danger","#C53A3A", "Info","#005A9E", "#6E7882") },
+                          "<span style='display:inline-block;background:" & c &
+                          ";color:#fff;padding:2px 10px;border-radius:11px;font:600 12px Segoe UI,Arial,sans-serif'>" &
+                          EncodeHTML(s) & "</span>"
+                      )
                   )
               )

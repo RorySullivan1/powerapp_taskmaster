@@ -106,6 +106,18 @@ def token_errors(doc) -> list[str]:
                         f"ends in {last.split('(')[0]}(), which returns a value — end it with `; true`"
                     )
 
+    # IsMatch in Power Apps defaults to MatchOptions.Complete, which already wraps
+    # the pattern in ^...$. Supplying your own anchors double-anchors it — the trap
+    # that got cmpStatusPill rejected. Flag it rather than rely on remembering.
+    for path, node in walk(doc):
+        for k, v in node.items():
+            if isinstance(v, str) and "IsMatch(" in v and ("^" in v or "$" in v):
+                out.append(
+                    f"{path}/{k}: NOTE IsMatch with a ^ or $ anchor — IsMatch defaults to "
+                    f"MatchOptions.Complete in Power Apps, which anchors already. For a fixed "
+                    f"word list prefer `value in [\"a\",\"b\"]` (membership, case-insensitive)"
+                )
+
     # Placeholders can hide in any string, not just Control/Variant.
     for path, node in walk(doc):
         for k, v in node.items():
