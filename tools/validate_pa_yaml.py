@@ -169,6 +169,24 @@ def token_errors(doc) -> list[str]:
                         f"ends in {last.split('(')[0]}(), which returns a value — end it with `; true`"
                     )
 
+    # A CanvasComponent instance sized to the screen with no `Visible` sits on
+    # top and swallows EVERY click — a transparent fill does not help, the
+    # component still hit-tests. Cost a whole preview session on scrHome.
+    for path, node in walk(doc):
+        for name, body in node.items():
+            if not isinstance(body, dict) or body.get("Control") != "CanvasComponent":
+                continue
+            props = body.get("Properties", {}) or {}
+            if "Visible" in props:
+                continue
+            w, h = str(props.get("Width", "")), str(props.get("Height", ""))
+            if "Parent.Width" in w and "Parent.Height" in h:
+                out.append(
+                    f"{path}/{name}: full-screen {body.get('ComponentName')} instance with no "
+                    f"`Visible` — it will sit on top and swallow every click on the screen. "
+                    f"Gate it on the same flag that opens it"
+                )
+
     # A control's `Items` is write-only — you set it, you can't read it. The
     # readable form is `AllItems`. Component custom properties NAMED Items are
     # fine (cmpSelection.Items), so only flag names declared as controls here.

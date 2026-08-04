@@ -63,8 +63,14 @@ Screens:
             Height: =Parent.Height - Theme.Space.HeaderH
             X: =0
             Y: =Theme.Space.HeaderH
-            TemplateFill: =If(ThisItem.Screen = App.ActiveScreen, Theme.Color.Accent, Theme.Color.Surface)
-            OnSelect: =Navigate(ThisItem.Screen, ScreenTransition.Fade)
+            TemplateFill: =If(ThisItem.Key = 4, Theme.Color.Accent, Theme.Color.Surface)
+            OnSelect: |
+              =Switch( ThisItem.Key,
+                       1, Navigate(scrHome, ScreenTransition.Fade),
+                       2, Navigate(scrReports, ScreenTransition.Fade),
+                       3, Navigate(scrProjects, ScreenTransition.Fade),
+                       4, Navigate(scrReference, ScreenTransition.Fade),
+                          Navigate(scrAdmin, ScreenTransition.Fade) )
           Children:
             - NavIcon:
                 Control: Classic/Icon@2.5.0
@@ -81,7 +87,7 @@ Screens:
                   Text: =ThisItem.Title
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
-                  FontWeight: =If(ThisItem.Screen = App.ActiveScreen, FontWeight.Semibold, FontWeight.Normal)
+                  FontWeight: =If(ThisItem.Key = 4, FontWeight.Semibold, FontWeight.Normal)
                   Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.TextPrimary)
                   Height: =Parent.TemplateHeight
                   VerticalAlign: =VerticalAlign.Middle

@@ -11,8 +11,9 @@
 //        scrProject / scrTask                                  <- detail screens
 //        scrProjectEdit / scrTaskEdit / scrTransactionEdit / scrIssueEdit
 //                                                              <- create / edit screens
-//      (NavMenu below holds live Screen references, so the names must exist. The
-//       detail and edit screens are NOT in NavMenu — they are reached by Navigate.)
+//      (Every nav gallery Navigates to these by name, so they must all exist
+//       before the screens are pasted. The detail and edit screens are not in
+//       NavMenu — they are reached by Navigate from the screens that own them.)
 //   2. Paste THIS file into the App.Formulas formula bar.
 //   3. Only then paste the screen controls (src/authored/scr*.pa.yaml).
 // Step 2 must precede step 3 because scrHome/scrReports OnVisible now reference
@@ -63,16 +64,24 @@ Theme = {
 };
 
 // --- Navigation model (native, licence-independent — Q2 decision) -----------
-// Screen references passed AS DATA (pattern T6). Every screen binds one nav
-// gallery to NavMenu; the gallery's OnSelect does Navigate(ThisItem.Screen).
-// NeedsLicence flags the Power BI-gated entry so the shell can grey/hide it for
+// Screens are NOT stored here. An earlier version had `Screen: scrHome` in each
+// record; a screen is a control reference, not a value, so a table column can't
+// hold one and the whole named formula fails to type — which is what produced
+// Studio's "expecting a table" on every nav gallery's Items.
+//
+// So the table carries a plain numeric Key, and each nav gallery turns that into
+// a Navigate with a Switch. Verbose by exactly five lines, and it types.
+// NeedsLicence flags the Power BI-gated entry so the shell can grey it for
 // unlicensed users without the dashboard ever carrying navigation.
+//
+// KEY MAP — the galleries depend on it, so keep it in step:
+//   1 scrHome · 2 scrReports · 3 scrProjects · 4 scrReference · 5 scrAdmin
 NavMenu = Table(
-    { Key: 1, Title: "Home",      Icon: Icon.Home,     Screen: scrHome,      NeedsLicence: false },
-    { Key: 2, Title: "Reports",   Icon: Icon.Table,    Screen: scrReports,   NeedsLicence: true  },
-    { Key: 3, Title: "Projects",  Icon: Icon.Documents,Screen: scrProjects,  NeedsLicence: false },
-    { Key: 4, Title: "Reference", Icon: Icon.Bookmark, Screen: scrReference, NeedsLicence: false },
-    { Key: 5, Title: "Admin",     Icon: Icon.Settings, Screen: scrAdmin,     NeedsLicence: false }
+    { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
+    { Key: 2, Title: "Reports",   Icon: Icon.Table,     NeedsLicence: true  },
+    { Key: 3, Title: "Projects",  Icon: Icon.Documents, NeedsLicence: false },
+    { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false },
+    { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false }
 );
 
 // --- Power BI licence gate (Q2) ---------------------------------------------

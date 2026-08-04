@@ -117,8 +117,14 @@ Screens:
             Height: =Parent.Height - Theme.Space.HeaderH
             X: =0
             Y: =Theme.Space.HeaderH
-            TemplateFill: =If(ThisItem.Screen = App.ActiveScreen, Theme.Color.Accent, Theme.Color.Surface)
-            OnSelect: =Navigate(ThisItem.Screen, ScreenTransition.Fade)
+            TemplateFill: =If(ThisItem.Key = 1, Theme.Color.Accent, Theme.Color.Surface)
+            OnSelect: |
+              =Switch( ThisItem.Key,
+                       1, Navigate(scrHome, ScreenTransition.Fade),
+                       2, Navigate(scrReports, ScreenTransition.Fade),
+                       3, Navigate(scrProjects, ScreenTransition.Fade),
+                       4, Navigate(scrReference, ScreenTransition.Fade),
+                          Navigate(scrAdmin, ScreenTransition.Fade) )
           Children:
             - NavIcon:
                 Control: Classic/Icon@2.5.0
@@ -135,7 +141,7 @@ Screens:
                   Text: =ThisItem.Title
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
-                  FontWeight: =If(ThisItem.Screen = App.ActiveScreen, FontWeight.Semibold, FontWeight.Normal)
+                  FontWeight: =If(ThisItem.Key = 1, FontWeight.Semibold, FontWeight.Normal)
                   Color: =If(ThisItem.NeedsLicence && Not(gHasPowerBiLicence), Theme.Color.TextMuted, Theme.Color.TextPrimary)
                   Height: =Parent.TemplateHeight
                   VerticalAlign: =VerticalAlign.Middle
@@ -182,7 +188,7 @@ Screens:
                    If( CountRows(colMyTasks) = 0, 0,
                        RoundDown( Average( AddColumns( colMyTasks, wgt,
                            Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-              Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); cmpToastHome.Show()
+              Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true); cmpToastHome.Show()
       # Three KPI cards, fed by the locals Set in OnVisible. Trend has no
       # historical source in this model, so it is omitted rather than faked.
       - cardOpen:
@@ -274,6 +280,11 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpToast
           Properties:
+            # Same reason as the dialog, smaller blast radius: an always-visible
+            # toast blocks clicks in the bottom-right corner even when nothing is
+            # showing. The component raises OnDismiss when its timer ends, so the
+            # screen can own the flag.
+            Visible: =gToastShow
             X: =Parent.Width - 340 - Theme.Space.Gutter
             Y: =Parent.Height - 56 - Theme.Space.Gutter
             Width: =340
@@ -281,11 +292,19 @@ Screens:
             Message: =gToastMsg
             Tone: =gToastTone
             Duration: =3000
+            OnDismiss: =Set(gToastShow, false)
       # Confirm modal (full-screen; declared LAST so it layers on top).
       - cmpConfirmHome:
           Control: CanvasComponent
           ComponentName: cmpConfirmDialog
           Properties:
+            # VISIBLE IS LOAD-BEARING. This instance is full-screen and declared
+            # last, so with Visible defaulting to true it sits on top of scrHome
+            # and swallows EVERY click — nav, buttons, gallery rows. A transparent
+            # fill doesn't help: the component still hit-tests. `IsOpen` only
+            # drives what's drawn INSIDE the component; it cannot stop the
+            # component's own area from intercepting input.
+            Visible: =gConfirmOpen
             X: =0
             Y: =0
             Width: =Parent.Width
@@ -296,5 +315,5 @@ Screens:
             ConfirmLabel: ="Archive"
             CancelLabel: ="Cancel"
             Destructive: =true
-            OnConfirm: =Set(gConfirmOpen, false); Set(gToastMsg, "Archive is wired on the project detail screen"); Set(gToastTone, "Info"); cmpToastHome.Show()
+            OnConfirm: =Set(gConfirmOpen, false); Set(gToastMsg, "Archive is wired on the project detail screen"); Set(gToastTone, "Info"); Set(gToastShow, true); cmpToastHome.Show()
             OnCancel: =Set(gConfirmOpen, false)
