@@ -42,7 +42,7 @@ types:
   Person:          { sp: "Person or Group — ALLOW MULTIPLE = NO", delegates: ["= on .Email/.DisplayName"], indexable: true, join_cost: 1 }
   PersonMulti:     { sp: "Person or Group — allow multiple = yes",  delegates: [],     indexable: false, join_cost: 1 }
   Lookup:          { sp: "Lookup",               delegates: ["= via .Id/.Value"],        indexable: true,  join_cost: 1 }
-  ManagedMetadata: { sp: "Managed Metadata",     delegates: ["= via subfield"],          indexable: true,  join_cost: 1 }
+  ManagedMetadata: { sp: "Managed Metadata — ALLOW MULTIPLE VALUES = NO", delegates: ["= via subfield"], indexable: true, join_cost: 1 }
   Hyperlink:       { sp: "Hyperlink or Picture", delegates: [],                          indexable: false, join_cost: 0 }
   Calculated:      { sp: "Calculated",           delegates: [],                          indexable: false, join_cost: 0 }
 
@@ -60,11 +60,11 @@ lists:
     columns:
       - { name: project_name,            type: Text,            required: true,  indexed: true,  desc: "User-facing project title (unique by convention only)" }
       - { name: project_manager,         type: Person, multi: false, required: true,  indexed: true,  desc: "Accountable owner" }
-      - { name: project_coverage,        type: ManagedMetadata, required: false,                 desc: "Business/product coverage area", term_set: Coverage }
+      - { name: project_coverage,        type: ManagedMetadata, multi: false, required: false,                 desc: "Business/product coverage area", term_set: Coverage }
       - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
-      - { name: project_region,          type: ManagedMetadata, required: true,  indexed: true,  desc: "Regional ownership", values: [AMER, EMEA, APAC, JAPAN, GLOBAL] }
+      - { name: project_region,          type: ManagedMetadata, multi: false, required: true,  indexed: true,  desc: "Regional ownership", values: [AMER, EMEA, APAC, JAPAN, GLOBAL] }
       - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
-      - { name: project_type,            type: ManagedMetadata, required: true,                  desc: "Project classification", values: [Production, Campaign, Platform, Event, Operational] }
+      - { name: project_type,            type: ManagedMetadata, multi: false, required: true,                  desc: "Project classification", values: [Production, Campaign, Platform, Event, Operational] }
       - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user" }
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  desc: "Lifecycle phase", values: [Planning, Active, Blocked, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
@@ -83,7 +83,7 @@ lists:
       - { name: task_name,             type: Text,            required: true,  indexed: true,  desc: "Task title" }
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
-      - { name: task_category,         type: ManagedMetadata, required: false,                 desc: "Task classification", term_set: Marketing }
+      - { name: task_category,         type: ManagedMetadata, multi: false, required: false,                 desc: "Task classification", term_set: Marketing }
       - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
       - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
@@ -150,10 +150,10 @@ lists:
     join_cost: 4
     columns:
       - { name: client_name,     type: Text,            required: true,  indexed: true, desc: "Client display name" }
-      - { name: client_type,     type: ManagedMetadata, required: true,                 desc: "Client classification", term_set: ClientType }
-      - { name: client_coverage, type: ManagedMetadata, required: true,                 desc: "Coverage group", term_set: Coverage }
+      - { name: client_type,     type: ManagedMetadata, multi: false, required: true,                 desc: "Client classification", term_set: ClientType }
+      - { name: client_coverage, type: ManagedMetadata, multi: false, required: true,                 desc: "Coverage group", term_set: Coverage }
       - { name: client_sales,    type: Person, multi: false, required: true,                 desc: "Primary sales owner" }
-      - { name: client_region,   type: ManagedMetadata, required: true,  indexed: true, desc: "Client region", values: [AMER, EMEA, APAC, JAPAN] }
+      - { name: client_region,   type: ManagedMetadata, multi: false, required: true,  indexed: true, desc: "Client region", values: [AMER, EMEA, APAC, JAPAN] }
       - { name: client_notes,    type: Note,            required: false,                desc: "Free-text notes (display only)" }
 
   # ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ lists:
     join_cost: 1
     columns:
       - { name: product_uid,         type: Text,            required: true, indexed: true, desc: "Product identifier (ISIN / Ticker / Internal ID). Business key — uniqueness by convention, not enforced" }
-      - { name: product_type,        type: ManagedMetadata, required: true,                desc: "Product classification", term_set: Product }
+      - { name: product_type,        type: ManagedMetadata, multi: false, required: true,                desc: "Product classification", term_set: Product }
       - { name: product_description, type: Note,            required: true,                desc: "Description (display only)" }
 
   # ---------------------------------------------------------------------------
@@ -192,9 +192,14 @@ lists:
 # project_requestor was found (provisioned multi, corrected to single the same
 # day). Four things drift most easily, in order of how loudly they fail:
 #
-#  1. PERSON ARITY — `multi:` on every Person column. A multi column returns a
-#     TABLE: the read errors ("expecting a Table") and the expanded-user write
-#     fails. Check all 9. This is the one that has already bitten.
+#  1. ARITY — `multi:` on every Person AND Managed Metadata column. A multi
+#     column returns a TABLE, so the read errors ("expecting a Table", because
+#     Coalesce types from its first argument) and the write fails too: the app
+#     hands back one expanded-user record / one `LookUp(Choices(…))` record, and
+#     neither is a table. **Both have already bitten** — project_requestor was
+#     provisioned multi-Person, project_region and project_coverage multi-value
+#     MM; all three corrected 2026-08-04. That leaves 8 Person and 6 MM columns
+#     still unverified.
 #  2. INTERNAL NAMES — frozen at creation. `name:` here IS the internal name; a
 #     later rename changes only the display label, so a column created as
 #     "Project Manager" is internally `Project_x0020_Manager` and every token in

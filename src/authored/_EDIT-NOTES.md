@@ -45,7 +45,25 @@ Re-seeding a global in `OnVisible` and patching from that global makes the write
 regardless of what the screen happens to be displaying. Text inputs get `Reset()` in the
 same `OnVisible` so their `Default` re-reads.
 
-## 1a. A Person column's ARITY must match the schema, or the screen errors on load
+## 1a. Column ARITY must match the schema, or the screen errors on load
+
+**Applies to Person *and* Managed Metadata columns**, and both have already bitten:
+`project_requestor` was provisioned multi-Person, `project_region` and `project_coverage`
+multi-value MM. Symptom is identical in every case — a multi column returns a **table**, so
+`Coalesce(<table>, "…")` fails because Coalesce takes its type from the first argument.
+
+The MM read and write both assume single:
+
+```powerapps
+Coalesce( gEditProject.project_region.Value, "not set" )                        // read
+project_region: LookUp( Choices([@taskmaster_projects].project_region), Path = … )  // write
+```
+
+`Choices()` itself is unaffected — it returns the term set, so the picker keeps working and only
+the current-value label and the save break. That makes a multi MM column quieter than a multi
+Person column, not safer.
+
+### The Person case in detail
 
 `schema/schema.yaml` marks every Person column `multi: false`, and the app depends on it in two
 places:
