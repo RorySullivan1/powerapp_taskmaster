@@ -43,6 +43,31 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 > functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
 > because you asked for components and it packages them as one importable unit.
 
+## If a component renders as a black box, it's the zero-alpha Fill
+
+`RGBA(0, 0, 0, 0)` is black at zero alpha. Where the alpha isn't honoured it renders as **opaque
+black**, which is what `cmpTermPicker` did (2026-08-03).
+
+Most components got away with it because their body covers the whole component — `cmpSelection`'s
+single gallery is `Width: =Parent.Width` / `Height: =Parent.Height`, so the fill never shows.
+`cmpTermPicker` was the first with genuinely exposed background: four narrow columns leaving the
+caption strip, the hint strip and the inter-column gaps visible.
+
+**Fixed there by removing every dependency on transparency** — the component and all four galleries
+now carry an explicit white surface, and the row buttons mirror their gallery's `TemplateFill`
+instead of being see-through. A picker is a panel; it should have a surface anyway.
+
+**Still relying on a zero-alpha fill** — if any of these shows a black box, apply the same fix and
+tell me, and note the intended background so the replacement colour is right:
+
+| Component | Intended to sit on |
+|---|---|
+| `cmpSelection`, `cmpStatusCard`, `cmpSectionHeader`, `cmpKpiRing` | the screen (`Theme.Color.Bg`, `#F5F7FA`) — body usually covers it |
+| `cmpStatusPill`, `cmpChoicePill` | inline, in a header or row — transparency is the point |
+| `cmpToast`, `cmpConfirmDialog` | overlays — transparency is load-bearing |
+
+Components can't read `Theme`, so any replacement has to be a literal.
+
 ## Column names are IDENTIFIERS, not strings
 
 Power Apps **3.24042** (April 2024) changed the column-name arguments of

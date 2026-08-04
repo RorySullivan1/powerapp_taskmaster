@@ -305,7 +305,7 @@ Cascading managed-metadata term picker driven by the term Path; outputs the leaf
 |---|---|
 | `Height` | `=190` |
 | `Width` | `=620` |
-| `Fill` | `=RGBA(0, 0, 0, 0)` |
+| `Fill` | `=RGBA(255, 255, 255, 1)` |
 
 ### Formulas backing the output properties
 

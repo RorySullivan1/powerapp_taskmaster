@@ -122,7 +122,19 @@ ComponentDefinitions:
     Properties:
       Height: =190
       Width: =620
-      Fill: =RGBA(0, 0, 0, 0)
+      # OPAQUE, deliberately (changed 2026-08-03 — reported rendering black).
+      #
+      # Every other component here uses Fill: =RGBA(0, 0, 0, 0) and gets away with
+      # it, but this is the first one where the component's own background is
+      # largely EXPOSED: cmpSelection's single gallery covers 100% of its area, so
+      # nothing shows through. Here four narrow columns leave the caption strip,
+      # the hint strip and the inter-column gaps visible.
+      #
+      # If a zero-alpha fill isn't honoured, `RGBA(0,0,0,0)` renders as opaque
+      # BLACK rather than transparent — which is exactly what was reported. A
+      # picker is a panel, so give it a real surface instead of relying on
+      # transparency. Literal white because a component can't read Theme.
+      Fill: =RGBA(255, 255, 255, 1)
       TermPath: =lblPick.Text
       TermLabel: |
         =Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )
@@ -184,6 +196,7 @@ ComponentDefinitions:
                          { v: Filter( cmpTermPicker.Terms,
                                   CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 1 ) } ),
                   v )
+            Fill: =RGBA(255, 255, 255, 1)
             TemplateSize: =28
             TemplatePadding: =0
             X: =0
@@ -199,7 +212,9 @@ ComponentDefinitions:
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
-                  Fill: =RGBA(0, 0, 0, 0)
+                  # Mirrors galL1's TemplateFill rather than being transparent —
+                  # nothing in this component now depends on alpha being honoured.
+                  Fill: =If(ThisItem.Path = galL1.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
                   Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
@@ -228,6 +243,7 @@ ComponentDefinitions:
                                && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 2
                                && StartsWith( Path, galL1.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
                   v )
+            Fill: =RGBA(255, 255, 255, 1)
             TemplateSize: =28
             TemplatePadding: =0
             X: =((Parent.Width - 24) / 4) + 8
@@ -243,7 +259,9 @@ ComponentDefinitions:
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
-                  Fill: =RGBA(0, 0, 0, 0)
+                  # Mirrors galL2's TemplateFill rather than being transparent —
+                  # nothing in this component now depends on alpha being honoured.
+                  Fill: =If(ThisItem.Path = galL2.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
                   Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
@@ -267,6 +285,7 @@ ComponentDefinitions:
                                && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 3
                                && StartsWith( Path, galL2.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
                   v )
+            Fill: =RGBA(255, 255, 255, 1)
             TemplateSize: =28
             TemplatePadding: =0
             X: =(((Parent.Width - 24) / 4) * 2) + 16
@@ -282,7 +301,9 @@ ComponentDefinitions:
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
-                  Fill: =RGBA(0, 0, 0, 0)
+                  # Mirrors galL3's TemplateFill rather than being transparent —
+                  # nothing in this component now depends on alpha being honoured.
+                  Fill: =If(ThisItem.Path = galL3.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
                   Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
@@ -309,6 +330,7 @@ ComponentDefinitions:
                                && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 4
                                && StartsWith( Path, galL3.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
                   v )
+            Fill: =RGBA(255, 255, 255, 1)
             TemplateSize: =28
             TemplatePadding: =0
             X: =(((Parent.Width - 24) / 4) * 3) + 24
@@ -324,7 +346,9 @@ ComponentDefinitions:
                   Align: =Align.Left
                   Font: =Font.'Segoe UI'
                   Size: =12
-                  Fill: =RGBA(0, 0, 0, 0)
+                  # Mirrors galL4's TemplateFill rather than being transparent —
+                  # nothing in this component now depends on alpha being honoured.
+                  Fill: =If(ThisItem.Path = galL4.Selected.Path, RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1))
                   Color: =If(Len(ThisItem.Path) = 0, RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1))
                   BorderThickness: =0
                   X: =0
