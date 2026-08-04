@@ -929,6 +929,7 @@ Screens:
             OnSelect: |
               =Set( gTkSaved, Blank() );
               Set( gTkErr, "" );
+              Set( gTkWarn, "" );
               IfError(
                   Set( gTkSaved,
                       Patch( taskmaster_tasks,
@@ -955,63 +956,49 @@ Screens:
               If( Len(gTkErr) = 0,
                   // --- optional fields, one guarded Patch each ---------------
                   If( Len(gTkSupporter.Mail) > 0,
-                      IfError( Patch(taskmaster_tasks, gTkSaved,
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved,
                                      { task_supporter:
                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
                                            Claims:      ClaimPrefix & Lower(gTkSupporter.Mail),
                                            DisplayName: gTkSupporter.DisplayName,
                                            Email:       gTkSupporter.Mail,
-                                           Department: "", JobTitle: "", Picture: "" } }),
-                               Notify("Task saved; the supporter didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                                           Department: "", JobTitle: "", Picture: "" } }) ), Set( gTkWarn, gTkWarn & "the supporter didn't stick: " & FirstError.Message & "   " )),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_supporter: Blank() }),
-                               Notify("Task saved; the supporter didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_supporter: Blank() }) ), Set( gTkWarn, gTkWarn & "the supporter didn't clear: " & FirstError.Message & "   " )) );
                   // Managed metadata (C10). The value written is the connector's OWN
                   // record, found by the path the picker resolved — not a hand-built
                   // taxonomy literal. Still its own Patch: MM remains the least-proven
                   // write in the app and must not take the rest of the task down.
                   If( Len(gTkCatPath) > 0 && gTkCatDone,
-                      IfError( Patch(taskmaster_tasks, gTkSaved,
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved,
                                      { task_category:
                                          LookUp( Choices([@taskmaster_tasks].task_category),
-                                                 Path = gTkCatPath ) }),
-                               Notify("Task saved; the category didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                                                 Path = gTkCatPath ) }) ), Set( gTkWarn, gTkWarn & "the category didn't stick: " & FirstError.Message & "   " )) );
                   If( gTkApproval.Id > 0,
-                      IfError( Patch(taskmaster_tasks, gTkSaved,
-                                     { task_output_approval: { Id: gTkApproval.Id, Value: gTkApproval.Value } }),
-                               Notify("Task saved; the approval link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved,
+                                     { task_output_approval: { Id: gTkApproval.Id, Value: gTkApproval.Value } }) ), Set( gTkWarn, gTkWarn & "the approval link didn't stick: " & FirstError.Message & "   " )) );
                   If( gTkClient.Id > 0,
-                      IfError( Patch(taskmaster_tasks, gTkSaved,
-                                     { task_client_name: { Id: gTkClient.Id, Value: gTkClient.Value } }),
-                               Notify("Task saved; the client link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved,
+                                     { task_client_name: { Id: gTkClient.Id, Value: gTkClient.Value } }) ), Set( gTkWarn, gTkWarn & "the client link didn't stick: " & FirstError.Message & "   " )) );
                   If( gTkProduct.Id > 0,
-                      IfError( Patch(taskmaster_tasks, gTkSaved,
-                                     { task_product_id: { Id: gTkProduct.Id, Value: gTkProduct.Value } }),
-                               Notify("Task saved; the product link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved,
+                                     { task_product_id: { Id: gTkProduct.Id, Value: gTkProduct.Value } }) ), Set( gTkWarn, gTkWarn & "the product link didn't stick: " & FirstError.Message & "   " )) );
                   If( gTkLanguage <> "(none)",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_language: { Value: gTkLanguage } }),
-                               Notify("Task saved; the language didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_language: { Value: gTkLanguage } }) ), Set( gTkWarn, gTkWarn & "the language didn't stick: " & FirstError.Message & "   " )),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_language: Blank() }),
-                               Notify("Task saved; the language didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_language: Blank() }) ), Set( gTkWarn, gTkWarn & "the language didn't clear: " & FirstError.Message & "   " )) );
                   If( gTkFormat <> "(none)",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_format: { Value: gTkFormat } }),
-                               Notify("Task saved; the format didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_format: { Value: gTkFormat } }) ), Set( gTkWarn, gTkWarn & "the format didn't stick: " & FirstError.Message & "   " )),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_format: Blank() }),
-                               Notify("Task saved; the format didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_format: Blank() }) ), Set( gTkWarn, gTkWarn & "the format didn't clear: " & FirstError.Message & "   " )) );
                   If( gTkBranding <> "(none)",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_branding: { Value: gTkBranding } }),
-                               Notify("Task saved; the branding didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_branding: { Value: gTkBranding } }) ), Set( gTkWarn, gTkWarn & "the branding didn't stick: " & FirstError.Message & "   " )),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_output_branding: Blank() }),
-                               Notify("Task saved; the branding didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_branding: Blank() }) ), Set( gTkWarn, gTkWarn & "the branding didn't clear: " & FirstError.Message & "   " )) );
                   If( gTkClientStage <> "(none)",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_client_stage: { Value: gTkClientStage } }),
-                               Notify("Task saved; the client stage didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_stage: { Value: gTkClientStage } }) ), Set( gTkWarn, gTkWarn & "the client stage didn't stick: " & FirstError.Message & "   " )),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_tasks, gTkSaved, { task_client_stage: Blank() }),
-                               Notify("Task saved; the client stage didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_stage: Blank() }) ), Set( gTkWarn, gTkWarn & "the client stage didn't clear: " & FirstError.Message & "   " )) );
                   // --- C3: rewrite the parent project's weighted completion ---
                   // Identical to scrTask's block. Delegable Filter on the indexed
                   // FK plus an Or-of-equals over the six live stages (`<> "Archived"`
@@ -1039,10 +1026,14 @@ Screens:
                                       Patch( taskmaster_projects, proj,
                                              { project_perc_completion:
                                                    If( CountRows(scored) = 0, 0,
-                                                       RoundDown(Average(scored, wgt), 0) ) } ) ),
-                                  Notify("Task saved, but the project rollup didn't update: " & FirstError.Message,
-                                         NotificationType.Warning) ) ) ) );
-                  Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success );
+                                                       RoundDown(Average(scored, wgt), 0) ) } ) ), Set( gTkWarn, gTkWarn & "Task saved, but the project rollup didn't update: " & FirstError.Message & "   " )) ) ) );
+                  // One banner for everything that didn't stick, rather than up to
+                  // ten. gTkWarn is appended to by each guarded Patch's IfError
+                  // fallback, which is the only place FirstError is in scope.
+                  If( Len(gTkWarn) > 0,
+                      Notify( "Task saved, but: " & gTkWarn, NotificationType.Warning ) );
+                  If( Len(gTkWarn) = 0,
+                      Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
                   Back()
               )
       - btnTkCancel:

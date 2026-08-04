@@ -81,10 +81,15 @@ Power Fx cannot conditionally omit a field from a record literal. So:
 ```powerapps
 // set it when chosen; clear it only when editing (nothing to clear on a new record)
 If( gChoice <> "(none)",
-    IfError( Patch(list, saved, { col: { Value: gChoice } }), Notify(…) ),
+    IfError( Set( gOpt, Patch(list, saved, { col: { Value: gChoice } }) ),
+             Set( gWarn, gWarn & "the col didn't stick: " & FirstError.Message & "   " ) ),
     gEditMode = "Edit",
-    IfError( Patch(list, saved, { col: Blank() }), Notify(…) ) )
+    IfError( Set( gOpt, Patch(list, saved, { col: Blank() }) ),
+             Set( gWarn, gWarn & "the col didn't clear: " & FirstError.Message & "   " ) ) )
 ```
+
+The `Set` wrappers are **not** decoration — see §5a. `gOpt` is never read; it exists only so both
+`IfError` arguments have the same type.
 
 More round trips, but a failure is attributable to one field instead of taking the whole
 form down — and the two risky shapes (**expanded user**, **expanded taxonomy**) get their
@@ -103,6 +108,43 @@ If( Len(gErr) = 0, …everything that says it worked… )
 ```
 
 Each `IfError` argument is a **single statement** — no `;` chains inside a function argument.
+
+## 5a. Every `IfError` argument must be the SAME TYPE
+
+This is the rule that bit hardest. MS Learn: *"IfError returns the value of one of its arguments.
+The types of all values that might be returned by IfError must be compatible"* — followed by a note
+that **currently ALL arguments must be compatible**, not merely the ones that could be returned.
+
+So the idiom the docs themselves print,
+
+```powerapps
+IfError( Patch(list, rec, {…}), Notify("didn't save") )       // REJECTED
+```
+
+fails in Studio with **"expecting a record"**: `Patch` returns a record, `Notify` a boolean. The
+same applies to `IfError(Patch(…), Set(…))` and to a three-arm `IfError(Patch(…), Collect(a,…),
+Collect(b,…))` where the two `Collect`s target differently-shaped tables.
+
+The fix is uniform — **make every arm a `Set`**:
+
+```powerapps
+IfError( Set( gTmp, Patch(list, rec, {…}) ),
+         Set( gErr, FirstError.Message ) );
+If( Len(gErr) > 0, Notify("Couldn't save: " & gErr, NotificationType.Error) )
+```
+
+`FirstError` is only in scope *inside* the replacement, which is why the message is stashed in a
+variable and notified afterwards. Warnings from the optional-column pass accumulate into one
+`gXWarn` string and produce a single banner instead of up to ten.
+
+Where a `Set` would be unsafe — inside `ForAll`, whose iteration order is not guaranteed — force
+the arms to text instead: `IfError( Text(Patch(…).ID), FirstError.Message, "" )`. An empty result
+means the row was written. That is how `scrProjectEdit` records per-row outcomes for staged
+children.
+
+Not affected: `IfError(Text(…), "⚠ not a date")` and `IfError(DateValue(…), Blank())` — text/text
+and date/blank are already compatible. The validator flags only a genuine mix of behaviour
+functions.
 
 ## 6. Complex column writes — give the connector its own shape wherever you can
 

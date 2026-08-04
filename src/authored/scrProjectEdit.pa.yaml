@@ -63,7 +63,7 @@ Screens:
         // Staging areas. Cleared on every visit — a half-entered child list left
         // over from the previous project would be written to THIS one.
         Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
-        Clear( colChildErrors ); Clear( colChildOk );
+        Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
         Set( gNtPriority, "Moderate" ); Set( gNtLeadWho, "Manager" );
         Set( gNxCcy, "USD" ); Set( gNxSalesWho, "Manager" );
         Set( gNxClient,  { Id: 0, Value: "" } );
@@ -1290,6 +1290,7 @@ Screens:
             OnSelect: |
               =Set( gPrSaved, Blank() );
               Set( gPrErr, "" );
+              Set( gPrWarn, "" );
               If( gEditMode = "New",
                   IfError(
                       Set( gPrSaved,
@@ -1344,107 +1345,125 @@ Screens:
               If( Len(gPrErr) = 0,
                   // --- 2. optional / re-picked parent fields ----------------
                   If( Len(gPrRequestor.Mail) > 0,
-                      IfError( Patch(taskmaster_projects, gPrSaved,
+                      IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
                                      { project_requestor:
                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
                                            Claims:      ClaimPrefix & Lower(gPrRequestor.Mail),
                                            DisplayName: gPrRequestor.DisplayName,
                                            Email:       gPrRequestor.Mail,
-                                           Department: "", JobTitle: "", Picture: "" } }),
-                               Notify("Project saved; the requestor didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                                           Department: "", JobTitle: "", Picture: "" } }) ), Set( gPrWarn, gPrWarn & "the requestor didn't stick: " & FirstError.Message & "   " )),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_projects, gPrSaved, { project_requestor: Blank() }),
-                               Notify("Project saved; the requestor didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved, { project_requestor: Blank() }) ), Set( gPrWarn, gPrWarn & "the requestor didn't clear: " & FirstError.Message & "   " )) );
                   If( Len(gPrSupporter.Mail) > 0,
-                      IfError( Patch(taskmaster_projects, gPrSaved,
+                      IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
                                      { project_supporter:
                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
                                            Claims:      ClaimPrefix & Lower(gPrSupporter.Mail),
                                            DisplayName: gPrSupporter.DisplayName,
                                            Email:       gPrSupporter.Mail,
-                                           Department: "", JobTitle: "", Picture: "" } }),
-                               Notify("Project saved; the supporter didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                                           Department: "", JobTitle: "", Picture: "" } }) ), Set( gPrWarn, gPrWarn & "the supporter didn't stick: " & FirstError.Message & "   " )),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_projects, gPrSaved, { project_supporter: Blank() }),
-                               Notify("Project saved; the supporter didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved, { project_supporter: Blank() }) ), Set( gPrWarn, gPrWarn & "the supporter didn't clear: " & FirstError.Message & "   " )) );
                   // Managed metadata on EDIT only — on New these went in with the
                   // insert. Each stays its own Patch: MM is still the least-proven
                   // write in the app and must not take the rest of the record down.
                   If( gEditMode = "Edit" && Len(gPrRegionPath) > 0 && gPrRegionDone,
-                      IfError( Patch(taskmaster_projects, gPrSaved,
+                      IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
                                      { project_region:
                                          LookUp( Choices([@taskmaster_projects].project_region),
-                                                 Path = gPrRegionPath ) }),
-                               Notify("Project saved; the region didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                                                 Path = gPrRegionPath ) }) ), Set( gPrWarn, gPrWarn & "the region didn't stick: " & FirstError.Message & "   " )) );
                   If( gEditMode = "Edit" && Len(gPrTypePath) > 0 && gPrTypeDone,
-                      IfError( Patch(taskmaster_projects, gPrSaved,
+                      IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
                                      { project_type:
                                          LookUp( Choices([@taskmaster_projects].project_type),
-                                                 Path = gPrTypePath ) }),
-                               Notify("Project saved; the type didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                                                 Path = gPrTypePath ) }) ), Set( gPrWarn, gPrWarn & "the type didn't stick: " & FirstError.Message & "   " )) );
                   If( Len(gPrCovPath) > 0 && gPrCovDone,
-                      IfError( Patch(taskmaster_projects, gPrSaved,
+                      IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
                                      { project_coverage:
                                          LookUp( Choices([@taskmaster_projects].project_coverage),
-                                                 Path = gPrCovPath ) }),
-                               Notify("Project saved; the coverage didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                                                 Path = gPrCovPath ) }) ), Set( gPrWarn, gPrWarn & "the coverage didn't stick: " & FirstError.Message & "   " )) );
                   // --- 3. children ------------------------------------------
                   // IfError's third argument is the value returned when NOTHING
                   // errored, which is how each row records success or failure
                   // without a second pass over the data.
-                  Clear( colChildErrors ); Clear( colChildOk );
+                  //
+                  // It records the outcome as TEXT, not by collecting into two
+                  // different collections, because IfError currently requires ALL
+                  // its arguments to be type-compatible — a record from Patch
+                  // against two differently-shaped tables from Collect is rejected.
+                  // Text(Patch(…).ID) forces the success arm to text so all three
+                  // arms match; an empty Message means the row was written.
+                  Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
                   ForAll( colNewTasks As t,
-                      IfError(
-                          Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
-                              { task_name:       t.t_name,
-                                task_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
-                                task_stage:      { Value: t.t_stage },
-                                task_status:     { Value: "Green" },
-                                task_priority:   { Value: t.t_priority },
-                                task_lead:
-                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                      Claims:      ClaimPrefix & Lower(t.t_leadMail),
-                                      DisplayName: t.t_leadName,
-                                      Email:       t.t_leadMail,
-                                      Department: "", JobTitle: "", Picture: "" },
-                                task_date_start:  Now(),
-                                task_date_target: IfError( DateValue(t.t_target), Blank() ) } ),
-                          Collect( colChildErrors, { Kind: "Task", Name: t.t_name, Message: FirstError.Message } ),
-                          Collect( colChildOk, { Kind: "Task", Sid: t.sid } ) ) );
+                      Collect( colChildResult,
+                          { Kind: "Task", Sid: t.sid, Name: t.t_name,
+                            Message:
+                              IfError( Text(
+                                  Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
+                                      { task_name:       t.t_name,
+                                        task_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                        task_stage:      { Value: t.t_stage },
+                                        task_status:     { Value: "Green" },
+                                        task_priority:   { Value: t.t_priority },
+                                        task_lead:
+                                            { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                              Claims:      ClaimPrefix & Lower(t.t_leadMail),
+                                              DisplayName: t.t_leadName,
+                                              Email:       t.t_leadMail,
+                                              Department: "", JobTitle: "", Picture: "" },
+                                        task_date_start:  Now(),
+                                        task_date_target: IfError( DateValue(t.t_target), Blank() ) } )
+                              .ID ),
+                              FirstError.Message,
+                              "" ) } ) );
                   ForAll( colNewTransactions As x,
-                      IfError(
-                          Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
-                              { transaction_name:        x.x_name,
-                                transaction_project_id:  { Id: gPrSaved.ID, Value: gPrSaved.project_name },
-                                transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
-                                transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
-                                transaction_sales:
-                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                      Claims:      ClaimPrefix & Lower(x.x_salesMail),
-                                      DisplayName: x.x_salesName,
-                                      Email:       x.x_salesMail,
-                                      Department: "", JobTitle: "", Picture: "" },
-                                transaction_currency:    { Value: x.x_ccy },
-                                transaction_notional:
-                                    If( Len(x.x_notional) = 0, Blank(), Value(x.x_notional) ),
-                                transaction_date:        DateValue(x.x_date) } ),
-                          Collect( colChildErrors, { Kind: "Transaction", Name: x.x_name, Message: FirstError.Message } ),
-                          Collect( colChildOk, { Kind: "Transaction", Sid: x.sid } ) ) );
+                      Collect( colChildResult,
+                          { Kind: "Transaction", Sid: x.sid, Name: x.x_name,
+                            Message:
+                              IfError( Text(
+                                  Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
+                                      { transaction_name:        x.x_name,
+                                        transaction_project_id:  { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                        transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
+                                        transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
+                                        transaction_sales:
+                                            { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                              Claims:      ClaimPrefix & Lower(x.x_salesMail),
+                                              DisplayName: x.x_salesName,
+                                              Email:       x.x_salesMail,
+                                              Department: "", JobTitle: "", Picture: "" },
+                                        transaction_currency:    { Value: x.x_ccy },
+                                        transaction_notional:
+                                            If( Len(x.x_notional) = 0, Blank(), Value(x.x_notional) ),
+                                        transaction_date:        DateValue(x.x_date) } )
+                              .ID ),
+                              FirstError.Message,
+                              "" ) } ) );
                   ForAll( colNewIssues As i,
-                      IfError(
-                          Patch( taskmaster_issues, Defaults(taskmaster_issues),
-                              { issue_name:       i.i_name,
-                                issue_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
-                                issue_status:     { Value: i.i_status },
-                                issue_date_open:  Now(),
-                                issue_assignee:
-                                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                      Claims:      ClaimPrefix & Lower(i.i_assigneeMail),
-                                      DisplayName: i.i_assigneeName,
-                                      Email:       i.i_assigneeMail,
-                                      Department: "", JobTitle: "", Picture: "" } } ),
-                          Collect( colChildErrors, { Kind: "Issue", Name: i.i_name, Message: FirstError.Message } ),
-                          Collect( colChildOk, { Kind: "Issue", Sid: i.sid } ) ) );
+                      Collect( colChildResult,
+                          { Kind: "Issue", Sid: i.sid, Name: i.i_name,
+                            Message:
+                              IfError( Text(
+                                  Patch( taskmaster_issues, Defaults(taskmaster_issues),
+                                      { issue_name:       i.i_name,
+                                        issue_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                        issue_status:     { Value: i.i_status },
+                                        issue_date_open:  Now(),
+                                        issue_assignee:
+                                            { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                              Claims:      ClaimPrefix & Lower(i.i_assigneeMail),
+                                              DisplayName: i.i_assigneeName,
+                                              Email:       i.i_assigneeMail,
+                                              Department: "", JobTitle: "", Picture: "" } } )
+                              .ID ),
+                              FirstError.Message,
+                              "" ) } ) );
+                  // Split the one result table into the two the screen already uses,
+                  // so nothing downstream changes.
+                  Collect( colChildErrors,
+                           ShowColumns( Filter(colChildResult, Len(Message) > 0), Kind, Name, Message ) );
+                  Collect( colChildOk,
+                           ShowColumns( Filter(colChildResult, Len(Message) = 0), Kind, Sid ) );
                   // Written rows leave staging; failures stay so Save retries them.
                   RemoveIf( colNewTasks,
                             sid in ShowColumns( Filter(colChildOk, Kind = "Task"), Sid ) );
@@ -1474,9 +1493,12 @@ Screens:
                                       Patch( taskmaster_projects, gPrSaved,
                                              { project_perc_completion:
                                                    If( CountRows(scored) = 0, 0,
-                                                       RoundDown(Average(scored, wgt), 0) ) } ) ),
-                                  Notify("Project saved, but the completion rollup didn't update: " & FirstError.Message,
-                                         NotificationType.Warning) ) ) ) );
+                                                       RoundDown(Average(scored, wgt), 0) ) } ) ), Set( gPrWarn, gPrWarn & "Project saved, but the completion rollup didn't update: " & FirstError.Message & "   " )) ) ) );
+                  // One banner for every optional column that didn't stick, rather
+                  // than up to seven. gPrWarn is appended to by each guarded Patch's
+                  // IfError fallback — the only place FirstError is in scope.
+                  If( Len(gPrWarn) > 0,
+                      Notify( "Project saved, but: " & gPrWarn, NotificationType.Warning ) );
                   If( IsEmpty(colChildErrors),
                       Notify("Project saved with everything attached.", NotificationType.Success);
                       Navigate( scrProject, ScreenTransition.Cover ),

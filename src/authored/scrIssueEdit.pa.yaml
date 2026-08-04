@@ -610,9 +610,22 @@ Screens:
             # failed Patch leaves in the Set target is not something a one-way gap
             # can verify. Each IfError argument is a SINGLE statement — no ";"
             # chains inside a function argument.
+            #
+            # EVERY IfError ARGUMENT IS A `Set(...)`, AND THAT IS LOAD-BEARING.
+            # "IfError returns the value of one of its arguments. The types of all
+            # values that might be returned by IfError must be compatible" — and
+            # MS Learn adds that *currently* ALL arguments must be compatible, not
+            # just the ones that could be returned. `Patch` returns a record and
+            # `Notify` returns a boolean, so the obvious `IfError(Patch(…),
+            # Notify(…))` — which the docs themselves show — is rejected today with
+            # "expecting a record". Wrapping the Patch in a Set makes both sides a
+            # Set and it types. Failures are therefore accumulated into gIssWarn
+            # and reported in ONE banner after the guarded block, which also beats
+            # up to five separate toasts.
             OnSelect: |
               =Set( gIssSaved, Blank() );
               Set( gIssErr, "" );
+              Set( gIssWarn, "" );
               IfError(
                   Set( gIssSaved,
                       Patch( taskmaster_issues,
@@ -637,36 +650,41 @@ Screens:
                   Notify("Couldn't save the issue: " & gIssErr, NotificationType.Error) );
               If( Len(gIssErr) = 0,
                   // --- optional fields, one guarded Patch each ---------------
+                  // gIssOpt exists only so both IfError arguments are a Set and
+                  // therefore type-compatible; its value is never read.
                   If( gIssType <> "(none)",
-                      IfError( Patch(taskmaster_issues, gIssSaved, { issue_type: { Value: gIssType } }),
-                               Notify("Issue saved; the type didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: { Value: gIssType } }) ),
+                               Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_issues, gIssSaved, { issue_type: Blank() }),
-                               Notify("Issue saved; the type didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: Blank() }) ),
+                               Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ) );
                   If( gIssImpact <> "(none)",
-                      IfError( Patch(taskmaster_issues, gIssSaved, { issue_impact: { Value: gIssImpact } }),
-                               Notify("Issue saved; the impact didn't stick: " & FirstError.Message, NotificationType.Warning) ),
+                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: { Value: gIssImpact } }) ),
+                               Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ),
                       gEditMode = "Edit",
-                      IfError( Patch(taskmaster_issues, gIssSaved, { issue_impact: Blank() }),
-                               Notify("Issue saved; the impact didn't clear: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: Blank() }) ),
+                               Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ) );
                   If( gIssTask.Id > 0,
-                      IfError( Patch(taskmaster_issues, gIssSaved,
-                                     { issue_task_name: { Id: gIssTask.Id, Value: gIssTask.Value } }),
-                               Notify("Issue saved; the task link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                     { issue_task_name: { Id: gIssTask.Id, Value: gIssTask.Value } }) ),
+                               Set( gIssWarn, gIssWarn & "task link (" & FirstError.Message & ")   " ) ) );
                   If( gIssTx.Id > 0,
-                      IfError( Patch(taskmaster_issues, gIssSaved,
-                                     { issue_transaction_name: { Id: gIssTx.Id, Value: gIssTx.Value } }),
-                               Notify("Issue saved; the transaction link didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
+                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                     { issue_transaction_name: { Id: gIssTx.Id, Value: gIssTx.Value } }) ),
+                               Set( gIssWarn, gIssWarn & "transaction link (" & FirstError.Message & ")   " ) ) );
                   If( Len(gIssOwner.Mail) > 0,
-                      IfError( Patch(taskmaster_issues, gIssSaved,
+                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
                                      { issue_owner:
                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
                                            Claims:      ClaimPrefix & Lower(gIssOwner.Mail),
                                            DisplayName: gIssOwner.DisplayName,
                                            Email:       gIssOwner.Mail,
-                                           Department: "", JobTitle: "", Picture: "" } }),
-                               Notify("Issue saved; the owner didn't stick: " & FirstError.Message, NotificationType.Warning) ) );
-                  Notify( If(gEditMode = "Edit", "Issue saved", "Issue created"), NotificationType.Success );
+                                           Department: "", JobTitle: "", Picture: "" } }) ),
+                               Set( gIssWarn, gIssWarn & "owner (" & FirstError.Message & ")   " ) ) );
+                  If( Len(gIssWarn) > 0,
+                      Notify( "Issue saved, but these fields didn't: " & gIssWarn, NotificationType.Warning ) );
+                  If( Len(gIssWarn) = 0,
+                      Notify( If(gEditMode = "Edit", "Issue saved", "Issue created"), NotificationType.Success ) );
                   Back()
               )
       - btnIssCancel:

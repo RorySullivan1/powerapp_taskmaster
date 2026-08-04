@@ -126,6 +126,30 @@ VALUE_RETURNING_BEHAVIOUR = (
 PLACEHOLDER = re.compile(r"\b(?:CONFIRM|TODO|TBD|XXX|FIXME)_\w+")
 
 
+def strip_comments(src: str) -> str:
+    """Drop Power Fx `//` line comments — they carry example code that would
+    otherwise be parsed as if it were live formula text."""
+    out, in_str = [], False
+    i = 0
+    while i < len(src):
+        ch = src[i]
+        if in_str:
+            out.append(ch)
+            if ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+            out.append(ch)
+        elif ch == "/" and src[i:i + 2] == "//":
+            while i < len(src) and src[i] != "\n":
+                i += 1
+            continue
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def walk(node, path=""):
     """Yield (path, dict) for every mapping in the tree."""
     if isinstance(node, dict):
@@ -191,6 +215,33 @@ def token_errors(doc) -> list[str]:
                     f"`Visible` — it will sit on top and swallow every click on the screen. "
                     f"Gate it on the same flag that opens it, or make its Height conditional"
                 )
+
+    # IfError returns the value of one of its arguments, and MS Learn is explicit
+    # that *currently* the types of ALL its arguments must be compatible — not just
+    # the ones that could be returned. So the idiom the docs themselves show,
+    # `IfError( Patch(…), Notify(…) )`, is rejected: Patch gives a record, Notify a
+    # boolean, and Studio says "expecting a record". Wrap the value in a Set so both
+    # sides are a Set. This checks the mix of BEHAVIOUR functions only — Text vs a
+    # string literal, or DateValue vs Blank(), are fine and not flagged.
+    MIXABLE = {"Patch", "Collect", "ClearCollect", "Set", "Notify", "Remove", "RemoveIf"}
+    for path, node in walk(doc):
+        for prop, formula in (node.get("Properties") or {}).items():
+            src = strip_comments(str(formula))
+            for m in re.finditer(r"\bIfError\s*\(", src):
+                args = split_args(src, m.end() - 1)
+                if not args:
+                    continue
+                kinds = set()
+                for a in args:
+                    head = re.match(r"([A-Za-z][A-Za-z0-9]*)\s*\(", a.strip())
+                    if head and head.group(1) in MIXABLE:
+                        kinds.add(head.group(1))
+                if len(kinds) > 1:
+                    out.append(
+                        f"{path}/{prop}: IfError mixes {sorted(kinds)} — all arguments must be "
+                        f"type-compatible, so a bare Patch cannot sit against a Notify or Set. "
+                        f"Wrap the value: `IfError( Set(gTmp, Patch(…)), Set(gErr, FirstError.Message) )`"
+                    )
 
     # A gallery's own `OnSelect` does NOT reliably fire when the click lands on a
     # child control — the row looks right and does nothing. Confirmed in Studio on

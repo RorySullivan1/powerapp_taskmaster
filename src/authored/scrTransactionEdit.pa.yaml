@@ -477,6 +477,10 @@ Screens:
             OnSelect: |
               =Set( gTxErr, "" );
               IfError(
+                  // The Set wrapper is not decoration: IfError requires all its
+                  // arguments to be type-compatible today, and a bare Patch (record)
+                  // against a Set fallback is rejected. Both sides are a Set now.
+                  Set( gTxSaved,
                   Patch( taskmaster_transactions,
                          If( gEditMode = "Edit", gEditTransaction, Defaults(taskmaster_transactions) ),
                          { transaction_name:        Trim(txtTxName.Text),
@@ -492,7 +496,7 @@ Screens:
                            transaction_currency:    { Value: gTxCurrency },
                            transaction_notional:
                                If( Len(txtTxNotional.Text) = 0, Blank(), Value(txtTxNotional.Text) ),
-                           transaction_date:        DateValue(txtTxDate.Text) } ),
+                           transaction_date:        DateValue(txtTxDate.Text) } ) ),
                   Set( gTxErr, FirstError.Message )
               );
               If( Len(gTxErr) > 0,

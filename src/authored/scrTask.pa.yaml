@@ -241,14 +241,23 @@ Screens:
             # anything — the test has to be IsEmpty(). Everything that tells the
             # user it worked lives inside that branch.
             OnSelect: |
-              =IfError(
+              =Set( gTaskErr, "" );
+              Set( gTaskWarn, "" );
+              // Both IfError arguments must be type-compatible today, so the Patch
+              // (a record) is wrapped in a Set to match the Set fallback. The
+              // message is stashed and notified afterwards, because FirstError is
+              // only in scope inside the replacement.
+              IfError(
+                  Set( gTaskSaved,
                   Patch( taskmaster_tasks, gSelTask,
                       { task_name:     txtTaskName.Text,
                         task_stage:    { Value: gTaskStage },
                         task_status:   { Value: gTaskHealth },
-                        task_priority: { Value: gTaskPriority } } ),
-                  Notify("Couldn't save the task: " & FirstError.Message, NotificationType.Error)
+                        task_priority: { Value: gTaskPriority } } ) ),
+                  Set( gTaskErr, FirstError.Message )
               );
+              If( Len(gTaskErr) > 0,
+                  Notify("Couldn't save the task: " & gTaskErr, NotificationType.Error) );
               If( IsEmpty(Errors(taskmaster_tasks, gSelTask)),
                   With( { pid: gSelTask.task_project_id.Id },
                       With( { proj: LookUp(taskmaster_projects, ID = pid),
@@ -275,14 +284,16 @@ Screens:
                                              { project_perc_completion:
                                                    If( CountRows(scored) = 0, 0,
                                                        RoundDown(Average(scored, wgt), 0) ) } ) ),
-                                  Notify("Task saved, but the project rollup didn't update: " & FirstError.Message,
-                                         NotificationType.Warning)
+                                  Set( gTaskWarn,
+                                       "Task saved, but the project rollup didn't update: "
+                                       & FirstError.Message )
                               )
                           )
                       )
                   );
+                  If( Len(gTaskWarn) > 0, Notify(gTaskWarn, NotificationType.Warning) );
                   Set(gTaskDirty, false);
-                  Notify("Saved", NotificationType.Success);
+                  If( Len(gTaskWarn) = 0, Notify("Saved", NotificationType.Success) );
                   Back()
               )
       - btnCancel:
