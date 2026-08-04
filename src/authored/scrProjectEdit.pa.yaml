@@ -614,7 +614,7 @@ Screens:
             # component's input schema declares. Capped at 20 terms by the
             # connector; swap for a flow-fed collection if a set outgrows that.
             Terms: |
-              =ShowColumns( Choices([@taskmaster_projects].project_region), "Label", "Path" )
+              =ShowColumns( Choices([@taskmaster_projects].project_region), Label, Path )
             OnChange: |
               =Set( gPrRegionLabel, pickPrRegion.TermLabel );
               Set( gPrRegionPath,  pickPrRegion.TermPath );
@@ -653,7 +653,7 @@ Screens:
             # component's input schema declares. Capped at 20 terms by the
             # connector; swap for a flow-fed collection if a set outgrows that.
             Terms: |
-              =ShowColumns( Choices([@taskmaster_projects].project_type), "Label", "Path" )
+              =ShowColumns( Choices([@taskmaster_projects].project_type), Label, Path )
             OnChange: |
               =Set( gPrTypeLabel, pickPrType.TermLabel );
               Set( gPrTypePath,  pickPrType.TermPath );
@@ -692,7 +692,7 @@ Screens:
             # component's input schema declares. Capped at 20 terms by the
             # connector; swap for a flow-fed collection if a set outgrows that.
             Terms: |
-              =ShowColumns( Choices([@taskmaster_projects].project_coverage), "Label", "Path" )
+              =ShowColumns( Choices([@taskmaster_projects].project_coverage), Label, Path )
             OnChange: |
               =Set( gPrCovLabel, pickPrCoverage.TermLabel );
               Set( gPrCovPath,  pickPrCoverage.TermPath );
@@ -1447,11 +1447,11 @@ Screens:
                           Collect( colChildOk, { Kind: "Issue", Sid: i.sid } ) ) );
                   // Written rows leave staging; failures stay so Save retries them.
                   RemoveIf( colNewTasks,
-                            sid in ShowColumns( Filter(colChildOk, Kind = "Task"), "Sid" ) );
+                            sid in ShowColumns( Filter(colChildOk, Kind = "Task"), Sid ) );
                   RemoveIf( colNewTransactions,
-                            sid in ShowColumns( Filter(colChildOk, Kind = "Transaction"), "Sid" ) );
+                            sid in ShowColumns( Filter(colChildOk, Kind = "Transaction"), Sid ) );
                   RemoveIf( colNewIssues,
-                            sid in ShowColumns( Filter(colChildOk, Kind = "Issue"), "Sid" ) );
+                            sid in ShowColumns( Filter(colChildOk, Kind = "Issue"), Sid ) );
                   // --- 4. the project now EXISTS. Never insert it twice. -----
                   Set( gEditProject, gPrSaved );
                   Set( gEditMode, "Edit" );
@@ -1465,7 +1465,7 @@ Screens:
                                      && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
                                        || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
                                        || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
-                                    "wgt", Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
+                                    wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
                           If( CountRows(scored) >= 2000,
                               Notify("Project saved. It has too many tasks to compute completion accurately, so it was left unchanged.",
                                      NotificationType.Warning),

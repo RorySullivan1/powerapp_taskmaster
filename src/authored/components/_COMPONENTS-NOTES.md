@@ -43,6 +43,23 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 > functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
 > because you asked for components and it packages them as one importable unit.
 
+## Column names are IDENTIFIERS, not strings
+
+Power Apps **3.24042** (April 2024) changed the column-name arguments of
+`AddColumns` / `DropColumns` / `RenameColumns` / `ShowColumns`, `GroupBy` / `Ungroup`, `Search` and
+`DataSourceInfo` from quoted strings to identifiers:
+
+```powerapps
+Ungroup( t, v )                       // correct
+Ungroup( t, "v" )                     // "expecting an identifier name"
+ShowColumns( Choices(...), Label, Path )
+```
+
+Existing apps were migrated automatically. **This repo authors from scratch, so nothing migrates
+it for us** — and most examples online predate the change. `tools/validate_pa_yaml.py` checks it,
+per argument position, because which arguments are column names differs by function (`AddColumns`'
+even arguments are formulas; `Search`'s second is the search text).
+
 ## Property KIND matters more than it looks
 
 An **Output** property's formula is evaluated **inside** the component, so it can freely reference

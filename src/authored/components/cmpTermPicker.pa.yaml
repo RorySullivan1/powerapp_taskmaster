@@ -54,7 +54,7 @@
 #    user never chose — and project_region / project_type are REQUIRED, so that
 #    is a wrong term written to SharePoint, not a cosmetic default. Every level
 #    prepends an explicit "— select —" row whose Path is "". The union is done
-#    with Ungroup(Table({v:...},{v:...}), "v"), the standard Power Fx way to
+#    with Ungroup(Table({v:...},{v:...}), v), the standard Power Fx way to
 #    concatenate two same-schema tables.
 #
 # 2. CHAIN VALIDATION, WHICH `Path` MAKES ALMOST FREE. When the user changes
@@ -89,7 +89,7 @@ ComponentDefinitions:
     CustomProperties:
       Terms:
         PropertyKind: Input
-        Description: Term table for ONE term set, {Label, Path}. Normally ShowColumns(Choices([@list].mmColumn), "Label", "Path").
+        Description: Term table for ONE term set, {Label, Path}. Normally ShowColumns(Choices([@list].mmColumn), Label, Path).
         DataType: Table
         Default: |
           =Table( { Label: "", Path: "" } )
@@ -183,7 +183,7 @@ ComponentDefinitions:
                   Table( { v: Table({ Label: "— select —", Path: "" }) },
                          { v: Filter( cmpTermPicker.Terms,
                                   CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 1 ) } ),
-                  "v" )
+                  v )
             TemplateSize: =28
             TemplatePadding: =0
             X: =0
@@ -227,7 +227,7 @@ ComponentDefinitions:
                                   Len(galL1.Selected.Path) > 0
                                && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 2
                                && StartsWith( Path, galL1.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
-                  "v" )
+                  v )
             TemplateSize: =28
             TemplatePadding: =0
             X: =((Parent.Width - 24) / 4) + 8
@@ -266,7 +266,7 @@ ComponentDefinitions:
                                   Len(galL2.Selected.Path) > 0
                                && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 3
                                && StartsWith( Path, galL2.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
-                  "v" )
+                  v )
             TemplateSize: =28
             TemplatePadding: =0
             X: =(((Parent.Width - 24) / 4) * 2) + 16
@@ -308,7 +308,7 @@ ComponentDefinitions:
                                   Len(galL3.Selected.Path) > 0
                                && CountRows( Split(Path, cmpTermPicker.PathDelimiter) ) = 4
                                && StartsWith( Path, galL3.Selected.Path & cmpTermPicker.PathDelimiter ) ) } ),
-                  "v" )
+                  v )
             TemplateSize: =28
             TemplatePadding: =0
             X: =(((Parent.Width - 24) / 4) * 3) + 24

@@ -156,7 +156,7 @@ ClaimPrefix = "i:0#.f|membership|";
 //                    && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
 //                      || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
 //                      || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
-//               "wgt", Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
+//               wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
 //       Patch( taskmaster_projects,
 //              LookUp(taskmaster_projects, ID = <pid>),
 //              { project_perc_completion:

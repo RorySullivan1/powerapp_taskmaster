@@ -53,6 +53,59 @@ KNOWN_CONTROLS = {
 }
 KNOWN_VARIANTS = {"Vertical", "Horizontal"}
 
+# Power Apps 3.24042 (Apr 2024) changed these functions' column-name arguments
+# from literal strings to IDENTIFIERS. `Ungroup(t, "v")` now errors with
+# "expecting an identifier name"; it must be `Ungroup(t, v)`. Existing apps were
+# migrated automatically — but this repo authors from scratch, so nothing
+# migrates it for us. Anything written against a pre-2024 example is wrong.
+#
+# Which ARGUMENT POSITIONS are column names differs per function, and getting
+# that wrong makes the check cry wolf: AddColumns' even args are formulas (a
+# quoted string there is fine) and Search's second arg is the search text.
+# Positions are 0-based over the direct arguments.
+COLUMN_ARG_POSITIONS = {
+    "ShowColumns":    lambda i: i >= 1,
+    "DropColumns":    lambda i: i >= 1,
+    "GroupBy":        lambda i: i >= 1,
+    "RenameColumns":  lambda i: i >= 1,
+    "Ungroup":        lambda i: i == 1,
+    "AddColumns":     lambda i: i >= 1 and i % 2 == 1,   # name, formula, name, ...
+    "Search":         lambda i: i >= 2,                  # arg 1 is the search text
+    "DataSourceInfo": lambda i: i >= 2,
+}
+
+
+def split_args(src: str, open_idx: int):
+    """Direct arguments of the call whose '(' is at open_idx — depth-aware."""
+    depth, arg, args, in_str = 0, [], [], False
+    i = open_idx
+    while i < len(src):
+        ch = src[i]
+        if in_str:
+            arg.append(ch)
+            if ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+            arg.append(ch)
+        elif ch == "(":
+            depth += 1
+            if depth > 1:
+                arg.append(ch)
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                args.append("".join(arg).strip())
+                return args
+            arg.append(ch)
+        elif ch == "," and depth == 1:
+            args.append("".join(arg).strip())
+            arg = []
+        else:
+            arg.append(ch)
+        i += 1
+    return None   # unbalanced — leave it to the Power Fx parser
+
 # Behaviour functions that RETURN A VALUE. An Action property declares
 # ReturnType: Boolean, but a behaviour formula returns its last expression — so
 # ending on one of these means the implementation's type disagrees with the
@@ -105,6 +158,26 @@ def token_errors(doc) -> list[str]:
                         f"{cname}.{pname}: NOTE Action declares ReturnType: Boolean but its formula "
                         f"ends in {last.split('(')[0]}(), which returns a value — end it with `; true`"
                     )
+
+    # Column names must be identifiers, not strings (see COLUMN_ARG_POSITIONS).
+    for path, node in walk(doc):
+        for k, v in node.items():
+            if not isinstance(v, str):
+                continue
+            flat = " ".join(v.split())
+            for fn, is_col in COLUMN_ARG_POSITIONS.items():
+                for m in re.finditer(rf"\b{fn}\s*\(", flat):
+                    args = split_args(flat, flat.index("(", m.start()))
+                    if not args:
+                        continue
+                    bad = [a for i, a in enumerate(args)
+                           if is_col(i) and a.startswith('"') and a.endswith('"')]
+                    if bad:
+                        out.append(
+                            f"{path}/{k}: {fn}() takes column names as IDENTIFIERS since "
+                            f"Power Apps 3.24042, but got {', '.join(bad)} — drop the quotes "
+                            f'(Ungroup(t, v), not Ungroup(t, "v"))'
+                        )
 
     # IsMatch in Power Apps defaults to MatchOptions.Complete, which already wraps
     # the pattern in ^...$. Supplying your own anchors double-anchors it — the trap

@@ -140,8 +140,8 @@ before Save enables — and they go in with the insert, not afterwards.
 `cmpTermPicker.IsComplete` is the leaf test: it counts terms sitting below the pick, from the
 same data the cascade walks, so it cannot disagree with what is on screen.
 
-The picker reads the term store **directly** — `ShowColumns(Choices([@list].mmColumn), "Label",
-"Path")`. There is no terms list. `Path` already carries the full hierarchy, so the cascade is
+The picker reads the term store **directly** — `ShowColumns(Choices([@list].mmColumn), Label,
+Path)`. There is no terms list. `Path` already carries the full hierarchy, so the cascade is
 prefix matching and the term store stays the only copy of the vocabulary.
 
 ---
