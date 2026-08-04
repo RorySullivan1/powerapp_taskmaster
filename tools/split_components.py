@@ -33,6 +33,8 @@ BODIES = SRC / "bodies"
 
 # Which screens instantiate which component — so nobody builds more than they need.
 USED_BY = {
+    "cmpNavMenu":        ["scrHome", "scrReports", "scrProjects", "scrReference", "scrAdmin",
+                          "+ the 3 skeleton variants"],
     "cmpSectionHeader":  ["scrProjects", "scrHome", "scrReports"],
     "cmpStatusCard":     ["scrHome"],
     "cmpKpiRing":        ["scrHome", "scrReports", "scrProject"],

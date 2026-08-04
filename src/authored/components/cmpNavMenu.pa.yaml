@@ -1,0 +1,151 @@
+# =============================================================================
+# cmpNavMenu  —  the left navigation rail (component)
+# =============================================================================
+# Replaces the NavPanel + NavGallery pair that was copy-pasted into five screens
+# and three skeletons. One definition, eight instances.
+#
+# ---------------------------------------------------------------------------
+# THE COMPONENT DOES NOT NAVIGATE — AND CANNOT.
+#
+# A component has no access to the app's screens, so `Navigate(scrHome)` cannot
+# be written in here. The component therefore reports WHICH entry was chosen and
+# the screen does the navigating:
+#
+#   cmpNavMenu   -> raises OnNavigate, exposes SelectedKey
+#   the screen   -> OnNavigate: =Switch( navMenu.SelectedKey, 1, Navigate(scrHome, …), … )
+#
+# That is the standard component/consumer split for anything screen-bound, and
+# it is why `Items` carries a numeric Key rather than a screen: the Key is the
+# only part the component needs to hand back.
+#
+# (For the record: a screen reference in a table IS legal — an earlier note here
+# claimed otherwise after misreading a Studio error, and that was wrong. The Key
+# is used because the component can't navigate, not because screens can't be
+# stored.)
+# ---------------------------------------------------------------------------
+#
+# THE FULL-ROW HIT TARGET IS NOT DECORATION.
+#
+# A gallery's own `OnSelect` does not reliably fire when the click lands on a
+# child control — tap the label or the icon and nothing happens, which is exactly
+# the "nav items don't navigate" symptom. So each row carries a transparent
+# `Classic/Button` sized to the whole template, declared LAST so positional
+# z-order puts it on top. It does `Select(Parent)` to set the gallery's selection
+# and then raises the event. Removing it makes the rail look fine and do nothing.
+#
+# Contract:
+#   Items        (Input, Table)   {Key, Title, Icon, NeedsLicence} — bind to NavMenu
+#   ActiveKey    (Input, Number)  the Key of the screen hosting this instance
+#   HasLicence   (Input, Boolean) pass gHasPowerBiLicence; a component can't read globals
+#   SelectedKey  (Output, Number) the Key the user just chose
+#   OnNavigate   (Event)          raised on click; the screen Navigates
+#
+# Colours are literals, not Theme.* — a component cannot read app-scope named
+# formulas. They mirror Theme exactly; if Theme changes, change them here too.
+# Grounded tokens only: Rectangle@2.3.0, Gallery@2.15.0, Classic/Icon@2.5.0,
+# Label@2.5.1, Classic/Button@2.2.0.
+# =============================================================================
+ComponentDefinitions:
+  cmpNavMenu:
+    DefinitionType: CanvasComponent
+    Description: Left navigation rail. Reports the chosen entry via SelectedKey/OnNavigate; the screen performs the Navigate.
+    AccessAppScope: false
+    CustomProperties:
+      Items:
+        PropertyKind: Input
+        Description: Navigation entries. Bind to the NavMenu named formula.
+        DataType: Table
+        Default: |
+          =Table(
+              { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
+              { Key: 2, Title: "Reports",   Icon: Icon.Table,     NeedsLicence: true  },
+              { Key: 3, Title: "Projects",  Icon: Icon.Documents, NeedsLicence: false },
+              { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false },
+              { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false } )
+      ActiveKey:
+        PropertyKind: Input
+        Description: Key of the screen this instance sits on — highlights that row.
+        DataType: Number
+        Default: =1
+      HasLicence:
+        PropertyKind: Input
+        Description: Pass gHasPowerBiLicence. Entries flagged NeedsLicence grey out when false.
+        DataType: Boolean
+        Default: =false
+      SelectedKey:
+        PropertyKind: Output
+        Description: Key of the entry the user just chose. Read this in OnNavigate.
+        DataType: Number
+      OnNavigate:
+        PropertyKind: Event
+        Description: Raised when an entry is chosen. The screen does the Navigate.
+        ReturnType: Boolean
+    Properties:
+      Width: =240
+      Height: =656
+      Fill: =RGBA(255, 255, 255, 1)
+      SelectedKey: =galNav.Selected.Key
+    Children:
+      - navPanel:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+      - galNav:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            Items: =cmpNavMenu.Items
+            TemplateSize: =52
+            TemplatePadding: =0
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            TemplateFill: |
+              =If( ThisItem.Key = cmpNavMenu.ActiveKey,
+                   RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1) )
+          Children:
+            - navIcon:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =ThisItem.Icon
+                  Color: |
+                    =If( ThisItem.NeedsLicence && !cmpNavMenu.HasLicence,
+                         RGBA(110, 120, 130, 1), RGBA(0, 90, 158, 1) )
+                  Height: =24
+                  Width: =24
+                  X: =16
+                  Y: =(Parent.TemplateHeight - Self.Height) / 2
+            - navLabel:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Title
+                  Font: =Font.'Segoe UI'
+                  Size: =14
+                  FontWeight: |
+                    =If( ThisItem.Key = cmpNavMenu.ActiveKey,
+                         FontWeight.Semibold, FontWeight.Normal )
+                  Color: |
+                    =If( ThisItem.NeedsLicence && !cmpNavMenu.HasLicence,
+                         RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1) )
+                  Height: =Parent.TemplateHeight
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =56
+                  Width: =Parent.TemplateWidth - 56 - 16
+            # DECLARED LAST so z-order puts it above the icon and label. This is
+            # what actually receives the click — see the header.
+            - navHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: =Select(Parent); cmpNavMenu.OnNavigate()

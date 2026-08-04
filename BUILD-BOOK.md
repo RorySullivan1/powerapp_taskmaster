@@ -99,7 +99,19 @@ a fresh blank screen. Skeletons are a scaffold, not the destination — they car
 > pasted with it, and `cmpToast`'s timer is **`Timer`** (no `Classic/` prefix, no version suffix).
 > **Every control token in the kit is now confirmed** — the validator emits no token warnings.
 
-### `cmpSelection`  *(build first — 7 screens use it)*  · body: 1 control
+### `cmpNavMenu`  *(build first — every nav screen uses it)*  · body: 3 controls
+- [ ] `Items` — Input · Table · Default the five-row `Table(…)` from BUILD-SHEET (bind instances to `NavMenu`)
+- [ ] `ActiveKey` — Input · Number · `=1`
+- [ ] `HasLicence` — Input · Boolean · `=false`
+- [ ] `SelectedKey` — **Output** · Number · ⚠️ **phase 3** — placeholder `=0`; after the body, `=galNav.Selected.Key`
+- [ ] `OnNavigate` — Event
+- [ ] Component props: `Width=240` · `Height=656` · `Fill=RGBA(255,255,255,1)`
+- [ ] Paste `bodies/cmpNavMenu.children.pa.yaml`
+> The component **cannot Navigate** — a component can't see app screens. It reports the chosen entry
+> and each screen does the navigating in `OnNavigate`. Each screen also sets its own `ActiveKey`
+> (1 Home · 2 Reports · 3 Projects · 4 Reference · 5 Admin) to highlight the current row.
+
+### `cmpSelection`  *(7 screens use it)*  · body: 1 control
 - [ ] `Items` — Input · Table · Default `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })`
 - [ ] `DefaultId` — Input · Number · Default `=1`
 - [ ] `Selected` — **Output** · Record · ⚠️ **phase 3** — placeholder `=First(cmpSelection.Items)`; after the body, set `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)`

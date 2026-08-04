@@ -162,6 +162,42 @@ SVG percent ring (Image data URI) — Percent, centre Label, AccentHex/TrackHex.
 
 ---
 
+## `cmpNavMenu`
+
+Left navigation rail. Reports the chosen entry via SelectedKey/OnNavigate; the screen performs the Navigate.
+
+**Used by:** scrHome, scrReports, scrProjects, scrReference, scrAdmin, + the 3 skeleton variants  
+**Access app scope:** `False`  
+**Body:** `bodies/cmpNavMenu.children.pa.yaml` (2 control(s)) — paste last
+
+### Custom properties — create these first
+
+| # | Name | Kind | Type | Default / formula | Where the formula goes |
+|---|---|---|---|---|---|
+| 1 | `Items` | Input | Table | `=Table( { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false }, { Key: 2, Title: "Reports",   Icon: Icon.Table,     NeedsLicence: true  }, { Key: 3, Title: "Projects",  Icon: Icon.Documents, NeedsLicence: false }, { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false }, { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false } )` | the property's **Default** |
+| 2 | `ActiveKey` | Input | Number | `=1` | the property's **Default** |
+| 3 | `HasLicence` | Input | Boolean | `=false` | the property's **Default** |
+| 4 | `SelectedKey` | Output | Number | `=galNav.Selected.Key` | ⚠️ **PHASE 3 — after the body.** Uses `galNav`, which the body creates. Create the property now with the placeholder `=0`, then set the real formula once the body is in. |
+| 5 | `OnNavigate` | Event | Boolean | `` | the property's **Default** |
+
+### Component properties — set these on the component itself
+
+| Property | Formula |
+|---|---|
+| `Width` | `=240` |
+| `Height` | `=656` |
+| `Fill` | `=RGBA(255, 255, 255, 1)` |
+
+### Formulas backing the output properties
+
+These are the ones that must NOT be entered as a `Default` — that is exactly what got the first batch rejected. Create the property, then set its formula here.
+
+| Output property | Formula |
+|---|---|
+| `SelectedKey` | `=galNav.Selected.Key` |
+
+---
+
 ## `cmpSectionHeader`
 
 Section header — Title, optional Subtitle, optional right-aligned action button.
