@@ -118,13 +118,27 @@ X/Y are exactly the properties Studio freezes on paste, so **anything inside an 
 container is immune to that whole failure mode**. It is the one layout that survives the gap
 intact.
 
-CONFIRMED by the photo: `LayoutDirection`, `LayoutAlignItems`, the four `Padding*`,
-`LayoutMinWidth`, `LayoutMinHeight`. Studio's code view lists only non-default properties, so the
-rest are named from the same `Layout*` convention and are **inferred, not confirmed** —
-`LayoutOverflowY`/`LayoutOverflowX` (display names *Vertical Overflow* / *Horizontal Overflow*,
-values Scroll and Hide), `LayoutGap`, `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`.
-Confirm the overflow one before authoring a scrolling screen — it is the property the whole
-design hangs on.
+**A SCROLLING COLUMN — every property below confirmed from a second code-view photo:**
+
+```yaml
+- frmScroll:
+    Control: GroupContainer@1.5.0
+    Variant: AutoLayout
+    Properties:
+      LayoutDirection:  =LayoutDirection.Vertical
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap:        =8
+      LayoutOverflowX:  =LayoutOverflow.Scroll
+      LayoutOverflowY:  =LayoutOverflow.Scroll
+      PaddingTop: =8   PaddingBottom: =8   PaddingLeft: =8   PaddingRight: =8
+```
+
+Still inferred (never non-default in either photo, so Studio never printed them):
+`LayoutJustifyContent`, `LayoutWrap`, `FillPortions`.
+
+**A hidden child takes no space**, so a results gallery placed inline after its search box
+expands the column when it opens and collapses when it closes — no overlay, no z-order, no
+one-picker-at-a-time gate. In a scrolling form that replaces the whole absolute-overlay pattern.
 
 ## LAYOUT FORMULAS DO NOT SURVIVE THE PASTE
 
