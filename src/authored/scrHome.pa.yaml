@@ -62,71 +62,14 @@ Screens:
                  RoundDown( Average( AddColumns( colMyTasks, wgt,
                      Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) )
     Children:
-      # ---- Header band ----------------------------------------------------
-      - HeaderBar:
-          Control: Rectangle@2.3.0
-          Properties:
-            Fill: =Theme.Color.Primary
-            Height: =Theme.Space.HeaderH
-            Width: =Parent.Width
-            X: =0
-            Y: =0
-      - AppTitle:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="EQD Taskmaster"
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            FontWeight: =FontWeight.Semibold
-            Size: =Theme.Size.H2
-            Height: =Theme.Space.HeaderH
-            VerticalAlign: =VerticalAlign.Middle
-            X: =Theme.Space.Gutter
-            Y: =0
-            Width: =360
-      - ScreenTitle:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Home"
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.H3
-            Align: =Align.Right
-            Height: =Theme.Space.HeaderH
-            VerticalAlign: =VerticalAlign.Middle
-            X: =Parent.Width - Self.Width - Theme.Space.Gutter
-            Y: =0
-            Width: =360
-      # ---- Left nav panel + Table-driven nav gallery (pattern T6) ----------
-      # The whole rail is one component now — see components/cmpNavMenu.pa.yaml.
-      # It cannot Navigate (a component can't see app screens), so it reports the
-      # chosen entry and this screen does the navigating.
-      - navMenu:
-          Control: CanvasComponent
-          ComponentName: cmpNavMenu
-          Properties:
-            X: =0
-            Y: =Theme.Space.HeaderH
-            Width: =Theme.Space.NavW
-            Height: =Parent.Height - Theme.Space.HeaderH
-            Items: =NavMenu
-            ActiveKey: =1
-            HasLicence: =gHasPowerBiLicence
-            OnNavigate: |
-              =Switch( navMenu.SelectedKey,
-                       1, Navigate(scrHome, ScreenTransition.Fade),
-                       2, Navigate(scrReports, ScreenTransition.Fade),
-                       3, Navigate(scrProjects, ScreenTransition.Fade),
-                       4, Navigate(scrReference, ScreenTransition.Fade),
-                          Navigate(scrAdmin, ScreenTransition.Fade) )
       # ---- Content: composed component instances (live data) ---------------
       - hdrMyWork:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
           Properties:
-            X: =Theme.Space.NavW + Theme.Space.Gutter
+            X: =Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter
-            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
             Height: =60
             Title: ="My work"
             Subtitle: ="Tasks you lead or support, plus issues assigned to or owned by you"
@@ -167,9 +110,9 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpStatusCard
           Properties:
-            X: =Theme.Space.NavW + Theme.Space.Gutter
+            X: =Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
-            Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
+            Width: =(Parent.Width - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
             Height: =120
             Title: ="Open tasks"
             Value: =Text(gMyOpen)
@@ -181,9 +124,9 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpStatusCard
           Properties:
-            X: =Theme.Space.NavW + Theme.Space.Gutter + ((Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3) + Theme.Space.Gap
+            X: =Theme.Space.Gutter + ((Parent.Width - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3) + Theme.Space.Gap
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
-            Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
+            Width: =(Parent.Width - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
             Height: =120
             Title: ="Overdue"
             Value: =Text(gMyOverdue)
@@ -195,9 +138,9 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpStatusCard
           Properties:
-            X: =Theme.Space.NavW + Theme.Space.Gutter + 2 * (((Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3) + Theme.Space.Gap)
+            X: =Theme.Space.Gutter + 2 * (((Parent.Width - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3) + Theme.Space.Gap)
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
-            Width: =(Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
+            Width: =(Parent.Width - (Theme.Space.Gutter * 2) - (Theme.Space.Gap * 2)) / 3
             Height: =120
             Title: ="Open issues"
             Value: =Text(gMyIssuesOpen)
@@ -211,7 +154,7 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpKpiRing
           Properties:
-            X: =Theme.Space.NavW + Theme.Space.Gutter
+            X: =Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter
             Width: =140
             Height: =140
@@ -226,7 +169,7 @@ Screens:
             Color: =Theme.Color.TextMuted
             Font: =Theme.Font
             Size: =Theme.Size.Body
-            X: =Theme.Space.NavW + Theme.Space.Gutter + 140 + Theme.Space.Gap
+            X: =Theme.Space.Gutter + 140 + Theme.Space.Gap
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter + 56
             Width: =260
             Height: =24
@@ -244,7 +187,7 @@ Screens:
             Size: =Theme.Size.Body
             Height: =40
             Width: =200
-            X: =Theme.Space.NavW + Theme.Space.Gutter + 140 + Theme.Space.Gap
+            X: =Theme.Space.Gutter + 140 + Theme.Space.Gap
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter + 90
             OnSelect: =Set(gConfirmOpen, true)
       # Toast (bottom-right). Set gToastMsg/gToastTone then call .Show().
@@ -289,3 +232,35 @@ Screens:
             Destructive: =true
             OnConfirm: =Set(gConfirmOpen, false); Set(gToastMsg, "Archive is wired on the project detail screen"); Set(gToastTone, "Info"); Set(gToastShow, true); cmpToastHome.Show()
             OnCancel: =Set(gConfirmOpen, false)
+      # ---- The whole shell is one component: header bar + fly-out nav rail ----
+      # DECLARED LAST so positional z-order floats the fly-out over the content.
+      #
+      # Height is dynamic and that is the whole trick: a component intercepts every
+      # click inside its bounds, so closed it must own nothing but the 64px header
+      # strip. Open, covering the screen is exactly right — the scrim wants the click.
+      #
+      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
+      # the chosen entry and this screen does the navigating.
+      - appBar:
+          Control: CanvasComponent
+          ComponentName: cmpAppBar
+          Properties:
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)
+            Items: =NavMenu
+            ActiveKey: =1
+            HasLicence: =gHasPowerBiLicence
+            AppTitle: ="EQD Taskmaster"
+            ScreenTitle: ="Home"
+            IsOpen: =gNavOpen
+            OnToggle: =Set(gNavOpen, !gNavOpen)
+            OnNavigate: |
+              =Switch( appBar.SelectedKey,
+                       1, Navigate(scrHome, ScreenTransition.Fade),
+                       2, Navigate(scrReports, ScreenTransition.Fade),
+                       3, Navigate(scrProjects, ScreenTransition.Fade),
+                       4, Navigate(scrReference, ScreenTransition.Fade),
+                          Navigate(scrAdmin, ScreenTransition.Fade) );
+              Set(gNavOpen, false)

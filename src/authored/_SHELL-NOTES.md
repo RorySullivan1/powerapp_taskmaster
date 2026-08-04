@@ -89,22 +89,22 @@ Two dialect rules applied during conversion:
 - Modern controls (Rectangle/Label) carry no `Variant`; Classic controls here (Icon/TextInput)
   also declared without one, matching the export.
 
-## The one paste-critical token — resolved, with a fallback (one-way gap)
+## The one paste-critical token — SETTLED (was wrong for a week)
 
 The air gap is **one-way** (repo → Studio; only binary "works/doesn't" returns), so there is
 **no round-trip** to confirm a token against — unknowns must be resolved from **public sources**
-or shipped as **grounded fallbacks**. The only token that gates a screen paste is the
-`NavGallery` `Variant`:
+or shipped as **grounded fallbacks**. The token that gated every screen paste was the gallery
+`Variant`, and the first answer here was **wrong**:
 
-- **Resolved to `Vertical`** (with the versioned `Gallery@2.15.0`) from public evidence: the
-  modern source-code format pairs `Gallery@2.15.0` with `Variant: Vertical` for a plain vertical
-  gallery. (The older/code-view value some sources show is `galleryVertical` — if `Vertical` is
-  rejected, that is the one alternative to try.)
-- **Grounded fallback if the gallery paste fails:** rebuild the nav from plain
-  `Classic/Button@2.2.0` controls (`OnSelect: =Navigate(scrX, ScreenTransition.Fade)`) — a fully
-  grounded token, paste-safest of all. It loses `NavMenu`-driven DRY (5 buttons per screen), but
-  guarantees a navigable shell. Since a failed screen paste can only be reported as "didn't work,"
-  this is the instant recovery — no revise-blind loop.
+- ~~`Variant: Vertical`~~ **never existed.** It made every gallery render as a black block, which
+  I first misdiagnosed as a zero-alpha fill problem. A photo of Studio's own code view settled it.
+- **Correct form:** `BrowseLayout_<Orientation>_<Template>_ver5.0`. This repo uses
+  `BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0` throughout — confirmed against Studio
+  output, and the validator now rejects anything off the known list.
+- **Grounded fallback if a gallery ever fails again:** rebuild that surface from plain
+  `Classic/Button@2.2.0` controls — the paste-safest token there is. It loses the DRY of a
+  data-bound gallery but guarantees a working screen, and a failed paste can only be reported as
+  "didn't work," so having the recovery pre-written avoids a revise-blind loop.
 
 Everything else the screens use is a **grounded token** read from the real example export
 (`Rectangle@2.3.0`, `Label@2.5.1`, `Classic/Icon@2.5.0`, `Classic/TextInput@2.3.2`,
@@ -114,15 +114,26 @@ version if omitted — so a version mismatch is not a failure mode; only the con
 
 ## Deliberate deviations from the blueprint (rationale)
 
-- **Nav is a per-screen gallery bound to `NavMenu`, not a reusable component.**
-  `screen-map.md` calls for one nav *component* (T6). A canvas component can't code-view-paste
-  across the one-way gap at all (it's hand-recreated in the component editor), whereas the
-  screen — with its inline nav gallery — *does* paste. The `NavMenu` named formula already
-  delivers T6's real intent — *screen refs as data, one source of truth for menu items* — with
-  far lower transfer risk. The header + nav block is duplicated across the five screens as the
-  cost of this.
-  **Upgrade path (optional):** once you're comfortable recreating components by hand, lift the
-  nav gallery into a component and place it on each screen; `NavMenu` stays as its Items source.
+- **Nav and the header are ONE component — `cmpAppBar` — and the rail flies out.**
+  Originally the header block plus a nav gallery was copy-pasted into all eight nav screens, on
+  the reasoning that components are the hardest thing to move across the gap. That reasoning
+  held until the component channel was proven; it now is (contract typed by hand, body pasted
+  via code view), so the whole shell collapsed into one definition with eight instances.
+
+  The rail is no longer a permanent 240px column. It overlays the content when the hamburger is
+  tapped and a scrim dismisses it, so screens start their content at `Theme.Space.Gutter` and use
+  the full width. `Theme.Space.NavW` survives only as the rail's own width.
+
+  **The instance `Height` carries the whole design:**
+  `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)`. A component intercepts every click
+  in its bounds regardless of fill — the lesson that cost a preview session below — so closed it
+  must own only its 64px strip. The instance is declared **last** on each screen so positional
+  z-order floats the fly-out over the content.
+
+  `cmpAppBar` **cannot Navigate** (a component can't see app screens): it exposes `SelectedKey`
+  and raises `OnNavigate`, and the screen runs the `Switch` then `Set(gNavOpen, false)`. That is
+  the only reason `NavMenu` carries a numeric `Key` rather than a screen — *a screen reference in
+  a table is perfectly legal*, contrary to an earlier note here.
 
 - **Absolute positioning tied to `Parent.Width/Height` + `Theme.Space.*`**, not nested
   responsive containers (T15). Simpler to paste one control at a time and diagnose. Revisit

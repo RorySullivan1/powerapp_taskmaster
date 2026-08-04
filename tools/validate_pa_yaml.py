@@ -180,11 +180,16 @@ def token_errors(doc) -> list[str]:
             if "Visible" in props:
                 continue
             w, h = str(props.get("Width", "")), str(props.get("Height", ""))
-            if "Parent.Width" in w and "Parent.Height" in h:
+            # A CONDITIONAL size is the other legitimate gate, and the one cmpAppBar
+            # uses: `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)` is
+            # full-screen only while the fly-out is open — and then swallowing the
+            # click is the point, because the scrim closes the menu with it.
+            gated = h.lstrip("=").strip().startswith(("If(", "Switch("))
+            if "Parent.Width" in w and "Parent.Height" in h and not gated:
                 out.append(
                     f"{path}/{name}: full-screen {body.get('ComponentName')} instance with no "
                     f"`Visible` — it will sit on top and swallow every click on the screen. "
-                    f"Gate it on the same flag that opens it"
+                    f"Gate it on the same flag that opens it, or make its Height conditional"
                 )
 
     # A control's `Items` is write-only — you set it, you can't read it. The

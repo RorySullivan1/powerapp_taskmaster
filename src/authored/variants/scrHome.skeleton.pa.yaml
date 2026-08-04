@@ -13,69 +13,14 @@ Screens:
     Properties:
       Fill: =Theme.Color.Bg
     Children:
-      - HeaderBar:
-          Control: Rectangle@2.3.0
-          Properties:
-            Fill: =Theme.Color.Primary
-            Height: =Theme.Space.HeaderH
-            Width: =Parent.Width
-            X: =0
-            Y: =0
-      - AppTitle:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="EQD Taskmaster"
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            FontWeight: =FontWeight.Semibold
-            Size: =Theme.Size.H2
-            Height: =Theme.Space.HeaderH
-            VerticalAlign: =VerticalAlign.Middle
-            X: =Theme.Space.Gutter
-            Y: =0
-            Width: =360
-      - ScreenTitle:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Home"
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.H3
-            Align: =Align.Right
-            Height: =Theme.Space.HeaderH
-            VerticalAlign: =VerticalAlign.Middle
-            X: =Parent.Width - Self.Width - Theme.Space.Gutter
-            Y: =0
-            Width: =360
-      # The whole rail is one component now — see components/cmpNavMenu.pa.yaml.
-      # It cannot Navigate (a component can't see app screens), so it reports the
-      # chosen entry and this screen does the navigating.
-      - navMenu:
-          Control: CanvasComponent
-          ComponentName: cmpNavMenu
-          Properties:
-            X: =0
-            Y: =Theme.Space.HeaderH
-            Width: =Theme.Space.NavW
-            Height: =Parent.Height - Theme.Space.HeaderH
-            Items: =NavMenu
-            ActiveKey: =1
-            HasLicence: =gHasPowerBiLicence
-            OnNavigate: |
-              =Switch( navMenu.SelectedKey,
-                       1, Navigate(scrHome, ScreenTransition.Fade),
-                       2, Navigate(scrReports, ScreenTransition.Fade),
-                       3, Navigate(scrProjects, ScreenTransition.Fade),
-                       4, Navigate(scrReference, ScreenTransition.Fade),
-                          Navigate(scrAdmin, ScreenTransition.Fade) )
       # ---- Content placeholder (no components, no data) --------------------
       - HomeEmpty:
           Control: Rectangle@2.3.0
           Properties:
             Fill: =Theme.Color.Surface
             Height: =Parent.Height - Theme.Space.HeaderH - (Theme.Space.Gutter * 2)
-            Width: =Parent.Width - Theme.Space.NavW - (Theme.Space.Gutter * 2)
-            X: =Theme.Space.NavW + Theme.Space.Gutter
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            X: =Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter
       - HomeEmptyLabel:
           Control: Label@2.5.1
@@ -90,3 +35,35 @@ Screens:
             Y: =HomeEmpty.Y
             Width: =HomeEmpty.Width - (Theme.Space.Gutter * 2)
             Height: =HomeEmpty.Height
+      # ---- The whole shell is one component: header bar + fly-out nav rail ----
+      # DECLARED LAST so positional z-order floats the fly-out over the content.
+      #
+      # Height is dynamic and that is the whole trick: a component intercepts every
+      # click inside its bounds, so closed it must own nothing but the 64px header
+      # strip. Open, covering the screen is exactly right — the scrim wants the click.
+      #
+      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
+      # the chosen entry and this screen does the navigating.
+      - appBar:
+          Control: CanvasComponent
+          ComponentName: cmpAppBar
+          Properties:
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)
+            Items: =NavMenu
+            ActiveKey: =1
+            HasLicence: =gHasPowerBiLicence
+            AppTitle: ="EQD Taskmaster"
+            ScreenTitle: ="Home"
+            IsOpen: =gNavOpen
+            OnToggle: =Set(gNavOpen, !gNavOpen)
+            OnNavigate: |
+              =Switch( appBar.SelectedKey,
+                       1, Navigate(scrHome, ScreenTransition.Fade),
+                       2, Navigate(scrReports, ScreenTransition.Fade),
+                       3, Navigate(scrProjects, ScreenTransition.Fade),
+                       4, Navigate(scrReference, ScreenTransition.Fade),
+                          Navigate(scrAdmin, ScreenTransition.Fade) );
+              Set(gNavOpen, false)

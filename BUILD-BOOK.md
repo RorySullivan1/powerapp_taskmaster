@@ -99,17 +99,44 @@ a fresh blank screen. Skeletons are a scaffold, not the destination — they car
 > pasted with it, and `cmpToast`'s timer is **`Timer`** (no `Classic/` prefix, no version suffix).
 > **Every control token in the kit is now confirmed** — the validator emits no token warnings.
 
-### `cmpNavMenu`  *(build first — every nav screen uses it)*  · body: 3 controls
+### `cmpAppBar`  *(build first — every nav screen uses it)*  · body: 10 controls
+Replaces `cmpNavMenu` **and** the `HeaderBar` / `AppTitle` / `ScreenTitle` trio that used to be
+copy-pasted into all eight nav screens. One component now owns the header bar *and* a nav rail
+that flies out over the content when the hamburger is tapped.
+
 - [ ] `Items` — Input · Table · Default the five-row `Table(…)` from BUILD-SHEET (bind instances to `NavMenu`)
 - [ ] `ActiveKey` — Input · Number · `=1`
 - [ ] `HasLicence` — Input · Boolean · `=false`
+- [ ] `AppTitle` — Input · Text · `="EQD Taskmaster"`
+- [ ] `ScreenTitle` — Input · Text · `=""`
+- [ ] `IsOpen` — Input · Boolean · `=false`
 - [ ] `SelectedKey` — **Output** · Number · ⚠️ **phase 3** — placeholder `=0`; after the body, `=galNav.Selected.Key`
 - [ ] `OnNavigate` — Event
-- [ ] Component props: `Width=240` · `Height=656` · `Fill=RGBA(255,255,255,1)`
-- [ ] Paste `bodies/cmpNavMenu.children.pa.yaml`
-> The component **cannot Navigate** — a component can't see app screens. It reports the chosen entry
-> and each screen does the navigating in `OnNavigate`. Each screen also sets its own `ActiveKey`
-> (1 Home · 2 Reports · 3 Projects · 4 Reference · 5 Admin) to highlight the current row.
+- [ ] `OnToggle` — Event
+- [ ] Component props: `Width=1366` · `Height=64` · `Fill=RGBA(0,0,0,0)`
+- [ ] Paste `bodies/cmpAppBar.children.pa.yaml`
+
+> **The instance `Height` is dynamic, and that is the whole trick.** Each screen sets
+> `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)`. A component intercepts every click
+> inside its bounds — a transparent fill does *not* help, which is what made scrHome completely
+> unresponsive in preview. Closed, the bar must therefore own nothing but its 64px strip. Open,
+> covering the screen is exactly right: the scrim wants the click, and uses it to close the menu.
+>
+> **Declare the instance LAST on every screen** — z-order is positional, and the fly-out has to
+> float above the content.
+>
+> The component **cannot Navigate** — a component can't see app screens. It reports the chosen
+> entry and each screen does the navigating in `OnNavigate`, then `Set(gNavOpen, false)`. Each
+> screen sets its own `ActiveKey` (1 Home · 2 Reports · 3 Projects · 4 Reference · 5 Admin) and its
+> own `ScreenTitle`.
+>
+> The hamburger is **three Rectangles plus a transparent `Classic/Button`**, not an icon. No
+> first-party source enumerates the classic `Icon` enum, and one unknown token fails the whole
+> body paste. If Studio's icon picker does list *Hamburger*, collapsing them into one
+> `Classic/Icon` afterwards is a safe tidy-up.
+>
+> The screens no longer reserve a 240px left gutter — content now starts at `Theme.Space.Gutter`
+> and runs the full width, because the rail is an overlay rather than a permanent column.
 
 ### `cmpSelection`  *(7 screens use it)*  · body: 1 control
 - [ ] `Items` — Input · Table · Default `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })`

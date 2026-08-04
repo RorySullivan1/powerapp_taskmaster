@@ -1,0 +1,272 @@
+# =============================================================================
+# cmpAppBar  —  header bar + fly-out navigation, in one component
+# =============================================================================
+# Supersedes cmpNavMenu (deleted) and the HeaderBar / AppTitle / ScreenTitle trio
+# that was copy-pasted into every nav screen. One definition, eight instances.
+#
+# Closed, it is a 64px header with a hamburger. Tapping the hamburger flies the
+# nav rail out over the screen with a scrim behind it; tapping the scrim, or
+# choosing an entry, closes it again.
+#
+# ---------------------------------------------------------------------------
+# THE INSTANCE HEIGHT IS DYNAMIC, AND THAT IS THE WHOLE TRICK.
+#
+#   Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)
+#
+# A component intercepts every click inside its bounds — a transparent fill does
+# not help, which is what made scrHome completely unresponsive earlier (see
+# _SHELL-NOTES.md). A fly-out needs to cover the screen when open, so the
+# component must be full-height *then* and only header-height the rest of the
+# time. Closed, it owns a 64px strip and nothing below it is affected. Open,
+# covering everything is exactly right: the scrim is meant to swallow the click,
+# and it uses it to close the menu.
+#
+# It must also be declared LAST on the screen so positional z-order floats the
+# fly-out above the content.
+# ---------------------------------------------------------------------------
+#
+# THE COMPONENT DOES NOT NAVIGATE — it cannot see the app's screens. It reports
+# the chosen entry and the screen acts:
+#
+#   OnNavigate: =Switch( appBar.SelectedKey, 1, Navigate(scrHome, …), … );
+#               Set(gNavOpen, false)
+#   OnToggle:   =Set(gNavOpen, !gNavOpen)
+#
+# Each row carries a transparent full-template `Classic/Button` declared LAST,
+# because a gallery's own OnSelect does not reliably fire when the click lands on
+# a child control — without it the rail looks right and does nothing.
+#
+# Contract:
+#   Items        (Input, Table)   {Key, Title, Icon, NeedsLicence} — bind to NavMenu
+#   ActiveKey    (Input, Number)  Key of the screen hosting this instance
+#   HasLicence   (Input, Boolean) pass gHasPowerBiLicence; a component can't read globals
+#   AppTitle     (Input, Text)    left-hand product name
+#   ScreenTitle  (Input, Text)    right-hand screen name
+#   IsOpen       (Input, Boolean) pass gNavOpen — the screen owns the state
+#   SelectedKey  (Output, Number) Key just chosen
+#   OnNavigate   (Event)          raised on choosing an entry
+#   OnToggle     (Event)          raised by the hamburger AND the scrim
+#
+# Colours are literals — a component cannot read app-scope named formulas. They
+# mirror Theme; if Theme changes, change them here too.
+# Grounded tokens only: Rectangle@2.3.0, Label@2.5.1, Classic/Icon@2.5.0,
+# Classic/Button@2.2.0, Gallery@2.15.0. NO NEW ENUM — the hamburger is three
+# Rectangles rather than an unverified `Icon.Hamburger`; see the note by btnMenu.
+# The only enums here are the ones NavMenu already carries.
+# =============================================================================
+ComponentDefinitions:
+  cmpAppBar:
+    DefinitionType: CanvasComponent
+    Description: App header with a fly-out navigation rail. Reports the chosen entry; the screen navigates.
+    AccessAppScope: false
+    CustomProperties:
+      Items:
+        PropertyKind: Input
+        Description: Navigation entries. Bind to the NavMenu named formula.
+        DataType: Table
+        Default: |
+          =Table(
+              { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
+              { Key: 2, Title: "Reports",   Icon: Icon.Table,     NeedsLicence: true  },
+              { Key: 3, Title: "Projects",  Icon: Icon.Documents, NeedsLicence: false },
+              { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false },
+              { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false } )
+      ActiveKey:
+        PropertyKind: Input
+        Description: Key of the screen this instance sits on — highlights that row.
+        DataType: Number
+        Default: =1
+      HasLicence:
+        PropertyKind: Input
+        Description: Pass gHasPowerBiLicence. Entries flagged NeedsLicence grey out when false.
+        DataType: Boolean
+        Default: =false
+      AppTitle:
+        PropertyKind: Input
+        Description: Product name shown at the left of the bar.
+        DataType: Text
+        Default: ="EQD Taskmaster"
+      ScreenTitle:
+        PropertyKind: Input
+        Description: Current screen name, shown at the right of the bar.
+        DataType: Text
+        Default: =""
+      IsOpen:
+        PropertyKind: Input
+        Description: Whether the fly-out is open. Pass gNavOpen — the screen owns this state.
+        DataType: Boolean
+        Default: =false
+      SelectedKey:
+        PropertyKind: Output
+        Description: Key of the entry just chosen. Read this in OnNavigate.
+        DataType: Number
+      OnNavigate:
+        PropertyKind: Event
+        Description: Raised when an entry is chosen. The screen Navigates and closes the fly-out.
+        ReturnType: Boolean
+      OnToggle:
+        PropertyKind: Event
+        Description: Raised by the hamburger and by the scrim. The screen flips gNavOpen.
+        ReturnType: Boolean
+    Properties:
+      Width: =1366
+      Height: =64
+      Fill: =RGBA(0, 0, 0, 0)
+      SelectedKey: =galNav.Selected.Key
+    Children:
+      # ---- Fly-out layer, declared FIRST so the header sits above it ---------
+      # The scrim covers everything below the bar. Its job is to be clicked:
+      # tapping outside the rail is the expected way to dismiss a fly-out.
+      - navScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =cmpAppBar.IsOpen
+            Fill: =RGBA(32, 38, 45, 0.35)
+            X: =0
+            Y: =64
+            Width: =Parent.Width
+            Height: =Parent.Height - 64
+            OnSelect: =cmpAppBar.OnToggle()
+      - navPanel:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =cmpAppBar.IsOpen
+            Fill: =RGBA(255, 255, 255, 1)
+            X: =0
+            Y: =64
+            Width: =240
+            Height: =Parent.Height - 64
+      - galNav:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            Visible: =cmpAppBar.IsOpen
+            Items: =cmpAppBar.Items
+            TemplateSize: =52
+            TemplatePadding: =0
+            X: =0
+            Y: =64
+            Width: =240
+            Height: =Parent.Height - 64
+            TemplateFill: |
+              =If( ThisItem.Key = cmpAppBar.ActiveKey,
+                   RGBA(102, 182, 227, 1), RGBA(255, 255, 255, 1) )
+          Children:
+            - navIcon:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =ThisItem.Icon
+                  Color: |
+                    =If( ThisItem.NeedsLicence && !cmpAppBar.HasLicence,
+                         RGBA(110, 120, 130, 1), RGBA(0, 90, 158, 1) )
+                  Height: =24
+                  Width: =24
+                  X: =16
+                  Y: =(Parent.TemplateHeight - Self.Height) / 2
+            - navLabel:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Title
+                  Font: =Font.'Segoe UI'
+                  Size: =14
+                  FontWeight: |
+                    =If( ThisItem.Key = cmpAppBar.ActiveKey,
+                         FontWeight.Semibold, FontWeight.Normal )
+                  Color: |
+                    =If( ThisItem.NeedsLicence && !cmpAppBar.HasLicence,
+                         RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1) )
+                  Height: =Parent.TemplateHeight
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =56
+                  Width: =Parent.TemplateWidth - 56 - 16
+            # LAST within the row: the actual hit target. See the header.
+            - navHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: =Select(Parent); cmpAppBar.OnNavigate()
+      # ---- Header layer, declared LAST so it stays above the fly-out ---------
+      - bar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(0, 90, 158, 1)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =64
+      # The hamburger is DRAWN, not an icon enum, and that is deliberate.
+      # `Icon.Hamburger` is not in any first-party enum list I can reach — the
+      # published Icon-control page documents the property but never enumerates the
+      # values — and one unknown token fails the WHOLE body paste, which across this
+      # gap costs a round trip measured in hours. Three Rectangles and a transparent
+      # Classic/Button use only tokens already proven in this repo and cannot be
+      # rejected. If Studio's icon picker turns out to list Hamburger, collapsing
+      # these four controls into one Classic/Icon is a safe later tidy-up.
+      - menuLine1:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            X: =20
+            Y: =25
+            Width: =24
+            Height: =2
+      - menuLine2:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            X: =20
+            Y: =32
+            Width: =24
+            Height: =2
+      - menuLine3:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            X: =20
+            Y: =39
+            Width: =24
+            Height: =2
+      # Declared after the lines so it takes the click; transparent so they show.
+      - btnMenu:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =12
+            Y: =16
+            Width: =40
+            Height: =32
+            OnSelect: =cmpAppBar.OnToggle()
+      - lblApp:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpAppBar.AppTitle
+            Color: =RGBA(255, 255, 255, 1)
+            Font: =Font.'Segoe UI'
+            FontWeight: =FontWeight.Semibold
+            Size: =20
+            X: =64
+            Y: =0
+            Width: =400
+            Height: =64
+            VerticalAlign: =VerticalAlign.Middle
+      - lblScreen:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpAppBar.ScreenTitle
+            Color: =RGBA(255, 255, 255, 1)
+            Font: =Font.'Segoe UI'
+            Size: =16
+            Align: =Align.Right
+            X: =Parent.Width - 400 - 24
+            Y: =0
+            Width: =400
+            Height: =64
+            VerticalAlign: =VerticalAlign.Middle
