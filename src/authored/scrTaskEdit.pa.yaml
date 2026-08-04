@@ -163,6 +163,7 @@ Screens:
       - txtTkProjectSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTkPicker, "Project")
             Visible: =gTaskEditTab = 1
             HintText: ="Type to find a project…"
             DelayOutput: =true
@@ -239,6 +240,7 @@ Screens:
       - txtTkLeadSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTkPicker, "Lead")
             Visible: =gTaskEditTab = 1
             HintText: ="Search people…"
             DelayOutput: =true
@@ -292,6 +294,7 @@ Screens:
       - txtTkSupporterSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTkPicker, "Supporter")
             Visible: =gTaskEditTab = 1
             HintText: ="Search people…"
             DelayOutput: =true
@@ -345,6 +348,7 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpSelection
           Properties:
+            FontSize: =10
             Visible: =gTaskEditTab = 1
             X: =580
             Y: =160
@@ -377,6 +381,7 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpSelection
           Properties:
+            FontSize: =12
             Visible: =gTaskEditTab = 1
             X: =580
             Y: =230
@@ -405,6 +410,7 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpSelection
           Properties:
+            FontSize: =12
             Visible: =gTaskEditTab = 1
             X: =900
             Y: =230
@@ -605,6 +611,7 @@ Screens:
       - txtTkApprovalSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTkPicker, "Approval")
             Visible: =gTaskEditTab = 2
             HintText: ="e.g. MAW, Legal, Compliance…"
             DelayOutput: =true
@@ -656,6 +663,7 @@ Screens:
       - txtTkClientSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTkPicker, "Client")
             Visible: =gTaskEditTab = 2
             HintText: ="Type to find a client…"
             DelayOutput: =true
@@ -707,6 +715,7 @@ Screens:
       - txtTkProductSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTkPicker, "Product")
             Visible: =gTaskEditTab = 2
             HintText: ="Type an ISIN / ticker / internal id…"
             DelayOutput: =true
@@ -1058,8 +1067,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gTaskEditTab = 1 && Len(txtTkProjectSearch.Text) >= 2 && gTkProject.Id <= 0
+            Visible: =gTkPicker = "Project" && ( gTaskEditTab = 1 && Len(txtTkProjectSearch.Text) >= 2 && gTkProject.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_projects,
                          StartsWith(project_name, txtTkProjectSearch.Text) ),
@@ -1068,8 +1076,8 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =268
+            X: =312
+            Y: =230
             Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
@@ -1107,17 +1115,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gTaskEditTab = 1 && Len(txtTkLeadSearch.Text) >= 2 && Len(gTkLead.Mail) = 0
+            Visible: =gTkPicker = "Lead" && ( gTaskEditTab = 1 && Len(txtTkLeadSearch.Text) >= 2 && Len(gTkLead.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtTkLeadSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =448
-            Width: =360
+            X: =312
+            Y: =410
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -1155,17 +1162,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gTaskEditTab = 1 && Len(txtTkSupporterSearch.Text) >= 2 && Len(gTkSupporter.Mail) = 0
+            Visible: =gTkPicker = "Supporter" && ( gTaskEditTab = 1 && Len(txtTkSupporterSearch.Text) >= 2 && Len(gTkSupporter.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtTkSupporterSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =514
-            Width: =360
+            X: =312
+            Y: =476
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -1203,8 +1209,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gTaskEditTab = 2 && Len(txtTkApprovalSearch.Text) >= 2 && gTkApproval.Id <= 0
+            Visible: =gTkPicker = "Approval" && ( gTaskEditTab = 2 && Len(txtTkApprovalSearch.Text) >= 2 && gTkApproval.Id <= 0 )
             # approval_status is a Yes/No; `= true` delegates on an indexed Boolean,
             # so retired approvals never reach the picker.
             Items: |
@@ -1216,8 +1221,8 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =198
+            X: =312
+            Y: =160
             Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
@@ -1256,8 +1261,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gTaskEditTab = 2 && Len(txtTkClientSearch.Text) >= 2 && gTkClient.Id <= 0
+            Visible: =gTkPicker = "Client" && ( gTaskEditTab = 2 && Len(txtTkClientSearch.Text) >= 2 && gTkClient.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_clients,
                          StartsWith(client_name, txtTkClientSearch.Text) ),
@@ -1266,8 +1270,8 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =264
+            X: =312
+            Y: =226
             Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
@@ -1305,8 +1309,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gTaskEditTab = 2 && Len(txtTkProductSearch.Text) >= 2 && gTkProduct.Id <= 0
+            Visible: =gTkPicker = "Product" && ( gTaskEditTab = 2 && Len(txtTkProductSearch.Text) >= 2 && gTkProduct.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_products,
                          StartsWith(product_uid, txtTkProductSearch.Text) ),
@@ -1315,8 +1318,8 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =330
+            X: =312
+            Y: =292
             Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface

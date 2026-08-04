@@ -68,11 +68,29 @@ No `ComboBox` or `DatePicker` token is grounded, so there are no dropdowns. Inst
   that is `Visible` only at 2+ characters with nothing yet chosen. Z-order is positional in
   this dialect, so declaring the gallery at the **end** of `Children:` floats it above the
   fields it covers — which is what makes it behave like a dropdown.
+
+  **Two rules that came out of the first render (2026-08-04), because the original layout was
+  unusable:**
+
+  1. **One picker open at a time.** Each search box does `OnChange: =Set(gXPicker, "<key>")`
+     and each results gallery requires `gXPicker = "<key>"` on top of its own conditions.
+     Without this, several dropdowns can be open at once and — since they sit 66px apart but
+     are 132px tall — the later-declared one covers the lower half of the earlier one, so
+     **some rows simply cannot be clicked**.
+  2. **The results gallery sits BESIDE its search box, not under it** — `X = input.X +
+     input.Width + 8`, same `Y`, width 280. Stacked pickers are 66px apart, so a 132px
+     dropdown opening downwards covers the next *two* search boxes and locks the user out of
+     them until they clear the current search. Opening sideways covers only the chip label and
+     empty space. (The two inline pickers inside `scrProjectEdit`'s staged-transaction row have
+     no free space beside them and stay below, relying on rule 1 alone.)
 - **Dates** → a text box parsed with `DateValue()`, plus an echo label that renders the parse
   (`12 Aug 2026`, or `⚠ not a date`). A mis-typed date cannot be silently stored as `Blank()`
   without the user seeing it.
 - **Choice** → `cmpSelection` strips. Optional Choices carry a real `"(none)"` option,
   because `{Value: ""}` is not a legal write and an optional column has to be clearable.
+  The strip's label size is the `FontSize` input (default **11**): a seven-option stage strip
+  needs smaller text than a three-option health strip, and a component cannot read `Theme.Size.*`.
+  Tune it on the instance — no repo round trip needed.
 
 ## 4. Required fields in one Patch; optional ones after, guarded
 

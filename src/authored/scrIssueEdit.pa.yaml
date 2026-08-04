@@ -170,6 +170,7 @@ Screens:
       - txtIssProjectSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gIssPicker, "Project")
             HintText: ="Type to find a project…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -217,6 +218,7 @@ Screens:
       - txtIssTaskSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gIssPicker, "Task")
             HintText: ="Type to find a task…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -264,6 +266,7 @@ Screens:
       - txtIssTxSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gIssPicker, "Tx")
             HintText: ="Type to find a transaction…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -311,6 +314,7 @@ Screens:
       - txtIssAssigneeSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gIssPicker, "Assignee")
             HintText: ="Search people…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -358,6 +362,7 @@ Screens:
       - txtIssOwnerSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gIssPicker, "Owner")
             HintText: ="Search people…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -406,6 +411,7 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpSelection
           Properties:
+            FontSize: =11
             X: =620
             Y: =108
             Width: =560
@@ -433,6 +439,7 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpSelection
           Properties:
+            FontSize: =10
             X: =620
             Y: =178
             Width: =660
@@ -462,6 +469,7 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpSelection
           Properties:
+            FontSize: =11
             X: =620
             Y: =248
             Width: =560
@@ -711,7 +719,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: =Len(txtIssProjectSearch.Text) >= 2 && gIssProject.Id <= 0
+            Visible: =gIssPicker = "Project" && ( Len(txtIssProjectSearch.Text) >= 2 && gIssProject.Id <= 0 )
             # Delegable: StartsWith on the indexed project_name.
             Items: |
               =Sort( Filter( taskmaster_projects,
@@ -721,9 +729,9 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =338
-            Width: =300
+            X: =332
+            Y: =300
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -760,7 +768,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: =Len(txtIssTaskSearch.Text) >= 2 && gIssTask.Id <= 0
+            Visible: =gIssPicker = "Task" && ( Len(txtIssTaskSearch.Text) >= 2 && gIssTask.Id <= 0 )
             # Narrowed to the chosen project when there is one — a delegable
             # `=` on the indexed Lookup FK plus a delegable StartsWith.
             Items: |
@@ -772,9 +780,9 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =404
-            Width: =300
+            X: =332
+            Y: =366
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -811,7 +819,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: =Len(txtIssTxSearch.Text) >= 2 && gIssTx.Id <= 0
+            Visible: =gIssPicker = "Tx" && ( Len(txtIssTxSearch.Text) >= 2 && gIssTx.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_transactions,
                          transaction_project_id.Id = gIssProject.Id
@@ -821,9 +829,9 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =470
-            Width: =300
+            X: =332
+            Y: =432
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -863,16 +871,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: =Len(txtIssAssigneeSearch.Text) >= 2 && Len(gIssAssignee.Mail) = 0
+            Visible: =gIssPicker = "Assignee" && ( Len(txtIssAssigneeSearch.Text) >= 2 && Len(gIssAssignee.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtIssAssigneeSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =536
-            Width: =360
+            X: =332
+            Y: =498
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -909,16 +917,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: =Len(txtIssOwnerSearch.Text) >= 2 && Len(gIssOwner.Mail) = 0
+            Visible: =gIssPicker = "Owner" && ( Len(txtIssOwnerSearch.Text) >= 2 && Len(gIssOwner.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtIssOwnerSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =602
-            Width: =360
+            X: =332
+            Y: =564
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:

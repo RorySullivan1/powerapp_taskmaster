@@ -35,6 +35,11 @@ ComponentDefinitions:
         DataType: Table
         Default: |
           =Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })
+      FontSize:
+        PropertyKind: Input
+        Description: Point size of the option labels. 11 keeps a 7-option strip legible; raise it for two or three wide options.
+        DataType: Number
+        Default: =11
       DefaultId:
         PropertyKind: Input
         Description: Id selected before the user interacts.
@@ -82,7 +87,10 @@ ComponentDefinitions:
                 Properties:
                   Text: =ThisItem.Label
                   Font: =Font.'Segoe UI'
-                  Size: =13
+                  # Tunable per instance: a 7-option stage strip needs smaller text
+                  # than a 2-option Yes/No, and this is a component so it cannot read
+                  # Theme.Size.*. Default 11.
+                  Size: =cmpSelection.FontSize
                   # Highlight the gallery's selected row.
                   Fill: =If(ThisItem.IsSelected, RGBA(0, 90, 158, 1), RGBA(255, 255, 255, 1))
                   Color: =If(ThisItem.IsSelected, RGBA(255, 255, 255, 1), RGBA(32, 38, 45, 1))

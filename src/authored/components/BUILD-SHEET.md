@@ -243,9 +243,10 @@ Single-select strip over an Items table; outputs Selected record, raises OnChang
 | # | Name | Kind | Type | Default / formula | Where the formula goes |
 |---|---|---|---|---|---|
 | 1 | `Items` | Input | Table | `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })` | the property's **Default** |
-| 2 | `DefaultId` | Input | Number | `=1` | the property's **Default** |
-| 3 | `Selected` | Output | Record | `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)` | ⚠️ **PHASE 3 — after the body.** Uses `galSel`, which the body creates. Create the property now with the placeholder `=First(cmpSelection.Items)`, then set the real formula once the body is in. |
-| 4 | `OnChange` | Event | Boolean | `` | the property's **Default** |
+| 2 | `FontSize` | Input | Number | `=11` | the property's **Default** |
+| 3 | `DefaultId` | Input | Number | `=1` | the property's **Default** |
+| 4 | `Selected` | Output | Record | `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)` | ⚠️ **PHASE 3 — after the body.** Uses `galSel`, which the body creates. Create the property now with the placeholder `=First(cmpSelection.Items)`, then set the real formula once the body is in. |
+| 5 | `OnChange` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
 

@@ -236,6 +236,7 @@ Screens:
       - txtPrManagerSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gPrPicker, "Manager")
             Visible: =gPrTab = 1
             HintText: ="Search people…"
             DelayOutput: =true
@@ -287,6 +288,7 @@ Screens:
       - txtPrRequestorSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gPrPicker, "Requestor")
             Visible: =gPrTab = 1
             HintText: ="Search people…"
             DelayOutput: =true
@@ -339,6 +341,7 @@ Screens:
       - txtPrSupporterSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gPrPicker, "Supporter")
             Visible: =gPrTab = 1
             HintText: ="Search people…"
             DelayOutput: =true
@@ -889,6 +892,7 @@ Screens:
       - txtNxClientSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gPrPicker, "NxClient")
             Visible: =gPrTab = 4
             HintText: ="Client…"
             DelayOutput: =true
@@ -918,6 +922,7 @@ Screens:
       - txtNxProductSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gPrPicker, "NxProduct")
             Visible: =gPrTab = 4
             HintText: ="Product…"
             DelayOutput: =true
@@ -1557,17 +1562,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gPrTab = 1 && Len(txtPrManagerSearch.Text) >= 2 && Len(gPrManager.Mail) = 0
+            Visible: =gPrPicker = "Manager" && ( gPrTab = 1 && Len(txtPrManagerSearch.Text) >= 2 && Len(gPrManager.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtPrManagerSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =464
-            Width: =360
+            X: =312
+            Y: =426
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -1605,17 +1609,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gPrTab = 1 && Len(txtPrRequestorSearch.Text) >= 2 && Len(gPrRequestor.Mail) = 0
+            Visible: =gPrPicker = "Requestor" && ( gPrTab = 1 && Len(txtPrRequestorSearch.Text) >= 2 && Len(gPrRequestor.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtPrRequestorSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =530
-            Width: =360
+            X: =312
+            Y: =492
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -1653,17 +1656,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gPrTab = 1 && Len(txtPrSupporterSearch.Text) >= 2 && Len(gPrSupporter.Mail) = 0
+            Visible: =gPrPicker = "Supporter" && ( gPrTab = 1 && Len(txtPrSupporterSearch.Text) >= 2 && Len(gPrSupporter.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtPrSupporterSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =596
-            Width: =360
+            X: =312
+            Y: =558
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -1701,8 +1703,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gPrTab = 4 && Len(txtNxClientSearch.Text) >= 2 && gNxClient.Id <= 0
+            Visible: =gPrPicker = "NxClient" && ( gPrTab = 4 && Len(txtNxClientSearch.Text) >= 2 && gNxClient.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_clients,
                          StartsWith(client_name, txtNxClientSearch.Text) ),
@@ -1750,8 +1751,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =gPrTab = 4 && Len(txtNxProductSearch.Text) >= 2 && gNxProduct.Id <= 0
+            Visible: =gPrPicker = "NxProduct" && ( gPrTab = 4 && Len(txtNxProductSearch.Text) >= 2 && gNxProduct.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_products,
                          StartsWith(product_uid, txtNxProductSearch.Text) ),

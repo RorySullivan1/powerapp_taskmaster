@@ -123,6 +123,7 @@ Screens:
       - txtTxProjectSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTxPicker, "Project")
             HintText: ="Type to find a project…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -172,6 +173,7 @@ Screens:
       - txtTxClientSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTxPicker, "Client")
             HintText: ="Type to find a client…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -221,6 +223,7 @@ Screens:
       - txtTxProductSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTxPicker, "Product")
             HintText: ="Type an ISIN / ticker / internal id…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -270,6 +273,7 @@ Screens:
       - txtTxSalesSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
+            OnChange: =Set(gTxPicker, "Sales")
             HintText: ="Search people…"
             DelayOutput: =true
             Font: =Theme.Font
@@ -527,8 +531,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =Len(txtTxProjectSearch.Text) >= 2 && gTxProject.Id <= 0
+            Visible: =gTxPicker = "Project" && ( Len(txtTxProjectSearch.Text) >= 2 && gTxProject.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_projects,
                          StartsWith(project_name, txtTxProjectSearch.Text) ),
@@ -537,9 +540,9 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =218
-            Width: =300
+            X: =332
+            Y: =180
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -576,8 +579,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =Len(txtTxClientSearch.Text) >= 2 && gTxClient.Id <= 0
+            Visible: =gTxPicker = "Client" && ( Len(txtTxClientSearch.Text) >= 2 && gTxClient.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_clients,
                          StartsWith(client_name, txtTxClientSearch.Text) ),
@@ -586,9 +588,9 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =284
-            Width: =300
+            X: =332
+            Y: =246
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -625,8 +627,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =Len(txtTxProductSearch.Text) >= 2 && gTxProduct.Id <= 0
+            Visible: =gTxPicker = "Product" && ( Len(txtTxProductSearch.Text) >= 2 && gTxProduct.Id <= 0 )
             Items: |
               =Sort( Filter( taskmaster_products,
                          StartsWith(product_uid, txtTxProductSearch.Text) ),
@@ -635,9 +636,9 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =350
-            Width: =300
+            X: =332
+            Y: =312
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:
@@ -674,17 +675,16 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
-            Visible: |
-              =Len(txtTxSalesSearch.Text) >= 2 && Len(gTxSales.Mail) = 0
+            Visible: =gTxPicker = "Sales" && ( Len(txtTxSalesSearch.Text) >= 2 && Len(gTxSales.Mail) = 0 )
             Items: |
               =Office365Users.SearchUser({ searchTerm: txtTxSalesSearch.Text, top: 8 })
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =24
-            Y: =416
-            Width: =360
+            X: =332
+            Y: =378
+            Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
           Children:

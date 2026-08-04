@@ -143,6 +143,7 @@ that flies out over the content when the hamburger is tapped.
 > and runs the full width, because the rail is an overlay rather than a permanent column.
 
 ### `cmpSelection`  *(7 screens use it)*  · body: 1 control
+- [ ] `FontSize` — Input · Number · `=11`  *(NEW 2026-08-04 — the strip's label size. A component can't read `Theme.Size.*`, and a 7-option stage strip needs smaller text than a 3-option health strip. Tune it on the instance, not here.)*
 - [ ] `Items` — Input · Table · Default `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })`
 - [ ] `DefaultId` — Input · Number · Default `=1`
 - [ ] `Selected` — **Output** · Record · ⚠️ **phase 3** — placeholder `=First(cmpSelection.Items)`; after the body, set `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)`
