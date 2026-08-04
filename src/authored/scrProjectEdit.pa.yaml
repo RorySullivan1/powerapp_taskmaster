@@ -1,43 +1,52 @@
 # =============================================================================
-# scrProjectEdit  —  create / edit a project.  ONE SCROLLING COLUMN, NO TABS.
+# scrProjectEdit  —  create / edit a project.
+# ONE SCROLLING COLUMN · CHILDREN ADDED THROUGH MODALS · NO TABS
 # =============================================================================
-# The five tabs are gone. Everything lives in `frmPrScroll`, a single vertical
-# auto-layout container with a headed section per former tab:
+# LAYOUT BANDS (tablet 1366x768), so Studio's numbers can be checked by eye:
+#      0 ..  64   header band            (absolute)
+#     64 .. 636   frmPrScroll            (scrolls; Height = Parent.Height - 64 - 132)
+#    636 .. 768   actionBar              (OPAQUE — the scroll cannot bleed under it)
+#                 validation message 652, Save / Cancel 706
 #
-#     Details · Classification · Tasks · Transactions · Issues
+# The action bar is a filled Rectangle, not just a gap. The container's own
+# Height stops at 636, but an opaque bar behind the buttons means that even if
+# Studio freezes a stale Height on paste, content can never show through the
+# Save row.
 #
-# WHY THIS SHAPE, beyond the ask:
+# THE SCROLLING COLUMN — `frmPrScroll`, a vertical auto-layout container with a
+# headed section per former tab: Details · Classification · Tasks ·
+# Transactions · Issues. Children carry NO X/Y (the container places them), so
+# nothing in the form can be frozen into a wrong constant on paste — the
+# galProjects failure mode is impossible in here.
 #
-#  * CHILDREN CARRY NO X/Y. The container places them. X/Y/Width/Height are the
-#    properties Studio freezes into constants on paste, so container-laid-out
-#    content is the only layout that survives this gap intact — the class of bug
-#    that put galProjects on top of its own filter row cannot occur in here.
+# CHILDREN ARE ADDED THROUGH A MODAL, NOT AN INLINE ROW.
+# Each of the three child sections is now just: heading · note · "+ Add …" ·
+# the staged list. Pressing Add opens a modal (`mdNt` / `mdNx` / `mdNi`) that
+# collects one row into colNewTasks / colNewTransactions / colNewIssues and
+# closes. Nothing is written to SharePoint until the project itself is saved —
+# a child needs the parent's ID, which does not exist until the insert returns.
+# The modals are declared LAST so they float above everything, and each is
+# gated on its own `g*Open` flag.
 #
-#  * A HIDDEN CHILD TAKES NO SPACE. Each people picker's results gallery now sits
-#    INLINE, immediately after its search box, and expands the column when it
-#    opens. That retires the whole absolute-overlay pattern: no z-order, no
-#    dropdown covering the fields below it, and no one-picker-at-a-time gate
-#    (`gPrPicker` is gone). Two dropdowns open at once is simply two expanded
-#    sections now.
+# PEOPLE ARE PICKED FREELY. The old two-option "Manager / Me" strips are gone.
+# Every modal has a full `SearchUserV2` picker, so a task lead, sales owner or
+# assignee can be anyone in the directory.
 #
-#  * NO TAB STATE. `gPrTab` is gone with the tabs, and with it the cmpSelection
-#    strip whose OnChange read `Selected.Id` in the same behaviour pass that set
-#    it — the race that stopped tab switching working at all.
+# THE COMPLETION DATE IS NOT A FIELD. `project_date_complete` is derived on
+# save — `If( gPrPhase = "Complete", Coalesce(<existing>, Now()), Blank() )` —
+# so marking a project Complete stamps it, and re-saving an already-complete
+# project keeps the original date rather than moving it.
 #
-# FIXED FURNITURE stays absolutely positioned, outside the container: the header
-# band (0–64), the validation message (652–700) and the Save / Cancel bar (706).
-# The container occupies 64 .. Parent.Height - 120 and scrolls.
+# STILL TO COME, blocked on two ungrounded tokens: the Choice strips want to be
+# real dropdowns and the date boxes want date pickers. Both need a control token
+# confirmed from a Studio code-view photo, exactly as `GroupContainer@1.5.0` was.
+# Until then Choices use cmpSelection strips and dates are typed with a parsed
+# echo beside them (`12 Aug 2026`, or `⚠ not a date`).
 #
-# ONE INFERRED TOKEN: `LayoutAlignItems.Start`. The container control, its
-# variant, LayoutDirection, LayoutGap, LayoutOverflowY and the enum
-# `LayoutOverflow.Scroll` are all confirmed from Studio code-view photos; only
-# `.Center` is confirmed for LayoutAlignItems, and Start/End/Stretch are read
-# from the docs' display names. If the paste is rejected, that is the first line
-# to change — `=LayoutAlignItems.Center` is the confirmed fallback.
-#
-# Everything else — every formula, every column token, the guarded Patch pass,
-# the staged-children writer — is unchanged from the tabbed version.
-# See _EDIT-NOTES.md for the shared edit-screen pattern.
+# ONE INFERRED TOKEN: `LayoutAlignItems.Start`. The container, its variant,
+# LayoutDirection, LayoutGap, LayoutOverflowY and `LayoutOverflow.Scroll` are all
+# photo-confirmed; only `.Center` is confirmed for LayoutAlignItems. If the paste
+# is rejected, that is the first line to change — `.Center` is the fallback.
 # =============================================================================
 Screens:
   scrProjectEdit:
@@ -75,11 +84,13 @@ Screens:
         // over from the previous project would be written to THIS one.
         Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
         Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
-        Set( gNtPriority, "Moderate" ); Set( gNtLeadWho, "Manager" );
-        Set( gNxCcy, "USD" ); Set( gNxSalesWho, "Manager" );
+        Set( gNtPriority, "Moderate" );
+        Set( gNtLead,     { DisplayName: "", Mail: "" } );
+        Set( gNxCcy, "USD" );
+        Set( gNxSales,    { DisplayName: "", Mail: "" } );
         Set( gNxClient,  { Id: 0, Value: "" } );
         Set( gNxProduct, { Id: 0, Value: "" } );
-        Set( gNiStatus, "Open" ); Set( gNiImpact, "(none)" ); Set( gNiAssigneeWho, "Manager" );
+        Set( gNiStatus, "Open" ); Set( gNiImpact, "(none)" ); Set( gNiAssignee, { DisplayName: "", Mail: "" } );
         Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
         Reset( txtPrStart ); Reset( txtPrTarget ); Reset( txtPrComplete );
         Reset( txtPrManagerSearch ); Reset( txtPrRequestorSearch ); Reset( txtPrSupporterSearch );
@@ -87,6 +98,9 @@ Screens:
         Reset( txtNxName ); Reset( txtNxNotional ); Reset( txtNxDate );
         Reset( txtNxClientSearch ); Reset( txtNxProductSearch );
         Reset( txtNiName )
+        
+        Set( gNtOpen, false ); Set( gNxOpen, false ); Set( gNiOpen, false );
+        Set( gNiStatus, "Open" ); Set( gNiImpact, "Medium" )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -134,13 +148,6 @@ Screens:
             X: =Parent.Width - 24 - Theme.Space.Gutter
             Y: =(Theme.Space.HeaderH - 24) / 2
             OnSelect: =Back()
-      # ---- THE SCROLLING FORM ------------------------------------------
-      # One vertical auto-layout container, five headed sections, no tabs.
-      # Children carry NO X/Y: the container stacks them, which also makes
-      # this the only layout Studio cannot freeze into constants on paste.
-      # A hidden child takes no space, so each picker's results gallery sits
-      # INLINE after its search box and expands the column instead of
-      # overlaying the fields below it.
       - frmPrScroll:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -156,9 +163,8 @@ Screens:
             X: =0
             Y: =64
             Width: =Parent.Width
-            Height: =Parent.Height - 64 - 120
+            Height: =Parent.Height - 64 - 132
           Children:
-            # ===== DETAILS =====
             - secHeadDetails:
                 Control: Label@2.5.1
                 Properties:
@@ -337,40 +343,6 @@ Screens:
                     =If( Len(txtPrTarget.Text) > 0 && IsError(DateValue(txtPrTarget.Text)),
                          Theme.Color.Danger, Theme.Color.TextMuted )
                   Width: =160
-                  Height: =36
-                  VerticalAlign: =VerticalAlign.Middle
-            - lblPrCompleteCap:
-                Control: Label@2.5.1
-                Properties:
-                  Text: ="Completion date"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =240
-                  Height: =18
-            - txtPrComplete:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  Default: |
-                    =If( gEditMode = "Edit" && !IsBlank(gEditProject.project_date_complete),
-                         Text(gEditProject.project_date_complete, "dd/mm/yyyy"), "" )
-                  HintText: ="dd/mm/yyyy"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =160
-                  Height: =36
-            - lblPrCompleteEcho:
-                Control: Label@2.5.1
-                Properties:
-                  Text: |
-                    =If( Len(txtPrComplete.Text) = 0, "not set",
-                         IfError( Text(DateValue(txtPrComplete.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: |
-                    =If( Len(txtPrComplete.Text) > 0 && IsError(DateValue(txtPrComplete.Text)),
-                         Theme.Color.Danger, Theme.Color.TextMuted )
-                  Width: =200
                   Height: =36
                   VerticalAlign: =VerticalAlign.Middle
             - lblPrMgrCap:
@@ -618,7 +590,6 @@ Screens:
                   Width: =16
                   OnSelect: |
                     =Set(gPrSupporter, { DisplayName: "", Mail: "" })
-            # ===== CLASSIFICATION =====
             - secHeadClassification:
                 Control: Label@2.5.1
                 Properties:
@@ -719,7 +690,6 @@ Screens:
                   Width: =520
                   Height: =36
                   VerticalAlign: =VerticalAlign.Middle
-            # ===== TASKS =====
             - secHeadTasks:
                 Control: Label@2.5.1
                 Properties:
@@ -733,73 +703,24 @@ Screens:
             - lblNtCap:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Add tasks now; they are written after the project is created and its ID exists."
+                  Text: ="Staged tasks are held here and written only after the project is created."
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
                   Width: =900
                   Height: =18
-            - txtNtName:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  HintText: ="Task name"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =300
-                  Height: =36
-            - txtNtTarget:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  HintText: ="Due dd/mm/yyyy"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =140
-                  Height: =36
-            - selNtPriority:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
-                Properties:
-                  Width: =380
-                  Height: =36
-                  Items: |
-                    =Table( { Id: 1, Label: "Low" }, { Id: 2, Label: "Moderate" },
-                            { Id: 3, Label: "High" }, { Id: 4, Label: "Critical" } )
-                  DefaultId: =2
-                  OnChange: =Set(gNtPriority, selNtPriority.Selected.Label)
-            - selNtLeadWho:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
-                Properties:
-                  Width: =260
-                  Height: =36
-                  Items: |
-                    =Table( { Id: 1, Label: "Manager" }, { Id: 2, Label: "Me" } )
-                  DefaultId: =1
-                  OnChange: =Set(gNtLeadWho, selNtLeadWho.Selected.Label)
-            - btnNtAdd:
+            - btnAddNt:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  Text: ="Add task"
-                  DisplayMode: |
-                    =If( Len(Trim(txtNtName.Text)) > 0
-                      && Len( If(gNtLeadWho = "Me", Coalesce(User().Email, ""), gPrManager.Mail) ) > 0,
-                         DisplayMode.Edit, DisplayMode.Disabled )
+                  Text: ="+  Add task"
                   Fill: =Theme.Color.Primary
                   Color: =Theme.Color.OnPrimary
+                  BorderColor: =Theme.Color.Primary
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
+                  Width: =200
                   Height: =36
-                  Width: =140
-                  OnSelect: |
-                    =Collect( colNewTasks,
-                        { sid:        If( IsEmpty(colNewTasks), 1, Max(colNewTasks, sid) + 1 ),
-                          t_name:     Trim(txtNtName.Text),
-                          t_stage:    "Not Started",
-                          t_priority: gNtPriority,
-                          t_leadName: If( gNtLeadWho = "Me", Coalesce(User().FullName, ""), gPrManager.DisplayName ),
-                          t_leadMail: If( gNtLeadWho = "Me", Coalesce(User().Email, ""),    gPrManager.Mail ),
-                          t_target:   txtNtTarget.Text } );
-                    Reset( txtNtName ); Reset( txtNtTarget )
+                  OnSelect: =Set(gNtOpen, true)
             - galNewTasks:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
@@ -837,7 +758,6 @@ Screens:
                         X: =Parent.TemplateWidth - 36
                         Y: =10
                         OnSelect: =RemoveIf(colNewTasks, sid = ThisItem.sid)
-            # ===== TRANSACTIONS =====
             - secHeadTransactions:
                 Control: Label@2.5.1
                 Properties:
@@ -851,219 +771,24 @@ Screens:
             - lblNxCap:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Client, product, currency and trade date are required on every transaction, so all four must be set before a row can be staged."
+                  Text: ="Staged transactions are held here and written only after the project is created."
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
                   Width: =1000
                   Height: =18
-            - txtNxName:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  HintText: ="Transaction label"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =240
-                  Height: =36
-            - txtNxClientSearch:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  HintText: ="Client…"
-                  DelayOutput: =true
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =180
-                  Height: =36
-            - galNxClient:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtNxClientSearch.Text) >= 2 && gNxClient.Id <= 0
-                  Items: |
-                    =Sort( Filter( taskmaster_clients,
-                               StartsWith(client_name, txtNxClientSearch.Text) ),
-                           client_name )
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Width: =240
-                  Height: =132
-                  TemplateFill: =Theme.Color.Surface
-                Children:
-                  - rowNxClient:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.client_name
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =8
-                        Y: =0
-                        Width: =Parent.TemplateWidth - 16
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - galNxClientHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gNxClient, { Id: ThisItem.ID, Value: ThisItem.client_name })
-            - txtNxProductSearch:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  HintText: ="Product…"
-                  DelayOutput: =true
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =180
-                  Height: =36
-            - galNxProduct:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtNxProductSearch.Text) >= 2 && gNxProduct.Id <= 0
-                  Items: |
-                    =Sort( Filter( taskmaster_products,
-                               StartsWith(product_uid, txtNxProductSearch.Text) ),
-                           product_uid )
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Width: =240
-                  Height: =132
-                  TemplateFill: =Theme.Color.Surface
-                Children:
-                  - rowNxProduct:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.product_uid
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =8
-                        Y: =0
-                        Width: =Parent.TemplateWidth - 16
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - galNxProductHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gNxProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid })
-            - txtNxNotional:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  HintText: ="Notional"
-                  Format: =TextFormat.Number
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =140
-                  Height: =36
-            - selNxCcy:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
-                Properties:
-                  Width: =260
-                  Height: =36
-                  Items: |
-                    =Table( { Id: 1, Label: "USD" }, { Id: 2, Label: "EUR" }, { Id: 3, Label: "GBP" },
-                            { Id: 4, Label: "JPY" }, { Id: 5, Label: "CHF" } )
-                  DefaultId: =1
-                  OnChange: =Set(gNxCcy, selNxCcy.Selected.Label)
-            - txtNxDate:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  Default: =Text(Today(), "dd/mm/yyyy")
-                  HintText: ="dd/mm/yyyy"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =120
-                  Height: =36
-            - btnNxAdd:
+            - btnAddNx:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  Text: ="Add"
-                  DisplayMode: |
-                    =If( Len(Trim(txtNxName.Text)) > 0
-                      && gNxClient.Id > 0 && gNxProduct.Id > 0
-                      && Len(txtNxDate.Text) > 0 && !IsError(DateValue(txtNxDate.Text))
-                      && ( Len(txtNxNotional.Text) = 0 || !IsError(Value(txtNxNotional.Text)) )
-                      && Len( If(gNxSalesWho = "Me", Coalesce(User().Email, ""), gPrManager.Mail) ) > 0,
-                         DisplayMode.Edit, DisplayMode.Disabled )
+                  Text: ="+  Add transaction"
                   Fill: =Theme.Color.Primary
                   Color: =Theme.Color.OnPrimary
+                  BorderColor: =Theme.Color.Primary
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
+                  Width: =200
                   Height: =36
-                  Width: =92
-                  OnSelect: |
-                    =Collect( colNewTransactions,
-                        { sid:           If( IsEmpty(colNewTransactions), 1, Max(colNewTransactions, sid) + 1 ),
-                          x_name:        Trim(txtNxName.Text),
-                          x_clientId:    gNxClient.Id,
-                          x_clientValue: gNxClient.Value,
-                          x_productId:   gNxProduct.Id,
-                          x_productValue: gNxProduct.Value,
-                          x_ccy:         gNxCcy,
-                          x_notional:    txtNxNotional.Text,
-                          x_date:        txtNxDate.Text,
-                          x_salesName:   If( gNxSalesWho = "Me", Coalesce(User().FullName, ""), gPrManager.DisplayName ),
-                          x_salesMail:   If( gNxSalesWho = "Me", Coalesce(User().Email, ""),    gPrManager.Mail ) } );
-                    Reset( txtNxName ); Reset( txtNxNotional );
-                    Reset( txtNxClientSearch ); Reset( txtNxProductSearch );
-                    Set( gNxClient,  { Id: 0, Value: "" } );
-                    Set( gNxProduct, { Id: 0, Value: "" } )
-            - selNxSalesWho:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
-                Properties:
-                  Width: =240
-                  Height: =24
-                  Items: |
-                    =Table( { Id: 1, Label: "Manager" }, { Id: 2, Label: "Me" } )
-                  DefaultId: =1
-                  OnChange: =Set(gNxSalesWho, selNxSalesWho.Selected.Label)
-            - lblNxClientChip:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =If(gNxClient.Id > 0, gNxClient.Value, "— client —")
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =If(gNxClient.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                  Width: =180
-                  Height: =20
-                  VerticalAlign: =VerticalAlign.Middle
-                  OnSelect: |
-                    =Set(gNxClient, { Id: 0, Value: "" })
-            - lblNxProductChip:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =If(gNxProduct.Id > 0, gNxProduct.Value, "— product —")
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =If(gNxProduct.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                  Width: =180
-                  Height: =20
-                  VerticalAlign: =VerticalAlign.Middle
-                  OnSelect: |
-                    =Set(gNxProduct, { Id: 0, Value: "" })
+                  OnSelect: =Set(gNxOpen, true)
             - galNewTransactions:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
@@ -1102,7 +827,6 @@ Screens:
                         X: =Parent.TemplateWidth - 36
                         Y: =10
                         OnSelect: =RemoveIf(colNewTransactions, sid = ThisItem.sid)
-            # ===== ISSUES =====
             - secHeadIssues:
                 Control: Label@2.5.1
                 Properties:
@@ -1116,76 +840,24 @@ Screens:
             - lblNiCap:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Issues raised at kick-off — known risks, dependencies, outstanding approvals."
+                  Text: ="Staged issues are held here and written only after the project is created."
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
                   Width: =900
                   Height: =18
-            - txtNiName:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  HintText: ="Issue summary"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =320
-                  Height: =36
-            - selNiStatus:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
-                Properties:
-                  Width: =400
-                  Height: =36
-                  Items: |
-                    =Table( { Id: 1, Label: "Open" }, { Id: 2, Label: "Review" },
-                            { Id: 3, Label: "Waiting" }, { Id: 4, Label: "Blocked" } )
-                  DefaultId: =1
-                  OnChange: =Set(gNiStatus, selNiStatus.Selected.Label)
-            - selNiImpact:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
-                Properties:
-                  Width: =400
-                  Height: =36
-                  Items: |
-                    =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "Low" },
-                            { Id: 3, Label: "Moderate" }, { Id: 4, Label: "High" },
-                            { Id: 5, Label: "Critical" } )
-                  DefaultId: =1
-                  OnChange: =Set(gNiImpact, selNiImpact.Selected.Label)
-            - btnNiAdd:
+            - btnAddNi:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  Text: ="Add issue"
-                  DisplayMode: |
-                    =If( Len(Trim(txtNiName.Text)) > 0
-                      && Len( If(gNiAssigneeWho = "Me", Coalesce(User().Email, ""), gPrManager.Mail) ) > 0,
-                         DisplayMode.Edit, DisplayMode.Disabled )
+                  Text: ="+  Add issue"
                   Fill: =Theme.Color.Primary
                   Color: =Theme.Color.OnPrimary
+                  BorderColor: =Theme.Color.Primary
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
+                  Width: =200
                   Height: =36
-                  Width: =140
-                  OnSelect: |
-                    =Collect( colNewIssues,
-                        { sid:            If( IsEmpty(colNewIssues), 1, Max(colNewIssues, sid) + 1 ),
-                          i_name:         Trim(txtNiName.Text),
-                          i_status:       gNiStatus,
-                          i_impact:       gNiImpact,
-                          i_assigneeName: If( gNiAssigneeWho = "Me", Coalesce(User().FullName, ""), gPrManager.DisplayName ),
-                          i_assigneeMail: If( gNiAssigneeWho = "Me", Coalesce(User().Email, ""),    gPrManager.Mail ) } );
-                    Reset( txtNiName )
-            - selNiAssigneeWho:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
-                Properties:
-                  Width: =240
-                  Height: =24
-                  Items: |
-                    =Table( { Id: 1, Label: "Manager" }, { Id: 2, Label: "Me" } )
-                  DefaultId: =1
-                  OnChange: =Set(gNiAssigneeWho, selNiAssigneeWho.Selected.Label)
+                  OnSelect: =Set(gNiOpen, true)
             - galNewIssues:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
@@ -1222,6 +894,16 @@ Screens:
                         X: =Parent.TemplateWidth - 36
                         Y: =10
                         OnSelect: =RemoveIf(colNewIssues, sid = ThisItem.sid)
+      - actionBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =0
+            Y: =Parent.Height - 132
+            Width: =Parent.Width
+            Height: =132
       - lblPrMissingCap:
           Control: Label@2.5.1
           Properties:
@@ -1304,7 +986,10 @@ Screens:
                                             Path = gPrTypePath ),
                                 project_date_start:    IfError( DateValue(txtPrStart.Text),    Blank() ),
                                 project_date_target:   IfError( DateValue(txtPrTarget.Text),   Blank() ),
-                                project_date_complete: IfError( DateValue(txtPrComplete.Text), Blank() ) } ) ),
+                                project_date_complete:
+                                                  If( gPrPhase = "Complete",
+                                                      Coalesce(gEditProject.project_date_complete, Now()),
+                                                      Blank() ) } ) ),
                       Set( gPrErr, FirstError.Message ) ),
                   IfError(
                       Set( gPrSaved,
@@ -1322,7 +1007,10 @@ Screens:
                                       Department: "", JobTitle: "", Picture: "" },
                                 project_date_start:    IfError( DateValue(txtPrStart.Text),    Blank() ),
                                 project_date_target:   IfError( DateValue(txtPrTarget.Text),   Blank() ),
-                                project_date_complete: IfError( DateValue(txtPrComplete.Text), Blank() ) } ) ),
+                                project_date_complete:
+                                                  If( gPrPhase = "Complete",
+                                                      Coalesce(gEditProject.project_date_complete, Now()),
+                                                      Blank() ) } ) ),
                       Set( gPrErr, FirstError.Message ) ) );
               If( Len(gPrErr) > 0,
                   Notify( If(gEditMode = "New", "Couldn't create the project: ", "Couldn't save the project: ")
@@ -1506,3 +1194,950 @@ Screens:
             X: =380
             Y: =706
             OnSelect: =Back()
+      - mdNtScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set(gNtOpen, false)
+            Visible: =gNtOpen
+      - mdNtCard:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 680) / 2
+            Y: =(Parent.Height - 470) / 2
+            Width: =680
+            Height: =470
+            Visible: =gNtOpen
+      - mdNtTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Add a task"
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 20
+            Width: =400
+            Height: =28
+            FontWeight: =FontWeight.Semibold
+            Visible: =gNtOpen
+      - lblNtNameCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Task name  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 64
+            Width: =300
+            Height: =18
+            Visible: =gNtOpen
+      - txtNtName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="What needs doing?"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 84
+            Width: =300
+            Height: =36
+            Visible: =gNtOpen
+      - lblNtTgtCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Target date  (dd/mm/yyyy)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 348
+            Y: =(Parent.Height - 470) / 2 + 64
+            Width: =300
+            Height: =18
+            Visible: =gNtOpen
+      - txtNtTarget:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="e.g. 30/09/2026"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 348
+            Y: =(Parent.Height - 470) / 2 + 84
+            Width: =160
+            Height: =36
+            Visible: =gNtOpen
+      - lblNtTgtEcho:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If( Len(txtNtTarget.Text) = 0, "",
+                   IfError( Text(DateValue(txtNtTarget.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 680) / 2 + 516
+            Y: =(Parent.Height - 470) / 2 + 84
+            Width: =140
+            Height: =36
+            Visible: =gNtOpen
+      - lblNtPriCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Priority"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 136
+            Width: =300
+            Height: =18
+            Visible: =gNtOpen
+      - selNtPriority:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 156
+            Width: =380
+            Height: =36
+            FontSize: =11
+            Items: |
+              =Table({ Id: 1, Label: "Low" }, { Id: 2, Label: "Moderate" },
+                      { Id: 3, Label: "High" }, { Id: 4, Label: "Critical" })
+            DefaultId: =2
+            OnChange: =Set(gNtPriority, selNtPriority.Selected.Label)
+            Visible: =gNtOpen
+      - lblNtLeadCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Task lead  *  —  anyone in the directory"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 208
+            Width: =500
+            Height: =18
+            Visible: =gNtOpen
+      - txtNtLeadSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="Type a name…"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 228
+            Width: =300
+            Height: =36
+            Visible: =gNtOpen
+      - lblNtLeadChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(Len(gNtLead.Mail) > 0, gNtLead.DisplayName, "— nobody selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 228 + 38
+            Width: =300
+            Height: =20
+            Visible: =gNtOpen
+      - icoNtLeadClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Visible: =gNtOpen
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24 + 300 + 8
+            Y: =(Parent.Height - 470) / 2 + 228 + 40
+            Width: =16
+            Height: =16
+            OnSelect: |
+              =Set(gNtLead, { DisplayName: "", Mail: "" })
+      - galNtLead:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            Visible: =gNtOpen
+            Items: |
+              =Office365Users.SearchUserV2({ searchTerm: txtNtLeadSearch.Text, top: 6 }).value
+            TemplateSize: =32
+            TemplatePadding: =0
+            TemplateFill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 228 + 38
+            Width: =300
+            Height: =104
+          Children:
+            - rowNtLead:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.DisplayName
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+            - hitNtLead:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set(gNtLead, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
+                     Reset(txtNtLeadSearch)
+      - mdNtAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Add"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            DisplayMode: |
+              =If( Len(Trim(txtNtName.Text)) > 0 && Len(gNtLead.Mail) > 0,
+                   DisplayMode.Edit, DisplayMode.Disabled )
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 470) / 2 + 470 - 60
+            Width: =140
+            Height: =40
+            OnSelect: |
+              =Collect( colNewTasks,
+                  { sid:        If( IsEmpty(colNewTasks), 1, Max(colNewTasks, sid) + 1 ),
+                    t_name:     Trim(txtNtName.Text),
+                    t_stage:    "Not Started",
+                    t_priority: gNtPriority,
+                    t_leadName: gNtLead.DisplayName,
+                    t_leadMail: gNtLead.Mail,
+                    t_target:   txtNtTarget.Text } );
+               Reset( txtNtName ); Reset( txtNtTarget ); Reset( txtNtLeadSearch );
+               Set( gNtLead, { DisplayName: "", Mail: "" } );
+               Set(gNtOpen, false)
+            Visible: =gNtOpen
+      - mdNtCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.TextPrimary
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 176
+            Y: =(Parent.Height - 470) / 2 + 470 - 60
+            Width: =120
+            Height: =40
+            OnSelect: |
+              =Reset( txtNtName ); Reset( txtNtTarget ); Reset( txtNtLeadSearch );
+               Set( gNtLead, { DisplayName: "", Mail: "" } );
+               Set(gNtOpen, false)
+            Visible: =gNtOpen
+      - mdNxScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set(gNxOpen, false)
+            Visible: =gNxOpen
+      - mdNxCard:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 760) / 2
+            Y: =(Parent.Height - 560) / 2
+            Width: =760
+            Height: =560
+            Visible: =gNxOpen
+      - mdNxTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Add a transaction"
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 20
+            Width: =400
+            Height: =28
+            FontWeight: =FontWeight.Semibold
+            Visible: =gNxOpen
+      - lblNxNameCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Transaction label  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 64
+            Width: =300
+            Height: =18
+            Visible: =gNxOpen
+      - txtNxName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="e.g. QIS-2026-0417 EMEA autocall"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 84
+            Width: =300
+            Height: =36
+            Visible: =gNxOpen
+      - lblNxDateCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Trade date  *  (dd/mm/yyyy)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 348
+            Y: =(Parent.Height - 560) / 2 + 64
+            Width: =300
+            Height: =18
+            Visible: =gNxOpen
+      - txtNxDate:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="e.g. 12/08/2026"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 348
+            Y: =(Parent.Height - 560) / 2 + 84
+            Width: =160
+            Height: =36
+            Visible: =gNxOpen
+      - lblNxDateEcho:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =If( Len(txtNxDate.Text) = 0, "",
+                   IfError( Text(DateValue(txtNxDate.Text), "dd mmm yyyy"), "⚠ not a date" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 680) / 2 + 516
+            Y: =(Parent.Height - 560) / 2 + 84
+            Width: =140
+            Height: =36
+            Visible: =gNxOpen
+      - lblNxClientCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Client  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 136
+            Width: =300
+            Height: =18
+            Visible: =gNxOpen
+      - txtNxClientSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="Type to find a client…"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 156
+            Width: =280
+            Height: =36
+            Visible: =gNxOpen
+      - lblNxClientChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(gNxClient.Id > 0, gNxClient.Value, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 156 + 38
+            Width: =280
+            Height: =20
+            Visible: =gNxOpen
+      - galNxClient:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            Visible: =gNxOpen
+            Items: =Sort( Filter(taskmaster_clients, StartsWith(client_name, txtNxClientSearch.Text)), client_name )
+            TemplateSize: =32
+            TemplatePadding: =0
+            TemplateFill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 156 + 38
+            Width: =280
+            Height: =104
+          Children:
+            - rowNxClient:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.client_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+            - hitNxClient:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set(gNxClient, { Id: ThisItem.ID, Value: ThisItem.client_name });
+                     Reset(txtNxClientSearch)
+      - lblNxProdCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Product  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 312
+            Width: =300
+            Height: =18
+            Visible: =gNxOpen
+      - txtNxProductSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="Type to find a product…"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 332
+            Width: =280
+            Height: =36
+            Visible: =gNxOpen
+      - lblNxProductChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(gNxProduct.Id > 0, gNxProduct.Value, "— none selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 332 + 38
+            Width: =280
+            Height: =20
+            Visible: =gNxOpen
+      - galNxProduct:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            Visible: =gNxOpen
+            Items: =Sort( Filter(taskmaster_products, StartsWith(product_uid, txtNxProductSearch.Text)), product_uid )
+            TemplateSize: =32
+            TemplatePadding: =0
+            TemplateFill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 332 + 38
+            Width: =280
+            Height: =104
+          Children:
+            - rowNxProduct:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.product_uid
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+            - hitNxProduct:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set(gNxProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid });
+                     Reset(txtNxProductSearch)
+      - lblNxNotCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Notional  (native currency)"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 760) / 2 + 372
+            Y: =(Parent.Height - 560) / 2 + 136
+            Width: =300
+            Height: =18
+            Visible: =gNxOpen
+      - txtNxNotional:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="e.g. 25000000"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 760) / 2 + 372
+            Y: =(Parent.Height - 560) / 2 + 156
+            Width: =160
+            Height: =36
+            Visible: =gNxOpen
+      - selNxCcy:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =(Parent.Width - 760) / 2 + 372
+            Y: =(Parent.Height - 560) / 2 + 206
+            Width: =300
+            Height: =36
+            FontSize: =11
+            Items: |
+              =Table({ Id: 1, Label: "USD" }, { Id: 2, Label: "EUR" }, { Id: 3, Label: "GBP" },
+                      { Id: 4, Label: "JPY" }, { Id: 5, Label: "CHF" })
+            DefaultId: =1
+            OnChange: =Set(gNxCcy, selNxCcy.Selected.Label)
+            Visible: =gNxOpen
+      - lblNxSalesCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Sales owner  *  —  anyone in the directory"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 760) / 2 + 372
+            Y: =(Parent.Height - 560) / 2 + 258
+            Width: =400
+            Height: =18
+            Visible: =gNxOpen
+      - txtNxSalesSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="Type a name…"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 760) / 2 + 372
+            Y: =(Parent.Height - 560) / 2 + 278
+            Width: =280
+            Height: =36
+            Visible: =gNxOpen
+      - lblNxSalesChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(Len(gNxSales.Mail) > 0, gNxSales.DisplayName, "— nobody selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 760) / 2 + 372
+            Y: =(Parent.Height - 560) / 2 + 278 + 38
+            Width: =280
+            Height: =20
+            Visible: =gNxOpen
+      - icoNxSalesClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Visible: =gNxOpen
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 760) / 2 + 372 + 280 + 8
+            Y: =(Parent.Height - 560) / 2 + 278 + 40
+            Width: =16
+            Height: =16
+            OnSelect: |
+              =Set(gNxSales, { DisplayName: "", Mail: "" })
+      - galNxSales:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            Visible: =gNxOpen
+            Items: |
+              =Office365Users.SearchUserV2({ searchTerm: txtNxSalesSearch.Text, top: 6 }).value
+            TemplateSize: =32
+            TemplatePadding: =0
+            TemplateFill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 760) / 2 + 372
+            Y: =(Parent.Height - 560) / 2 + 278 + 38
+            Width: =280
+            Height: =104
+          Children:
+            - rowNxSales:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.DisplayName
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+            - hitNxSales:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set(gNxSales, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
+                     Reset(txtNxSalesSearch)
+      - mdNxAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Add"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            DisplayMode: |
+              =If( Len(Trim(txtNxName.Text)) > 0 && gNxClient.Id > 0 && gNxProduct.Id > 0
+                && Len(txtNxDate.Text) > 0 && !IsError(DateValue(txtNxDate.Text))
+                && ( Len(txtNxNotional.Text) = 0 || !IsError(Value(txtNxNotional.Text)) )
+                && Len(gNxSales.Mail) > 0,
+                   DisplayMode.Edit, DisplayMode.Disabled )
+            X: =(Parent.Width - 760) / 2 + 24
+            Y: =(Parent.Height - 560) / 2 + 560 - 60
+            Width: =140
+            Height: =40
+            OnSelect: |
+              =Collect( colNewTransactions,
+                  { sid:            If( IsEmpty(colNewTransactions), 1, Max(colNewTransactions, sid) + 1 ),
+                    x_name:         Trim(txtNxName.Text),
+                    x_clientId:     gNxClient.Id,
+                    x_clientValue:  gNxClient.Value,
+                    x_productId:    gNxProduct.Id,
+                    x_productValue: gNxProduct.Value,
+                    x_ccy:          gNxCcy,
+                    x_notional:     txtNxNotional.Text,
+                    x_date:         txtNxDate.Text,
+                    x_salesName:    gNxSales.DisplayName,
+                    x_salesMail:    gNxSales.Mail } );
+               Reset( txtNxName ); Reset( txtNxNotional ); Reset( txtNxDate );
+               Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
+               Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
+               Set( gNxSales, { DisplayName: "", Mail: "" } );
+               Set(gNxOpen, false)
+            Visible: =gNxOpen
+      - mdNxCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.TextPrimary
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 760) / 2 + 176
+            Y: =(Parent.Height - 560) / 2 + 560 - 60
+            Width: =120
+            Height: =40
+            OnSelect: |
+              =Reset( txtNxName ); Reset( txtNxNotional ); Reset( txtNxDate );
+               Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
+               Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
+               Set( gNxSales, { DisplayName: "", Mail: "" } );
+               Set(gNxOpen, false)
+            Visible: =gNxOpen
+      - mdNiScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set(gNiOpen, false)
+            Visible: =gNiOpen
+      - mdNiCard:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 680) / 2
+            Y: =(Parent.Height - 520) / 2
+            Width: =680
+            Height: =520
+            Visible: =gNiOpen
+      - mdNiTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Add an issue"
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 20
+            Width: =400
+            Height: =28
+            FontWeight: =FontWeight.Semibold
+            Visible: =gNiOpen
+      - lblNiNameCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Issue summary  *"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 64
+            Width: =400
+            Height: =18
+            Visible: =gNiOpen
+      - txtNiName:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="What is the issue?"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 84
+            Width: =400
+            Height: =36
+            Visible: =gNiOpen
+      - lblNiStatCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Status"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 136
+            Width: =300
+            Height: =18
+            Visible: =gNiOpen
+      - selNiStatus:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 156
+            Width: =400
+            Height: =36
+            FontSize: =11
+            Items: |
+              =Table({ Id: 1, Label: "Open" }, { Id: 2, Label: "In Progress" },
+                      { Id: 3, Label: "Blocked" }, { Id: 4, Label: "Resolved" })
+            DefaultId: =1
+            OnChange: =Set(gNiStatus, selNiStatus.Selected.Label)
+            Visible: =gNiOpen
+      - lblNiImpCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Impact"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 208
+            Width: =300
+            Height: =18
+            Visible: =gNiOpen
+      - selNiImpact:
+          Control: CanvasComponent
+          ComponentName: cmpSelection
+          Properties:
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 228
+            Width: =400
+            Height: =36
+            FontSize: =11
+            Items: |
+              =Table({ Id: 1, Label: "Low" }, { Id: 2, Label: "Medium" }, { Id: 3, Label: "High" })
+            DefaultId: =2
+            OnChange: =Set(gNiImpact, selNiImpact.Selected.Label)
+            Visible: =gNiOpen
+      - lblNiAssCap:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Assignee  *  —  anyone in the directory"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 280
+            Width: =500
+            Height: =18
+            Visible: =gNiOpen
+      - txtNiAssSearch:
+          Control: Classic/TextInput@2.3.2
+          Properties:
+            Default: =""
+            HintText: ="Type a name…"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 300
+            Width: =300
+            Height: =36
+            Visible: =gNiOpen
+      - lblNiAssChip:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(Len(gNiAssignee.Mail) > 0, gNiAssignee.DisplayName, "— nobody selected —")
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextPrimary
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 300 + 38
+            Width: =300
+            Height: =20
+            Visible: =gNiOpen
+      - icoNiAssClear:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Visible: =gNiOpen
+            Color: =Theme.Color.TextMuted
+            X: =(Parent.Width - 680) / 2 + 24 + 300 + 8
+            Y: =(Parent.Height - 520) / 2 + 300 + 40
+            Width: =16
+            Height: =16
+            OnSelect: |
+              =Set(gNiAssignee, { DisplayName: "", Mail: "" })
+      - galNiAss:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+          Properties:
+            Visible: =gNiOpen
+            Items: |
+              =Office365Users.SearchUserV2({ searchTerm: txtNiAssSearch.Text, top: 6 }).value
+            TemplateSize: =32
+            TemplatePadding: =0
+            TemplateFill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 300 + 38
+            Width: =300
+            Height: =104
+          Children:
+            - rowNiAss:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.DisplayName
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextPrimary
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =32
+            - hitNiAss:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set(gNiAssignee, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
+                     Reset(txtNiAssSearch)
+      - mdNiAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Add"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            DisplayMode: |
+              =If( Len(Trim(txtNiName.Text)) > 0 && Len(gNiAssignee.Mail) > 0,
+                   DisplayMode.Edit, DisplayMode.Disabled )
+            X: =(Parent.Width - 680) / 2 + 24
+            Y: =(Parent.Height - 520) / 2 + 520 - 60
+            Width: =140
+            Height: =40
+            OnSelect: |
+              =Collect( colNewIssues,
+                  { sid:            If( IsEmpty(colNewIssues), 1, Max(colNewIssues, sid) + 1 ),
+                    i_name:         Trim(txtNiName.Text),
+                    i_status:       gNiStatus,
+                    i_impact:       gNiImpact,
+                    i_assigneeName: gNiAssignee.DisplayName,
+                    i_assigneeMail: gNiAssignee.Mail } );
+               Reset( txtNiName ); Reset( txtNiAssSearch );
+               Set( gNiAssignee, { DisplayName: "", Mail: "" } );
+               Set(gNiOpen, false)
+            Visible: =gNiOpen
+      - mdNiCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.TextPrimary
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =(Parent.Width - 680) / 2 + 176
+            Y: =(Parent.Height - 520) / 2 + 520 - 60
+            Width: =120
+            Height: =40
+            OnSelect: |
+              =Reset( txtNiName ); Reset( txtNiAssSearch );
+               Set( gNiAssignee, { DisplayName: "", Mail: "" } );
+               Set(gNiOpen, false)
+            Visible: =gNiOpen
