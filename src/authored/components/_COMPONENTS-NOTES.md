@@ -18,7 +18,7 @@ is isolated and can't read app globals; keep the hex/RGBA in step with `Theme`.
 | `cmpEditableGrid.pa.yaml` | Editable grid, bulk-save | Component | in: `Items`; out: `EditedItems,RowCount`; action: `AddRow`; event: `OnCommit` |
 | `cmpSectionHeader.pa.yaml` | Section title + subtitle + action | Component | in: `Title,Subtitle,ActionLabel,ShowAction`; event: `OnAction` |
 | `cmpConfirmDialog.pa.yaml` | Modal confirm (scrim + card) | Component | in: `Visible,Title,Message,ConfirmLabel,CancelLabel,Destructive`; events: `OnConfirm,OnCancel` |
-| `cmpToast.pa.yaml` | Self-dismissing toast | Component | in: `Message,Tone,Duration`; action: `Show`; event: `OnDismiss` |
+| `cmpToast.pa.yaml` | Self-dismissing toast | Component | in: `IsOpen,Message,Tone,Duration`; event: `OnDismiss` |
 | `cmpKpiRing.pa.yaml` | SVG percent ring (licence-free) | Component | in: `Percent,Label,AccentHex,TrackHex` |
 
 ## The one rule that shaped the design: **no component inside a gallery/form**
@@ -201,9 +201,12 @@ What that changes:
 
 - `cmpConfirmDialog` — place the instance **full-screen**; the app owns `Visible` and closes
   it in `OnConfirm`/`OnCancel`. Scrim tap = cancel. `Destructive` reddens the confirm button.
-- `cmpToast` — set `Message`/`Tone`, then call `cmpToast_1.Show()`; internal `_show` var +
-  Timer auto-dismiss after `Duration`. (`_show` is read by child controls only — not by an
-  Output property — so it stays within component rules.)
+- `cmpToast` — set `Message`/`Tone`, then flip ONE flag: `Set(gToastShow, false)` then
+  `Set(gToastShow, true)`. That flag is passed to BOTH the instance's `Visible` and the
+  component's `IsOpen`, and inside, `IsOpen` drives the children's `Visible` **and** the timer
+  (`Start: =IsOpen`, `Reset: =!IsOpen`). The old `Show()` action and internal `_show` variable
+  are gone — two sources of truth plus a `Reset()` racing the timer's `Start` is why the toast
+  appeared and never dismissed (2026-08-04).
 - `cmpKpiRing` — colours are **hex text** (`AccentHex`/`TrackHex`) so they drop into the SVG
   without a Color→hex conversion; the ring uses the circumference-100 `stroke-dasharray` trick.
 - `cmpSectionHeader` — grounded tokens only; `ShowAction`/`OnAction` make the button optional.

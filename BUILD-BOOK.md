@@ -32,7 +32,7 @@ page** — component contracts are inlined so you're not flipping between files 
 
 - [ ] Get the files on the work machine (clone/pull, or GitHub → **Raw** → copy). Copy files
       **whole**; don't retype.
-- [ ] `python tools/validate_pa_yaml.py` → expect **22/22 valid**. Re-copy from `main` right before
+- [ ] `python tools/validate_pa_yaml.py` → expect **23/23 valid**. Re-copy from `main` right before
       each paste (a stale local copy is invisible from my side).
 - [ ] Studio: create the canvas app (**tablet** layout), turn on the **Power Fx formula bar**
       (Settings → General), allow clipboard for `make.powerapps.com`.
@@ -174,13 +174,28 @@ that flies out over the content when the hamburger is tapped.
 - [ ] Paste `bodies/cmpKpiRing.children.pa.yaml`
 
 ### `cmpToast`  · body: 4 controls
+- [ ] `IsOpen` — Input · Boolean · `=false`  *(pass the SAME flag as the instance's `Visible`)*
 - [ ] `Message` — Input · Text · `=""`
 - [ ] `Tone` — Input · Text · `="Info"`
 - [ ] `Duration` — Input · Number · `=3000`
-- [ ] `Show` — Action · ⚠️ **phase 3** — create with placeholder `=true`; after the body, set `=Set(_show, true); Reset(tmrToast); true`
 - [ ] `OnDismiss` — Event
 - [ ] Component props: `Height=56` · `Width=340` · `Fill=RGBA(0,0,0,0)`
-- [ ] Paste `bodies/cmpToast.children.pa.yaml`  *(Timer token unverified — report if rejected)*
+- [ ] Paste `bodies/cmpToast.children.pa.yaml`
+
+> **REBUILT 2026-08-04 — the `Show` action and the internal `_show` variable are GONE.** If you
+> already created them in Studio, delete both. The toast never dismissed because there were two
+> sources of truth (the screen's flag gating the instance's `Visible`, and `_show` inside) and
+> because `Show()` did `Set(_show, true); Reset(tmrToast)` — a reset racing the variable the
+> timer's `Start` reads. Now one flag does everything: `Start: =cmpToast.IsOpen` with
+> `Reset: =!cmpToast.IsOpen`, both documented Timer properties.
+>
+> Raise it with `Set(gToastShow, false); … ; Set(gToastShow, true)` — the false→true edge is what
+> restarts the timer, so re-raising a toast that is already up still gets a full `Duration`.
+>
+> **Timers only run in Preview**, not on the Studio canvas (MS Learn, Timer control) — rule that
+> out first. The timer is `Visible: =false`, which the same page explicitly endorses for
+> background timers; if it still never fires, that is the one remaining unverified thing, so make
+> it visible at 1×1 to prove it.
 
 ### `cmpConfirmDialog`  · body: 7 controls
 - [ ] `IsOpen` — Input · Boolean · `=false`  *(NOT `Visible`)*

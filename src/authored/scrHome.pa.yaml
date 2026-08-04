@@ -103,7 +103,8 @@ Screens:
                    If( CountRows(colMyTasks) = 0, 0,
                        RoundDown( Average( AddColumns( colMyTasks, wgt,
                            Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-              Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true); cmpToastHome.Show()
+              Set(gToastShow, false);
+              Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
       # Three KPI cards, fed by the locals Set in OnVisible. Trend has no
       # historical source in this model, so it is omitted rather than faked.
       - cardOpen:
@@ -190,7 +191,10 @@ Screens:
             X: =Theme.Space.Gutter + 140 + Theme.Space.Gap
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 120 + Theme.Space.Gutter + 90
             OnSelect: =Set(gConfirmOpen, true)
-      # Toast (bottom-right). Set gToastMsg/gToastTone then call .Show().
+      # Toast (bottom-right). ONE flag raises it: set gToastMsg/gToastTone, then
+      # Set(gToastShow, false) followed by Set(gToastShow, true) — the false->true
+      # edge is what resets and restarts the internal timer, so re-raising a toast
+      # that is already showing still gets a full Duration.
       - cmpToastHome:
           Control: CanvasComponent
           ComponentName: cmpToast
@@ -200,6 +204,7 @@ Screens:
             # showing. The component raises OnDismiss when its timer ends, so the
             # screen can own the flag.
             Visible: =gToastShow
+            IsOpen: =gToastShow
             X: =Parent.Width - 340 - Theme.Space.Gutter
             Y: =Parent.Height - 56 - Theme.Space.Gutter
             Width: =340
@@ -230,7 +235,11 @@ Screens:
             ConfirmLabel: ="Archive"
             CancelLabel: ="Cancel"
             Destructive: =true
-            OnConfirm: =Set(gConfirmOpen, false); Set(gToastMsg, "Archive is wired on the project detail screen"); Set(gToastTone, "Info"); Set(gToastShow, true); cmpToastHome.Show()
+            OnConfirm: |
+              =Set(gConfirmOpen, false);
+               Set(gToastShow, false);
+               Set(gToastMsg, "Archive is wired on the project detail screen");
+               Set(gToastTone, "Info"); Set(gToastShow, true)
             OnCancel: =Set(gConfirmOpen, false)
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.

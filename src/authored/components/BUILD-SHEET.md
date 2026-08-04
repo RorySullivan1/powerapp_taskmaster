@@ -361,7 +361,7 @@ These are the ones that must NOT be entered as a `Default` — that is exactly w
 
 ## `cmpToast`
 
-Self-dismissing toast — Show() action raises it, internal Timer hides after Duration.
+Self-dismissing toast. The screen sets IsOpen; an internal Timer raises OnDismiss after Duration.
 
 **Used by:** scrHome  
 **Access app scope:** `False`  
@@ -371,10 +371,10 @@ Self-dismissing toast — Show() action raises it, internal Timer hides after Du
 
 | # | Name | Kind | Type | Default / formula | Where the formula goes |
 |---|---|---|---|---|---|
-| 1 | `Message` | Input | Text | `=""` | the property's **Default** |
-| 2 | `Tone` | Input | Text | `="Info"` | the property's **Default** |
-| 3 | `Duration` | Input | Number | `=3000` | the property's **Default** |
-| 4 | `Show` | Action | Boolean | `=Set(_show, true); Reset(tmrToast); true` | ⚠️ **PHASE 3 — after the body.** Uses `tmrToast`, which the body creates. Create the property now with the placeholder `=false`, then set the real formula once the body is in. |
+| 1 | `IsOpen` | Input | Boolean | `=false` | the property's **Default** |
+| 2 | `Message` | Input | Text | `=""` | the property's **Default** |
+| 3 | `Tone` | Input | Text | `="Info"` | the property's **Default** |
+| 4 | `Duration` | Input | Number | `=3000` | the property's **Default** |
 | 5 | `OnDismiss` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -384,14 +384,6 @@ Self-dismissing toast — Show() action raises it, internal Timer hides after Du
 | `Height` | `=56` |
 | `Width` | `=340` |
 | `Fill` | `=RGBA(0, 0, 0, 0)` |
-
-### Formulas backing the output properties
-
-These are the ones that must NOT be entered as a `Default` — that is exactly what got the first batch rejected. Create the property, then set its formula here.
-
-| Output property | Formula |
-|---|---|
-| `Show` | `=Set(_show, true); Reset(tmrToast); true` |
 
 ---
 

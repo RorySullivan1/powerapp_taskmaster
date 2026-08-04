@@ -1,28 +1,65 @@
 # =============================================================================
 # cmpToast  —  transient notification / snackbar (component; screen-level)
 # =============================================================================
-# A self-dismissing toast. The app sets Message + Tone, then CALLS the Show()
-# action to raise it; an internal Timer hides it after Duration ms.
-#   ThisItem?  No — place one instance per screen (or app-scope), e.g. bottom-right.
-#   To raise:  cmpToast_1.Show()   (after setting its Message/Tone inputs)
+# ONE FLAG DRIVES EVERYTHING. The screen owns a boolean; that boolean shows the
+# toast, starts the timer, and resets it. There is no internal state and no
+# Show() action any more — see "Why the redesign" below.
 #
-# Internal state `_show` (component Set) drives visibility — read by child controls
-# only, never by an Output property (keeps within component rules). Grounded tokens
-# All tokens CONFIRMED. The Timer was authored as `Classic/Timer@2.1.0`, which
-# was the wrong class — it is plain `Timer`. Fallback, if you would rather not use
-# a Timer at all: drop it and let the app own the timing (set a variable, clear it
-# yourself), making this a visual-only toast driven by an Input `Visible`.
+#   To raise:   Set(gToastShow, false);                    // forces the reset edge
+#               Set(gToastMsg, "Saved"); Set(gToastTone, "Success");
+#               Set(gToastShow, true)
+#   To place:   one instance per screen, e.g. bottom-right, with
+#               Visible: =gToastShow   AND   IsOpen: =gToastShow
+#   It dismisses itself: OnTimerEnd raises OnDismiss, the screen clears the flag.
+#
+# ---------------------------------------------------------------------------
+# WHY THE REDESIGN (the "duration doesn't work" bug, 2026-08-04)
+#
+# The first version kept its own `_show` variable, exposed a `Show()` action that
+# did `Set(_show, true); Reset(tmrToast)`, and had the timer's `Start: =_show`.
+# That is TWO sources of truth — the screen's `gToastShow` (which gates the
+# instance's Visible, added to stop the toast swallowing clicks) and the
+# component's `_show` — plus a race: `Reset()` fires in the same behaviour pass
+# that sets the variable the timer's `Start` reads, so whether the timer ends up
+# running depends on evaluation order this air gap cannot verify. The toast
+# appeared and never dismissed.
+#
+# Now: `IsOpen` is an INPUT, the timer is `Start: =cmpToast.IsOpen` with
+# `Reset: =!cmpToast.IsOpen`. Both are documented Timer properties and this is the
+# canonical restart idiom — while the flag is false the timer sits reset at zero;
+# the moment it goes true the timer starts from zero. No action, no internal
+# variable, nothing to race.
+#
+# FIRST TWO THINGS TO CHECK if it still doesn't dismiss:
+#   1. **Timers only run in Preview** — "In Power Apps Studio, timers run only in
+#      Preview mode" (MS Learn, Timer control). Not a bug if you were on canvas.
+#   2. The timer is `Visible: =false`, which the same page explicitly endorses
+#      ("Background timers should have their Visible property set to false"). If
+#      it still never fires, make it visible at 1x1 in a corner to prove whether
+#      hidden is the problem — that is the one remaining unverifiable.
+# Fallback if the Timer control is the problem at all: delete it and let the
+# screen own the timing, making this a visual-only toast driven by `IsOpen`.
+# ---------------------------------------------------------------------------
+#
+# Tokens: `Rectangle@2.3.0`, `Classic/Icon@2.5.0`, `Label@2.5.1`, and `Timer` —
+# plain `Timer`, NOT `Classic/Timer`, confirmed in Studio 2026-08-03. No version
+# suffix: optional per the schema, and Studio uses the current version.
 # Colours inline the Theme palette. DIALECT v3.0 pa.yaml. See _COMPONENTS-NOTES.md.
 # =============================================================================
 ComponentDefinitions:
   cmpToast:
     DefinitionType: CanvasComponent
-    Description: Self-dismissing toast — Show() action raises it, internal Timer hides after Duration.
+    Description: Self-dismissing toast. The screen sets IsOpen; an internal Timer raises OnDismiss after Duration.
     AccessAppScope: false
     CustomProperties:
+      IsOpen:
+        PropertyKind: Input
+        Description: Whether the toast is raised. Pass the same flag as the instance's Visible — it both shows the toast and starts the timer.
+        DataType: Boolean
+        Default: =false
       Message:
         PropertyKind: Input
-        Description: Text to show. Set before calling Show().
+        Description: Text to show. Set it before raising IsOpen.
         DataType: Text
         Default: =""
       Tone:
@@ -35,23 +72,14 @@ ComponentDefinitions:
         Description: Milliseconds visible before auto-dismiss.
         DataType: Number
         Default: =3000
-      Show:
-        PropertyKind: Action
-        Description: Raise the toast (reads current Message/Tone) and restart the dismiss timer.
-        ReturnType: Boolean
       OnDismiss:
         PropertyKind: Event
-        Description: Raised when the toast auto-dismisses.
+        Description: Raised when the dismiss timer ends. The screen clears its flag.
         ReturnType: Boolean
     Properties:
       Height: =56
       Width: =340
       Fill: =RGBA(0, 0, 0, 0)
-      # Ends in `true` for the same reason as cmpEditableGrid.AddRow — an Action
-      # declares ReturnType: Boolean, and a behaviour formula returns its last
-      # expression. `Reset` is void, so this was relying on Studio not checking.
-      Show: |
-        =Set(_show, true); Reset(tmrToast); true
     Children:
       - toastBg:
           Control: Rectangle@2.3.0
@@ -62,7 +90,7 @@ ComponentDefinitions:
                   "Warning", RGBA(214, 152, 40, 1),
                   "Danger",  RGBA(197, 58, 58, 1),
                   RGBA(0, 90, 158, 1))
-            Visible: =_show
+            Visible: =cmpToast.IsOpen
             Height: =Parent.Height
             Width: =Parent.Width
             X: =0
@@ -77,7 +105,7 @@ ComponentDefinitions:
                   "Danger",  Icon.Error,
                   Icon.Information)
             Color: =RGBA(255, 255, 255, 1)
-            Visible: =_show
+            Visible: =cmpToast.IsOpen
             Height: =22
             Width: =22
             X: =16
@@ -87,7 +115,7 @@ ComponentDefinitions:
           Properties:
             Text: =cmpToast.Message
             Color: =RGBA(255, 255, 255, 1)
-            Visible: =_show
+            Visible: =cmpToast.IsOpen
             Font: =Font.'Segoe UI'
             Size: =13
             X: =50
@@ -96,15 +124,15 @@ ComponentDefinitions:
             Height: =Parent.Height
             VerticalAlign: =VerticalAlign.Middle
       - tmrToast:
-          # `Timer`, NOT `Classic/Timer` — confirmed in Studio 2026-08-03. This was
-          # the last best-effort token in the kit, and it was wrong. No version
-          # suffix: the schema treats it as optional and Studio uses the current
-          # version, which avoids inventing a number we can't check.
+          # `Start` + `Reset` off the SAME flag is the whole mechanism: false holds
+          # the timer reset at zero, true runs it once from zero. Both are
+          # documented Timer properties; nothing here depends on evaluation order.
           Control: Timer
           Properties:
             Duration: =cmpToast.Duration
             AutoStart: =false
             Repeat: =false
-            Start: =_show
+            Start: =cmpToast.IsOpen
+            Reset: =!cmpToast.IsOpen
             Visible: =false
-            OnTimerEnd: =Set(_show, false); cmpToast.OnDismiss()
+            OnTimerEnd: =cmpToast.OnDismiss()
