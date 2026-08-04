@@ -33,7 +33,8 @@ clipboard, moved by a human, and it runs ONE WAY: repo → Studio.**
    public evidence, and a fully-grounded `Classic/Button` nav documented as the instant recovery.)
 3. **Tokens that never gate a paste don't need chasing.** Canvas **components are not code-view-
    pasted** — they're recreated by hand in the Studio component editor. So a component's control
-   tokens (e.g. `HtmlViewer`, `Classic/Timer`) are *documentation*, not a paste payload; only the
+   tokens are a REAL paste payload (corrected 2026-08-03 — they were once assumed to be mere
+   documentation, which cost two wrong tokens); only the
    tokens in the **screens** (which do paste) can actually fail. Version suffixes are optional —
    Studio uses the current version if omitted — so only a control's *name* and `Variant` matter.
 4. **Provisioning names are captured by hand.** True internal column names (post `_x0020_`

@@ -92,8 +92,8 @@ a fresh blank screen. Skeletons are a scaffold, not the destination — they car
 
 > Watch items: **`cmpConfirmDialog`'s input is `IsOpen`, not `Visible`** (a `Visible` custom prop
 > collides with the built-in). **`HtmlViewer@2.1.0` is now confirmed** — `cmpStatusPill`'s body
-> pasted with it. **`Classic/Timer@2.1.0`** (`cmpToast`) is the last unverified token in the kit;
-> if that body is rejected, send me the error — the Timer is the first suspect.
+> pasted with it, and `cmpToast`'s timer is **`Timer`** (no `Classic/` prefix, no version suffix).
+> **Every control token in the kit is now confirmed** — the validator emits no token warnings.
 
 ### `cmpSelection`  *(build first — 7 screens use it)*  · body: 1 control
 - [ ] `Items` — Input · Table · Default `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })`

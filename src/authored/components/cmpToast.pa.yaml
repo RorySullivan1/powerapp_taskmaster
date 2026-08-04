@@ -8,9 +8,10 @@
 #
 # Internal state `_show` (component Set) drives visibility — read by child controls
 # only, never by an Output property (keeps within component rules). Grounded tokens
-# except the Timer: `Classic/Timer@2.1.0` is UNCONFIRMED (round-trip). If you'd
-# rather not use a Timer, drop it and let the app own timing (Set a var + its own
-# timer) — then this becomes a visual-only toast with an Input `Visible`.
+# All tokens CONFIRMED. The Timer was authored as `Classic/Timer@2.1.0`, which
+# was the wrong class — it is plain `Timer`. Fallback, if you would rather not use
+# a Timer at all: drop it and let the app own the timing (set a variable, clear it
+# yourself), making this a visual-only toast driven by an Input `Visible`.
 # Colours inline the Theme palette. DIALECT v3.0 pa.yaml. See _COMPONENTS-NOTES.md.
 # =============================================================================
 ComponentDefinitions:
@@ -95,7 +96,11 @@ ComponentDefinitions:
             Height: =Parent.Height
             VerticalAlign: =VerticalAlign.Middle
       - tmrToast:
-          Control: Classic/Timer@2.1.0
+          # `Timer`, NOT `Classic/Timer` — confirmed in Studio 2026-08-03. This was
+          # the last best-effort token in the kit, and it was wrong. No version
+          # suffix: the schema treats it as optional and Studio uses the current
+          # version, which avoids inventing a number we can't check.
+          Control: Timer
           Properties:
             Duration: =cmpToast.Duration
             AutoStart: =false

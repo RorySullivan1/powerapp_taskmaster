@@ -120,10 +120,13 @@ is a failed paste, reported back only as "it didn't work".
 - **`HtmlViewer@2.1.0`** — **CONFIRMED 2026-08-03.** `cmpStatusPill`'s body pasted with it; the
   only failure in that unit was the HtmlText *value* (a bad regex), not the control token. So
   `cmpChoicePill` and `cmpUiKit`'s HTML output no longer carry a token risk either.
-- **`Classic/Timer@2.1.0`** (`cmpToast`) is still a best-effort name and is now the **last
-  unverified token in the kit**. If `cmpToast`'s body is rejected, that is the first suspect —
-  report the error. Fallback: drop the Timer and let the app own timing (visual-only toast +
-  `Visible`).
+- **`Timer`** — **CONFIRMED 2026-08-03, and the authored token was WRONG.** `cmpToast` had
+  `Classic/Timer@2.1.0`; the control is plain **`Timer`**, no `Classic/` prefix. Written
+  without a version suffix — the schema treats it as optional and Studio uses the current
+  version, which beats inventing a number nothing can check.
+
+**Every control token in the kit is now confirmed.** `tools/validate_pa_yaml.py` emits no
+token warnings at all; if it ever does, something new was authored against a guess.
 
 ## Transfer — a component crosses in TWO parts
 
