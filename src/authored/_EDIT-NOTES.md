@@ -45,7 +45,26 @@ Re-seeding a global in `OnVisible` and patching from that global makes the write
 regardless of what the screen happens to be displaying. Text inputs get `Reset()` in the
 same `OnVisible` so their `Default` re-reads.
 
-## 2. Normalised picker records
+## 1a. A Person column's ARITY must match the schema, or the screen errors on load
+
+`schema/schema.yaml` marks every Person column `multi: false`, and the app depends on it in two
+places:
+
+```powerapps
+Coalesce( gEditProject.project_requestor.DisplayName, "" )        // read, in OnVisible
+project_requestor: { '@odata.type': "…SPListExpandedUser", … }    // write, in the Patch
+```
+
+If the SharePoint column is provisioned with **Allow multiple selections = Yes**, the connector
+returns a **table**, so `col.DisplayName` is a single-column table and `Coalesce(<table>, "")`
+fails — Coalesce takes its type from the first argument, and `""` is not a table. The write breaks
+too: a single expanded-user record is not a table. Seen live on `project_requestor`, 2026-08-04,
+while `project_manager` and `project_supporter` — the same formula, one column apart — were fine.
+
+**The fix is in SharePoint, not here**: the repo is the golden source and it says single. Turn
+*Allow multiple selections* off on that column. If a column genuinely needs to be multi, change
+`multi:` in `schema.yaml` first, then both the read (`First(col).DisplayName`) and the write (a
+table of expanded-user records) have to change for that column — it is not a formula tweak.
 
 Every picker global has exactly **one** record schema:
 

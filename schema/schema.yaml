@@ -33,8 +33,14 @@ types:
   Currency:        { sp: "Currency",             delegates: ["=", "<", ">", "Sort"],     indexable: true,  join_cost: 0 }
   DateTime:        { sp: "Date and Time",        delegates: ["=", "<", ">", "Sort"],     indexable: true,  join_cost: 0 }
   Boolean:         { sp: "Yes/No",               delegates: ["=", "Sort"],               indexable: true,  join_cost: 0 }
-  Person:          { sp: "Person or Group (single)", delegates: ["= on .Email/.DisplayName"], indexable: true, join_cost: 1 }
-  PersonMulti:     { sp: "Person or Group (multi)",  delegates: [],                      indexable: false, join_cost: 1 }
+  # ARITY IS PART OF THE CONTRACT — every Person column below carries `multi:`.
+  # Get it wrong in SharePoint and the app breaks in two places at once: a MULTI
+  # column returns a TABLE, so `Coalesce(col.DisplayName, "")` errors ("expecting
+  # a Table" — the "" no longer matches the first argument's type), and the write
+  # fails too because a single expanded-user record is not a table. Seen live on
+  # project_requestor, 2026-08-04: it had been provisioned multi.
+  Person:          { sp: "Person or Group — ALLOW MULTIPLE = NO", delegates: ["= on .Email/.DisplayName"], indexable: true, join_cost: 1 }
+  PersonMulti:     { sp: "Person or Group — allow multiple = yes",  delegates: [],     indexable: false, join_cost: 1 }
   Lookup:          { sp: "Lookup",               delegates: ["= via .Id/.Value"],        indexable: true,  join_cost: 1 }
   ManagedMetadata: { sp: "Managed Metadata",     delegates: ["= via subfield"],          indexable: true,  join_cost: 1 }
   Hyperlink:       { sp: "Hyperlink or Picture", delegates: [],                          indexable: false, join_cost: 0 }
@@ -53,20 +59,20 @@ lists:
     join_cost: 6
     columns:
       - { name: project_name,            type: Text,            required: true,  indexed: true,  desc: "User-facing project title (unique by convention only)" }
-      - { name: project_manager,         type: Person,          required: true,  indexed: true,  desc: "Accountable owner" }
+      - { name: project_manager,         type: Person, multi: false, required: true,  indexed: true,  desc: "Accountable owner" }
       - { name: project_coverage,        type: ManagedMetadata, required: false,                 desc: "Business/product coverage area", term_set: Coverage }
       - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
       - { name: project_region,          type: ManagedMetadata, required: true,  indexed: true,  desc: "Regional ownership", values: [AMER, EMEA, APAC, JAPAN, GLOBAL] }
       - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
       - { name: project_type,            type: ManagedMetadata, required: true,                  desc: "Project classification", values: [Production, Campaign, Platform, Event, Operational] }
-      - { name: project_requestor,       type: Person,          required: false,                 desc: "Requesting user" }
+      - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user" }
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  desc: "Lifecycle phase", values: [Planning, Active, Blocked, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
       - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below" }
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
       - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  desc: "Desired completion date" }
       - { name: project_date_complete,   type: DateTime,        required: false,                 desc: "Actual completion date" }
-      - { name: project_supporter,       type: Person,          required: false, indexed: true,  desc: "Supporting contributor (one extra person beside project_manager)" }
+      - { name: project_supporter,       type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside project_manager)" }
 
   # ---------------------------------------------------------------------------
   taskmaster_tasks:
@@ -81,8 +87,8 @@ lists:
       - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
       - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
-      - { name: task_lead,             type: Person,          required: true,  indexed: true,  desc: "Primary owner" }
-      - { name: task_supporter,        type: Person,          required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
+      - { name: task_lead,             type: Person, multi: false, required: true,  indexed: true,  desc: "Primary owner" }
+      - { name: task_supporter,        type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
       - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
       - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
       - { name: task_date_completion,  type: DateTime,        required: false,                 desc: "Date completed" }
@@ -105,7 +111,7 @@ lists:
       - { name: transaction_project_id, type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: transaction_client_name, type: Lookup,  required: true,  indexed: true,  desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
       - { name: transaction_product_id, type: Lookup,   required: true,                  desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
-      - { name: transaction_sales,      type: Person,   required: true,                  desc: "Sales owner" }
+      - { name: transaction_sales,      type: Person, multi: false, required: true,                  desc: "Sales owner" }
       - { name: transaction_notional,   type: Currency, required: false,                 desc: "Trade notional amount (positive)" }
       - { name: transaction_currency,   type: Choice,   required: true,                  desc: "Currency denomination", values: [USD, EUR, GBP, JPY, CHF] }
       # SUPERSEDED 2026-08-03 (Q14) — DO NOT PROVISION. Kept here so the decision is
@@ -128,14 +134,14 @@ lists:
       - { name: issue_project_id,       type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: issue_task_name,        type: Lookup,   required: false,                 desc: "Related task", lookup: { list: taskmaster_tasks, show: task_name } }
       - { name: issue_transaction_name, type: Lookup,   required: false,                 desc: "Related transaction", lookup: { list: taskmaster_transactions, show: transaction_name } }
-      - { name: issue_assignee,         type: Person,   required: true,  indexed: true,  desc: "Responsible resolver" }
+      - { name: issue_assignee,         type: Person, multi: false, required: true,  indexed: true,  desc: "Responsible resolver" }
       - { name: issue_status,           type: Choice,   required: true,  indexed: true,  default: Open,          desc: "Current status", values: [Open, Review, Waiting, Blocked, Closed] }
       - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue", values: [Approval, Process, Compliance, Branding, Technical] }
       - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact", values: [Low, Moderate, High, Critical] }
       - { name: issue_date_open,        type: DateTime, required: false,                 desc: "Date opened (default = Created)" }
       - { name: issue_date_target,      type: DateTime, required: false, indexed: true,  desc: "Expected resolution date" }
       - { name: issue_date_close,       type: DateTime, required: false,                 desc: "Resolution date" }
-      - { name: issue_owner,            type: Person,   required: false,                 desc: "Issue owner / business owner (distinct from Created By)" }
+      - { name: issue_owner,            type: Person, multi: false, required: false,                 desc: "Issue owner / business owner (distinct from Created By)" }
 
   # ---------------------------------------------------------------------------
   taskmaster_clients:
@@ -146,7 +152,7 @@ lists:
       - { name: client_name,     type: Text,            required: true,  indexed: true, desc: "Client display name" }
       - { name: client_type,     type: ManagedMetadata, required: true,                 desc: "Client classification", term_set: ClientType }
       - { name: client_coverage, type: ManagedMetadata, required: true,                 desc: "Coverage group", term_set: Coverage }
-      - { name: client_sales,    type: Person,          required: true,                 desc: "Primary sales owner" }
+      - { name: client_sales,    type: Person, multi: false, required: true,                 desc: "Primary sales owner" }
       - { name: client_region,   type: ManagedMetadata, required: true,  indexed: true, desc: "Client region", values: [AMER, EMEA, APAC, JAPAN] }
       - { name: client_notes,    type: Note,            required: false,                desc: "Free-text notes (display only)" }
 
