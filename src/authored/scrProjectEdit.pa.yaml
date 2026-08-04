@@ -37,11 +37,26 @@
 # so marking a project Complete stamps it, and re-saving an already-complete
 # project keeps the original date rather than moving it.
 #
-# STILL TO COME, blocked on two ungrounded tokens: the Choice strips want to be
-# real dropdowns and the date boxes want date pickers. Both need a control token
-# confirmed from a Studio code-view photo, exactly as `GroupContainer@1.5.0` was.
-# Until then Choices use cmpSelection strips and dates are typed with a parsed
-# echo beside them (`12 Aug 2026`, or `⚠ not a date`).
+# DROPDOWNS AND DATE PICKERS ARE IN. `ModernCombobox@1.0.0` and
+# `ModernDatePicker@1.0.0` (both grounded from Studio YAML) replace the 40px
+# cmpSelection strips and the typed-date-plus-echo-label pairs:
+#
+#   phase · priority · task priority · currency · issue status · issue impact
+#   project start · project target · task target date · trade date
+#
+# Every one drops to a single 32px control, and the eight echo labels that
+# rendered `12 Aug 2026 / ⚠ not a date` are gone — a date picker cannot produce
+# an unparseable date, so there is nothing left to echo. Dates now travel as real
+# date values end to end: `dtp*.SelectedDate` into the staging collections, and
+# straight into the Patch. No DateValue() parsing survives on this screen.
+#
+# Combobox reads: `cbo*.Selected.Value` (SelectMultiple is false, so `Selected`
+# is a record). Date picker reads: `dtp*.SelectedDate`, Blank() when unset.
+#
+# ONE INFERRED PROPERTY: `DefaultSelectedItems` on the comboboxes, which seeds
+# the current value when editing. The control, its version and every other
+# property are confirmed. If the paste is rejected, delete that one line from
+# each combobox — the only loss is the pre-selection on an Edit.
 #
 # ONE INFERRED TOKEN: `LayoutAlignItems.Start`. The container, its variant,
 # LayoutDirection, LayoutGap, LayoutOverflowY and `LayoutOverflow.Scroll` are all
@@ -92,10 +107,9 @@ Screens:
         Set( gNxProduct, { Id: 0, Value: "" } );
         Set( gNiStatus, "Open" ); Set( gNiImpact, "(none)" ); Set( gNiAssignee, { DisplayName: "", Mail: "" } );
         Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
-        Reset( txtPrStart ); Reset( txtPrTarget ); Reset( txtPrComplete );
         Reset( txtPrManagerSearch ); Reset( txtPrRequestorSearch ); Reset( txtPrSupporterSearch );
-        Reset( txtNtName ); Reset( txtNtTarget );
-        Reset( txtNxName ); Reset( txtNxNotional ); Reset( txtNxDate );
+        Reset( txtNtName );
+        Reset( txtNxName ); Reset( txtNxNotional );
         Reset( txtNxClientSearch ); Reset( txtNxProductSearch );
         Reset( txtNiName )
         
@@ -202,20 +216,18 @@ Screens:
                   Size: =Theme.Size.Body
                   Width: =520
                   Height: =40
-            - selPrPhase:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
+            - cboPrPhase:
+                Control: ModernCombobox@1.0.0
                 Properties:
-                  Width: =700
-                  Height: =40
-                  Items: |
-                    =Table( { Id: 1, Label: "Planning" }, { Id: 2, Label: "Active" },
-                            { Id: 3, Label: "Blocked" },  { Id: 4, Label: "Complete" },
-                            { Id: 5, Label: "Archived" } )
-                  DefaultId: |
-                    =Switch( If(gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, "Planning"), "Planning"),
-                             "Planning", 1, "Active", 2, "Blocked", 3, "Complete", 4, 5 )
-                  OnChange: =Set(gPrPhase, selPrPhase.Selected.Label)
+                  Items: =["Planning", "Active", "Blocked", "Complete", "Archived"]
+                  ItemDisplayText: =ThisItem.Value
+                  InputTextPlaceholder: ="Select a phase"
+                  SelectMultiple: =false
+                  IsSearchable: =false
+                  DefaultSelectedItems: =[gPrPhase]
+                  Width: =320
+                  Height: =32
+                  OnChange: =Set(gPrPhase, cboPrPhase.Selected.Value)
             - lblPrPathCap:
                 Control: Label@2.5.1
                 Properties:
@@ -243,20 +255,18 @@ Screens:
                   Size: =Theme.Size.Small
                   Width: =520
                   Height: =36
-            - selPrPriority:
-                Control: CanvasComponent
-                ComponentName: cmpSelection
+            - cboPrPriority:
+                Control: ModernCombobox@1.0.0
                 Properties:
-                  Width: =700
-                  Height: =40
-                  Items: |
-                    =Table( { Id: 1, Label: "Lowest" }, { Id: 2, Label: "Low" },
-                            { Id: 3, Label: "Moderate" }, { Id: 4, Label: "High" },
-                            { Id: 5, Label: "Critical" } )
-                  DefaultId: |
-                    =Switch( If(gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate"),
-                             "Lowest", 1, "Low", 2, "Moderate", 3, "High", 4, 5 )
-                  OnChange: =Set(gPrPriority, selPrPriority.Selected.Label)
+                  Items: =["Lowest", "Low", "Moderate", "High", "Critical"]
+                  ItemDisplayText: =ThisItem.Value
+                  InputTextPlaceholder: ="Select a priority"
+                  SelectMultiple: =false
+                  IsSearchable: =false
+                  DefaultSelectedItems: =[gPrPriority]
+                  Width: =320
+                  Height: =32
+                  OnChange: =Set(gPrPriority, cboPrPriority.Selected.Value)
             - lblPrDescCap:
                 Control: Label@2.5.1
                 Properties:
@@ -293,58 +303,24 @@ Screens:
                   Size: =Theme.Size.Small
                   Width: =520
                   Height: =100
-            - txtPrStart:
-                Control: Classic/TextInput@2.3.2
+            - dtpPrStart:
+                Control: ModernDatePicker@1.0.0
                 Properties:
-                  Default: |
-                    =If( gEditMode = "Edit",
-                         If( IsBlank(gEditProject.project_date_start), "",
-                             Text(gEditProject.project_date_start, "dd/mm/yyyy") ),
-                         Text(Today(), "dd/mm/yyyy") )
-                  HintText: ="dd/mm/yyyy"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =160
-                  Height: =36
-            - lblPrStartEcho:
-                Control: Label@2.5.1
+                  Placeholder: ="Actual start date"
+                  Format: =DatePickerFormat.LongAbbreviated
+                  StartOfWeek: =StartOfWeek.Monday
+                  IsEditable: =true
+                  Width: =240
+                  Height: =32
+            - dtpPrTarget:
+                Control: ModernDatePicker@1.0.0
                 Properties:
-                  Text: |
-                    =If( Len(txtPrStart.Text) = 0, "not set",
-                         IfError( Text(DateValue(txtPrStart.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: |
-                    =If( Len(txtPrStart.Text) > 0 && IsError(DateValue(txtPrStart.Text)),
-                         Theme.Color.Danger, Theme.Color.TextMuted )
-                  Width: =160
-                  Height: =36
-                  VerticalAlign: =VerticalAlign.Middle
-            - txtPrTarget:
-                Control: Classic/TextInput@2.3.2
-                Properties:
-                  Default: |
-                    =If( gEditMode = "Edit" && !IsBlank(gEditProject.project_date_target),
-                         Text(gEditProject.project_date_target, "dd/mm/yyyy"), "" )
-                  HintText: ="dd/mm/yyyy"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Width: =160
-                  Height: =36
-            - lblPrTargetEcho:
-                Control: Label@2.5.1
-                Properties:
-                  Text: |
-                    =If( Len(txtPrTarget.Text) = 0, "not set",
-                         IfError( Text(DateValue(txtPrTarget.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: |
-                    =If( Len(txtPrTarget.Text) > 0 && IsError(DateValue(txtPrTarget.Text)),
-                         Theme.Color.Danger, Theme.Color.TextMuted )
-                  Width: =160
-                  Height: =36
-                  VerticalAlign: =VerticalAlign.Middle
+                  Placeholder: ="Target completion"
+                  Format: =DatePickerFormat.LongAbbreviated
+                  StartOfWeek: =StartOfWeek.Monday
+                  IsEditable: =true
+                  Width: =240
+                  Height: =32
             - lblPrMgrCap:
                 Control: Label@2.5.1
                 Properties:
@@ -354,17 +330,6 @@ Screens:
                   Color: =Theme.Color.TextMuted
                   Width: =520
                   Height: =18
-            - lblPrPercNote:
-                Control: Label@2.5.1
-                Properties:
-                  Text: |
-                    ="Completion % is not entered by hand — it is a weighted rollup of this project's task stages, rewritten whenever a task is saved. Currently "
-                     & If( gEditMode = "Edit", Coalesce(gEditProject.project_perc_completion, 0) & "%", "0% (new project)" ) & "."
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =700
-                  Height: =40
             - txtPrManagerSearch:
                 Control: Classic/TextInput@2.3.2
                 Properties:
@@ -738,8 +703,8 @@ Screens:
                         Text: |
                           =ThisItem.t_name & "   ·   " & ThisItem.t_priority
                            & "   ·   lead " & ThisItem.t_leadName
-                           & If( Len(ThisItem.t_target) = 0, "",
-                                 "   ·   due " & IfError(Text(DateValue(ThisItem.t_target), "dd mmm yyyy"), "⚠ " & ThisItem.t_target) )
+                           & If( IsBlank(ThisItem.t_target), "",
+                                 "   ·   due " & Text(ThisItem.t_target, "dd mmm yyyy") )
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Color: =Theme.Color.TextPrimary
@@ -807,7 +772,7 @@ Screens:
                           =ThisItem.x_name & "   ·   " & ThisItem.x_clientValue & "   ·   " & ThisItem.x_productValue
                            & "   ·   " & ThisItem.x_ccy & " "
                            & If( Len(ThisItem.x_notional) = 0, "—", Text(Value(ThisItem.x_notional), "[$-en-US]#,##0") )
-                           & "   ·   " & IfError(Text(DateValue(ThisItem.x_date), "dd mmm yyyy"), "⚠ " & ThisItem.x_date)
+                           & "   ·   " & Text(ThisItem.x_date, "dd mmm yyyy")
                            & "   ·   sales " & ThisItem.x_salesName
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
@@ -984,8 +949,8 @@ Screens:
                                 project_type:
                                     LookUp( Choices([@taskmaster_projects].project_type),
                                             Path = gPrTypePath ),
-                                project_date_start:    IfError( DateValue(txtPrStart.Text),    Blank() ),
-                                project_date_target:   IfError( DateValue(txtPrTarget.Text),   Blank() ),
+                                project_date_start:    dtpPrStart.SelectedDate,
+                                project_date_target:   dtpPrTarget.SelectedDate,
                                 project_date_complete:
                                                   If( gPrPhase = "Complete",
                                                       Coalesce(gEditProject.project_date_complete, Now()),
@@ -1005,8 +970,8 @@ Screens:
                                       DisplayName: gPrManager.DisplayName,
                                       Email:       gPrManager.Mail,
                                       Department: "", JobTitle: "", Picture: "" },
-                                project_date_start:    IfError( DateValue(txtPrStart.Text),    Blank() ),
-                                project_date_target:   IfError( DateValue(txtPrTarget.Text),   Blank() ),
+                                project_date_start:    dtpPrStart.SelectedDate,
+                                project_date_target:   dtpPrTarget.SelectedDate,
                                 project_date_complete:
                                                   If( gPrPhase = "Complete",
                                                       Coalesce(gEditProject.project_date_complete, Now()),
@@ -1086,7 +1051,7 @@ Screens:
                                               Email:       t.t_leadMail,
                                               Department: "", JobTitle: "", Picture: "" },
                                         task_date_start:  Now(),
-                                        task_date_target: IfError( DateValue(t.t_target), Blank() ) } )
+                                        task_date_target: t.t_target } )
                               .ID ),
                               FirstError.Message,
                               "" ) } ) );
@@ -1109,7 +1074,7 @@ Screens:
                                         transaction_currency:    { Value: x.x_ccy },
                                         transaction_notional:
                                             If( Len(x.x_notional) = 0, Blank(), Value(x.x_notional) ),
-                                        transaction_date:        DateValue(x.x_date) } )
+                                        transaction_date:        x.x_date } )
                               .ID ),
                               FirstError.Message,
                               "" ) } ) );
@@ -1264,31 +1229,17 @@ Screens:
             Width: =300
             Height: =18
             Visible: =gNtOpen
-      - txtNtTarget:
-          Control: Classic/TextInput@2.3.2
+      - dtpNtTarget:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Default: =""
-            HintText: ="e.g. 30/09/2026"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Placeholder: ="Target date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
             X: =(Parent.Width - 680) / 2 + 348
             Y: =(Parent.Height - 470) / 2 + 84
-            Width: =160
-            Height: =36
-            Visible: =gNtOpen
-      - lblNtTgtEcho:
-          Control: Label@2.5.1
-          Properties:
-            Text: |
-              =If( Len(txtNtTarget.Text) = 0, "",
-                   IfError( Text(DateValue(txtNtTarget.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextPrimary
-            X: =(Parent.Width - 680) / 2 + 516
-            Y: =(Parent.Height - 470) / 2 + 84
-            Width: =140
-            Height: =36
+            Width: =220
+            Height: =32
             Visible: =gNtOpen
       - lblNtPriCap:
           Control: Label@2.5.1
@@ -1302,20 +1253,20 @@ Screens:
             Width: =300
             Height: =18
             Visible: =gNtOpen
-      - selNtPriority:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      - cboNtPriority:
+          Control: ModernCombobox@1.0.0
           Properties:
+            Items: =["Low", "Moderate", "High", "Critical"]
+            ItemDisplayText: =ThisItem.Value
+            InputTextPlaceholder: ="Priority"
+            SelectMultiple: =false
+            IsSearchable: =false
+            DefaultSelectedItems: =[gNtPriority]
             X: =(Parent.Width - 680) / 2 + 24
             Y: =(Parent.Height - 470) / 2 + 156
-            Width: =380
-            Height: =36
-            FontSize: =11
-            Items: |
-              =Table({ Id: 1, Label: "Low" }, { Id: 2, Label: "Moderate" },
-                      { Id: 3, Label: "High" }, { Id: 4, Label: "Critical" })
-            DefaultId: =2
-            OnChange: =Set(gNtPriority, selNtPriority.Selected.Label)
+            Width: =300
+            Height: =32
+            OnChange: =Set(gNtPriority, cboNtPriority.Selected.Value)
             Visible: =gNtOpen
       - lblNtLeadCap:
           Control: Label@2.5.1
@@ -1431,8 +1382,8 @@ Screens:
                     t_priority: gNtPriority,
                     t_leadName: gNtLead.DisplayName,
                     t_leadMail: gNtLead.Mail,
-                    t_target:   txtNtTarget.Text } );
-               Reset( txtNtName ); Reset( txtNtTarget ); Reset( txtNtLeadSearch );
+                    t_target:   dtpNtTarget.SelectedDate } );
+               Reset( txtNtName );  Reset( txtNtLeadSearch );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set(gNtOpen, false)
             Visible: =gNtOpen
@@ -1451,7 +1402,7 @@ Screens:
             Width: =120
             Height: =40
             OnSelect: |
-              =Reset( txtNtName ); Reset( txtNtTarget ); Reset( txtNtLeadSearch );
+              =Reset( txtNtName );  Reset( txtNtLeadSearch );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set(gNtOpen, false)
             Visible: =gNtOpen
@@ -1525,31 +1476,17 @@ Screens:
             Width: =300
             Height: =18
             Visible: =gNxOpen
-      - txtNxDate:
-          Control: Classic/TextInput@2.3.2
+      - dtpNxDate:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Default: =""
-            HintText: ="e.g. 12/08/2026"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Placeholder: ="Trade date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
             X: =(Parent.Width - 680) / 2 + 348
             Y: =(Parent.Height - 560) / 2 + 84
-            Width: =160
-            Height: =36
-            Visible: =gNxOpen
-      - lblNxDateEcho:
-          Control: Label@2.5.1
-          Properties:
-            Text: |
-              =If( Len(txtNxDate.Text) = 0, "",
-                   IfError( Text(DateValue(txtNxDate.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextPrimary
-            X: =(Parent.Width - 680) / 2 + 516
-            Y: =(Parent.Height - 560) / 2 + 84
-            Width: =140
-            Height: =36
+            Width: =220
+            Height: =32
             Visible: =gNxOpen
       - lblNxClientCap:
           Control: Label@2.5.1
@@ -1729,20 +1666,20 @@ Screens:
             Width: =160
             Height: =36
             Visible: =gNxOpen
-      - selNxCcy:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      - cboNxCcy:
+          Control: ModernCombobox@1.0.0
           Properties:
+            Items: =["USD", "EUR", "GBP", "JPY", "CHF"]
+            ItemDisplayText: =ThisItem.Value
+            InputTextPlaceholder: ="Currency"
+            SelectMultiple: =false
+            IsSearchable: =false
+            DefaultSelectedItems: =[gNxCcy]
             X: =(Parent.Width - 760) / 2 + 372
             Y: =(Parent.Height - 560) / 2 + 206
-            Width: =300
-            Height: =36
-            FontSize: =11
-            Items: |
-              =Table({ Id: 1, Label: "USD" }, { Id: 2, Label: "EUR" }, { Id: 3, Label: "GBP" },
-                      { Id: 4, Label: "JPY" }, { Id: 5, Label: "CHF" })
-            DefaultId: =1
-            OnChange: =Set(gNxCcy, selNxCcy.Selected.Label)
+            Width: =160
+            Height: =32
+            OnChange: =Set(gNxCcy, cboNxCcy.Selected.Value)
             Visible: =gNxOpen
       - lblNxSalesCap:
           Control: Label@2.5.1
@@ -1845,7 +1782,7 @@ Screens:
             Size: =Theme.Size.Small
             DisplayMode: |
               =If( Len(Trim(txtNxName.Text)) > 0 && gNxClient.Id > 0 && gNxProduct.Id > 0
-                && Len(txtNxDate.Text) > 0 && !IsError(DateValue(txtNxDate.Text))
+                && !IsBlank(dtpNxDate.SelectedDate)
                 && ( Len(txtNxNotional.Text) = 0 || !IsError(Value(txtNxNotional.Text)) )
                 && Len(gNxSales.Mail) > 0,
                    DisplayMode.Edit, DisplayMode.Disabled )
@@ -1863,10 +1800,10 @@ Screens:
                     x_productValue: gNxProduct.Value,
                     x_ccy:          gNxCcy,
                     x_notional:     txtNxNotional.Text,
-                    x_date:         txtNxDate.Text,
+                    x_date:         dtpNxDate.SelectedDate,
                     x_salesName:    gNxSales.DisplayName,
                     x_salesMail:    gNxSales.Mail } );
-               Reset( txtNxName ); Reset( txtNxNotional ); Reset( txtNxDate );
+               Reset( txtNxName ); Reset( txtNxNotional );
                Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
@@ -1887,7 +1824,7 @@ Screens:
             Width: =120
             Height: =40
             OnSelect: |
-              =Reset( txtNxName ); Reset( txtNxNotional ); Reset( txtNxDate );
+              =Reset( txtNxName ); Reset( txtNxNotional );
                Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
@@ -1963,20 +1900,20 @@ Screens:
             Width: =300
             Height: =18
             Visible: =gNiOpen
-      - selNiStatus:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      - cboNiStatus:
+          Control: ModernCombobox@1.0.0
           Properties:
+            Items: =["Open", "In Progress", "Blocked", "Resolved"]
+            ItemDisplayText: =ThisItem.Value
+            InputTextPlaceholder: ="Status"
+            SelectMultiple: =false
+            IsSearchable: =false
+            DefaultSelectedItems: =[gNiStatus]
             X: =(Parent.Width - 680) / 2 + 24
             Y: =(Parent.Height - 520) / 2 + 156
-            Width: =400
-            Height: =36
-            FontSize: =11
-            Items: |
-              =Table({ Id: 1, Label: "Open" }, { Id: 2, Label: "In Progress" },
-                      { Id: 3, Label: "Blocked" }, { Id: 4, Label: "Resolved" })
-            DefaultId: =1
-            OnChange: =Set(gNiStatus, selNiStatus.Selected.Label)
+            Width: =300
+            Height: =32
+            OnChange: =Set(gNiStatus, cboNiStatus.Selected.Value)
             Visible: =gNiOpen
       - lblNiImpCap:
           Control: Label@2.5.1
@@ -1990,19 +1927,20 @@ Screens:
             Width: =300
             Height: =18
             Visible: =gNiOpen
-      - selNiImpact:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      - cboNiImpact:
+          Control: ModernCombobox@1.0.0
           Properties:
+            Items: =["Low", "Medium", "High"]
+            ItemDisplayText: =ThisItem.Value
+            InputTextPlaceholder: ="Impact"
+            SelectMultiple: =false
+            IsSearchable: =false
+            DefaultSelectedItems: =[gNiImpact]
             X: =(Parent.Width - 680) / 2 + 24
             Y: =(Parent.Height - 520) / 2 + 228
-            Width: =400
-            Height: =36
-            FontSize: =11
-            Items: |
-              =Table({ Id: 1, Label: "Low" }, { Id: 2, Label: "Medium" }, { Id: 3, Label: "High" })
-            DefaultId: =2
-            OnChange: =Set(gNiImpact, selNiImpact.Selected.Label)
+            Width: =300
+            Height: =32
+            OnChange: =Set(gNiImpact, cboNiImpact.Selected.Value)
             Visible: =gNiOpen
       - lblNiAssCap:
           Control: Label@2.5.1
