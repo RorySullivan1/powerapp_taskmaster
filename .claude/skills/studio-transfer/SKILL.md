@@ -88,6 +88,34 @@ Instead, establish paste-readiness *before* the human ever pastes:
    revise-blind loop that follows rewrites correct code. Confirmed 2026-08-04, after two rounds
    of rewriting `cmpToast` chasing a symptom that a refresh cleared.
 
+## LAYOUT FORMULAS DO NOT SURVIVE THE PASTE
+
+First-party, from *Create responsive layouts in canvas apps*:
+
+> After you write formulas for the **X**, **Y**, **Width** and **Height** properties of a control,
+> your formulas will be overwritten with constant values if you subsequently drag the control in
+> the canvas editor.
+
+Studio does that positioning as part of a paste, so **every layout formula lands as a frozen
+constant** — the value the formula happened to evaluate to *at the instant of the paste*.
+
+Three consequences, all of which have already bitten:
+
+1. **A layout formula that references another control freezes to a transient value.** If the
+   referenced control isn't yet at its final position when the paste evaluates, the wrong number
+   is baked in permanently. `scrProjects`' gallery landed at `Y=193` this way and covered the
+   filter row. **Never position off another control** — the value must be self-contained.
+2. **The landed app is not responsive.** `Width: =Parent.Width - 48` becomes `1318`. Fine for a
+   fixed 1366×768 tablet app, which this is, but it means a Theme change will never propagate to
+   layout: re-pasting is the only way, and re-pasting re-freezes.
+3. **Fixing a frozen value means editing that property in Studio**, not re-pasting — the paste
+   will just freeze it again. Set the number in the formula bar.
+
+**Authoring rule:** prefer plain integers for X/Y/Width/Height whenever the value is static
+anyway, so what lands equals what was authored and there is no evaluation-order dependency at
+all. Keep a formula only where genuine responsiveness is wanted, and tell the human not to drag
+that control.
+
 ## The channel — code view mechanics
 
 Code view (GA **17 Mar 2025**) is the interactive channel. Grounded on Microsoft Learn

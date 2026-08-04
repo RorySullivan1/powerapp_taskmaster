@@ -9,6 +9,11 @@ page** — component contracts are inlined so you're not flipping between files 
 - **Golden rule:** paste one unit at a time onto a blank target, then tell me two things — **did it
   land?** and **what suffix did Studio add?** (`galProjects` → `galProjects_1`). Rename back before
   moving on; screens reference controls by name.
+- **LAYOUT FORMULAS FREEZE ON PASTE.** Studio overwrites `X`/`Y`/`Width`/`Height` formulas with
+  constants when it positions a control, which a paste does ([MS Learn](https://learn.microsoft.com/power-apps/maker/canvas-apps/create-responsive-layout#use-formulas-for-dynamic-layout)).
+  What lands is whatever the formula evaluated to *at that instant*. So: **don't drag controls
+  after pasting**, and if a position is wrong, fix it in the formula bar — re-pasting just
+  freezes it again. Each screen header lists its intended bands so you can check the numbers.
 - **REFRESH STUDIO BEFORE REPORTING A FAILURE.** The editor can keep serving an old component
   definition after you've changed its properties or body, so the app behaves as if the edit never
   happened. A browser refresh is the difference between a real bug and a phantom one — and from my
