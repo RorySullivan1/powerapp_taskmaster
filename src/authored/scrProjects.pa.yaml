@@ -45,11 +45,11 @@ Screens:
             Items: |
               =Table({ Id: 1, Label: "All" }, { Id: 2, Label: "Active" }, { Id: 3, Label: "Archived" })
             DefaultId: =2
-            OnChange: =Reset(SearchBox)
-      - SearchBox:
+            OnChange: =Reset(txtProjSearch)
+      - txtProjSearch:
           Control: Classic/TextInput@2.3.2
           Properties:
-            # Phase 2: drives StartsWith(project_name, SearchBox.Text) on the projects gallery.
+            # Phase 2: drives StartsWith(project_name, txtProjSearch.Text) on the projects gallery.
             HintText: ="Search projects…"
             Font: =Theme.Font
             Size: =Theme.Size.Body
@@ -71,23 +71,29 @@ Screens:
               =If( selFilter.Selected.Id = 3,
                    Sort( Filter( taskmaster_projects,
                              project_phase.Value = "Archived"
-                          && StartsWith(project_name, SearchBox.Text) ),
+                          && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    selFilter.Selected.Id = 2,
                    Sort( Filter( taskmaster_projects,
                              ( project_phase.Value = "Planning" || project_phase.Value = "Active"
                             || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" )
-                          && StartsWith(project_name, SearchBox.Text) ),
+                          && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    Sort( Filter( taskmaster_projects,
-                             StartsWith(project_name, SearchBox.Text) ),
+                             StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ) )
             TemplateSize: =72
             TemplatePadding: =0
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
-            Height: =Parent.Height - (SearchBox.Y + SearchBox.Height + Theme.Space.Gap) - Theme.Space.Gutter
+            # ABSOLUTE, not `txtProjSearch.Y + txtProjSearch.Height + …`. A cross-control
+            # geometry reference is fragile across this gap: Studio suffixes a
+            # colliding name on paste (txtProjSearch -> txtProjSearch_1), and if the
+            # reference then fails to resolve the gallery jumps to the top of the
+            # screen and covers the filter and search row. Same arithmetic as every
+            # other screen: header band 88, section header 60, gap, filter row 40, gap.
+            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap) - Theme.Space.Gutter
             X: =Theme.Space.Gutter
-            Y: =SearchBox.Y + SearchBox.Height + Theme.Space.Gap
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, Theme.Color.Accent, Theme.Color.Surface)
           Children:
             - rowName:
@@ -176,19 +182,19 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Text: |
-              =If( IsBlank(SearchBox.Text),
+              =If( IsBlank(txtProjSearch.Text),
                    "No projects match this filter.",
-                   "No projects start with """ & SearchBox.Text & """." )
+                   "No projects start with """ & txtProjSearch.Text & """." )
             Font: =Theme.Font
             Size: =Theme.Size.Body
             Color: =Theme.Color.TextMuted
             Align: =Align.Center
             VerticalAlign: =VerticalAlign.Middle
             Visible: =IsEmpty(galProjects.AllItems)
-            X: =galProjects.X
-            Y: =galProjects.Y
-            Width: =galProjects.Width
-            Height: =galProjects.Height
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap) - Theme.Space.Gutter
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #

@@ -225,6 +225,25 @@ def token_errors(doc) -> list[str]:
                     f"Gate it on the same flag that opens it, or make its Height conditional"
                 )
 
+    # A control's POSITION must not depend on another control's geometry. Studio
+    # suffixes a colliding name on paste (SearchBox -> SearchBox_1); if the reference
+    # then fails to resolve, the control silently jumps — scrProjects' gallery landed
+    # over the filter and search row that way. Anchoring X/Width to a backdrop
+    # rectangle is harmless by comparison, so only Y and Height are flagged.
+    for path, node in walk(doc):
+        for name, body in node.items():
+            if not isinstance(body, dict):
+                continue
+            for prop in ("Y", "Height"):
+                f = strip_comments(str((body.get("Properties") or {}).get(prop, "")))
+                for ref in re.findall(r"\b([A-Z][A-Za-z0-9_]*|gal[A-Za-z0-9_]*)\.(?:X|Y|Width|Height)\b", f):
+                    if ref in ("Parent", "Self", "ThisItem", "App", "Theme"):
+                        continue
+                    out.append(
+                        f"{path}/{name}/{prop}: NOTE positions off `{ref}` — a paste-time rename "
+                        f"breaks the chain silently and the control jumps. Prefer Theme arithmetic"
+                    )
+
     # MS Learn documents the Icon property and NEVER enumerates its values, so every
     # icon name here was a guess until the list was recovered from Templates.json
     # inside the example .msapp — a real Studio export, i.e. first-party ground
