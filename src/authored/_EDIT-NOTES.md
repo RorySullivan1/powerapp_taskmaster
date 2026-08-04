@@ -101,6 +101,17 @@ round-trip.
 
 No `ComboBox` or `DatePicker` token is grounded, so there are no dropdowns. Instead:
 
+- **People search uses `SearchUserV2`, not `SearchUser`.** The V1 docs claim `searchTerm` covers
+  display name, given name, surname, mail, mail nickname and UPN, but in practice V1 matched only
+  the address — people could not be found by name. MS's own current worked example uses V2, which
+  returns a wrapper, so the Items formula ends in `.value`:
+
+  ```powerapps
+  Office365Users.SearchUserV2({ searchTerm: txtPrManagerSearch.Text, top: 8 }).value
+  ```
+
+  All 8 people pickers use this form. The row already leads with `DisplayName`.
+
 - **Lookup / person** → a search `TextInput` (`DelayOutput: true`) plus a results `Gallery`
   that is `Visible` only at 2+ characters with nothing yet chosen. Z-order is positional in
   this dialect, so declaring the gallery at the **end** of `Children:` floats it above the

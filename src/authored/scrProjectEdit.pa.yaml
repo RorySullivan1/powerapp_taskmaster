@@ -127,21 +127,87 @@ Screens:
             X: =Parent.Width - 24 - Theme.Space.Gutter
             Y: =(Theme.Space.HeaderH - 24) / 2
             OnSelect: =Back()
-      - selPrTab:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      # TABS ARE PLAIN BUTTONS, NOT A cmpSelection STRIP.
+      # The strip set the tab from `<strip>.Selected.Id` inside its OnChange, which the
+      # component raises straight after `Select(Parent)` — so the consumer reads the
+      # gallery's selection in the same behaviour pass that sets it. Tab switching did
+      # not work in Studio. A button carries its own value in its own OnSelect, so
+      # there is nothing to propagate and nothing to race.
+      - btnTabPrDetails:
+          Control: Classic/Button@2.2.0
           Properties:
+            Text: ="Details"
+            Fill: =If(gPrTab = 1, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gPrTab = 1, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
             X: =24
             Y: =84
-            Width: =760
+            Width: =148
             Height: =40
-            Items: |
-              =Table( { Id: 1, Label: "Details" }, { Id: 2, Label: "Classification" },
-                      { Id: 3, Label: "Tasks" },   { Id: 4, Label: "Transactions" },
-                      { Id: 5, Label: "Issues" } )
-            DefaultId: =1
-            OnChange: |
-              =Set(gPrTab, selPrTab.Selected.Id)
+            OnSelect: =Set(gPrTab, 1)
+      - btnTabPrClass:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Classification"
+            Fill: =If(gPrTab = 2, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gPrTab = 2, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24 + 152
+            Y: =84
+            Width: =148
+            Height: =40
+            OnSelect: =Set(gPrTab, 2)
+      - btnTabPrTasks:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Tasks"
+            Fill: =If(gPrTab = 3, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gPrTab = 3, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24 + 304
+            Y: =84
+            Width: =148
+            Height: =40
+            OnSelect: =Set(gPrTab, 3)
+      - btnTabPrTx:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Transactions"
+            Fill: =If(gPrTab = 4, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gPrTab = 4, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24 + 456
+            Y: =84
+            Width: =148
+            Height: =40
+            OnSelect: =Set(gPrTab, 4)
+      - btnTabPrIssues:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Issues"
+            Fill: =If(gPrTab = 5, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gPrTab = 5, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24 + 608
+            Y: =84
+            Width: =148
+            Height: =40
+            OnSelect: =Set(gPrTab, 5)
       # =====================================================================
       # TAB 1 — DETAILS
       # =====================================================================
@@ -1564,7 +1630,7 @@ Screens:
           Properties:
             Visible: =gPrPicker = "Manager" && ( gPrTab = 1 && Len(txtPrManagerSearch.Text) >= 2 && Len(gPrManager.Mail) = 0 )
             Items: |
-              =Office365Users.SearchUser({ searchTerm: txtPrManagerSearch.Text, top: 8 })
+              =Office365Users.SearchUserV2({ searchTerm: txtPrManagerSearch.Text, top: 8 }).value
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
@@ -1578,8 +1644,7 @@ Screens:
             - rowPrManager:
                 Control: Label@2.5.1
                 Properties:
-                  Text: |
-                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Text: =ThisItem.DisplayName
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextPrimary
@@ -1611,7 +1676,7 @@ Screens:
           Properties:
             Visible: =gPrPicker = "Requestor" && ( gPrTab = 1 && Len(txtPrRequestorSearch.Text) >= 2 && Len(gPrRequestor.Mail) = 0 )
             Items: |
-              =Office365Users.SearchUser({ searchTerm: txtPrRequestorSearch.Text, top: 8 })
+              =Office365Users.SearchUserV2({ searchTerm: txtPrRequestorSearch.Text, top: 8 }).value
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
@@ -1625,8 +1690,7 @@ Screens:
             - rowPrRequestor:
                 Control: Label@2.5.1
                 Properties:
-                  Text: |
-                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Text: =ThisItem.DisplayName
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextPrimary
@@ -1658,7 +1722,7 @@ Screens:
           Properties:
             Visible: =gPrPicker = "Supporter" && ( gPrTab = 1 && Len(txtPrSupporterSearch.Text) >= 2 && Len(gPrSupporter.Mail) = 0 )
             Items: |
-              =Office365Users.SearchUser({ searchTerm: txtPrSupporterSearch.Text, top: 8 })
+              =Office365Users.SearchUserV2({ searchTerm: txtPrSupporterSearch.Text, top: 8 }).value
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
@@ -1672,8 +1736,7 @@ Screens:
             - rowPrSupporter:
                 Control: Label@2.5.1
                 Properties:
-                  Text: |
-                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Text: =ThisItem.DisplayName
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextPrimary

@@ -130,18 +130,57 @@ Screens:
                Set( gEditProject, gSelProject );
                Navigate( scrProjectEdit, ScreenTransition.Cover )
       # ---- Tab strip -------------------------------------------------------
-      - selTab:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      # TABS ARE PLAIN BUTTONS, NOT A cmpSelection STRIP.
+      # The strip set the tab from `<strip>.Selected.Id` inside its OnChange, which the
+      # component raises straight after `Select(Parent)` — so the consumer reads the
+      # gallery's selection in the same behaviour pass that sets it. Tab switching did
+      # not work in Studio. A button carries its own value in its own OnSelect, so
+      # there is nothing to propagate and nothing to race.
+      - btnTabPjTasks:
+          Control: Classic/Button@2.2.0
           Properties:
+            Text: ="Tasks"
+            Fill: =If(gProjTab = 1, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gProjTab = 1, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
             X: =Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64
-            Width: =420
+            Width: =138
             Height: =40
-            Items: |
-              =Table({ Id: 1, Label: "Tasks" }, { Id: 2, Label: "Transactions" }, { Id: 3, Label: "Issues" })
-            DefaultId: =1
-            OnChange: =Set(gProjTab, selTab.Selected.Id)
+            OnSelect: =Set(gProjTab, 1)
+      - btnTabPjTx:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Transactions"
+            Fill: =If(gProjTab = 2, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gProjTab = 2, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =Theme.Space.Gutter + 142
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64
+            Width: =138
+            Height: =40
+            OnSelect: =Set(gProjTab, 2)
+      - btnTabPjIssues:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Issues"
+            Fill: =If(gProjTab = 3, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gProjTab = 3, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =Theme.Space.Gutter + 284
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64
+            Width: =138
+            Height: =40
+            OnSelect: =Set(gProjTab, 3)
       # One "new" button that follows the active tab, rather than three that only
       # differ in which screen they open. gSelProject is already set, so each edit
       # screen pre-attaches the new child to this project.

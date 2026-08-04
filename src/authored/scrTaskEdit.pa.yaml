@@ -109,19 +109,42 @@ Screens:
             X: =Parent.Width - 24 - Theme.Space.Gutter
             Y: =(Theme.Space.HeaderH - 24) / 2
             OnSelect: =Back()
-      - selTaskTab:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      # TABS ARE PLAIN BUTTONS, NOT A cmpSelection STRIP.
+      # The strip set the tab from `<strip>.Selected.Id` inside its OnChange, which the
+      # component raises straight after `Select(Parent)` — so the consumer reads the
+      # gallery's selection in the same behaviour pass that sets it. Tab switching did
+      # not work in Studio. A button carries its own value in its own OnSelect, so
+      # there is nothing to propagate and nothing to race.
+      - btnTabTkTask:
+          Control: Classic/Button@2.2.0
           Properties:
+            Text: ="Task"
+            Fill: =If(gTaskEditTab = 1, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gTaskEditTab = 1, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
             X: =24
             Y: =84
-            Width: =300
+            Width: =148
             Height: =40
-            Items: |
-              =Table( { Id: 1, Label: "Task" }, { Id: 2, Label: "Output" } )
-            DefaultId: =1
-            OnChange: |
-              =Set(gTaskEditTab, selTaskTab.Selected.Id)
+            OnSelect: =Set(gTaskEditTab, 1)
+      - btnTabTkOutput:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Output"
+            Fill: =If(gTaskEditTab = 2, Theme.Color.Primary, Theme.Color.Surface)
+            Color: =If(gTaskEditTab = 2, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            X: =24 + 152
+            Y: =84
+            Width: =148
+            Height: =40
+            OnSelect: =Set(gTaskEditTab, 2)
       # ================= TAB 1 — TASK ======================================
       - lblTkNameCap:
           Control: Label@2.5.1
@@ -1117,7 +1140,7 @@ Screens:
           Properties:
             Visible: =gTkPicker = "Lead" && ( gTaskEditTab = 1 && Len(txtTkLeadSearch.Text) >= 2 && Len(gTkLead.Mail) = 0 )
             Items: |
-              =Office365Users.SearchUser({ searchTerm: txtTkLeadSearch.Text, top: 8 })
+              =Office365Users.SearchUserV2({ searchTerm: txtTkLeadSearch.Text, top: 8 }).value
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
@@ -1131,8 +1154,7 @@ Screens:
             - rowTkLead:
                 Control: Label@2.5.1
                 Properties:
-                  Text: |
-                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Text: =ThisItem.DisplayName
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextPrimary
@@ -1164,7 +1186,7 @@ Screens:
           Properties:
             Visible: =gTkPicker = "Supporter" && ( gTaskEditTab = 1 && Len(txtTkSupporterSearch.Text) >= 2 && Len(gTkSupporter.Mail) = 0 )
             Items: |
-              =Office365Users.SearchUser({ searchTerm: txtTkSupporterSearch.Text, top: 8 })
+              =Office365Users.SearchUserV2({ searchTerm: txtTkSupporterSearch.Text, top: 8 }).value
             TemplateSize: =32
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
@@ -1178,8 +1200,7 @@ Screens:
             - rowTkSupporter:
                 Control: Label@2.5.1
                 Properties:
-                  Text: |
-                    =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
+                  Text: =ThisItem.DisplayName
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextPrimary
