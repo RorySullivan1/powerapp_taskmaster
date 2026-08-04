@@ -106,37 +106,6 @@ def token_errors(doc) -> list[str]:
                         f"ends in {last.split('(')[0]}(), which returns a value — end it with `; true`"
                     )
 
-    # CONFIRMED IN STUDIO 2026-08-03, both directions:
-    #   conditional over a child control  -> rejected  (cmpSelection.Selected)
-    #   bare `control.Property` reference -> accepted
-    # So this is a rule, not a guess. Keep outputs bare; compute in a child control.
-    for _, node in walk(doc):
-        for cname, cdef in (node.get("ComponentDefinitions") or {}).items():
-            props = cdef.get("Properties") or {}
-            kids = set()
-            def _rec(n):
-                if isinstance(n, dict):
-                    for k, v in n.items():
-                        if isinstance(v, dict) and "Control" in v:
-                            kids.add(k)
-                        _rec(v)
-                elif isinstance(n, list):
-                    for v in n:
-                        _rec(v)
-            _rec(cdef.get("Children") or [])
-            for pname, p_ in (cdef.get("CustomProperties") or {}).items():
-                if not isinstance(p_, dict) or p_.get("PropertyKind") != "Output":
-                    continue
-                fx = " ".join(str(props.get(pname, "")).split())
-                refs = [k for k in kids if re.search(rf"\b{re.escape(k)}\b", fx)]
-                if refs and not re.fullmatch(r"=\w+\.\w+", fx):
-                    kind = "conditional" if ("If(" in fx or "Coalesce(" in fx) else "expression"
-                    out.append(
-                        f"{cname}.{pname}: NOTE Output is a {kind} over child control(s) "
-                        f"{refs}. CONFIRMED: Studio rejects this shape and accepts a bare "
-                        f"`control.Property` reference. Move the logic onto a hidden child control"
-                    )
-
     # IsMatch in Power Apps defaults to MatchOptions.Complete, which already wraps
     # the pattern in ^...$. Supplying your own anchors double-anchors it — the trap
     # that got cmpStatusPill rejected. Flag it rather than rely on remembering.

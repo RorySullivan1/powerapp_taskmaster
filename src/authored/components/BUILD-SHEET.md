@@ -204,7 +204,7 @@ Single-select strip over an Items table; outputs Selected record, raises OnChang
 |---|---|---|---|---|---|
 | 1 | `Items` | Input | Table | `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })` | the property's **Default** |
 | 2 | `DefaultId` | Input | Number | `=1` | the property's **Default** |
-| 3 | `Selected` | Output | Record | `=galSel.Selected` | ⚠️ **PHASE 3 — after the body.** Uses `galSel`, which the body creates. Create the property now with the placeholder `=First(cmpSelection.Items)`, then set the real formula once the body is in. |
+| 3 | `Selected` | Output | Record | `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)` | ⚠️ **PHASE 3 — after the body.** Uses `galSel`, which the body creates. Create the property now with the placeholder `=First(cmpSelection.Items)`, then set the real formula once the body is in. |
 | 4 | `OnChange` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -221,7 +221,7 @@ These are the ones that must NOT be entered as a `Default` — that is exactly w
 
 | Output property | Formula |
 |---|---|
-| `Selected` | `=galSel.Selected` |
+| `Selected` | `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)` |
 
 ---
 
@@ -285,7 +285,7 @@ Cascading managed-metadata term picker driven by the term Path; outputs the leaf
 
 **Used by:** scrProjectEdit, scrTaskEdit  
 **Access app scope:** `False`  
-**Body:** `bodies/cmpTermPicker.children.pa.yaml` (11 control(s)) — paste last
+**Body:** `bodies/cmpTermPicker.children.pa.yaml` (9 control(s)) — paste last
 
 ### Custom properties — create these first
 
@@ -295,8 +295,8 @@ Cascading managed-metadata term picker driven by the term Path; outputs the leaf
 | 2 | `Caption` | Input | Text | `="Term"` | the property's **Default** |
 | 3 | `PathDelimiter` | Input | Text | `=";"` | the property's **Default** |
 | 4 | `TermPath` | Output | Text | `=lblPick.Text` | ⚠️ **PHASE 3 — after the body.** Uses `lblPick`, which the body creates. Create the property now with the placeholder `=""`, then set the real formula once the body is in. |
-| 5 | `TermLabel` | Output | Text | `=lblPickLabel.Text` | ⚠️ **PHASE 3 — after the body.** Uses `lblPickLabel`, which the body creates. Create the property now with the placeholder `=""`, then set the real formula once the body is in. |
-| 6 | `IsComplete` | Output | Boolean | `=lblPickDone.Visible` | ⚠️ **PHASE 3 — after the body.** Uses `lblPickDone`, which the body creates. Create the property now with the placeholder `=false`, then set the real formula once the body is in. |
+| 5 | `TermLabel` | Output | Text | `=Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )` | ⚠️ **PHASE 3 — after the body.** Uses `lblPick`, which the body creates. Create the property now with the placeholder `=""`, then set the real formula once the body is in. |
+| 6 | `IsComplete` | Output | Boolean | `=Len(lblPick.Text) > 0 && CountRows( Filter( cmpTermPicker.Terms, StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0` | ⚠️ **PHASE 3 — after the body.** Uses `lblPick`, which the body creates. Create the property now with the placeholder `=false`, then set the real formula once the body is in. |
 | 7 | `OnChange` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -314,8 +314,8 @@ These are the ones that must NOT be entered as a `Default` — that is exactly w
 | Output property | Formula |
 |---|---|
 | `TermPath` | `=lblPick.Text` |
-| `TermLabel` | `=lblPickLabel.Text` |
-| `IsComplete` | `=lblPickDone.Visible` |
+| `TermLabel` | `=Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )` |
+| `IsComplete` | `=Len(lblPick.Text) > 0 && CountRows( Filter( cmpTermPicker.Terms, StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0` |
 
 ---
 

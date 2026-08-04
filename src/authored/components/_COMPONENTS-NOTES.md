@@ -43,18 +43,18 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 > functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
 > because you asked for components and it packages them as one importable unit.
 
-## The output rule — CONFIRMED in Studio
+## Property KIND matters more than it looks
 
-**A component Output must be a bare `control.Property` reference.** Confirmed 2026-08-03 from both
-directions: `=If(IsBlank(galSel.Selected), …)` is rejected, `=galSel.Selected` is accepted. It is not
-an ordering problem — the conditional form fails whether or not the child control exists yet.
+An **Output** property's formula is evaluated **inside** the component, so it can freely reference
+the component's own child controls — `=If(IsBlank(galSel.Selected), …, galSel.Selected)` is fine.
 
-Where a value needs computing, put the logic on a **hidden child control** and have the output read
-it. `cmpTermPicker` carries three such labels: `lblPick` (resolved path), `lblPickLabel` (its label)
-and `lblPickDone` (the leaf test, stored on `Visible` — the only Boolean property a grounded control
-offers, which is what lets a Boolean output stay a bare reference).
+An **Input** property's `Default` is evaluated in the **consumer's** scope, so it cannot see them at
+all. Create an output as an input by mistake and you get a name-scope error pointing at the child
+control, which reads like "you may not reference your own controls" and is really "this property is
+the wrong kind".
 
-`tools/validate_pa_yaml.py` flags any Output that references a child control without being bare.
+That cost a round trip on `cmpSelection.Selected` (2026-08-03). If a property errors on a child
+reference, **check its kind before changing the formula.**
 
 ## Control tokens — and why they DO gate a paste
 

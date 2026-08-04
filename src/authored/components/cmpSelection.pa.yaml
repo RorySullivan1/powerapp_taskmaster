@@ -52,22 +52,7 @@ ComponentDefinitions:
       Height: =40
       Width: =360
       Fill: =RGBA(0, 0, 0, 0)
-      # BARE REFERENCE, DELIBERATELY (changed 2026-08-03 after Studio rejected the
-      # conditional form). This was:
-      #     =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
-      # Studio errors on that even once galSel exists, so the ordering fix didn't
-      # help — the problem is the conditional, not the timing.
-      #
-      # And the fallback was never doing anything. A gallery's `Selected` ALREADY
-      # returns its first row until the user taps one — that is the exact behaviour
-      # cmpTermPicker's sentinel row exists to defend against. The only case where
-      # `galSel.Selected` is blank is an empty Items table, and then
-      # `First(cmpSelection.Items)` is blank too. So the If guarded nothing.
-      #
-      # RULE, now that it has cost us a build session: a component output should be
-      # a BARE reference to a child control's property. Push any computation into
-      # the child control and read the result.
-      Selected: =galSel.Selected
+      Selected: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
     Children:
       # A HORIZONTAL STRIP BUILT FROM A VERTICAL GALLERY (changed 2026-08-03).
       #
