@@ -101,7 +101,7 @@ Editable grid — staging collection, add/delete rows, single bulk-save via OnCo
 | 1 | `Items` | Input | Table | `=Table({ Id: 0, Col1: "", Col2: "", Col3: "" })` | the property's **Default** |
 | 2 | `EditedItems` | Output | Table | `=colGrid` | component **Properties** (below) |
 | 3 | `RowCount` | Output | Number | `=CountRows(colGrid)` | component **Properties** (below) |
-| 4 | `AddRow` | Action | Boolean | `=Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" })` | component **Properties** (below) |
+| 4 | `AddRow` | Action | Boolean | `=Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" }); true` | component **Properties** (below) |
 | 5 | `OnCommit` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -121,7 +121,7 @@ These are the ones that must NOT be entered as a `Default` — that is exactly w
 |---|---|
 | `EditedItems` | `=colGrid` |
 | `RowCount` | `=CountRows(colGrid)` |
-| `AddRow` | `=Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" })` |
+| `AddRow` | `=Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" }); true` |
 
 ---
 
@@ -324,7 +324,7 @@ Self-dismissing toast — Show() action raises it, internal Timer hides after Du
 | 1 | `Message` | Input | Text | `=""` | the property's **Default** |
 | 2 | `Tone` | Input | Text | `="Info"` | the property's **Default** |
 | 3 | `Duration` | Input | Number | `=3000` | the property's **Default** |
-| 4 | `Show` | Action | Boolean | `=Set(_show, true); Reset(tmrToast)` | component **Properties** (below) |
+| 4 | `Show` | Action | Boolean | `=Set(_show, true); Reset(tmrToast); true` | component **Properties** (below) |
 | 5 | `OnDismiss` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -341,7 +341,7 @@ These are the ones that must NOT be entered as a `Default` — that is exactly w
 
 | Output property | Formula |
 |---|---|
-| `Show` | `=Set(_show, true); Reset(tmrToast)` |
+| `Show` | `=Set(_show, true); Reset(tmrToast); true` |
 
 ---
 

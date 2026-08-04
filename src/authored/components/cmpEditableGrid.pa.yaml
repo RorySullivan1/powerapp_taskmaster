@@ -60,8 +60,14 @@ ComponentDefinitions:
       OnReset: =ClearCollect(colGrid, cmpEditableGrid.Items)
       EditedItems: =colGrid
       RowCount: =CountRows(colGrid)
+      # The trailing `true` is not decoration. This is an Action property, so it
+      # declares `ReturnType: Boolean` — but `Collect` returns the RECORD it added,
+      # so the formula's actual type was Record and disagreed with the contract.
+      # A behaviour formula returns its last expression, so ending in `true` makes
+      # the implementation match what the property promises.
       AddRow: |
-        =Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" })
+        =Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" });
+         true
     Children:
       - headerBar:
           Control: Rectangle@2.3.0

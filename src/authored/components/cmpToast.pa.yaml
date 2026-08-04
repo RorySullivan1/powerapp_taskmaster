@@ -46,7 +46,11 @@ ComponentDefinitions:
       Height: =56
       Width: =340
       Fill: =RGBA(0, 0, 0, 0)
-      Show: =Set(_show, true); Reset(tmrToast)
+      # Ends in `true` for the same reason as cmpEditableGrid.AddRow — an Action
+      # declares ReturnType: Boolean, and a behaviour formula returns its last
+      # expression. `Reset` is void, so this was relying on Studio not checking.
+      Show: |
+        =Set(_show, true); Reset(tmrToast); true
     Children:
       - toastBg:
           Control: Rectangle@2.3.0

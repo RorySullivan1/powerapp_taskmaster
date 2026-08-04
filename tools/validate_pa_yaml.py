@@ -52,6 +52,14 @@ KNOWN_CONTROLS = {
     "Classic/Timer@2.1.0":    "unverified", # "Timer" — name is best-effort
 }
 KNOWN_VARIANTS = {"Vertical", "Horizontal"}
+
+# Behaviour functions that RETURN A VALUE. An Action property declares
+# ReturnType: Boolean, but a behaviour formula returns its last expression — so
+# ending on one of these means the implementation's type disagrees with the
+# contract. Real bug, found in cmpEditableGrid.AddRow (Collect returns a Record).
+VALUE_RETURNING_BEHAVIOUR = (
+    "Collect", "ClearCollect", "Patch", "Remove", "RemoveIf", "Update", "UpdateIf",
+)
 PLACEHOLDER = re.compile(r"\b(?:CONFIRM|TODO|TBD|XXX|FIXME)_\w+")
 
 
@@ -80,6 +88,23 @@ def token_errors(doc) -> list[str]:
         var = node.get("Variant")
         if isinstance(var, str) and var not in KNOWN_VARIANTS:
             out.append(f"{path}: unknown gallery Variant {var!r} — expected one of {sorted(KNOWN_VARIANTS)}")
+
+    # Action properties: does the implementation actually return what it declares?
+    for _, node in walk(doc):
+        for cname, cdef in (node.get("ComponentDefinitions") or {}).items():
+            props = cdef.get("Properties") or {}
+            for pname, p in (cdef.get("CustomProperties") or {}).items():
+                if not isinstance(p, dict) or p.get("PropertyKind") != "Action":
+                    continue
+                if p.get("ReturnType") != "Boolean":
+                    continue
+                f = str(props.get(pname, "")).strip().rstrip(";").strip()
+                last = f.split(";")[-1].strip().lstrip("=").strip()
+                if last.startswith(VALUE_RETURNING_BEHAVIOUR):
+                    out.append(
+                        f"{cname}.{pname}: NOTE Action declares ReturnType: Boolean but its formula "
+                        f"ends in {last.split('(')[0]}(), which returns a value — end it with `; true`"
+                    )
 
     # Placeholders can hide in any string, not just Control/Variant.
     for path, node in walk(doc):
