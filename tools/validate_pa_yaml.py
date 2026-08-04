@@ -48,7 +48,7 @@ KNOWN_CONTROLS = {
     "Gallery@2.15.0":         "grounded",
     "Image@2.2.3":            "grounded",
     "CanvasComponent":        "grounded",   # component instance, not a control
-    "HtmlViewer@2.1.0":       "unverified", # "HTML text" — name is best-effort
+    "HtmlViewer@2.1.0":       "grounded",   # CONFIRMED 2026-08-03 — cmpStatusPill body pasted
     "Classic/Timer@2.1.0":    "unverified", # "Timer" — name is best-effort
 }
 KNOWN_VARIANTS = {"Vertical", "Horizontal"}

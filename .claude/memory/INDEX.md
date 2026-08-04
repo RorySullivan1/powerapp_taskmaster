@@ -15,6 +15,7 @@
 - **Blocked on nothing authored.** Next real gates: provision the lists, add Office 365 Users.
 
 ## Decisions        (append-only; supersede, never delete)
+- [2026-08-03] **`HtmlViewer@2.1.0` CONFIRMED** — cmpStatusPill's body pasted with it; the only failure was the HtmlText VALUE (four `IsMatch` patterns carrying their own `^`/`$` while IsMatch already defaults to MatchOptions.Complete → double-anchored). Rewritten as `in` membership over a word list — `in` on a single-column table is membership AND case-insensitive by default, so `(?i)` was never needed. Also confirmed en route: `(?i)` inline flags ARE supported ([imsx] at pattern start), and `EncodeHTML` IS a real canvas function (v24034). **`Classic/Timer@2.1.0` is now the ONLY unverified token in the kit** — paste-log.md
 - [2026-07-26] Project is parent; Task/Ticket/Issue are peers (not variants) — why: distinct kinds — sessions/2026-07-26-1726-repo-init-decisions.md
 - [2026-07-26] Three lists, not one discriminated list — why: a discriminator nulls ⅔ of columns + misleads Owner/PercentComplete — sessions/2026-07-26-1726-repo-init-decisions.md
 - [2026-07-26] Only Tasks roll up into completion; Tickets/Issues surface alongside — sessions/2026-07-26-1726-repo-init-decisions.md

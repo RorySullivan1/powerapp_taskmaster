@@ -62,11 +62,12 @@ is a failed paste, reported back only as "it didn't work".
   `WrapCount = CountRows(Items)`, which lays every item across one row — a horizontal strip built
   from the only variant that has actually landed. (`scrAdmin`, the one confirmed crossing, used
   `Gallery@2.15.0` vertical.)
-- **`HtmlViewer@2.1.0`** (`cmpStatusPill`/`cmpChoicePill`) and **`Classic/Timer@2.1.0`**
-  (`cmpToast`) are best-effort names for the "HTML text" and "Timer" controls. **Under the
-  correction above these are now a real risk**, not free: if either component is rejected, the
-  token is the first suspect. Report the error and I'll ground the name. Fallback for the toast
-  if the Timer token is wrong: drop it and let the app own timing (visual-only toast +
+- **`HtmlViewer@2.1.0`** — **CONFIRMED 2026-08-03.** `cmpStatusPill`'s body pasted with it; the
+  only failure in that unit was the HtmlText *value* (a bad regex), not the control token. So
+  `cmpChoicePill` and `cmpUiKit`'s HTML output no longer carry a token risk either.
+- **`Classic/Timer@2.1.0`** (`cmpToast`) is still a best-effort name and is now the **last
+  unverified token in the kit**. If `cmpToast`'s body is rejected, that is the first suspect —
+  report the error. Fallback: drop the Timer and let the app own timing (visual-only toast +
   `Visible`).
 
 ## Transfer — a component crosses in TWO parts
