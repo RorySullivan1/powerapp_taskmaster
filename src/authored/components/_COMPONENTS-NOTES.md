@@ -62,51 +62,19 @@ This is very likely what caused `cmpTermPicker` to render black: an unrecognised
 gallery with no template to style itself from. The explicit surface fills added for that are kept —
 a picker should be a panel regardless — but the variant was probably the actual cause.
 
-## If a component renders as a black box, it's the zero-alpha Fill
+## The black component was the Variant, not the Fill
 
-`RGBA(0, 0, 0, 0)` is black at zero alpha. Where the alpha isn't honoured it renders as **opaque
-black**, which is what `cmpTermPicker` did (2026-08-03).
+`cmpTermPicker` rendered black and `RGBA(0, 0, 0, 0)` looked like the culprit — black at zero alpha,
+and the picker was the first component with genuinely exposed background. That was wrong. The cause
+was the invalid gallery `Variant` (see above); with a real variant the picker loads correctly.
 
-Most components got away with it because their body covers the whole component — `cmpSelection`'s
-single gallery is `Width: =Parent.Width` / `Height: =Parent.Height`, so the fill never shows.
-`cmpTermPicker` was the first with genuinely exposed background: four narrow columns leaving the
-caption strip, the hint strip and the inter-column gaps visible.
+The galleries and row buttons are back to transparent. The **component's** own `Fill` stays an
+opaque white, but as design rather than repair: four narrow columns leave the caption strip, hint
+strip and inter-column gaps visible, and a picker should read as a panel. Every other component
+keeps `RGBA(0, 0, 0, 0)`, and transparency is now known to work.
 
-**Fixed there by removing every dependency on transparency** — the component and all four galleries
-now carry an explicit white surface, and the row buttons mirror their gallery's `TemplateFill`
-instead of being see-through. A picker is a panel; it should have a surface anyway.
-
-**Still relying on a zero-alpha fill** — if any of these shows a black box, apply the same fix and
-tell me, and note the intended background so the replacement colour is right:
-
-| Component | Intended to sit on |
-|---|---|
-| `cmpSelection`, `cmpStatusCard`, `cmpSectionHeader`, `cmpKpiRing` | the screen (`Theme.Color.Bg`, `#F5F7FA`) — body usually covers it |
-| `cmpStatusPill`, `cmpChoicePill` | inline, in a header or row — transparency is the point |
-| `cmpToast`, `cmpConfirmDialog` | overlays — transparency is load-bearing |
-
-Components can't read `Theme`, so any replacement has to be a literal.
-
-## A control's `Items` is write-only
-
-You set `Items`; you cannot read it. `CountRows(gal.Items)` is invalid — the readable form is
-`gal.AllItems`.
-
-But `AllItems` has a trap of its own here: **a hidden gallery's rows aren't realised**, so
-`Visible: =CountRows(Self.AllItems) > 0` latches off — once false it can never become true again.
-`cmpTermPicker`'s level-visibility therefore asks the **source data** instead of the gallery:
-
-```powerapps
-=Len(galL1.Selected.Path) > 0 &&
- CountRows( Filter( cmpTermPicker.Terms,
-     StartsWith(Path, galL1.Selected.Path & cmpTermPicker.PathDelimiter) ) ) > 0
-```
-
-A tree has no gaps, so "something exists deeper" implies "something exists at the next level" — no
-depth arithmetic, and no sentinel row to compensate for, which is why it's `> 0` and not `> 1`.
-
-Component custom properties *named* `Items` (`cmpSelection.Items`) are a different thing entirely
-and are fine to read. The validator distinguishes them.
+**Worth keeping as a habit:** a rendering oddity was blamed on the nearest suspicious-looking
+property when the real fault was a token three lines above it. Prefer confirming the token first.
 
 ## Column names are IDENTIFIERS, not strings
 
