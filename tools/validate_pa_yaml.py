@@ -192,6 +192,25 @@ def token_errors(doc) -> list[str]:
                     f"Gate it on the same flag that opens it, or make its Height conditional"
                 )
 
+    # A gallery's own `OnSelect` does NOT reliably fire when the click lands on a
+    # child control — the row looks right and does nothing. Confirmed in Studio on
+    # the nav rail. The action belongs on a transparent full-template button
+    # declared LAST in the row, doing `Select(Parent); <action>`.
+    for path, node in walk(doc):
+        for name, body in node.items():
+            if not isinstance(body, dict):
+                continue
+            if not str(body.get("Control", "")).startswith("Gallery@"):
+                continue
+            if "OnSelect" not in (body.get("Properties") or {}):
+                continue
+            out.append(
+                f"{path}/{name}: a gallery's own `OnSelect` does not fire reliably when the "
+                f"click lands on a child control — move the action to a transparent "
+                f"`Classic/Button@2.2.0` sized to Parent.TemplateWidth/Height, declared LAST "
+                f"in Children, doing `Select(Parent); <action>`"
+            )
+
     # A control's `Items` is write-only — you set it, you can't read it. The
     # readable form is `AllItems`. Component custom properties NAMED Items are
     # fine (cmpSelection.Items), so only flag names declared as controls here.
@@ -266,6 +285,52 @@ def rel(p: pathlib.Path) -> str:
     except ValueError:
         return str(p)
 
+# Built-in control properties an instance may set without the component declaring
+# them. Anything else must be a custom property of that component, or the paste
+# fails on an unrecognised name — and across a one-way gap that costs a round trip.
+INSTANCE_BUILTINS = {
+    "X", "Y", "Width", "Height", "Visible", "Fill", "DisplayMode",
+    "TabIndex", "Tooltip", "OnReset", "BorderColor", "BorderThickness",
+    "AccessibleLabel",
+}
+
+
+def contract_errors(files) -> list[str]:
+    """Cross-file check: every property a CanvasComponent instance sets must exist."""
+    comps: dict[str, set] = {}
+    for f in files:
+        try:
+            doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            continue
+        for cname, cdef in ((doc or {}).get("ComponentDefinitions") or {}).items():
+            comps[cname] = set((cdef.get("CustomProperties") or {}).keys())
+    if not comps:
+        return []
+
+    out = []
+    for f in files:
+        try:
+            doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            continue
+        for path, node in walk(doc):
+            for name, body in node.items():
+                if not isinstance(body, dict) or body.get("Control") != "CanvasComponent":
+                    continue
+                cn = body.get("ComponentName")
+                if cn not in comps:
+                    out.append(f"{rel(f)}: {name} references unknown component {cn!r}")
+                    continue
+                for prop in (body.get("Properties") or {}):
+                    if prop not in INSTANCE_BUILTINS and prop not in comps[cn]:
+                        out.append(
+                            f"{rel(f)}: {name} ({cn}) sets `{prop}`, which is neither a custom "
+                            f"property of {cn} nor a built-in — the paste will fail"
+                        )
+    return out
+
+
 def main() -> int:
     validator = Draft7Validator(yaml.safe_load(SCHEMA.read_text(encoding="utf-8")))
     files = targets(sys.argv[1:])
@@ -307,9 +372,17 @@ def main() -> int:
             print(f"  at {path}\n     {msg}")
         print()
 
+    contract = contract_errors(files)
+    if contract:
+        print("\nFAIL component-instance contracts")
+        for c in contract:
+            print(f"  {c}")
+
     total = len(files)
     print(f"\n{total - bad}/{total} valid" + ("" if not bad else f"  —  {bad} FAILING"))
-    return 1 if bad else 0
+    if contract:
+        print(f"{len(contract)} component-instance contract error(s) — a paste WILL fail on these")
+    return 1 if (bad or contract) else 0
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -194,7 +194,6 @@ Screens:
             Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 24) - Theme.Space.Gutter
             # Selection lives on the GALLERY so the whole row is the target —
             # putting it on a child rectangle leaves the title area inert.
-            OnSelect: =Set(gSelTask, ThisItem); Navigate(scrTask, ScreenTransition.Cover)
           Children:
             - rowFill:
                 Control: Rectangle@2.3.0
@@ -261,6 +260,23 @@ Screens:
                   Width: =Parent.TemplateWidth * 0.45
                   Height: =20
                   VerticalAlign: =VerticalAlign.Middle
+            - galTasksHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
+                  # OnSelect does not reliably fire when the click lands on a child control, so
+                  # without a transparent full-template button declared LAST the rows look right
+                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set(gSelTask, ThisItem); Navigate(scrTask, ScreenTransition.Cover)
       - lblTasksMeta:
           Control: Label@2.5.1
           Properties:
@@ -297,10 +313,6 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 28
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
             Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap + 28) - Theme.Space.Gutter
-            OnSelect: |
-              =Set( gEditMode, "Edit" );
-               Set( gEditTransaction, ThisItem );
-               Navigate( scrTransactionEdit, ScreenTransition.Cover )
           Children:
             - txName:
                 Control: Label@2.5.1
@@ -371,6 +383,25 @@ Screens:
                   Width: =Parent.TemplateWidth * 0.18
                   Height: =44
                   VerticalAlign: =VerticalAlign.Middle
+            - galTransactionsHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
+                  # OnSelect does not reliably fire when the click lands on a child control, so
+                  # without a transparent full-template button declared LAST the rows look right
+                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gEditMode, "Edit" );
+                     Set( gEditTransaction, ThisItem );
+                     Navigate( scrTransactionEdit, ScreenTransition.Cover )
       - lblTxTotal:
           Control: Label@2.5.1
           Properties:
@@ -426,10 +457,6 @@ Screens:
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
             Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 64 + 40 + Theme.Space.Gap) - Theme.Space.Gutter
-            OnSelect: |
-              =Set( gEditMode, "Edit" );
-               Set( gEditIssue, ThisItem );
-               Navigate( scrIssueEdit, ScreenTransition.Cover )
           Children:
             - issFill:
                 Control: Rectangle@2.3.0
@@ -490,6 +517,25 @@ Screens:
                   Y: =56
                   Width: =Parent.TemplateWidth * 0.9
                   Height: =22
+            - galIssuesHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
+                  # OnSelect does not reliably fire when the click lands on a child control, so
+                  # without a transparent full-template button declared LAST the rows look right
+                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gEditMode, "Edit" );
+                     Set( gEditIssue, ThisItem );
+                     Navigate( scrIssueEdit, ScreenTransition.Cover )
       # ---- Shared empty state for whichever tab is active -------------------
       - lblTabEmpty:
           Control: Label@2.5.1

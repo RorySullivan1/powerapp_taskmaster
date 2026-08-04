@@ -89,7 +89,6 @@ Screens:
             X: =Theme.Space.Gutter
             Y: =SearchBox.Y + SearchBox.Height + Theme.Space.Gap
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, Theme.Color.Accent, Theme.Color.Surface)
-            OnSelect: =Set(gSelProject, ThisItem); Navigate(scrProject, ScreenTransition.Cover)
           Children:
             - rowName:
                 Control: Label@2.5.1
@@ -155,6 +154,23 @@ Screens:
                   Width: =180
                   Height: =20
                   VerticalAlign: =VerticalAlign.Middle
+            - galProjectsHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
+                  # OnSelect does not reliably fire when the click lands on a child control, so
+                  # without a transparent full-template button declared LAST the rows look right
+                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set(gSelProject, ThisItem); Navigate(scrProject, ScreenTransition.Cover)
       # Empty state — only when the query genuinely returns nothing.
       - ProjectsEmptyLabel:
           Control: Label@2.5.1
