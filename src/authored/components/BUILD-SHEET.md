@@ -3,7 +3,7 @@
 Regenerate with `python tools/split_components.py`. The `.pa.yaml` files beside
 this one are the source of record.
 
-## Why a component takes two steps
+## Why a component takes THREE phases
 
 A component definition is two different things, and Studio accepts them through
 two different channels:
@@ -13,13 +13,23 @@ two different channels:
 | **Contract** | custom properties + the component-level formulas backing the Output / OutputFunction / Action ones | **Typed** into the component's property pane. There is no paste gesture for this |
 | **Body** | the child controls | **Pasted** via code view, exactly like a screen — `bodies/<name>.children.pa.yaml` |
 
-So: create the component, add its custom properties from the table, set the
-component-level formulas, then paste the body. A whole-definition paste asks one
-channel to carry both, which is why it fails.
+But the two are **mutually dependent**, so typing everything up front doesn't work:
 
-**Order matters inside a component too.** Add every custom property *before*
-pasting the body — the body's controls reference them (`cmpX.SomeInput`), and a
-reference to a property that doesn't exist yet is a paste-time failure.
+- the **body** references custom properties by name (`cmpSelection.Items`) — so the
+  properties must exist *before* the paste;
+- some **backing formulas** reference controls the body creates (`galSel.Selected`) —
+  so those cannot be entered *until after* the paste. Typing one early gives you a
+  name-isn't-valid error on a control that doesn't exist yet.
+
+Hence three phases:
+
+| Phase | Do this |
+|---|---|
+| **1** | Create every custom property — name, kind, type, and the `Default` for Inputs. For any row marked ⚠️ below, enter the **placeholder** formula, not the real one |
+| **2** | Paste `bodies/<name>.children.pa.yaml` into the component's canvas |
+| **3** | Go back and set the real backing formula on every ⚠️ row |
+
+Rows without ⚠️ can be finished in phase 1 — they don't touch the body.
 
 ## Build order
 
@@ -99,9 +109,9 @@ Editable grid — staging collection, add/delete rows, single bulk-save via OnCo
 | # | Name | Kind | Type | Default / formula | Where the formula goes |
 |---|---|---|---|---|---|
 | 1 | `Items` | Input | Table | `=Table({ Id: 0, Col1: "", Col2: "", Col3: "" })` | the property's **Default** |
-| 2 | `EditedItems` | Output | Table | `=colGrid` | component **Properties** (below) |
-| 3 | `RowCount` | Output | Number | `=CountRows(colGrid)` | component **Properties** (below) |
-| 4 | `AddRow` | Action | Boolean | `=Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" }); true` | component **Properties** (below) |
+| 2 | `EditedItems` | Output | Table | `=colGrid` | ⚠️ **PHASE 3 — after the body.** Uses `colGrid`, which the body creates. Create the property now with the placeholder `=cmpEditableGrid.Items`, then set the real formula once the body is in. |
+| 3 | `RowCount` | Output | Number | `=CountRows(colGrid)` | ⚠️ **PHASE 3 — after the body.** Uses `colGrid`, which the body creates. Create the property now with the placeholder `=0`, then set the real formula once the body is in. |
+| 4 | `AddRow` | Action | Boolean | `=Collect(colGrid, { Id: 0, Col1: "", Col2: "", Col3: "" }); true` | ⚠️ **PHASE 3 — after the body.** Uses `colGrid`, which the body creates. Create the property now with the placeholder `=false`, then set the real formula once the body is in. |
 | 5 | `OnCommit` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -194,7 +204,7 @@ Single-select strip over an Items table; outputs Selected record, raises OnChang
 |---|---|---|---|---|---|
 | 1 | `Items` | Input | Table | `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })` | the property's **Default** |
 | 2 | `DefaultId` | Input | Number | `=1` | the property's **Default** |
-| 3 | `Selected` | Output | Record | `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)` | component **Properties** (below) |
+| 3 | `Selected` | Output | Record | `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)` | ⚠️ **PHASE 3 — after the body.** Uses `galSel`, which the body creates. Create the property now with the placeholder `=First(cmpSelection.Items)`, then set the real formula once the body is in. |
 | 4 | `OnChange` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -284,9 +294,9 @@ Cascading managed-metadata term picker driven by the term Path; outputs the leaf
 | 1 | `Terms` | Input | Table | `=Table( { Label: "", Path: "" } )` | the property's **Default** |
 | 2 | `Caption` | Input | Text | `="Term"` | the property's **Default** |
 | 3 | `PathDelimiter` | Input | Text | `=";"` | the property's **Default** |
-| 4 | `TermPath` | Output | Text | `=lblPick.Text` | component **Properties** (below) |
-| 5 | `TermLabel` | Output | Text | `=Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )` | component **Properties** (below) |
-| 6 | `IsComplete` | Output | Boolean | `=Len(lblPick.Text) > 0 && CountRows( Filter( cmpTermPicker.Terms, StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0` | component **Properties** (below) |
+| 4 | `TermPath` | Output | Text | `=lblPick.Text` | ⚠️ **PHASE 3 — after the body.** Uses `lblPick`, which the body creates. Create the property now with the placeholder `=""`, then set the real formula once the body is in. |
+| 5 | `TermLabel` | Output | Text | `=Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )` | ⚠️ **PHASE 3 — after the body.** Uses `lblPick`, which the body creates. Create the property now with the placeholder `=""`, then set the real formula once the body is in. |
+| 6 | `IsComplete` | Output | Boolean | `=Len(lblPick.Text) > 0 && CountRows( Filter( cmpTermPicker.Terms, StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0` | ⚠️ **PHASE 3 — after the body.** Uses `lblPick`, which the body creates. Create the property now with the placeholder `=false`, then set the real formula once the body is in. |
 | 7 | `OnChange` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself
@@ -324,7 +334,7 @@ Self-dismissing toast — Show() action raises it, internal Timer hides after Du
 | 1 | `Message` | Input | Text | `=""` | the property's **Default** |
 | 2 | `Tone` | Input | Text | `="Info"` | the property's **Default** |
 | 3 | `Duration` | Input | Number | `=3000` | the property's **Default** |
-| 4 | `Show` | Action | Boolean | `=Set(_show, true); Reset(tmrToast); true` | component **Properties** (below) |
+| 4 | `Show` | Action | Boolean | `=Set(_show, true); Reset(tmrToast); true` | ⚠️ **PHASE 3 — after the body.** Uses `tmrToast`, which the body creates. Create the property now with the placeholder `=false`, then set the real formula once the body is in. |
 | 5 | `OnDismiss` | Event | Boolean | `` | the property's **Default** |
 
 ### Component properties — set these on the component itself

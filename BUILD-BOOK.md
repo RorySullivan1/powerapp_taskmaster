@@ -73,9 +73,16 @@ a fresh blank screen. Skeletons are a scaffold, not the destination — they car
 
 ## A2 · Build the components you need
 
-For **each**: create the component → add every custom property (**Input/Output/Event/Action** with
-the exact type) → set the backing formula for Output/Action props on the component itself → **then**
-paste `bodies/<name>.children.pa.yaml`. The body references the properties by name, so order matters.
+**THREE phases per component, not two** — the contract and the body depend on each other:
+
+1. **Create every custom property** (Input/Output/Event/Action, exact type). Set Input `Default`s.
+   For anything marked ⚠️ below, enter the **placeholder** — its real formula names a control the
+   body hasn't created yet, and typing it now gives a name-isn't-valid error.
+2. **Paste** `bodies/<name>.children.pa.yaml` into the component canvas. (The body references the
+   properties by name, which is why phase 1 comes first.)
+3. **Go back and set the real formula** on every ⚠️ property.
+
+`BUILD-SHEET.md` marks the ⚠️ rows per component and gives each placeholder.
 
 > Watch items: **`cmpConfirmDialog`'s input is `IsOpen`, not `Visible`** (a `Visible` custom prop
 > collides with the built-in). **`cmpToast`** uses a Timer and **`cmpStatusPill`/`cmpChoicePill`** an
@@ -85,7 +92,7 @@ paste `bodies/<name>.children.pa.yaml`. The body references the properties by na
 ### `cmpSelection`  *(build first — 7 screens use it)*  · body: 1 control
 - [ ] `Items` — Input · Table · Default `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })`
 - [ ] `DefaultId` — Input · Number · Default `=1`
-- [ ] `Selected` — Output · Record · backing formula `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)`
+- [ ] `Selected` — Output · Record · ⚠️ **phase 3** — create with placeholder `=First(cmpSelection.Items)`; after the body, set `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)`
 - [ ] `OnChange` — Event
 - [ ] Component props: `Height=40` · `Width=360` · `Fill=RGBA(0,0,0,0)`
 - [ ] Paste `bodies/cmpSelection.children.pa.yaml`
@@ -121,7 +128,7 @@ paste `bodies/<name>.children.pa.yaml`. The body references the properties by na
 - [ ] `Message` — Input · Text · `=""`
 - [ ] `Tone` — Input · Text · `="Info"`
 - [ ] `Duration` — Input · Number · `=3000`
-- [ ] `Show` — Action · backing formula `=Set(_show, true); Reset(tmrToast)`
+- [ ] `Show` — Action · ⚠️ **phase 3** — create with placeholder `=true`; after the body, set `=Set(_show, true); Reset(tmrToast); true`
 - [ ] `OnDismiss` — Event
 - [ ] Component props: `Height=56` · `Width=340` · `Fill=RGBA(0,0,0,0)`
 - [ ] Paste `bodies/cmpToast.children.pa.yaml`  *(Timer token unverified — report if rejected)*
@@ -141,9 +148,9 @@ paste `bodies/<name>.children.pa.yaml`. The body references the properties by na
 - [ ] `Terms` — Input · Table · `=Table( { Label: "", Path: "" } )`
 - [ ] `Caption` — Input · Text · `="Term"`
 - [ ] `PathDelimiter` — Input · Text · `=";"`
-- [ ] `TermPath` — Output · Text · backing `=lblPick.Text`
-- [ ] `TermLabel` — Output · Text · backing `=Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )`
-- [ ] `IsComplete` — Output · Boolean · backing `=Len(lblPick.Text) > 0 && CountRows( Filter( cmpTermPicker.Terms, StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0`
+- [ ] `TermPath` — Output · Text · ⚠️ **phase 3** — placeholder `=""`; after the body, `=lblPick.Text`
+- [ ] `TermLabel` — Output · Text · ⚠️ **phase 3** — placeholder `=""`; after the body, `=Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )`
+- [ ] `IsComplete` — Output · Boolean · ⚠️ **phase 3** — placeholder `=false`; after the body, `=Len(lblPick.Text) > 0 && CountRows( Filter( cmpTermPicker.Terms, StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0`
 - [ ] `OnChange` — Event
 - [ ] Component props: `Height=190` · `Width=620` · `Fill=RGBA(0,0,0,0)`
 - [ ] Paste `bodies/cmpTermPicker.children.pa.yaml`

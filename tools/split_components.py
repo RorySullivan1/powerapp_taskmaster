@@ -53,6 +53,45 @@ USED_BY = {
 # what got the first component batch rejected).
 FORMULA_IN_PROPERTIES = {"Output", "OutputFunction", "Action"}
 
+# A backing formula that names a control (or collection) from the BODY cannot be
+# entered until the body has been pasted — the name doesn't exist yet. So the
+# build is three phases, not two, and this is what detects which properties are
+# affected. Placeholders below are type-correct and body-free, so the property
+# can be created and saved in phase 1 and finished in phase 3.
+PLACEHOLDER_BY_TYPE = {
+    "Text": '=""', "Number": "=0", "Boolean": "=false",
+    "Record": "=Blank()", "Table": "=Table()",
+}
+PLACEHOLDER_OVERRIDE = {
+    ("cmpSelection", "Selected"):      "=First(cmpSelection.Items)",
+    ("cmpEditableGrid", "EditedItems"): "=cmpEditableGrid.Items",
+}
+
+
+def body_names(children) -> set:
+    """Control names declared anywhere in the body."""
+    found = set()
+    def rec(n):
+        if isinstance(n, dict):
+            for k, v in n.items():
+                if isinstance(v, dict) and "Control" in v:
+                    found.add(k)
+                rec(v)
+        elif isinstance(n, list):
+            for v in n:
+                rec(v)
+    rec(children)
+    return found
+
+
+def deferred_refs(formula: str, names: set) -> list:
+    """Body controls / component collections this formula depends on."""
+    import re as _re
+    f = str(formula or "")
+    hits = sorted(n for n in names if _re.search(rf"\b{_re.escape(n)}\b", f))
+    hits += sorted(set(_re.findall(r"\bcol[A-Z]\w*", f)) - set(hits))
+    return hits
+
 
 def clean(o):
     """Drop comments, keep multi-line formulas as block scalars.
@@ -102,7 +141,7 @@ def main() -> int:
 Regenerate with `python tools/split_components.py`. The `.pa.yaml` files beside
 this one are the source of record.
 
-## Why a component takes two steps
+## Why a component takes THREE phases
 
 A component definition is two different things, and Studio accepts them through
 two different channels:
@@ -112,13 +151,23 @@ two different channels:
 | **Contract** | custom properties + the component-level formulas backing the Output / OutputFunction / Action ones | **Typed** into the component's property pane. There is no paste gesture for this |
 | **Body** | the child controls | **Pasted** via code view, exactly like a screen — `bodies/<name>.children.pa.yaml` |
 
-So: create the component, add its custom properties from the table, set the
-component-level formulas, then paste the body. A whole-definition paste asks one
-channel to carry both, which is why it fails.
+But the two are **mutually dependent**, so typing everything up front doesn't work:
 
-**Order matters inside a component too.** Add every custom property *before*
-pasting the body — the body's controls reference them (`cmpX.SomeInput`), and a
-reference to a property that doesn't exist yet is a paste-time failure.
+- the **body** references custom properties by name (`cmpSelection.Items`) — so the
+  properties must exist *before* the paste;
+- some **backing formulas** reference controls the body creates (`galSel.Selected`) —
+  so those cannot be entered *until after* the paste. Typing one early gives you a
+  name-isn't-valid error on a control that doesn't exist yet.
+
+Hence three phases:
+
+| Phase | Do this |
+|---|---|
+| **1** | Create every custom property — name, kind, type, and the `Default` for Inputs. For any row marked ⚠️ below, enter the **placeholder** formula, not the real one |
+| **2** | Paste `bodies/<name>.children.pa.yaml` into the component's canvas |
+| **3** | Go back and set the real backing formula on every ⚠️ row |
+
+Rows without ⚠️ can be finished in phase 1 — they don't touch the body.
 
 ## Build order
 
@@ -134,6 +183,7 @@ do first — seven screens use it, and four of them are the editors.
             props = body.get("Properties", {}) or {}
             cprops = body.get("CustomProperties", {}) or {}
             children = body.get("Children", []) or []
+            kids = body_names(children)
 
             # ---- body file ----
             if children:
@@ -179,7 +229,15 @@ do first — seven screens use it, and four of them are the editors.
                     dtype = p.get("DataType", p.get("ReturnType", ""))
                     if kind in FORMULA_IN_PROPERTIES:
                         formula = props.get(pname)
-                        where = "component **Properties** (below)"
+                        needs = deferred_refs(formula, kids)
+                        if needs:
+                            ph = PLACEHOLDER_OVERRIDE.get((name, pname)) or \
+                                 PLACEHOLDER_BY_TYPE.get(dtype, '=""')
+                            where = (f"⚠️ **PHASE 3 — after the body.** Uses `{', '.join(needs)}`, "
+                                     f"which the body creates. Create the property now with the "
+                                     f"placeholder `{ph}`, then set the real formula once the body is in.")
+                        else:
+                            where = "component **Properties** (below)"
                         val = scalar(formula) if formula is not None else "—"
                     else:
                         where = "the property's **Default**"
