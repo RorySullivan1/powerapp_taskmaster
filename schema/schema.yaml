@@ -17,8 +17,8 @@
 # =============================================================================
 
 meta:
-  version: 2.0.0
-  updated: 2026-08-03
+  version: 2.1.0
+  updated: 2026-08-04
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
   source: user-supplied schema screenshots (see incoming-lists.md), then edited here
@@ -55,7 +55,7 @@ lists:
   # ---------------------------------------------------------------------------
   taskmaster_projects:
     role: The parent. Tasks, transactions and issues all hang off it.
-    provisioned: pending
+    provisioned: live        # 2026-08-04
     join_cost: 6
     columns:
       - { name: project_name,            type: Text,            required: true,  indexed: true,  desc: "User-facing project title (unique by convention only)" }
@@ -77,7 +77,7 @@ lists:
   # ---------------------------------------------------------------------------
   taskmaster_tasks:
     role: Units of work. The busiest list in the app.
-    provisioned: pending
+    provisioned: live        # 2026-08-04
     join_cost: 8          # 5 Lookup + 2 Person + 1 ManagedMetadata (10 incl. Created By/Modified By; cap is 12)
     columns:
       - { name: task_name,             type: Text,            required: true,  indexed: true,  desc: "Task title" }
@@ -104,7 +104,7 @@ lists:
   # ---------------------------------------------------------------------------
   taskmaster_transactions:
     role: Trades, at full transaction level.
-    provisioned: pending
+    provisioned: live        # 2026-08-04
     join_cost: 4
     columns:
       - { name: transaction_name,       type: Text,     required: true,  indexed: true,  desc: "Transaction label" }
@@ -126,7 +126,7 @@ lists:
   # ---------------------------------------------------------------------------
   taskmaster_issues:
     role: Freeform issues raised against a project, optionally a task or transaction.
-    provisioned: pending
+    provisioned: live        # 2026-08-04
     join_cost: 5
     columns:
       - { name: issue_name,             type: Text,     required: true,  indexed: true,  desc: "Issue summary / title" }
@@ -146,7 +146,7 @@ lists:
   # ---------------------------------------------------------------------------
   taskmaster_clients:
     role: Client dimension.
-    provisioned: pending
+    provisioned: live        # 2026-08-04
     join_cost: 4
     columns:
       - { name: client_name,     type: Text,            required: true,  indexed: true, desc: "Client display name" }
@@ -159,7 +159,7 @@ lists:
   # ---------------------------------------------------------------------------
   taskmaster_products:
     role: Product reference.
-    provisioned: pending
+    provisioned: live        # 2026-08-04
     join_cost: 1
     columns:
       - { name: product_uid,         type: Text,            required: true, indexed: true, desc: "Product identifier (ISIN / Ticker / Internal ID). Business key — uniqueness by convention, not enforced" }
@@ -169,7 +169,7 @@ lists:
   # ---------------------------------------------------------------------------
   asset_approval:
     role: Approval reference. Tasks point at it via task_output_approval.
-    provisioned: pending
+    provisioned: live        # 2026-08-04
     join_cost: 0
     columns:
       - { name: approval_id,     type: Text,      required: true, indexed: true, desc: "Approval identifier (e.g. MAW, Legal, Compliance, Brand)" }
@@ -184,6 +184,27 @@ lists:
     join_cost: null
     columns: []          # SCHEMA NOT SUPPLIED — any binding to this list is blocked.
 
+# =============================================================================
+# PROVISIONING VERIFICATION — check the live lists against this file.
+#
+# The lists went live 2026-08-04. Nothing reads SharePoint back into this repo,
+# so a mismatch is silent until a screen errors — which is exactly how
+# project_requestor was found (provisioned multi, corrected to single the same
+# day). Four things drift most easily, in order of how loudly they fail:
+#
+#  1. PERSON ARITY — `multi:` on every Person column. A multi column returns a
+#     TABLE: the read errors ("expecting a Table") and the expanded-user write
+#     fails. Check all 9. This is the one that has already bitten.
+#  2. INTERNAL NAMES — frozen at creation. `name:` here IS the internal name; a
+#     later rename changes only the display label, so a column created as
+#     "Project Manager" is internally `Project_x0020_Manager` and every token in
+#     the app misses. Nothing in the app will work against a mis-created name.
+#  3. CHOICE VALUES — the `values:` list must match exactly, including case.
+#     A Patch of an unlisted value fails; a Filter on one silently returns none.
+#  4. INDEXED COLUMNS — `indexed: true`. Missing indexes don't error, they just
+#     turn a delegable Filter into a 5000-item threshold failure once the list
+#     grows. Cheapest to fix now, most expensive to discover later.
+#
 # =============================================================================
 # Derived values — computed, not stored by SharePoint.
 # =============================================================================

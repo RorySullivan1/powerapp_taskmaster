@@ -12,9 +12,11 @@
   pastes). `.msapp` packing works only for data-independent screens, never components.
 - **Skeleton screens** (`variants/scr{Home,Reports,Projects}.skeleton.pa.yaml`) give a navigable
   5-screen app with no components and no data — scaffold, not the destination.
-- **Backend:** 8 `taskmaster_*`/`asset_*` lists, ALL `provisioned: pending`; `schema/schema.yaml`
-  v2.0.0 is the golden source. No MM terms list — the picker reads `Choices()` directly (C10).
-- **Blocked on nothing authored.** Next real gates: provision the lists, add Office 365 Users.
+- **Backend: THE LISTS ARE LIVE (2026-08-04).** 7 defined lists `provisioned: live`; `asset_library` still has no
+  schema. `schema/schema.yaml` v2.1.0 is the golden source and now carries a provisioning-verification block.
+  No MM terms list — the picker reads `Choices()` directly (C10).
+- **Blocked on nothing authored.** Lists are live; remaining gates: Office 365 Users connection, and verifying the
+  other 8 Person columns' arity (project_requestor was provisioned multi and has been corrected).
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-04] **A Person column's ARITY is part of the provisioning contract.** `project_requestor` was provisioned *Allow multiple selections = Yes*, so the connector returns a TABLE: `Coalesce(col.DisplayName, "")` errors ("expecting a Table" — Coalesce types from its first argument) and the expanded-user WRITE would have failed too. The tell: `gPrManager` and `gPrSupporter` use the identical formula and were fine — **when one instance of a repeated formula fails, suspect the DATA, not the code**. Fix is in SharePoint (repo is golden source, says single). All 9 Person columns now carry explicit `multi: false` — schema/schema.yaml
