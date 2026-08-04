@@ -88,6 +88,44 @@ Instead, establish paste-readiness *before* the human ever pastes:
    revise-blind loop that follows rewrites correct code. Confirmed 2026-08-04, after two rounds
    of rewriting `cmpToast` chasing a symptom that a refresh cleared.
 
+## The auto-layout container — GROUNDED 2026-08-04
+
+`GroupContainer@1.5.0` with `Variant: AutoLayout`, read straight off a photo of Studio's code
+view. This is the control the Insert pane calls *Horizontal container* / *Vertical container* —
+one control, direction chosen by a property.
+
+```yaml
+- Container3:
+    Control: GroupContainer@1.5.0
+    Variant: AutoLayout
+    Properties:
+      LayoutDirection:  =LayoutDirection.Horizontal    # or .Vertical
+      LayoutAlignItems: =LayoutAlignItems.Center
+      PaddingTop: =8
+      PaddingBottom: =8
+      PaddingLeft: =8
+      PaddingRight: =8
+    Children:
+      - Rectangle2:
+          Control: Rectangle@2.3.0
+          Properties:
+            LayoutMinWidth:  =16      # child-side layout properties
+            LayoutMinHeight: =16
+```
+
+**Children carry no X/Y** — the container positions them. That matters more here than it looks:
+X/Y are exactly the properties Studio freezes on paste, so **anything inside an auto-layout
+container is immune to that whole failure mode**. It is the one layout that survives the gap
+intact.
+
+CONFIRMED by the photo: `LayoutDirection`, `LayoutAlignItems`, the four `Padding*`,
+`LayoutMinWidth`, `LayoutMinHeight`. Studio's code view lists only non-default properties, so the
+rest are named from the same `Layout*` convention and are **inferred, not confirmed** —
+`LayoutOverflowY`/`LayoutOverflowX` (display names *Vertical Overflow* / *Horizontal Overflow*,
+values Scroll and Hide), `LayoutGap`, `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`.
+Confirm the overflow one before authoring a scrolling screen — it is the property the whole
+design hangs on.
+
 ## LAYOUT FORMULAS DO NOT SURVIVE THE PASTE
 
 First-party, from *Create responsive layouts in canvas apps*:

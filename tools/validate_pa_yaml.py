@@ -50,6 +50,8 @@ KNOWN_CONTROLS = {
     "CanvasComponent":        "grounded",   # component instance, not a control
     "HtmlViewer@2.1.0":       "grounded",   # CONFIRMED 2026-08-03 — cmpStatusPill body pasted
     "Timer":                  "grounded",   # CONFIRMED 2026-08-03 — NOT Classic/Timer
+    "GroupContainer@1.5.0":   "grounded",   # CONFIRMED 2026-08-04 — auto-layout container,
+                                            # read off a Studio code-view photo. Variant: AutoLayout
 }
 # Gallery Variant tokens are NOT "Vertical"/"Horizontal" — that was a guess this
 # repo carried for weeks. Studio's own generated YAML names them
@@ -57,6 +59,7 @@ KNOWN_CONTROLS = {
 # straight off a Studio code-view screenshot; the others are corroborated from
 # published .pa.yaml in the wild.
 KNOWN_VARIANTS = {
+    "AutoLayout",   # GroupContainer@1.5.0 — CONFIRMED from Studio code view 2026-08-04
     "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0",   # CONFIRMED from Studio
     "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0",
     "BrowseLayout_Vertical_OneTextVariant_ver5.0",
