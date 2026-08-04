@@ -5,6 +5,19 @@
 # DIALECT: modern structured schema; positional z-order. Header + nav are one
 # component (cmpAppBar), declared LAST so the fly-out floats over the content.
 # =============================================================================
+# VERTICAL BANDS — resolved, so they can be checked against Studio by eye.
+# Theme.Space: HeaderH 64 · Gutter 24 · Gap 16.  Screen height 768 (tablet).
+#
+#     0 ..  64   appBar (the blue bar; declared LAST, floats above everything)
+#    88 .. 148   hdrProjects      = HeaderH + Gutter,           height 60
+#   164 .. 204   selFilter | txtProjSearch  = +60 +Gap,         height 40
+#   220 .. 744   galProjects      = +40 +Gap,   height = 768 - 220 - Gutter
+#
+# If Studio shows anything else here, the layout has drifted — most likely a
+# control positioned off another control's geometry, which is how galProjects
+# once landed at Y=193 and covered the filter row by 11px. Every value in this
+# stack is now absolute Theme arithmetic for that reason.
+
 Screens:
   scrProjects:
     Properties:
