@@ -43,6 +43,25 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 > functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
 > because you asked for components and it packages them as one importable unit.
 
+## Gallery `Variant` tokens — the real ones
+
+**`Variant: Vertical` is not a thing.** That was a guess this repo carried for weeks. Studio's own
+generated code view names them `BrowseLayout_<Orientation>_<Template>_ver5.0`:
+
+| Variant | Status |
+|---|---|
+| `BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0` | **CONFIRMED** — read off Studio's code view |
+| `BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0` | corroborated from published `.pa.yaml` |
+| `BrowseLayout_Vertical_OneTextVariant_ver5.0` | corroborated |
+| `BrowseLayout_Flexible_SocialFeed_ver5.0` | corroborated |
+
+The template part only picks the *default* child layout — the children you paste replace it — so any
+vertical variant will do. All 49 galleries in this repo use the confirmed one.
+
+This is very likely what caused `cmpTermPicker` to render black: an unrecognised variant leaves the
+gallery with no template to style itself from. The explicit surface fills added for that are kept —
+a picker should be a panel regardless — but the variant was probably the actual cause.
+
 ## If a component renders as a black box, it's the zero-alpha Fill
 
 `RGBA(0, 0, 0, 0)` is black at zero alpha. Where the alpha isn't honoured it renders as **opaque

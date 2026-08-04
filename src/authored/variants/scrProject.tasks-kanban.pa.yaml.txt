@@ -1,27 +1,16 @@
-# =============================================================================
-# scrProject — KANBAN VARIANT for the Tasks tab (swap-in, NOT the default)
-# =============================================================================
-# The shipped scrProject.pa.yaml uses a FLAT, stage-grouped vertical gallery,
-# because `Variant: Vertical` is the only gallery variant with positive landing
-# evidence. This file holds the nicer horizontal-column kanban, which depends on
-# `Variant: Horizontal` — a token nothing has confirmed.
+# scrProject — TASKS TAB AS A KANBAN (swap-in variant, not the shipped form)
 #
-# WHY IT ISN'T THE DEFAULT: it sits mid-file in a large paste unit and gates the
-# entire Tasks tab. Across a one-way gap a rejection returns only "it didn't
-# work", so an unverified token there costs the whole screen.
+# The shipped scrProject.pa.yaml uses a FLAT, stage-grouped vertical gallery.
+# This file is the horizontal-board alternative.
 #
-# HOW TO SWAP IT IN, once a Horizontal gallery is known to paste:
-#   1. Paste any trivial Gallery with `Variant: Horizontal` onto a blank screen.
-#   2. If it lands, replace the `galTasks` block in scrProject.pa.yaml with the
-#      `galKanban` block below, and re-run: python tools/validate_pa_yaml.py
+# UPDATE 2026-08-03: this was parked because no gallery `Variant` token was
+# confirmed. Both now are, read off Studio's own generated YAML:
+#   vertical   `BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0`
+#   horizontal `BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0`
+# So the swap is no longer a token gamble — it is just a layout choice.
 #
-# The data shape is identical — both read the same `colProjectTasks`, filtered
-# locally per stage — so nothing else on the screen changes.
+# TO SWAP: replace the `galTasks` block in scrProject.pa.yaml with the one below.
 #
-# NOTE: `Parent.TemplateHeight` inside a HORIZONTAL gallery is itself suspect —
-# TemplateSize drives WIDTH there and TemplateWidth is the documented companion.
-# Use `Parent.Height - 40` for the inner gallery height when swapping in.
-# =============================================================================
       # =====================================================================
       # TAB 1 — TASKS as a kanban: outer gallery = stage columns, inner
       # gallery = that stage's cards. The inner Items filter runs against the
@@ -33,7 +22,7 @@
       # =====================================================================
       - galKanban:
           Control: Gallery@2.15.0
-          Variant: Horizontal
+          Variant: BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0
           Properties:
             Visible: =gProjTab = 1
             Items: |
@@ -64,7 +53,7 @@
                   VerticalAlign: =VerticalAlign.Middle
             - galStageCards:
                 Control: Gallery@2.15.0
-                Variant: Vertical
+                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
                 Properties:
                   # LOCAL filter over the project's tasks — colProjectTasks is
                   # already scoped by the delegable OnVisible query.

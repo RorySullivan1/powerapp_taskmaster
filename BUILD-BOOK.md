@@ -24,6 +24,10 @@ page** — component contracts are inlined so you're not flipping between files 
 > properties (`PA3004: … use Power Apps Studio to edit component definitions`). Packing only helps
 > for data-independent *screens*. Contracts are Studio-only — that's why they're typed below.
 
+> **If anything renders oddly, send me a photo of its code view.** That is how the gallery
+> `Variant` token was finally pinned down — `Variant: Vertical` had been a guess since Phase 1 and
+> was never valid. A screenshot carries far more than "it worked / it didn't".
+
 ## Pre-flight (once)
 
 - [ ] Get the files on the work machine (clone/pull, or GitHub → **Raw** → copy). Copy files

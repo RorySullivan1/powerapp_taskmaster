@@ -54,28 +54,17 @@ ComponentDefinitions:
       Fill: =RGBA(0, 0, 0, 0)
       Selected: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
     Children:
-      # A HORIZONTAL STRIP BUILT FROM A VERTICAL GALLERY (changed 2026-08-03).
+      # A HORIZONTAL STRIP BUILT FROM A VERTICAL GALLERY.
       #
-      # This was `Variant: Horizontal`, which its own comment flagged as
-      # UNCONFIRMED. Seven screens instantiate this component, so one bad token
-      # here is the highest-leverage paste risk in the repo.
-      #
-      # HONEST STATE OF THE EVIDENCE (corrected 2026-08-03): `Vertical` is NOT
-      # confirmed by a landing either. `scrAdmin` was cited as proof, but the copy
-      # that actually got pasted carried `Variant: CONFIRM_BlankVertical` — a
-      # leftover placeholder — so its landing proves a Gallery pastes, and nothing
-      # about which variant names are legal. `Vertical` is simply the
-      # better-evidenced of the two from public exports. Treat both as open until
-      # a paste says otherwise.
-      #
-      # `WrapCount` removes the need for it: a vertical gallery with WrapCount = N
-      # lays N items across before wrapping, so setting it to the row count gives
-      # exactly one row — a horizontal strip, from the proven variant. TemplateSize
-      # is the item HEIGHT in a vertical gallery, hence Parent.Height rather than
-      # the per-item width it meant before.
+      # `WrapCount` = row count lays every item across before wrapping, giving one
+      # row — a horizontal strip from a vertical gallery. Kept now that the real
+      # variant tokens are known (2026-08-03): switching to
+      # `BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0` would work too,
+      # but this needs no second token confirmed and TemplateSize already means
+      # item HEIGHT here, which is what the layout wants.
       - galSel:
           Control: Gallery@2.15.0
-          Variant: Vertical
+          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: =cmpSelection.Items
             # Seed the initial selection from DefaultId (no hand-managed variable).

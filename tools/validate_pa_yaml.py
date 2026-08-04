@@ -51,7 +51,17 @@ KNOWN_CONTROLS = {
     "HtmlViewer@2.1.0":       "grounded",   # CONFIRMED 2026-08-03 — cmpStatusPill body pasted
     "Timer":                  "grounded",   # CONFIRMED 2026-08-03 — NOT Classic/Timer
 }
-KNOWN_VARIANTS = {"Vertical", "Horizontal"}
+# Gallery Variant tokens are NOT "Vertical"/"Horizontal" — that was a guess this
+# repo carried for weeks. Studio's own generated YAML names them
+# `BrowseLayout_<Orientation>_<Template>_ver5.0`. The vertical one below was read
+# straight off a Studio code-view screenshot; the others are corroborated from
+# published .pa.yaml in the wild.
+KNOWN_VARIANTS = {
+    "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0",   # CONFIRMED from Studio
+    "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0",
+    "BrowseLayout_Vertical_OneTextVariant_ver5.0",
+    "BrowseLayout_Flexible_SocialFeed_ver5.0",
+}
 
 # Power Apps 3.24042 (Apr 2024) changed these functions' column-name arguments
 # from literal strings to IDENTIFIERS. `Ungroup(t, "v")` now errors with
