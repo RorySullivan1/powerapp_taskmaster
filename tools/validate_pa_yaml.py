@@ -106,9 +106,10 @@ def token_errors(doc) -> list[str]:
                         f"ends in {last.split('(')[0]}(), which returns a value — end it with `; true`"
                     )
 
-    # A component Output that wraps a child-control reference in a conditional is
-    # rejected by Studio — cmpSelection.Selected did, and no amount of ordering
-    # helped. Keep outputs as BARE references and compute in a child control.
+    # CONFIRMED IN STUDIO 2026-08-03, both directions:
+    #   conditional over a child control  -> rejected  (cmpSelection.Selected)
+    #   bare `control.Property` reference -> accepted
+    # So this is a rule, not a guess. Keep outputs bare; compute in a child control.
     for _, node in walk(doc):
         for cname, cdef in (node.get("ComponentDefinitions") or {}).items():
             props = cdef.get("Properties") or {}
@@ -132,8 +133,8 @@ def token_errors(doc) -> list[str]:
                     kind = "conditional" if ("If(" in fx or "Coalesce(" in fx) else "expression"
                     out.append(
                         f"{cname}.{pname}: NOTE Output is a {kind} over child control(s) "
-                        f"{refs} — Studio rejects conditional child references in an Output. "
-                        f"Move the logic onto a hidden child control and make this a bare reference"
+                        f"{refs}. CONFIRMED: Studio rejects this shape and accepts a bare "
+                        f"`control.Property` reference. Move the logic onto a hidden child control"
                     )
 
     # IsMatch in Power Apps defaults to MatchOptions.Complete, which already wraps

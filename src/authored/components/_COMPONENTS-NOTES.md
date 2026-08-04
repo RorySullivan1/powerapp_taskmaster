@@ -43,6 +43,19 @@ pills and person chips are almost always **cell renderers inside gallery rows**,
 > functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
 > because you asked for components and it packages them as one importable unit.
 
+## The output rule — CONFIRMED in Studio
+
+**A component Output must be a bare `control.Property` reference.** Confirmed 2026-08-03 from both
+directions: `=If(IsBlank(galSel.Selected), …)` is rejected, `=galSel.Selected` is accepted. It is not
+an ordering problem — the conditional form fails whether or not the child control exists yet.
+
+Where a value needs computing, put the logic on a **hidden child control** and have the output read
+it. `cmpTermPicker` carries three such labels: `lblPick` (resolved path), `lblPickLabel` (its label)
+and `lblPickDone` (the leaf test, stored on `Visible` — the only Boolean property a grounded control
+offers, which is what lets a Boolean output stay a bare reference).
+
+`tools/validate_pa_yaml.py` flags any Output that references a child control without being bare.
+
 ## Control tokens — and why they DO gate a paste
 
 **Corrected 2026-08-03 (user-reported): components ARE code-view-pasteable, and several have
