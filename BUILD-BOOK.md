@@ -192,6 +192,12 @@ that flies out over the content when the hamburger is tapped.
 > Raise it with `Set(gToastShow, false); … ; Set(gToastShow, true)` — the false→true edge is what
 > restarts the timer, so re-raising a toast that is already up still gets a full `Duration`.
 >
+> **TWO EDITS ON THE SCREEN, not just the component** — skipping either is why the toast went
+> silent after the rebuild. On `scrHome`'s `cmpToastHome` instance set **`IsOpen: =gToastShow`**,
+> and in every raise site (`btnRefresh.OnSelect`, `cmpConfirmHome.OnConfirm`) delete the trailing
+> `cmpToastHome.Show()` — it names a property that no longer exists, which makes the whole
+> `OnSelect` a broken formula, so nothing in it runs at all.
+>
 > **Timers only run in Preview**, not on the Studio canvas (MS Learn, Timer control) — rule that
 > out first. The timer is `Visible: =false`, which the same page explicitly endorses for
 > background timers; if it still never fires, that is the one remaining unverified thing, so make

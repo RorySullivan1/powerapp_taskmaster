@@ -30,6 +30,14 @@
 # the moment it goes true the timer starts from zero. No action, no internal
 # variable, nothing to race.
 #
+# `IsOpen` DRIVES THE TIMER ONLY — the visual children carry no `Visible` of their
+# own, because the INSTANCE's `Visible` already hides the whole component. That is
+# deliberate: if `IsOpen` is ever left unwired on an instance it defaults to false,
+# and if the children depended on it the toast would vanish completely with no clue
+# why. Now a forgotten `IsOpen` degrades to "shows but never auto-dismisses" —
+# annoying, but it points straight at the cause. (This is exactly what happened on
+# 2026-08-04: the component was rebuilt but the instance's new input was not set.)
+#
 # FIRST TWO THINGS TO CHECK if it still doesn't dismiss:
 #   1. **Timers only run in Preview** — "In Power Apps Studio, timers run only in
 #      Preview mode" (MS Learn, Timer control). Not a bug if you were on canvas.
@@ -90,7 +98,6 @@ ComponentDefinitions:
                   "Warning", RGBA(214, 152, 40, 1),
                   "Danger",  RGBA(197, 58, 58, 1),
                   RGBA(0, 90, 158, 1))
-            Visible: =cmpToast.IsOpen
             Height: =Parent.Height
             Width: =Parent.Width
             X: =0
@@ -105,7 +112,6 @@ ComponentDefinitions:
                   "Danger",  Icon.Error,
                   Icon.Information)
             Color: =RGBA(255, 255, 255, 1)
-            Visible: =cmpToast.IsOpen
             Height: =22
             Width: =22
             X: =16
@@ -115,7 +121,6 @@ ComponentDefinitions:
           Properties:
             Text: =cmpToast.Message
             Color: =RGBA(255, 255, 255, 1)
-            Visible: =cmpToast.IsOpen
             Font: =Font.'Segoe UI'
             Size: =13
             X: =50
