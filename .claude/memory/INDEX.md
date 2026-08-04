@@ -1,42 +1,18 @@
 # MEMORY INDEX  ·  keep ≤ ~80 lines
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **Phase:** Phase-1 **core shell + component kit AUTHORED** (first Power Fx in the repo):
-  `App.Formulas` (theme + `NavMenu` T6 + `gUserEmail`) in `src/patches/`; 5 screen shells
-  `scr{Home,Reports,Projects,Reference,Admin}` + **10 components** in `src/authored/components/`
-  (`cmpUiKit` fns, `cmpStatusPill`, `cmpChoicePill`, `cmpStatusCard`, `cmpSelection`,
-  `cmpEditableGrid`, `cmpSectionHeader`, `cmpConfirmDialog`, `cmpToast`, `cmpKpiRing` SVG).
-  Data-independent (no `tm*` tokens). All audited → **NOT landed** (paste-log empty).
-  See `_SHELL-NOTES.md` + `components/_COMPONENTS-NOTES.md`.
-- **Phase-2 composition done (static data):** `scrHome`/`scrReports`/`scrProjects` now instantiate
-  6 components (cards+ring+toast+confirm on Home, 3 KPI rings as the Q2 fallback on Reports,
-  section-header+selection on Projects). Instance dialect = `Control: CanvasComponent` +
-  `ComponentName:` + `Properties:`, no `Children:`. Live queries left as `TODO(Phase-2-data)`.
-  Real data binding still blocked on provisioning (⟨capture⟩ names) + a pull. Merged PR#2/3/4.
-- **Dialect (learned):** paste target is the **modern structured schema** (`Screens:`/`Children:`/
-  `Control: Type@version`, positional z-order, no ZIndex) — NOT `pac canvas unpack`'s retired
-  inline `As type:` format. Files converted with real tokens from the example export.
-- **Backend:** 8 `tm*` SharePoint lists, provisioned **manually** → internal names are
-  ⟨capture⟩ placeholders in `context/schema.md` until columns exist; snapshot must hold TRUE names.
-- **Reporting:** Power BI embedded, **licence-gated** — native nav is primary, empty state for
-  unlicensed. Tickets are **full ticket-level, primary store** → delegation/indexing critical.
-- **Air gap is ONE-WAY (corrected 2026-08-02):** repo → clipboard → Studio only. The work
-  machine's output CANNOT come back into the repo/Claude's view — the ONLY return signal is the
-  user's binary "it works / it doesn't." So: **no pulls, no returned code-view samples, no
-  round-trip.** `studio/pulled/`, `/pull-reconcile`, and "repo mirrors Studio / Studio is source
-  of truth" are premised on a return channel that does NOT exist → treat the **repo as the
-  authoritative authored source**, Studio as a downstream apply-target (Studio-only edits are
-  invisible drift, lost forever). Consequences: (1) unknown tokens (gallery `Variant`,
-  `HtmlViewer@2.1.0`, `Classic/Timer@2.1.0`) must be resolved by ME from PUBLIC sources (MS Learn,
-  PowerApps-Tooling repo, public .msapp) — they can't be confirmed by a return sample; (2) every
-  manual paste is costly and returns only works/doesn't → **maximise first-try correctness; prefer
-  grounded constructs, ship safe FALLBACKS for anything unverifiable** (e.g. button nav vs the
-  gallery). The `studio-transfer` skill + CLAUDE.md still describe a two-way gap — they need fixing.
-- **Phase-3 CRUD AUTHORED (2026-08-03):** 4 edit screens + `cmpTermPicker` (11 components, 11
-  screens, 22/22 valid). Managed metadata is writable by reading `Choices()` directly — no cache
-  list. **Nothing landed** — blocked on provisioning and the Office 365 Users connection.
-- **Template:** PM-tracker (SQL-backed) is the **screen/nav blueprint** only — rebuild on our
-  SharePoint schema (`docs/screen-map.md`). Pattern candidates in `docs/powerapp-patterns-distillation.md`.
+- **Phase: BUILDING IN STUDIO.** Authoring is essentially done — 11 screens + 11 components +
+  `App.Formulas`, 22/22 valid. `BUILD-BOOK.md` is the single linear runbook; work the checkboxes.
+- **Landed so far:** `scrAdmin` (qualified — a stale copy carrying a placeholder Variant) and some
+  component bodies. Everything else is authored, not landed. `paste-log.md` is the record.
+- **Channel facts:** screens paste via code view ✅. A component is TWO parts — **contract** (custom
+  properties, typed by hand; `pac` refuses this, PA3004) + **body** (`bodies/*.children.pa.yaml`,
+  pastes). `.msapp` packing works only for data-independent screens, never components.
+- **Skeleton screens** (`variants/scr{Home,Reports,Projects}.skeleton.pa.yaml`) give a navigable
+  5-screen app with no components and no data — scaffold, not the destination.
+- **Backend:** 8 `taskmaster_*`/`asset_*` lists, ALL `provisioned: pending`; `schema/schema.yaml`
+  v2.0.0 is the golden source. No MM terms list — the picker reads `Choices()` directly (C10).
+- **Blocked on nothing authored.** Next real gates: provision the lists, add Office 365 Users.
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-07-26] Project is parent; Task/Ticket/Issue are peers (not variants) — why: distinct kinds — sessions/2026-07-26-1726-repo-init-decisions.md
@@ -108,16 +84,15 @@
 - Open questions Q3–Q10, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
 - Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
-- **Paste order (no round-trip — one-way):** in Studio create screens `scr{Home,Reports,Projects,
-  Reference,Admin}`; PASTE the components via code view (they are pasteable); paste screen control-groups
-  (one/time) → `App.Formulas` LAST → set Data row limit 2000. Gallery `Variant` is now `Vertical`
-  (best-grounded); button-nav is the fallback if a screen paste fails. Need tablet-vs-phone target.
+- **Paste order — see `BUILD-BOOK.md`, which supersedes the sketch that used to live here.** That
+  sketch said `App.Formulas` LAST; it is now **before** the data screens, which reference
+  `StageWeights`/`ClaimPrefix`. Tablet layout chosen. Data row limit 2000 at the end.
 - **Licence gate SETTLED (soft gate, greyed-but-reachable).** Only optional follow-up left: supply
   a real signal for `gHasPowerBiLicence` (config allow-list column or Entra group) — a one-line
   change, since nav and the Reports screen both read it.
-- **Component transfer CORRECTED 2026-08-03:** components **ARE** code-view-pasteable and several
-  have LANDED. The repo had assumed the opposite (rebuild by hand in the component editor) — wrong,
-  and wrong in the expensive direction. Consequence: their control tokens are a **real paste
+- **Component transfer — SETTLED after two wrong turns.** A component is a **contract** (custom
+  properties — typed by hand, no paste gesture, and `pac` refuses it with PA3004) plus a **body**
+  (child controls — pastes like a screen). Consequence: body control tokens are a **real paste
   payload**, so `HtmlViewer@2.1.0` / `Classic/Timer@2.1.0` / gallery `Variant` are genuine risks,
   not documentation. → `components/_COMPONENTS-NOTES.md`.
 - **Follow-up:** run `/reindex` to regenerate CATALOG (pull-reconcile now deprecated). Minor
