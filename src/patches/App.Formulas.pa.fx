@@ -78,8 +78,8 @@ Theme = {
 //   1 scrHome · 2 scrReports · 3 scrProjects · 4 scrReference · 5 scrAdmin
 NavMenu = Table(
     { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
-    { Key: 2, Title: "Reports",   Icon: Icon.Table,     NeedsLicence: true  },
-    { Key: 3, Title: "Projects",  Icon: Icon.Documents, NeedsLicence: false },
+    { Key: 2, Title: "Reports",   Icon: Icon.DetailList,     NeedsLicence: true  },
+    { Key: 3, Title: "Projects",  Icon: Icon.Document, NeedsLicence: false },
     { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false },
     { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false }
 );

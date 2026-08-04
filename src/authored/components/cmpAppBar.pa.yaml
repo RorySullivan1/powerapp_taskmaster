@@ -50,9 +50,9 @@
 # Colours are literals — a component cannot read app-scope named formulas. They
 # mirror Theme; if Theme changes, change them here too.
 # Grounded tokens only: Rectangle@2.3.0, Label@2.5.1, Classic/Icon@2.5.0,
-# Classic/Button@2.2.0, Gallery@2.15.0. NO NEW ENUM — the hamburger is three
-# Rectangles rather than an unverified `Icon.Hamburger`; see the note by btnMenu.
-# The only enums here are the ones NavMenu already carries.
+# Classic/Button@2.2.0, Gallery@2.15.0. Icon names are checked against the real
+# 180-value enum (tools/studio-enums.json) — `Icon.Hamburger` turns out to BE
+# valid, so the drawn hamburger below is now optional; see the note by btnMenu.
 # =============================================================================
 ComponentDefinitions:
   cmpAppBar:
@@ -67,8 +67,8 @@ ComponentDefinitions:
         Default: |
           =Table(
               { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
-              { Key: 2, Title: "Reports",   Icon: Icon.Table,     NeedsLicence: true  },
-              { Key: 3, Title: "Projects",  Icon: Icon.Documents, NeedsLicence: false },
+              { Key: 2, Title: "Reports",   Icon: Icon.DetailList, NeedsLicence: true  },
+              { Key: 3, Title: "Projects",  Icon: Icon.Document,   NeedsLicence: false },
               { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false },
               { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false } )
       ActiveKey:
@@ -200,14 +200,15 @@ ComponentDefinitions:
             Y: =0
             Width: =Parent.Width
             Height: =64
-      # The hamburger is DRAWN, not an icon enum, and that is deliberate.
-      # `Icon.Hamburger` is not in any first-party enum list I can reach — the
-      # published Icon-control page documents the property but never enumerates the
-      # values — and one unknown token fails the WHOLE body paste, which across this
-      # gap costs a round trip measured in hours. Three Rectangles and a transparent
-      # Classic/Button use only tokens already proven in this repo and cannot be
-      # rejected. If Studio's icon picker turns out to list Hamburger, collapsing
-      # these four controls into one Classic/Icon is a safe later tidy-up.
+      # The hamburger is DRAWN rather than an icon, and that is now a CHOICE, not a
+      # necessity. It was authored this way because MS Learn documents the Icon
+      # property without ever enumerating its values, so `Icon.Hamburger` could not
+      # be grounded — and one unknown token fails the WHOLE body paste. The real
+      # 180-value enum has since been recovered from Templates.json inside the
+      # example .msapp, and `Hamburger` IS in it. These four controls could collapse
+      # to one `Classic/Icon` with `Icon: =Icon.Hamburger`; it is left alone only
+      # because this component is landed and working, and re-pasting a working body
+      # to save three rectangles is a bad trade across this gap.
       - menuLine1:
           Control: Rectangle@2.3.0
           Properties:

@@ -26,7 +26,7 @@ Schema vendored from (MS Learn links to this as the current static schema):
 https://raw.githubusercontent.com/microsoft/PowerApps-Tooling/refs/heads/master/schemas/pa-yaml/v3.0/pa.schema.yaml
 """
 from __future__ import annotations
-import sys, re, pathlib, yaml
+import sys, re, json, pathlib, yaml
 from jsonschema import Draft7Validator
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -125,6 +125,15 @@ VALUE_RETURNING_BEHAVIOUR = (
 )
 PLACEHOLDER = re.compile(r"\b(?:CONFIRM|TODO|TBD|XXX|FIXME)_\w+")
 
+# The 180 classic Icon enum values, recovered from References/Templates.json inside
+# a genuine Studio-exported .msapp. See tools/studio-enums.json for provenance.
+try:
+    ICON_NAMES = set(
+        json.loads((pathlib.Path(__file__).parent / "studio-enums.json").read_text())["Icon"]
+    )
+except Exception:            # reference missing — skip the check rather than fail
+    ICON_NAMES = set()
+
 
 def strip_comments(src: str) -> str:
     """Drop Power Fx `//` line comments — they carry example code that would
@@ -215,6 +224,22 @@ def token_errors(doc) -> list[str]:
                     f"`Visible` — it will sit on top and swallow every click on the screen. "
                     f"Gate it on the same flag that opens it, or make its Height conditional"
                 )
+
+    # MS Learn documents the Icon property and NEVER enumerates its values, so every
+    # icon name here was a guess until the list was recovered from Templates.json
+    # inside the example .msapp — a real Studio export, i.e. first-party ground
+    # truth. Icon.Back, Icon.Documents and Icon.Table were all invented and would
+    # each have failed a paste. Anything off this list must be drawn as an SVG in an
+    # Image control instead (the cmpKpiRing pattern).
+    for path, node in walk(doc):
+        for prop, formula in (node.get("Properties") or {}).items():
+            for name in set(re.findall(r"\bIcon\.([A-Za-z0-9_]+)\b", strip_comments(str(formula)))):
+                if ICON_NAMES and name not in ICON_NAMES:
+                    near = [i for i in ICON_NAMES if name.rstrip("s").lower() in i.lower()][:4]
+                    out.append(
+                        f"{path}/{prop}: `Icon.{name}` is not one of the {len(ICON_NAMES)} classic "
+                        f"icon names" + (f" — did you mean {', '.join('Icon.' + n for n in near)}?" if near else "")
+                    )
 
     # IfError returns the value of one of its arguments, and MS Learn is explicit
     # that *currently* the types of ALL its arguments must be compatible — not just

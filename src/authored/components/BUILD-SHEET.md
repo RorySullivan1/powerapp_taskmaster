@@ -51,7 +51,7 @@ App header with a fly-out navigation rail. Reports the chosen entry; the screen 
 
 | # | Name | Kind | Type | Default / formula | Where the formula goes |
 |---|---|---|---|---|---|
-| 1 | `Items` | Input | Table | `=Table( { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false }, { Key: 2, Title: "Reports",   Icon: Icon.Table,     NeedsLicence: true  }, { Key: 3, Title: "Projects",  Icon: Icon.Documents, NeedsLicence: false }, { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false }, { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false } )` | the property's **Default** |
+| 1 | `Items` | Input | Table | `=Table( { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false }, { Key: 2, Title: "Reports",   Icon: Icon.DetailList, NeedsLicence: true  }, { Key: 3, Title: "Projects",  Icon: Icon.Document,   NeedsLicence: false }, { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false }, { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false } )` | the property's **Default** |
 | 2 | `ActiveKey` | Input | Number | `=1` | the property's **Default** |
 | 3 | `HasLicence` | Input | Boolean | `=false` | the property's **Default** |
 | 4 | `AppTitle` | Input | Text | `="EQD Taskmaster"` | the property's **Default** |

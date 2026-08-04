@@ -63,6 +63,20 @@ Instead, establish paste-readiness *before* the human ever pastes:
    values come from the example `.msapp` already in the repo, MS Learn, or the
    `microsoft/PowerApps-Tooling` schema — not from a pull. (Version suffixes are optional;
    Studio uses the current version if omitted, so only the control *name* and `Variant` matter.)
+
+   **An `.msapp` carries the ENUM TABLES, and that is the strongest evidence available here.**
+   MS Learn documents properties like `Icon` and never lists their values. But an `.msapp` is a
+   zip, and `References/Templates.json` inside it holds the enums as pipe-delimited runs:
+
+   ```bash
+   unzip -o app.msapp -d /tmp/app                       # note: backslash paths, ignore the warning
+   grep -oE '[A-Za-z0-9_]+(\|[A-Za-z0-9_]+){20,}' /tmp/app/References/Templates.json
+   ```
+
+   That recovered the complete **180-value classic `Icon` enum** — from an export that had been
+   sitting in this repo the whole time — and immediately exposed three invented names
+   (`Icon.Back`, `Icon.Documents`, `Icon.Table`). The list lives in `tools/studio-enums.json`
+   and the validator checks against it. **Check here BEFORE declaring a value ungroundable.**
 2. **For anything still uncertain, author the grounded fallback**, and keep the risky-but-nicer
    variant documented as an alternative to try if the first paste is rejected.
 3. **The human's feedback is binary** — "it pasted / it didn't." Design each paste so a failure
