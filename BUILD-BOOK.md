@@ -84,6 +84,12 @@ a fresh blank screen. Skeletons are a scaffold, not the destination — they car
 
 `BUILD-SHEET.md` marks the ⚠️ rows per component and gives each placeholder.
 
+> **Every output is a bare `control.Property` reference — keep it that way.** Studio rejects a
+> component Output that wraps a child-control reference in a conditional, and no ordering fixes it
+> (`cmpSelection.Selected` proved that the hard way). Where a value needed computing, the logic
+> now lives on a hidden child control and the output just reads it. The body carries `lblPick`,
+> `lblPickLabel` and `lblPickDone` in `cmpTermPicker` for exactly this reason.
+
 > Watch items: **`cmpConfirmDialog`'s input is `IsOpen`, not `Visible`** (a `Visible` custom prop
 > collides with the built-in). **`HtmlViewer@2.1.0` is now confirmed** — `cmpStatusPill`'s body
 > pasted with it. **`Classic/Timer@2.1.0`** (`cmpToast`) is the last unverified token in the kit;
@@ -92,7 +98,7 @@ a fresh blank screen. Skeletons are a scaffold, not the destination — they car
 ### `cmpSelection`  *(build first — 7 screens use it)*  · body: 1 control
 - [ ] `Items` — Input · Table · Default `=Table({ Id: 1, Label: "Option A" }, { Id: 2, Label: "Option B" }, { Id: 3, Label: "Option C" })`
 - [ ] `DefaultId` — Input · Number · Default `=1`
-- [ ] `Selected` — Output · Record · ⚠️ **phase 3** — create with placeholder `=First(cmpSelection.Items)`; after the body, set `=If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)`
+- [ ] `Selected` — Output · Record · ⚠️ **phase 3** — placeholder `=First(cmpSelection.Items)`; after the body, set `=galSel.Selected` *(bare reference — the old conditional form is what Studio rejected)*
 - [ ] `OnChange` — Event
 - [ ] Component props: `Height=40` · `Width=360` · `Fill=RGBA(0,0,0,0)`
 - [ ] Paste `bodies/cmpSelection.children.pa.yaml`
@@ -149,8 +155,8 @@ a fresh blank screen. Skeletons are a scaffold, not the destination — they car
 - [ ] `Caption` — Input · Text · `="Term"`
 - [ ] `PathDelimiter` — Input · Text · `=";"`
 - [ ] `TermPath` — Output · Text · ⚠️ **phase 3** — placeholder `=""`; after the body, `=lblPick.Text`
-- [ ] `TermLabel` — Output · Text · ⚠️ **phase 3** — placeholder `=""`; after the body, `=Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )`
-- [ ] `IsComplete` — Output · Boolean · ⚠️ **phase 3** — placeholder `=false`; after the body, `=Len(lblPick.Text) > 0 && CountRows( Filter( cmpTermPicker.Terms, StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0`
+- [ ] `TermLabel` — Output · Text · ⚠️ **phase 3** — placeholder `=""`; after the body, `=lblPickLabel.Text`
+- [ ] `IsComplete` — Output · Boolean · ⚠️ **phase 3** — placeholder `=false`; after the body, `=lblPickDone.Visible`
 - [ ] `OnChange` — Event
 - [ ] Component props: `Height=190` · `Width=620` · `Fill=RGBA(0,0,0,0)`
 - [ ] Paste `bodies/cmpTermPicker.children.pa.yaml`

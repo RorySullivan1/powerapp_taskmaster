@@ -123,15 +123,16 @@ ComponentDefinitions:
       Height: =190
       Width: =620
       Fill: =RGBA(0, 0, 0, 0)
+      # Both are BARE references to a hidden label — see the rule in
+      # cmpSelection.pa.yaml. The lookup that used to live here now lives on
+      # lblPickLabel, so no output formula wraps a child reference in a function.
       TermPath: =lblPick.Text
-      TermLabel: |
-        =Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )
-      # LEAF TEST: nothing in the set sits BELOW this path. Derived from the same
-      # data the cascade walks, so it cannot disagree with what is on screen.
-      IsComplete: |
-        =Len(lblPick.Text) > 0 &&
-         CountRows( Filter( cmpTermPicker.Terms,
-             StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0
+      TermLabel: =lblPickLabel.Text
+      # LEAF TEST — also a bare reference. A Boolean output can't read a Label's
+      # Text, so the test lives on lblPickDone's `Visible`, which IS a Boolean, and
+      # this output just reads it. Slightly unusual, but it keeps every output in
+      # this kit to the one shape Studio accepts.
+      IsComplete: =lblPickDone.Visible
     Children:
       - lblCaption:
           Control: Label@2.5.1
@@ -167,6 +168,35 @@ ComponentDefinitions:
                        With( { v4: If( Len(v3) > 0 && StartsWith(galL4.Selected.Path, v3 & d),
                                        galL4.Selected.Path, "" ) },
                          Coalesce( v4, v3, v2, v1, "" ) ) ) ) ) )
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+      # LEAF TEST carrier. `Visible` is the only Boolean property a grounded
+      # control offers, so it doubles as the store for IsComplete. The label is
+      # 1x1 at the origin, so it costs nothing when the condition flips it on.
+      # Nothing in the set sits BELOW this path => the pick is a leaf. Derived from
+      # the same data the cascade walks, so it cannot disagree with the screen.
+      - lblPickDone:
+          Control: Label@2.5.1
+          Properties:
+            Visible: |
+              =Len(lblPick.Text) > 0 &&
+               CountRows( Filter( cmpTermPicker.Terms,
+                   StartsWith(Path, lblPick.Text & cmpTermPicker.PathDelimiter) ) ) = 0
+            Text: =""
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+      # The resolved pick's own LABEL, computed here rather than in the output
+      # property, so `TermLabel` can stay a bare control reference.
+      - lblPickLabel:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =false
+            Text: |
+              =Coalesce( LookUp(cmpTermPicker.Terms, Path = lblPick.Text, Label), "" )
             X: =0
             Y: =0
             Width: =1
