@@ -234,7 +234,22 @@ ComponentDefinitions:
           Control: Gallery@2.15.0
           Variant: Vertical
           Properties:
-            Visible: =CountRows(galL2.Items) > 1
+            # NESTING DETECTION — asked of the DATA, not of the gallery.
+            #
+            # This was `CountRows(galL2.Items) > 1`, which is invalid: a gallery's
+            # `Items` is a property you SET, not one you can read. The readable form
+            # is `AllItems` — but `Self.AllItems` here would be a latch: a hidden
+            # gallery's rows aren't realised, so once Visible went false it could
+            # never become true again.
+            #
+            # So ask the source instead: does ANY term sit below the level-1 pick?
+            # A tree has no gaps, so "something deeper exists" implies "something
+            # exists at exactly the next level" — no depth arithmetic needed, and no
+            # sentinel to compensate for, which is why this is `> 0` not `> 1`.
+            Visible: |
+              =Len(galL1.Selected.Path) > 0 &&
+               CountRows( Filter( cmpTermPicker.Terms,
+                   StartsWith(Path, galL1.Selected.Path & cmpTermPicker.PathDelimiter) ) ) > 0
             Items: |
               =Ungroup(
                   Table( { v: Table({ Label: "— select —", Path: "" }) },
@@ -276,7 +291,22 @@ ComponentDefinitions:
           Control: Gallery@2.15.0
           Variant: Vertical
           Properties:
-            Visible: =CountRows(galL3.Items) > 1
+            # NESTING DETECTION — asked of the DATA, not of the gallery.
+            #
+            # This was `CountRows(galL3.Items) > 1`, which is invalid: a gallery's
+            # `Items` is a property you SET, not one you can read. The readable form
+            # is `AllItems` — but `Self.AllItems` here would be a latch: a hidden
+            # gallery's rows aren't realised, so once Visible went false it could
+            # never become true again.
+            #
+            # So ask the source instead: does ANY term sit below the level-2 pick?
+            # A tree has no gaps, so "something deeper exists" implies "something
+            # exists at exactly the next level" — no depth arithmetic needed, and no
+            # sentinel to compensate for, which is why this is `> 0` not `> 1`.
+            Visible: |
+              =Len(galL2.Selected.Path) > 0 &&
+               CountRows( Filter( cmpTermPicker.Terms,
+                   StartsWith(Path, galL2.Selected.Path & cmpTermPicker.PathDelimiter) ) ) > 0
             Items: |
               =Ungroup(
                   Table( { v: Table({ Label: "— select —", Path: "" }) },
@@ -321,7 +351,22 @@ ComponentDefinitions:
           Control: Gallery@2.15.0
           Variant: Vertical
           Properties:
-            Visible: =CountRows(galL4.Items) > 1
+            # NESTING DETECTION — asked of the DATA, not of the gallery.
+            #
+            # This was `CountRows(galL4.Items) > 1`, which is invalid: a gallery's
+            # `Items` is a property you SET, not one you can read. The readable form
+            # is `AllItems` — but `Self.AllItems` here would be a latch: a hidden
+            # gallery's rows aren't realised, so once Visible went false it could
+            # never become true again.
+            #
+            # So ask the source instead: does ANY term sit below the level-3 pick?
+            # A tree has no gaps, so "something deeper exists" implies "something
+            # exists at exactly the next level" — no depth arithmetic needed, and no
+            # sentinel to compensate for, which is why this is `> 0` not `> 1`.
+            Visible: |
+              =Len(galL3.Selected.Path) > 0 &&
+               CountRows( Filter( cmpTermPicker.Terms,
+                   StartsWith(Path, galL3.Selected.Path & cmpTermPicker.PathDelimiter) ) ) > 0
             Items: |
               =Ungroup(
                   Table( { v: Table({ Label: "— select —", Path: "" }) },

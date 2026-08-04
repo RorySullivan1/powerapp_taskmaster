@@ -68,6 +68,27 @@ tell me, and note the intended background so the replacement colour is right:
 
 Components can't read `Theme`, so any replacement has to be a literal.
 
+## A control's `Items` is write-only
+
+You set `Items`; you cannot read it. `CountRows(gal.Items)` is invalid — the readable form is
+`gal.AllItems`.
+
+But `AllItems` has a trap of its own here: **a hidden gallery's rows aren't realised**, so
+`Visible: =CountRows(Self.AllItems) > 0` latches off — once false it can never become true again.
+`cmpTermPicker`'s level-visibility therefore asks the **source data** instead of the gallery:
+
+```powerapps
+=Len(galL1.Selected.Path) > 0 &&
+ CountRows( Filter( cmpTermPicker.Terms,
+     StartsWith(Path, galL1.Selected.Path & cmpTermPicker.PathDelimiter) ) ) > 0
+```
+
+A tree has no gaps, so "something exists deeper" implies "something exists at the next level" — no
+depth arithmetic, and no sentinel row to compensate for, which is why it's `> 0` and not `> 1`.
+
+Component custom properties *named* `Items` (`cmpSelection.Items`) are a different thing entirely
+and are fine to read. The validator distinguishes them.
+
 ## Column names are IDENTIFIERS, not strings
 
 Power Apps **3.24042** (April 2024) changed the column-name arguments of

@@ -159,6 +159,27 @@ def token_errors(doc) -> list[str]:
                         f"ends in {last.split('(')[0]}(), which returns a value — end it with `; true`"
                     )
 
+    # A control's `Items` is write-only — you set it, you can't read it. The
+    # readable form is `AllItems`. Component custom properties NAMED Items are
+    # fine (cmpSelection.Items), so only flag names declared as controls here.
+    declared = set()
+    for _, node in walk(doc):
+        for k, v in node.items():
+            if isinstance(v, dict) and "Control" in v:
+                declared.add(k)
+    if declared:
+        for path, node in walk(doc):
+            for k, v in node.items():
+                if not isinstance(v, str):
+                    continue
+                for ctrl in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\.Items\b", v):
+                    if ctrl in declared:
+                        out.append(
+                            f"{path}/{k}: reads {ctrl}.Items — a control's Items is set, not read. "
+                            f"Use {ctrl}.AllItems, or better, ask the underlying data: a hidden "
+                            f"gallery's AllItems is empty, which can latch a Visible formula off"
+                        )
+
     # Column names must be identifiers, not strings (see COLUMN_ARG_POSITIONS).
     for path, node in walk(doc):
         for k, v in node.items():
