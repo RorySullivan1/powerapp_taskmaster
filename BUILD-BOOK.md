@@ -9,6 +9,10 @@ page** — component contracts are inlined so you're not flipping between files 
 - **Golden rule:** paste one unit at a time onto a blank target, then tell me two things — **did it
   land?** and **what suffix did Studio add?** (`galProjects` → `galProjects_1`). Rename back before
   moving on; screens reference controls by name.
+- **REFRESH STUDIO BEFORE REPORTING A FAILURE.** The editor can keep serving an old component
+  definition after you've changed its properties or body, so the app behaves as if the edit never
+  happened. A browser refresh is the difference between a real bug and a phantom one — and from my
+  side a phantom looks identical to a real one, so I rewrite working code chasing it.
 
 ## What crosses which way (validated this session)
 

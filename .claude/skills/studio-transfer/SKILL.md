@@ -67,6 +67,12 @@ Instead, establish paste-readiness *before* the human ever pastes:
    variant documented as an alternative to try if the first paste is rejected.
 3. **The human's feedback is binary** — "it pasted / it didn't." Design each paste so a failure
    is cheap to recover: small units, one control-group at a time, with the fallback ready.
+4. **A "didn't work" can be a STALE STUDIO, not a bad paste.** Studio's editor can keep showing
+   an old component definition after its properties or body have changed — the app behaves as if
+   the edit never happened. **Ask for a browser refresh before believing any failure report.**
+   Across a one-way gap a false negative is expensive: it looks like an authoring bug, and the
+   revise-blind loop that follows rewrites correct code. Confirmed 2026-08-04, after two rounds
+   of rewriting `cmpToast` chasing a symptom that a refresh cleared.
 
 ## The channel — code view mechanics
 
@@ -148,6 +154,9 @@ never see; never describe the app as if authored-but-unlanded work is live.
    immediately, the next pull is full of `Control_1` noise you can't map back.
 5. **Pasting `.pa.yaml`.** It's read-only review output, not a paste source. Imitate the
    **code-view** dialect for anything you intend to land.
+6. **Rewriting code on an unrefreshed failure report.** Before diagnosing, confirm Studio was
+   refreshed after the edit. A stale editor reports a working unit as broken, and each blind
+   rewrite that follows costs a full round trip and can damage code that was already correct.
 
 ## Out of scope — defer
 
