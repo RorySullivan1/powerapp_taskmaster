@@ -3,10 +3,16 @@
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **Phase: BUILDING IN STUDIO.** Authoring is essentially done — 11 screens + 11 components +
   `App.Formulas`, 23/23 valid. `BUILD-BOOK.md` is the single linear runbook; work the checkboxes.
-- **The shell is now ONE component, `cmpAppBar`** (header bar + fly-out nav rail), built FIRST.
-  `cmpNavMenu` and the per-screen `HeaderBar`/`AppTitle`/`ScreenTitle` blocks are deleted.
-- **Landed so far:** `scrAdmin`, several component bodies, and **`cmpAppBar` — the header + fly-out nav rail,
-  confirmed working 2026-08-04.** Everything else is authored, not landed. `paste-log.md` is the record.
+- **The shell is ONE component, `cmpAppBar`** (header bar + fly-out nav rail), built FIRST.
+  `cmpNavMenu` and the per-screen `HeaderBar`/`AppTitle`/`ScreenTitle` blocks are deleted **on the
+  five nav screens**. The four `scr*Edit` screens deliberately KEEP a local close-only header —
+  the fly-out rail would let a user navigate away from an editor holding unsaved staged children.
+- **Landed so far:** `scrAdmin`, several component bodies, and **`cmpAppBar` — confirmed working
+  2026-08-04.** Everything else is authored, not landed. `paste-log.md` is the record.
+- **`scrProjectEdit` is the container-layout REFERENCE (rebuilt 2026-08-05).** Fixed footer =
+  one auto-layout container + opaque backing rect on the identical anchor; fields = `row*` of
+  `col*`; results galleries expand inline as siblings; 57 containers, 0 children with X/Y; no
+  inferred layout token left. Copy this shape, not the older absolute-overlay screens.
 - **Channel facts:** screens paste via code view ✅. A component is TWO parts — **contract** (custom
   properties, typed by hand; `pac` refuses this, PA3004) + **body** (`bodies/*.children.pa.yaml`,
   pastes). `.msapp` packing works only for data-independent screens, never components.
@@ -15,9 +21,9 @@
 - **Backend: THE LISTS ARE LIVE (2026-08-04).** 7 defined lists `provisioned: live`; `asset_library` still has no
   schema. `schema/schema.yaml` v2.1.0 is the golden source and now carries a provisioning-verification block.
   No MM terms list — the picker reads `Choices()` directly (C10).
-- **Blocked on nothing authored.** Lists are live; remaining gates: Office 365 Users connection, and verifying the
-  other 8 Person and 6 Managed Metadata columns' arity (project_requestor, project_region and project_coverage
-  were all provisioned multi and have been corrected).
+- **Blocked on nothing authored.** Remaining gates: Office 365 Users connection, and verifying the
+  other 8 Person and 6 Managed Metadata columns' arity (project_requestor, project_region and
+  project_coverage were all provisioned multi and have been corrected).
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-05] **A responsive anchor and a hardcoded one in the same band is the floating-button bug.** `scrProjectEdit`'s action bar was `Y: =Parent.Height - 132` while its buttons were `Y: =706` — fine at 768 tall, mid-screen anywhere else, and the freeze rule guarantees they land inconsistently rather than drift. **Rule: a fixed footer is ONE auto-layout container plus an opaque backing rectangle sharing the identical anchor expression, and nothing inside it carries X/Y.** Applies to every screen with an action bar; scrProjectEdit is the reference implementation.
@@ -130,6 +136,18 @@
 - Open questions Q3–Q10, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
 - Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
+- **AUDIT the other three edit screens** (`scrTaskEdit`, `scrTransactionEdit`, `scrIssueEdit`) for the
+  two silent defects found in `scrProjectEdit` on 2026-08-05: (a) a `ModernDatePicker` with no
+  `DefaultDate` on an edit path, which patches `Blank()` over the stored date with no error; and
+  (b) hardcoded `Items: =[…]` arrays that have drifted from the Choice column's `values:` in
+  `schema.yaml` (three invalid values shipped undetected). Not yet started.
+- **Extend the column-token validator to look inside `Items: =[…]` array literals** and check them
+  against the matching Choice column. This is the concrete case for the hook above — the three bad
+  Choice values were invisible to every check the repo currently runs.
+- **If `scrProjectEdit`'s paste fails, suspect the container NESTING DEPTH first.** Every token is
+  photo-confirmed, but `frmPrScroll → row* → col*` is three deep and that depth has never crossed
+  the gap. Fallback: flatten `col*` into single-column rows (caption immediately followed by its
+  control) — keeps the label/field pairing fix, loses only the multi-column layout.
 - **Paste order — see `BUILD-BOOK.md`, which supersedes the sketch that used to live here.** That
   sketch said `App.Formulas` LAST; it is now **before** the data screens, which reference
   `StageWeights`/`ClaimPrefix`. Tablet layout chosen. Data row limit 2000 at the end.
