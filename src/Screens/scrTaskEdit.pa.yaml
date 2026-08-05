@@ -70,11 +70,15 @@ Screens:
         //
         // No term collection is built: the picker reads the term store directly
         // through Choices() on its instance.
-        Set( gTkCatLabel, "" ); Set( gTkCatPath, "" ); Set( gTkCatDone, false );
+        // Managed metadata: hold the connector's OWN Choices() record, seeded from
+        // the task under edit. Blank on New, because the LookUp finds nothing.
+        Set( gTkCat, LookUp( Choices([@taskmaster_tasks].task_category),
+                             Label = Coalesce(gEditTask.task_category.Value, "") ) );
         Reset( txtTkName ); Reset( txtTkDesc );
           
         Reset( txtTkProjectSearch ); Reset( txtTkLeadSearch ); Reset( txtTkSupporterSearch );
         Reset( txtTkApprovalSearch ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch );
+        Reset( cboTkCategory );
         // A date picker re-reads DefaultDate ONLY on Reset. Without these three the
         // seeds above never take on a second visit, and the Patch writes Blank()
         // over task_date_start / _target / _completion.
@@ -523,12 +527,11 @@ Screens:
           Properties:
             Visible: =gTaskEditTab = 1
             Text: |
-              =If( gEditMode = "Edit" && Len(gTkCatPath) = 0,
+              =If( !IsBlank(gTkCat), "✓ " & gTkCat.Label,
+                   gEditMode = "Edit",
                    "Currently: " & Coalesce(gEditTask.task_category.Value, "not set")
-                     & "   —   leave the picker alone to keep it",
-                   Len(gTkCatPath) > 0,
-                   "Will be set to: " & gTkCatLabel,
-                   "" )
+                     & "   —   leave it alone to keep it",
+                   "Nothing picked yet" )
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: =Theme.Color.TextMuted
@@ -536,25 +539,27 @@ Screens:
             Y: =414
             Width: =760
             Height: =18
-      - pickTkCategory:
-          Control: CanvasComponent
-          ComponentName: cmpTermPicker
+      - cboTkCategory:
+          Control: ModernCombobox@1.0.0
           Properties:
             Visible: =gTaskEditTab = 1
+            # Straight at the term store. Choices() returns the term set; Label is the
+            # only field read, and Selected is handed back to SharePoint unchanged.
+            # Capped at 20 terms by the connector — swap Items for a flow-fed
+            # collection of the same shape if this vocabulary outgrows that.
+            Items: =Choices([@taskmaster_tasks].task_category)
+            ItemDisplayText: =ThisItem.Label
+            DefaultSelectedItems: =Filter( Choices([@taskmaster_tasks].task_category),
+                                           Label = Coalesce(gEditTask.task_category.Value, "") )
+            SelectMultiple: =false
+            IsSearchable: =true
+            InputTextPlaceholder: ="Select a category"
             X: =580
             Y: =434
             Width: =760
-            Height: =180
-            Caption: ="Category"
-            # Straight at the term store — no cache list, no flow, no second copy.
-            # Capped at 20 terms by the connector; swap for a flow-fed collection
-            # if this vocabulary outgrows that.
-            Terms: |
-              =ShowColumns( Choices([@taskmaster_tasks].task_category), Label, Path )
-            OnChange: |
-              =Set( gTkCatLabel, pickTkCategory.TermLabel );
-              Set( gTkCatPath,  pickTkCategory.TermPath );
-              Set( gTkCatDone,  pickTkCategory.IsComplete )
+            Height: =32
+            OnChange: =Set( gTkCat, cboTkCategory.Selected )
+
       # ================= TAB 2 — OUTPUT ====================================
       - lblTkApprovalCap:
           Control: Label@2.5.1
@@ -869,8 +874,7 @@ Screens:
                  If( Len(Trim(txtTkName.Text)) = 0, "task name   ", "" ) &
                  If( gTkProject.Id <= 0,            "project   ",   "" ) &
                  If( Len(gTkLead.Mail) = 0,         "lead   ",      "" ) &
-                 If( Len(gTkCatPath) > 0 && !gTkCatDone,
-                     "a full category path (keep picking until the last column is empty)   ", "" ) )
+                 "" )
             Font: =Theme.Font
             Size: =Theme.Size.Small
             Color: =Theme.Color.Danger
@@ -938,11 +942,9 @@ Screens:
                   // record, found by the path the picker resolved — not a hand-built
                   // taxonomy literal. Still its own Patch: MM remains the least-proven
                   // write in the app and must not take the rest of the task down.
-                  If( Len(gTkCatPath) > 0 && gTkCatDone,
+                  If( !IsBlank(gTkCat),
                       IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved,
-                                     { task_category:
-                                         LookUp( Choices([@taskmaster_tasks].task_category),
-                                                 Path = gTkCatPath ) }) ), Set( gTkWarn, gTkWarn & "the category didn't stick: " & FirstError.Message & "   " )) );
+                                     { task_category: gTkCat }) ), Set( gTkWarn, gTkWarn & "the category didn't stick: " & FirstError.Message & "   " )) );
                   If( gTkApproval.Id > 0,
                       IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved,
                                      { task_output_approval: { Id: gTkApproval.Id, Value: gTkApproval.Value } }) ), Set( gTkWarn, gTkWarn & "the approval link didn't stick: " & FirstError.Message & "   " )) );

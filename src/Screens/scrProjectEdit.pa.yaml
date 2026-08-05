@@ -168,9 +168,15 @@ Screens:
         //
         // No term collections are built here. Each picker reads the term store
         // DIRECTLY through Choices() on its own instance — see the Terms bindings.
-        Set( gPrRegionLabel, "" ); Set( gPrRegionPath, "" ); Set( gPrRegionDone, false );
-        Set( gPrTypeLabel,   "" ); Set( gPrTypePath,   "" ); Set( gPrTypeDone,   false );
-        Set( gPrCovLabel,    "" ); Set( gPrCovPath,    "" ); Set( gPrCovDone,    false );
+        // Managed metadata. Each global holds the CONNECTOR'S OWN record from
+        // Choices(), which is what gets written back — nothing is hand-built and
+        // no term path is parsed. On New the LookUp finds nothing and leaves blank.
+        Set( gPrRegion, LookUp( Choices([@taskmaster_projects].project_region),
+                                Label = Coalesce(gEditProject.project_region.Value, "") ) );
+        Set( gPrType,   LookUp( Choices([@taskmaster_projects].project_type),
+                                Label = Coalesce(gEditProject.project_type.Value, "") ) );
+        Set( gPrCov,    LookUp( Choices([@taskmaster_projects].project_coverage),
+                                Label = Coalesce(gEditProject.project_coverage.Value, "") ) );
         // Staging areas. Cleared on every visit — a half-entered child list left
         // over from the previous project would be written to THIS one.
         Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
@@ -205,6 +211,7 @@ Screens:
         // re-picking the displayed value fires no OnChange, so the correction can't
         // be made by hand either.
         Reset( cboPrPhase ); Reset( cboPrPriority );
+        Reset( cboPrRegion ); Reset( cboPrType ); Reset( cboPrCov );
         Reset( cboNtPriority ); Reset( cboNxCcy );
         Reset( cboNiStatus ); Reset( cboNiImpact )
     Children:
@@ -964,7 +971,7 @@ Screens:
                           =Select(Parent);
                            Set(gPrSupporter, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
             # -----------------------------------------------------------------
-            # CLASSIFICATION  (managed metadata — cmpTermPicker per column)
+            # CLASSIFICATION  (managed metadata — one combobox bound to Choices() per column)
             # -----------------------------------------------------------------
             - divPrClass:
                 Control: Rectangle@2.3.0
@@ -991,84 +998,129 @@ Screens:
                   Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
                   Height: =18
-            - pickPrRegion:
-                Control: CanvasComponent
-                ComponentName: cmpTermPicker
+            - lblCapPrRegion:
+                Control: Label@2.5.1
                 Properties:
+                  Text: ="Region  *"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
-                  Height: =170
-                  Caption: ="Region  *"
-                  Terms: =ShowColumns( Choices([@taskmaster_projects].project_region), Label, Path )
-                  OnChange: |
-                    =Set( gPrRegionLabel, pickPrRegion.TermLabel );
-                    Set( gPrRegionPath,  pickPrRegion.TermPath );
-                    Set( gPrRegionDone,  pickPrRegion.IsComplete )
+                  Height: =18
+            - cboPrRegion:
+                Control: ModernCombobox@1.0.0
+                Properties:
+                  # Bound STRAIGHT to the term store. Choices() on a managed-metadata
+                  # column returns the term set; Label is the only field this reads,
+                  # and Selected hands the connector its own record back at save time.
+                  Items: =Choices([@taskmaster_projects].project_region)
+                  ItemDisplayText: =ThisItem.Label
+                  # Seeds the current term on Edit. Filter (not LookUp) because
+                  # DefaultSelectedItems takes a TABLE of records from Items; an empty
+                  # table is the correct "nothing selected" value, so New needs no branch.
+                  DefaultSelectedItems: =Filter( Choices([@taskmaster_projects].project_region),
+                                                 Label = Coalesce(gEditProject.project_region.Value, "") )
+                  SelectMultiple: =false
+                  IsSearchable: =true
+                  InputTextPlaceholder: ="Select a region"
+                  Width: =Parent.Width - 48
+                  Height: =32
+                  OnChange: =Set( gPrRegion, cboPrRegion.Selected )
             - lblPrRegionState:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
-                    =If( Len(gPrRegionPath) > 0,
-                         If( gPrRegionDone, "✓ " & gPrRegionLabel, "… " & gPrRegionLabel & " — keep going, this term has children" ),
+                    =If( !IsBlank(gPrRegion), "✓ " & gPrRegion.Label,
                          gEditMode = "Edit",
                          "Currently: " & Coalesce(gEditProject.project_region.Value, "not set") & "   (leave alone to keep it)",
                          "Nothing picked yet" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
-                  Color: =If( Len(gPrRegionPath) > 0 && !gPrRegionDone, Theme.Color.Warning, Theme.Color.TextMuted )
+                  Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
                   Height: =20
                   VerticalAlign: =VerticalAlign.Middle
-            - pickPrType:
-                Control: CanvasComponent
-                ComponentName: cmpTermPicker
+            - lblCapPrType:
+                Control: Label@2.5.1
                 Properties:
+                  Text: ="Project type  *"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
-                  Height: =170
-                  Caption: ="Project type  *"
-                  Terms: =ShowColumns( Choices([@taskmaster_projects].project_type), Label, Path )
-                  OnChange: |
-                    =Set( gPrTypeLabel, pickPrType.TermLabel );
-                    Set( gPrTypePath,  pickPrType.TermPath );
-                    Set( gPrTypeDone,  pickPrType.IsComplete )
+                  Height: =18
+            - cboPrType:
+                Control: ModernCombobox@1.0.0
+                Properties:
+                  # Bound STRAIGHT to the term store. Choices() on a managed-metadata
+                  # column returns the term set; Label is the only field this reads,
+                  # and Selected hands the connector its own record back at save time.
+                  Items: =Choices([@taskmaster_projects].project_type)
+                  ItemDisplayText: =ThisItem.Label
+                  # Seeds the current term on Edit. Filter (not LookUp) because
+                  # DefaultSelectedItems takes a TABLE of records from Items; an empty
+                  # table is the correct "nothing selected" value, so New needs no branch.
+                  DefaultSelectedItems: =Filter( Choices([@taskmaster_projects].project_type),
+                                                 Label = Coalesce(gEditProject.project_type.Value, "") )
+                  SelectMultiple: =false
+                  IsSearchable: =true
+                  InputTextPlaceholder: ="Select a project type"
+                  Width: =Parent.Width - 48
+                  Height: =32
+                  OnChange: =Set( gPrType, cboPrType.Selected )
             - lblPrTypeState:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
-                    =If( Len(gPrTypePath) > 0,
-                         If( gPrTypeDone, "✓ " & gPrTypeLabel, "… " & gPrTypeLabel & " — keep going, this term has children" ),
+                    =If( !IsBlank(gPrType), "✓ " & gPrType.Label,
                          gEditMode = "Edit",
                          "Currently: " & Coalesce(gEditProject.project_type.Value, "not set") & "   (leave alone to keep it)",
                          "Nothing picked yet" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
-                  Color: =If( Len(gPrTypePath) > 0 && !gPrTypeDone, Theme.Color.Warning, Theme.Color.TextMuted )
+                  Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
                   Height: =20
                   VerticalAlign: =VerticalAlign.Middle
-            - pickPrCoverage:
-                Control: CanvasComponent
-                ComponentName: cmpTermPicker
+            - lblCapPrCov:
+                Control: Label@2.5.1
                 Properties:
+                  Text: ="Coverage"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
-                  Height: =170
-                  Caption: ="Coverage"
-                  Terms: =ShowColumns( Choices([@taskmaster_projects].project_coverage), Label, Path )
-                  OnChange: |
-                    =Set( gPrCovLabel, pickPrCoverage.TermLabel );
-                    Set( gPrCovPath,  pickPrCoverage.TermPath );
-                    Set( gPrCovDone,  pickPrCoverage.IsComplete )
+                  Height: =18
+            - cboPrCov:
+                Control: ModernCombobox@1.0.0
+                Properties:
+                  # Bound STRAIGHT to the term store. Choices() on a managed-metadata
+                  # column returns the term set; Label is the only field this reads,
+                  # and Selected hands the connector its own record back at save time.
+                  Items: =Choices([@taskmaster_projects].project_coverage)
+                  ItemDisplayText: =ThisItem.Label
+                  # Seeds the current term on Edit. Filter (not LookUp) because
+                  # DefaultSelectedItems takes a TABLE of records from Items; an empty
+                  # table is the correct "nothing selected" value, so New needs no branch.
+                  DefaultSelectedItems: =Filter( Choices([@taskmaster_projects].project_coverage),
+                                                 Label = Coalesce(gEditProject.project_coverage.Value, "") )
+                  SelectMultiple: =false
+                  IsSearchable: =true
+                  InputTextPlaceholder: ="Select a coverage area"
+                  Width: =Parent.Width - 48
+                  Height: =32
+                  OnChange: =Set( gPrCov, cboPrCov.Selected )
             - lblPrCovState:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
-                    =If( Len(gPrCovPath) > 0,
-                         If( gPrCovDone, "✓ " & gPrCovLabel, "… " & gPrCovLabel & " — keep going, this term has children" ),
+                    =If( !IsBlank(gPrCov), "✓ " & gPrCov.Label,
                          gEditMode = "Edit",
                          "Currently: " & Coalesce(gEditProject.project_coverage.Value, "not set") & "   (leave alone to keep it)",
                          "Nothing picked yet" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
-                  Color: =If( Len(gPrCovPath) > 0 && !gPrCovDone, Theme.Color.Warning, Theme.Color.TextMuted )
+                  Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
                   Height: =20
                   VerticalAlign: =VerticalAlign.Middle
@@ -1444,14 +1496,8 @@ Screens:
                     =With( { m: Trim(
                          If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
                          If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
-                         If( gEditMode = "New" && !gPrRegionDone, "a full Region path (Classification)   ", "" ) &
-                         If( gEditMode = "New" && !gPrTypeDone,   "a full Project type path (Classification)   ", "" ) &
-                         If( gEditMode = "Edit" && Len(gPrRegionPath) > 0 && !gPrRegionDone,
-                             "finish the Region path or clear it   ", "" ) &
-                         If( gEditMode = "Edit" && Len(gPrTypePath) > 0 && !gPrTypeDone,
-                             "finish the Project type path or clear it   ", "" ) &
-                         If( Len(gPrCovPath) > 0 && !gPrCovDone,
-                             "finish the Coverage path or clear it   ", "" ) ) },
+                         If( gEditMode = "New" && IsBlank(gPrRegion), "a Region (Classification)   ", "" ) &
+                         If( gEditMode = "New" && IsBlank(gPrType),   "a Project type (Classification)   ", "" ) &
                        If( Len(m) = 0, "", "Still required:   " & m ) )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
@@ -1503,12 +1549,8 @@ Screens:
                                       // record, found by the path the picker resolved — not
                                       // a hand-built SPListExpandedTaxonomy literal. See
                                       // _EDIT-NOTES.md for why that swap matters.
-                                      project_region:
-                                          LookUp( Choices([@taskmaster_projects].project_region),
-                                                  Path = gPrRegionPath ),
-                                      project_type:
-                                          LookUp( Choices([@taskmaster_projects].project_type),
-                                                  Path = gPrTypePath ),
+                                      project_region: gPrRegion,
+                                      project_type:   gPrType,
                                       project_date_start:    dtpPrStart.SelectedDate,
                                       project_date_target:   dtpPrTarget.SelectedDate,
                                       project_date_complete:
@@ -1566,21 +1608,15 @@ Screens:
                         // Managed metadata on EDIT only — on New these went in with the
                         // insert. Each stays its own Patch: MM is still the least-proven
                         // write in the app and must not take the rest of the record down.
-                        If( gEditMode = "Edit" && Len(gPrRegionPath) > 0 && gPrRegionDone,
+                        If( gEditMode = "Edit" && !IsBlank(gPrRegion),
                             IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_region:
-                                               LookUp( Choices([@taskmaster_projects].project_region),
-                                                       Path = gPrRegionPath ) }) ), Set( gPrWarn, gPrWarn & "the region didn't stick: " & FirstError.Message & "   " )) );
-                        If( gEditMode = "Edit" && Len(gPrTypePath) > 0 && gPrTypeDone,
+                                           { project_region: gPrRegion }) ), Set( gPrWarn, gPrWarn & "the region didn't stick: " & FirstError.Message & "   " )) );
+                        If( gEditMode = "Edit" && !IsBlank(gPrType),
                             IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_type:
-                                               LookUp( Choices([@taskmaster_projects].project_type),
-                                                       Path = gPrTypePath ) }) ), Set( gPrWarn, gPrWarn & "the type didn't stick: " & FirstError.Message & "   " )) );
-                        If( Len(gPrCovPath) > 0 && gPrCovDone,
+                                           { project_type: gPrType }) ), Set( gPrWarn, gPrWarn & "the type didn't stick: " & FirstError.Message & "   " )) );
+                        If( !IsBlank(gPrCov),
                             IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_coverage:
-                                               LookUp( Choices([@taskmaster_projects].project_coverage),
-                                                       Path = gPrCovPath ) }) ), Set( gPrWarn, gPrWarn & "the coverage didn't stick: " & FirstError.Message & "   " )) );
+                                           { project_coverage: gPrCov }) ), Set( gPrWarn, gPrWarn & "the coverage didn't stick: " & FirstError.Message & "   " )) );
                         // --- 3. children ------------------------------------------
                         // IfError's third argument is the value returned when NOTHING
                         // errored, which is how each row records success or failure
