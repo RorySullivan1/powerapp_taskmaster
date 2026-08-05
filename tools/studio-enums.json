@@ -260,7 +260,31 @@
    "output": "Selected \u2014 a record; .Selected.Value for a string array",
    "props": "Items, ItemDisplayText, Default (a VALUE, not a table), Appearance, AccessibleLabel, ValidationState, OnChange",
    "note": "Grounded from MS Learn's own YAML sample rather than a Studio export. Single-select; the combo box is the multi-select / searchable one. Note Default here takes a value, where ModernCombobox takes DefaultSelectedItems, a TABLE."
+  },
+  "Classic/Toggle@2.1.0": {
+   "output": "Value — a boolean",
+   "props": "Default (boolean), Value, TrueText/FalseText, ShowLabel, TextPosition, TrueFill/TrueHoverFill, FalseFill/FalseHoverFill, HandleFill, RailFill, OnCheck, OnUncheck, OnChange, plus the usual colour/border set",
+   "studio_defaults": "BorderColor RGBA(0,0,0,0) · BorderStyle.None · Color RGBA(50,49,48,1) · DisabledBorderColor RGBA(0,0,0,0) · FalseFill RGBA(96,94,92,1) · FalseHoverFill RGBA(50,49,48,1) · FocusedBorderThickness 4 · Font.'Segoe UI' · HoverBorderColor RGBA(0,0,0,0) · PressedBorderColor RGBA(0,0,0,0) · TrueFill RGBA(0,120,212,1) · TrueHoverFill RGBA(16,110,190,1)",
+   "note": "PREFIXED — `Classic/Toggle@2.1.0` — because a modern Toggle shares the name. OnCheck/OnUncheck fire on the transition; OnChange fires on both. A toggle is a two-state control only — for a tri-state (yes/no/unset) SharePoint Boolean, use a dropdown or you cannot express Blank()."
+  },
+  "RichTextEditor@2.7.0": {
+   "output": "HtmlText — an HTML STRING, not plain text",
+   "props": "Default (HTML in), HtmlText (out), EnableSpellCheck, DisplayMode, BorderColor, plus size/position",
+   "studio_defaults": "BorderColor RGBA(245,245,245,1)",
+   "note": "NO Classic/ prefix. The IN property is Default and the OUT property is HtmlText — they are NOT the same name, unlike a text input. What it emits is markup, so a SharePoint Multiple lines of text column receiving it must be Enhanced rich text; a plain-text column will store the tags literally. Read it back into an HtmlViewer@2.1.0, never into a Label."
+  },
+  "Rating@2.1.0": {
+   "output": "Value — a number, 0 when unrated",
+   "props": "Default, Max, ReadOnly, RatingFill, ShowValue, BorderThickness, FocusedBorderThickness, plus the usual colour/border set",
+   "studio_defaults": "BorderColor RGBA(0,0,0,0) · BorderStyle.None · BorderThickness 2 · FocusedBorderThickness 4 · RatingFill RGBA(16,110,190,1)",
+   "note": "NO Classic/ prefix. The modern Rating control adds Step (half stars); the classic one is whole stars only. Max defaults to 5 — set it explicitly if the column's scale is anything else."
   }
+ },
+ "_controlPrefixRule": {
+  "rule": "`Classic/` appears on exactly those control names that a modern Fluent control also uses, and is absent where no modern namesake exists.",
+  "prefixed": ["Classic/Icon@2.5.0", "Classic/TextInput@2.3.2", "Classic/Button@2.2.0", "Classic/ComboBox@2.4.0", "Classic/DropDown@2.3.1", "Classic/Toggle@2.1.0"],
+  "bare": ["Timer", "ListBox@2.2.0", "RichTextEditor@2.7.0", "Rating@2.1.0", "Gallery@2.15.0", "Image@2.2.3", "HtmlViewer@2.1.0", "Label@2.5.1", "Rectangle@2.3.0", "Form@2.4.4", "TypedDataCard@1.0.7", "GroupContainer@1.5.0"],
+  "status": "PREDICTIVE ONLY — derived from every token grounded so far, 2026-08-05. Use it to guess which form to ask for; never to author an ungrounded token. Casing is still per-token (`DropDown` has a capital D, `ComboBox` a capital B)."
  },
  "FormVariant": [
   "Classic"

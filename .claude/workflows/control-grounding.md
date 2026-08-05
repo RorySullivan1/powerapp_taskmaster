@@ -31,9 +31,25 @@ control token. That is where `.SelectedDate`, `.Selected.Value` and `.Text` were
 Build the thing from proven tokens — three Rectangles instead of an unverified icon. Note in
 the file header what the nicer version would be, so it can be swapped once grounded.
 
-## 5. Record it, once
-- `tools/studio-enums.json` — the token, its properties, its output, its provenance
-- `tools/validate_pa_yaml.py` — the allow-list, with a dated comment
-- `.claude/memory/INDEX.md` — if it corrects a previous belief
+## 5. Record it in all four places, once
+- `tools/validate_pa_yaml.py` — the allow-list, with a dated comment. **This is the only copy
+  that gates a paste**; the rest are what make it findable.
+- `tools/studio-enums.json` — the token, its properties, its OUTPUT property, the Studio
+  defaults seen in the sample, and its provenance
+- `.claude/skills/powerapp-canvas-controls/SKILL.md` — the grounded-token list, the output-
+  property table, and a short YAML example if the control's wiring is not obvious. **A skill
+  is how the next session finds this**; a token that exists only in the allow-list is grounding
+  nobody will look for.
+- `paste-log.md` and `.claude/memory/INDEX.md` — the crossing, and the decision if it corrects
+  a previous belief.
+
+Then run `python3 tools/validate_pa_yaml.py`. It **audits the three copies against each other**
+and prints `NOTE control catalogue is out of step` for any allow-listed token missing from the
+enums file or the skill. A warning there means step 5 is unfinished.
+
+Downstream: if the control writes to SharePoint, check whether the COLUMN needs to change too —
+a rich text editor emits markup and needs an *Enhanced rich text* column; a toggle cannot
+produce `Blank()`, so a Yes/No column can never mean "unanswered". That belongs in
+`sharepoint-list-architecture`, not here.
 
 A token grounded once must never need grounding twice.

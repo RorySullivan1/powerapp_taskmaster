@@ -10,8 +10,10 @@ description: >
   control into `src/authored/` — an ungrounded token fails the whole paste and comes back only
   as "it didn't work". Covers: classic vs modern control families, version suffixes, gallery
   `BrowseLayout_*` variants, the 180-value classic `Icon` enum, `GroupContainer` auto-layout,
-  and the output property of every control in use (`.Text`, `.Value`, `.Selected.Value`,
-  `.SelectedDate`). Boundaries: the FORMULAS inside a control's properties are
+  the `Classic/` prefix rule, the four single-select controls and how each is seeded, forms and
+  data cards, toggles, ratings and the rich text editor, and the output property of every
+  control in use (`.Text`, `.Value`, `.Selected.Value`, `.SelectedDate`, `.HtmlText`).
+  Boundaries: the FORMULAS inside a control's properties are
   powerapp-canvas-development and power-fx-development; screen layout and geometry are
   powerapp-canvas-design; getting the YAML into Studio is studio-transfer; reusable component
   contracts are power-apps-components. This skill owns *what a control is called and what it
@@ -54,11 +56,21 @@ Treat the generic docs as a guide to *structure*, never to *tokens*.
 `HtmlViewer@2.1.0`, `Timer`, `CanvasComponent`.
 
 `Classic/ComboBox@2.4.0`, `Classic/DropDown@2.3.1`, `ListBox@2.2.0`, `Form@2.4.4`
-(`Variant: Classic`), `TypedDataCard@1.0.7` (`Variant: ClassicTextualEdit`).
+(`Variant: Classic`), `TypedDataCard@1.0.7` (`Variant: ClassicTextualEdit`),
+`Classic/Toggle@2.1.0`, `RichTextEditor@2.7.0`, `Rating@2.1.0`.
 
-**Two naming traps in that list.** `Classic/DropDown` has a **capital D** in the middle, unlike
-`Classic/ComboBox`. And `ListBox@2.2.0` carries **no `Classic/` prefix at all** — the same trap
-as `Timer`. There is no rule to infer here; check the catalogue.
+### The `Classic/` prefix has a rule — but it only predicts
+
+Across every token grounded so far the prefix appears on **exactly those names a modern Fluent
+control also uses**, and is absent where no modern namesake exists:
+
+| Prefixed (a modern namesake exists) | Bare (none exists) |
+|---|---|
+| `Classic/Icon`, `Classic/TextInput`, `Classic/Button`, `Classic/ComboBox`, `Classic/DropDown`, `Classic/Toggle` | `Timer`, `ListBox`, `RichTextEditor`, `Rating`, `Gallery`, `Image`, `HtmlViewer`, `Label`, `Rectangle`, `Form`, `TypedDataCard`, `GroupContainer` |
+
+Use it to *guess which form to ask for* — never to author an ungrounded token. A wrong guess
+still fails the whole paste. **Casing stays per-token**: `DropDown` has a capital D mid-word,
+`ComboBox` a capital B, `RichTextEditor` neither.
 
 **Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, `ModernCombobox@1.0.0`,
 `ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
@@ -90,6 +102,14 @@ mismatch is not a failure mode. **Only the control name and the `Variant` matter
 | `ModernDatePicker` | `.SelectedDate` | `Blank()` when unset |
 | `ModernTabList` | `.Selected.Value` | the tab label |
 | `Gallery` | `.AllItems`, `.Selected` | **`.Items` is WRITE-ONLY** — reading it is an error |
+| `Classic/Toggle` | `.Value` | a boolean; seeded by `Default` |
+| `Rating` | `.Value` | a number, `0` when unrated; seeded by `Default` |
+| `RichTextEditor` | `.HtmlText` | **in and out are different names** — `Default` in, `.HtmlText` out |
+
+`RichTextEditor` is the one control whose in and out properties don't match, and its output is
+**markup, not text**. So the SharePoint column receiving it must be *Multiple lines of text →
+Enhanced rich text*, or the tags get stored literally; and it reads back into an
+`HtmlViewer@2.1.0`, never a `Label`.
 
 ## Gallery variants
 
@@ -229,6 +249,58 @@ Prefer modern for anything a user types into or picks from — it removes hand-p
 **Keep classic where the modern control can't do the job.** The transparent full-template
 gallery hit target needs `Fill: =RGBA(0,0,0,0)` and `BorderThickness: =0`, which a Fluent
 button does not expose — those stay `Classic/Button@2.2.0`.
+
+## Boolean, rating and rich text
+
+All three were read off Studio code view on 2026-08-05. Studio prints only NON-default
+properties, so what follows is *its* default styling — copy the token and the properties you
+actually need, not the whole block.
+
+```yaml
+- Toggle1:
+    Control: Classic/Toggle@2.1.0
+    Properties:
+      Default:    =gEditProject.project_is_active   # boolean IN
+      TrueText:   ="Active"                         # only shown when ShowLabel is true
+      FalseText:  ="Inactive"
+      TrueFill:   =RGBA(0, 120, 212, 1)             # Studio default
+      FalseFill:  =RGBA(96, 94, 92, 1)
+      OnChange:   =Set(gPrActive, Toggle1.Value)
+```
+
+`OnCheck` / `OnUncheck` fire on one transition each; `OnChange` fires on both — pick one, not
+both, or the same work runs twice. A toggle is **two-state only**: a SharePoint Yes/No column
+that must distinguish "not answered" from "no" needs a dropdown, because a toggle cannot
+produce `Blank()`.
+
+```yaml
+- Rating1:
+    Control: Rating@2.1.0
+    Properties:
+      Default:     =gEditTask.task_priority_score
+      Max:         =5                               # defaults to 5 — set it if the scale differs
+      ReadOnly:    =false
+      RatingFill:  =RGBA(16, 110, 190, 1)           # Studio default
+```
+
+`Rating.Value` is a number and is `0`, not `Blank()`, when unrated — so a "must be rated"
+guard is `Rating1.Value > 0`, and writing an unrated control to an optional Number column
+stores a real 0. The **modern** Rating adds `Step` for half stars; the classic one is whole
+stars only.
+
+```yaml
+- RichTextEditor1:
+    Control: RichTextEditor@2.7.0
+    Properties:
+      Default:          =gEditIssue.issue_description   # HTML in
+      EnableSpellCheck: =true
+      DisplayMode:      =If(gReadOnly, DisplayMode.View, DisplayMode.Edit)
+```
+
+Then `Patch(..., { issue_description: RichTextEditor1.HtmlText })` — **the out property is a
+different name from the in property**, the only control in this catalogue where that is true.
+It emits markup, so it pairs with an *Enhanced rich text* column and an `HtmlViewer@2.1.0` on
+the read side. It is also a heavy control: one per screen, never inside a gallery template.
 
 ## How to ground a token you don't have
 

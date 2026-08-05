@@ -64,7 +64,16 @@ KNOWN_CONTROLS = {
     "TypedDataCard@1.0.7":    "grounded",   # CONFIRMED 2026-08-04 — a Form's data card
     "GroupContainer@1.5.0":   "grounded",   # CONFIRMED 2026-08-04 — auto-layout container,
                                             # read off a Studio code-view photo. Variant: AutoLayout
+    "Classic/Toggle@2.1.0":   "grounded",   # CONFIRMED 2026-08-05 — prefixed; a modern Toggle exists
+    "RichTextEditor@2.7.0":   "grounded",   # CONFIRMED 2026-08-05 — NO prefix; out is .HtmlText
+    "Rating@2.1.0":           "grounded",   # CONFIRMED 2026-08-05 — NO prefix; out is .Value
 }
+
+# The `Classic/` prefix is not decoration: it appears on exactly those controls whose
+# NAME is shared with a modern Fluent control, and is absent where no modern namesake
+# exists. Prefixed: Icon, TextInput, Button, ComboBox, DropDown, Toggle. Bare: Timer,
+# ListBox, RichTextEditor, Rating, Gallery, Image, HtmlViewer, Label, Rectangle.
+# Useful for PREDICTING an unseen token — never for asserting one. Ground it, then add it.
 # Gallery Variant tokens are NOT "Vertical"/"Horizontal" — that was a guess this
 # repo carried for weeks. Studio's own generated YAML names them
 # `BrowseLayout_<Orientation>_<Template>_ver5.0`. The vertical one below was read
@@ -444,6 +453,33 @@ def contract_errors(files) -> list[str]:
     return out
 
 
+# A token grounded in the validator but absent from the machine-readable enums or from the
+# controls skill is grounding that Claude will not FIND next session — the knowledge exists
+# but nothing routes to it. This audit keeps the three copies in step; it warns rather than
+# fails, because the allow-list is what actually gates a paste.
+CATALOGUE_EXEMPT = {"CanvasComponent"}   # a component instance, not a control template
+
+
+def catalogue_gaps() -> list[str]:
+    root = pathlib.Path(__file__).resolve().parent.parent
+    enums = root / "tools" / "studio-enums.json"
+    skill = root / ".claude" / "skills" / "powerapp-canvas-controls" / "SKILL.md"
+    out = []
+    for f in (enums, skill):
+        if not f.exists():
+            out.append(f"{rel(f)} is missing — the control catalogue has no second copy")
+    enums_txt = enums.read_text(encoding="utf-8") if enums.exists() else ""
+    skill_txt = skill.read_text(encoding="utf-8") if skill.exists() else ""
+    for tok in KNOWN_CONTROLS:
+        if tok in CATALOGUE_EXEMPT:
+            continue
+        if enums_txt and tok not in enums_txt:
+            out.append(f"{tok} is allow-listed but absent from tools/studio-enums.json")
+        if skill_txt and tok not in skill_txt:
+            out.append(f"{tok} is allow-listed but absent from the powerapp-canvas-controls skill")
+    return out
+
+
 def main() -> int:
     validator = Draft7Validator(yaml.safe_load(SCHEMA.read_text(encoding="utf-8")))
     files = targets(sys.argv[1:])
@@ -490,6 +526,12 @@ def main() -> int:
         print("\nFAIL component-instance contracts")
         for c in contract:
             print(f"  {c}")
+
+    gaps = catalogue_gaps()
+    if gaps:
+        print("\nNOTE control catalogue is out of step (warning, not a paste failure)")
+        for g in gaps:
+            print(f"  {g}")
 
     total = len(files)
     print(f"\n{total - bad}/{total} valid" + ("" if not bad else f"  —  {bad} FAILING"))
