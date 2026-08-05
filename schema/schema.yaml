@@ -81,7 +81,7 @@ lists:
     provisioned: pending
     join_cost: 0
     columns:
-      - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level, e.g. EMEA. Maps onto the list's built-in Title" }
+      - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level, e.g. EMEA. An EXPLICIT column — Title is left unused and not required" }
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
       - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete — a term in use must not vanish. Pickers filter on this; label resolution ignores it" }
@@ -106,7 +106,7 @@ lists:
     provisioned: pending
     join_cost: 0
     columns:
-      - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level. Maps onto the list's built-in Title" }
+      - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level. An EXPLICIT column — Title is left unused and not required" }
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
       - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete" }
@@ -344,6 +344,12 @@ migration:
     - 5. Carry any existing values across, resolving each term to its mapping row.
     - 6. Delete the Managed Metadata columns.
     - 7. Point the app at the new columns and remove the term-store code paths.
+  title_column: >-
+    All three mapping lists use an EXPLICIT `level1` column; the built-in Title is
+    left unused and set not-required. An earlier draft of this file told two of the
+    three to map level1 onto Title and the third not to, which is a contradiction —
+    the app filters on `level1` in every formula, so a list without that column
+    returns nothing and its picker is silently empty.
   internal_name_reuse: >-
     project_coverage, client_type and client_coverage keep their internal names
     while changing type, so the old column must be deleted before the new one is
