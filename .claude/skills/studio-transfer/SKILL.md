@@ -168,12 +168,12 @@ anyway, so what lands equals what was authored and there is no evaluation-order 
 all. Keep a formula only where genuine responsiveness is wanted, and tell the human not to drag
 that control.
 
-## Refinement: deliver change sheets, not re-pastes (2026-08-05)
+## Refinement: don't re-paste a screen to change a property (2026-08-05)
 
-The app is now BUILT — every screen populated, components in, lists added, `App.Formulas` in. The
-paste channel works exactly as this skill documents it, and it is a **hybrid**, not one route:
-screens paste through code view, `App.Formulas` goes through the formula bar, and component
-**bodies** paste while their **custom properties** are typed by hand.
+The app is BUILT — every screen populated, components in, lists added, `App.Formulas` in. Getting
+source across is a **hybrid**: screens paste through code view, `App.Formulas` goes through the
+formula bar (the App object has no code view), and a component's **custom properties** are typed
+by hand while its controls paste.
 
 Once a screen exists, **re-pasting it to change a few properties is the wrong move**:
 
@@ -181,21 +181,13 @@ Once a screen exists, **re-pasting it to change a few properties is the wrong mo
 - it re-suffixes any control whose name now collides (`galProjects` → `galProjects_1`), and
 - it creates a second control rather than patching the first — paste is never an in-place edit.
 
-So the refinement unit is one property:
+So for a small change, name the control and the property and let the human set it in the formula
+bar. Give the formula **without the leading `=`** — pa-yaml stores it with one, but the formula
+bar renders that `=` outside the editable area, so pasting it yields `==` and an error that reads
+like a syntax fault in the formula.
 
-```bash
-python3 tools/change_sheet.py --since HEAD~1 src/authored/scrTaskEdit.pa.yaml
-python3 tools/change_sheet.py --only galTasks src/authored/scrTask.pa.yaml
-```
-
-It emits `<control> · <property> · <formula>`, ordered, with the leading `=` **stripped** — the
-formula bar renders that `=` outside the editable area, so pasting it gives `==` and an error that
-reads like a syntax fault in the formula. It flags a control that does not exist yet as a
-hand-insert, and flags a property that vanished from the source for manual deletion, because
-Studio keeps the old formula until someone clears it.
-
-**Whole-file paste stays right for a NEW screen or a rebuild.** Change sheets are for edits to a
-screen that already landed. Pick by what exists in Studio, not by habit.
+**Whole-file paste stays right for a NEW screen or a full rebuild.** Pick by what already exists
+in Studio, not by habit.
 
 ## The channel — code view mechanics
 
@@ -221,7 +213,7 @@ Code view (GA **17 Mar 2025**) is the interactive channel. Grounded on Microsoft
 - **The App Object has no code view.** `App.OnStart`, `App.Formulas`, and named formulas
   **cannot** be copied or pasted through code view. They go through the **formula bar only** —
   paste the body into the formula bar by hand. Treat App-level code as a separate,
-  formula-bar-only transfer path, tracked in `src/patches/`, not `studio/pulled/`.
+  formula-bar-only transfer path, tracked in `src/`, not `studio/pulled/`.
 - **The code-view pane is not editable.** You cannot edit code inside code view — pasting
   creates, it never patches. To change a control, author the new YAML here, paste to create,
   rename, and delete the old one (or patch its properties in the formula bar).
@@ -249,9 +241,9 @@ Consequences for this repo:
 
 ## The authored → landed lifecycle
 
-1. **Authored** (`src/authored/`, `src/patches/`) — the change, written here in the paste
+1. **Authored** (`src/Screens/`, `src/`) — the change, written here in the paste
    dialect. The repo is the source of record. Formula *content* follows `power-fx-development`;
-   App-level bodies go to `src/patches/` for the formula bar.
+   App-level bodies go to `src/` for the formula bar.
 2. **Audited** — run the **pre-paste-review agent** on the authored change. It returns a
    paste / do-not-paste verdict. Do not hand a human a paste that hasn't passed.
 3. **Landed** — a human pastes it into Studio; it validates and creates the control; they

@@ -23,7 +23,7 @@ so the two cannot drift.
 - **Never invent a column.** Every field token in authored Power Fx must resolve to a `name:` here.
   (This is what the proposed column-token validator hook would enforce.)
 - **`provisioned:`** tracks reality per list — `pending` (defined here, not yet in SharePoint),
-  `applied` (lists match this file), `unknown`. It is the schema analogue of `paste-log.md`.
+  `applied` (lists match this file), `unknown`. It is the schema analogue of `docs/build-history.md`.
 - **Type changes after creation are destructive.** Decide the `open_recommendations` *before*
   provisioning, not after.
 

@@ -7,7 +7,7 @@ description: >
   get the source out of Studio", "pac canvas download", "what's in an .msapp", "update the
   build book", "log this paste", "the lists are provisioned", "what should I do next", "did
   this land". Covers: the golden-source inversion (repo defines, SharePoint applies), the
-  authored→landed lifecycle and its records (`BUILD-BOOK.md`, `paste-log.md`,
+  authored→landed lifecycle and its records (`docs/build-history.md`,
   `schema/schema.yaml`, `.claude/memory/`), provisioning verification, `.msapp` structure and
   the CLI, and the diagnostic discipline for reports that arrive as one sentence. Boundaries:
   the clipboard mechanics themselves are studio-transfer; formulas are
@@ -28,11 +28,10 @@ against re-deciding something already settled.
 | File | Answers | Rule |
 |---|---|---|
 | `schema/schema.yaml` | what the backend IS | **Golden source.** The repo defines; SharePoint applies. Never edited to match reality — reality is changed to match it. |
-| `BUILD-BOOK.md` | what to do next, in order | The linear runbook. Contracts inlined so nobody flips between files while typing. |
-| `paste-log.md` | what actually landed | One row per crossing. **Claude maintains it** from chat reports — the human cannot write to this repo. |
+| `docs/build-history.md` | what actually landed | One row per crossing. **Claude maintains it** from chat reports — the human cannot write to this repo. |
 | `.claude/memory/INDEX.md` | what was decided and why | Append-only decisions ledger. Committed, because the environment is ephemeral. |
 
-A unit is **authored** until a human pastes it and confirms. `paste-log.md` is the only place
+A unit is **authored** until a human pastes it and confirms. `docs/build-history.md` is the only place
 that distinction is recorded — if it is not in the log, it is not in the app.
 
 ## Provisioning verification
@@ -90,14 +89,14 @@ The user's whole channel is a sentence. Extract the most from it:
 1. **Decide** — check `.claude/memory/INDEX.md` first; do not relitigate a settled call.
 2. **Schema first** — if the change touches data, edit `schema/schema.yaml` before any app
    code, and note whether SharePoint needs re-provisioning.
-3. **Author** into `src/authored/` or `src/patches/`, grounding every token first.
+3. **Author** into `src/Screens/` or `src/`, grounding every token first.
 4. **Validate** — `python tools/validate_pa_yaml.py`. Add a lint for any new failure class;
    a bug found twice should have been a lint after the first time.
 5. **Audit** — the pre-paste-review agent, for a paste/do-not-paste verdict.
-6. **Update `BUILD-BOOK.md`** with anything the human must type by hand (component properties,
+6. **Say plainly what the human must do by hand in Studio** (component properties,
    connections, list settings).
 7. **Hand off** — say plainly what to paste, in what order, and what to report back.
-8. **Record** — `paste-log.md` row on the report; a decision in memory if it settles something.
+8. **Record** — `docs/build-history.md` row on the report; a decision in memory if it settles something.
 9. **Commit and push.**
 
 ## When to stop and ask

@@ -142,8 +142,8 @@ App object has **no code view** — its body is typed into the formula bar (see 
 1. Read the golden source (`schema/schema.yaml`) for every column token you intend to write —
    **never invent a column name**.
 2. Ground every control token (powerapp-canvas-controls) before typing it.
-3. Author into `src/authored/` (controls) or `src/patches/` (App object bodies).
+3. Author into `src/Screens/` (controls) or `src/` (App object bodies).
 4. `python tools/validate_pa_yaml.py` — schema, tokens, icons, `IfError` typing, gallery
    `OnSelect`, cross-file component contracts.
 5. Hand to the **pre-paste-review** agent for a paste/do-not-paste verdict.
-6. Cross the gap per studio-transfer, then record the outcome in `paste-log.md`.
+6. Cross the gap per studio-transfer, then record the outcome in `docs/build-history.md`.

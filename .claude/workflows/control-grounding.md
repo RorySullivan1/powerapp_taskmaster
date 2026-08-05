@@ -40,7 +40,7 @@ the file header what the nicer version would be, so it can be swapped once groun
   property table, and a short YAML example if the control's wiring is not obvious. **A skill
   is how the next session finds this**; a token that exists only in the allow-list is grounding
   nobody will look for.
-- `paste-log.md` and `.claude/memory/INDEX.md` — the crossing, and the decision if it corrects
+- `docs/build-history.md` and `.claude/memory/INDEX.md` — the crossing, and the decision if it corrects
   a previous belief.
 
 Then run `python3 tools/validate_pa_yaml.py`. It **audits the three copies against each other**

@@ -3,7 +3,7 @@ name: pre-paste-review
 description: >
   Pre-paste auditor for authored canvas-app Power Fx — the last gate before a human pastes
   YAML into Power Apps Studio across the air gap. Use proactively whenever a change has been
-  authored in `src/authored/` or `src/patches/` and is about to be handed off for paste, or
+  authored in `src/Screens/` or `src/` and is about to be handed off for paste, or
   when the user asks "is this safe to paste", "audit this before I paste", "check this for
   delegation / schema problems", "will Studio accept this". Read-only: it inspects the
   authored Power Fx against the schema snapshot and the delegation rules, determines *what*
@@ -44,7 +44,7 @@ that. You **determine what is wrong; you never edit.**
 1. **Confirm freshness first.** If you cannot tell that the authored change was written against
    a current pull (check `CLAUDE.local.md` last-pull date and the paste log), say so and
    **do-not-paste** — a paste built on stale state is unsafe regardless of its content.
-2. **Read the authored change, read-only.** Inspect the files in `src/authored/` / `src/patches/`
+2. **Read the authored change, read-only.** Inspect the files in `src/Screens/` / `src/`
    (or the specific files named). Orient on what it does and which lists/columns it touches.
 3. **Resolve every column token against the schema snapshot.** Grep the authored YAML for
    field references; for each, confirm the list and the **internal** name exist in the snapshot

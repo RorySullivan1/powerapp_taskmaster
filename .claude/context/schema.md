@@ -147,7 +147,7 @@ hard cap of two people per task — accepted as sufficient.
 **C3 ✅ Resolved 2026-08-03 — weighted stage rollup, written app-side.**
 `project_perc_completion` is the **mean stage-weight across a project's tasks**, not a done/total
 count. Weights (`schema.yaml` → `rollups:`, mirrored as the `StageWeights` named formula in
-`src/patches/App.Formulas.pa.fx`): `Not Started` 0 · `Planning` 10 · `Drafting` 35 ·
+`src/App.pa.yaml`): `Not Started` 0 · `Planning` 10 · `Drafting` 35 ·
 `Under Review` 60 · `Finalizing` 85 · `Complete` 100 · **`Archived` excluded** from numerator *and*
 denominator.
 

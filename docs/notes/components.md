@@ -156,7 +156,8 @@ most likely reason a whole-file paste fails while the controls inside it are per
 
 **So use the split, not the raw file:**
 - `BUILD-SHEET.md` — every custom property, its kind, type and formula, in creation order.
-- `bodies/<name>.children.pa.yaml` — the control body alone, comment-free, ready to paste.
+- *(historical)* `bodies/<name>.children.pa.yaml` held the control body alone, generated for the
+  two-part paste. Removed 2026-08-05 — a component is one whole file again.
 
 Both are **generated** from the `.pa.yaml` files here, which stay the source of record:
 

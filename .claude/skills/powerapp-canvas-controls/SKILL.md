@@ -7,7 +7,7 @@ description: >
   "what's the token for a dropdown / date picker / container", "is Icon.Table real", "what
   does a combobox return", "convert this to a modern control", "why did the paste fail on
   this control", "add a text input / gallery / tab list". Also use before writing ANY new
-  control into `src/authored/` — an ungrounded token fails the whole paste and comes back only
+  control into `src/Screens/` — an ungrounded token fails the whole paste and comes back only
   as "it didn't work". Covers: classic vs modern control families, version suffixes, gallery
   `BrowseLayout_*` variants, the 180-value classic `Icon` enum, `GroupContainer` auto-layout,
   the `Classic/` prefix rule, the five single-select controls and how each is seeded, forms and

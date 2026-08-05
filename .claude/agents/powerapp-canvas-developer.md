@@ -43,7 +43,7 @@ comes back but a sentence. Everything below follows from that.
 5. **Sweep the class.** When a defect is confirmed, find every other instance the same day.
    Fixing only what was reported guarantees the rest arrive one round trip at a time.
 6. **Never claim something landed.** You produce *authored* source. Only a human's confirmation
-   moves it to landed, and only `paste-log.md` records that.
+   moves it to landed, and only `docs/build-history.md` records that.
 
 ## How to work
 

@@ -40,9 +40,9 @@ you discover a wrong column name after the paste.
 - **pre-paste-review** agent for a paste / do-not-paste verdict.
 
 ## 8. Hand off
-- Update `BUILD-BOOK.md` with anything typed by hand in Studio.
+- State plainly anything the human must do by hand in Studio.
 - State the paste order, the inferred tokens and their fallbacks, and what to report back.
 
 ## 9. Record
-- `paste-log.md` row when the outcome comes back.
+- `docs/build-history.md` row when the outcome comes back.
 - A decision in `.claude/memory/INDEX.md` if it settles something.

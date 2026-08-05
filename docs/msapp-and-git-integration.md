@@ -68,7 +68,7 @@ clipboard entirely and make the gap two-way. It cannot be settled from this side
 ## Recommendation
 
 **Keep pasting.** The code-view channel works — `scrAdmin` landed through it. Components have
-since regressed (see `paste-log.md`), and the response to that is to split each one into a typed
+since regressed (see `docs/build-history.md`), and the response to that is to split each one into a typed
 contract and a pasteable body, not to abandon the channel: a packaging route whose failure mode is
 a file Studio silently refuses to open is strictly worse than one that at least reports an error.
 

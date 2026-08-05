@@ -112,7 +112,7 @@ The hand-built shape survives only as a documented fallback — see §5.
 
 ## 4. What the component does with all this
 
-`src/authored/components/cmpTermPicker.pa.yaml`. Four progressively-revealed vertical galleries.
+`src/Components/cmpTermPicker.pa.yaml`. Four progressively-revealed vertical galleries.
 Two details are load-bearing, and are commented as such in the file:
 
 - **A `"— select —"` sentinel row per level.** A gallery's `Selected` returns its first row until

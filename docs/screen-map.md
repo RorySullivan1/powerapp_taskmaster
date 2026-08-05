@@ -10,7 +10,7 @@ delegation/Power-Fx *how* is the `power-fx-development` skill. This doc adds onl
 per-screen **data bindings + nav + template lineage + build order**.
 
 **Air-gap note:** the bindings below are *authoring intent*, not paste payloads. Each screen is
-authored in `src/authored/`, audited by `pre-paste-review`, then pasted via code view against a
+authored in `src/Screens/`, audited by `pre-paste-review`, then pasted via code view against a
 public-grounded dialect (`studio-transfer`). Nothing binds to a real column until provisioning —
 and the true internal name is captured **by hand** into the snapshot (the one-way gap has no pull
 to confirm it).

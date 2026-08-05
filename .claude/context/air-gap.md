@@ -40,7 +40,7 @@ clipboard, moved by a human, and it runs ONE WAY: repo → Studio.**
 4. **Provisioning names are captured by hand.** True internal column names (post `_x0020_`
    mangling) can't be pulled back — capture them manually into `schema.md` when you provision.
 5. **"Landed" is confirmed by a human, then logged.** Nothing is in the app until a human pastes
-   it, it validates, and they confirm it worked; record the crossing in `paste-log.md`. An
+   it, it validates, and they confirm it worked; record the crossing in `docs/build-history.md`. An
    authored-but-unconfirmed file is **not** live.
 
 ## Consequences for the repo layout

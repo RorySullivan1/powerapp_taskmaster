@@ -30,7 +30,7 @@ log, or **stopped** before a wasted paste — with the reason and the next step.
 
 2. **Author the change.** Apply the **`power-fx-development`** skill to write the formulas and
    the **`studio-transfer`** skill for the paste-dialect shape; put control YAML in
-   `src/authored/` and any App-object body in `src/patches/`. Bind every column to the
+   `src/Screens/` and any App-object body in `src/`. Bind every column to the
    **`schema`** brief's internal names — never invent one. → hand-off: authored files.
 
 3. **Audit before paste.** Spawn the **`../agents/pre-paste-review.md`** agent on the authored
