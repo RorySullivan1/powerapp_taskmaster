@@ -1492,13 +1492,22 @@ Screens:
             - lblPrMissing:
                 Control: Label@2.5.1
                 Properties:
+                  Visible: |
+                    =Len(Trim(txtPrName.Text)) = 0
+                     || Len(gPrManager.Mail) = 0
+                     || ( gEditMode = "New" && ( IsBlank(gPrRegion) || IsBlank(gPrType) ) )
+                  # Deliberately flat: one Trim over an &-chain, no With and no inline
+                  # record. The nested version was correct but fragile to hand-edit —
+                  # a single `&` mistyped as `,` turns it into Trim(a, b) and Studio
+                  # reports "expected 1 argument, not 2", which reads like a bug in the
+                  # formula rather than a typo. Nothing here takes more than one argument.
                   Text: |
-                    =With( { m: Trim(
-                         If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
-                         If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
-                         If( gEditMode = "New" && IsBlank(gPrRegion), "a Region (Classification)   ", "" ) &
-                         If( gEditMode = "New" && IsBlank(gPrType),   "a Project type (Classification)   ", "" ) ) },
-                       If( Len(m) = 0, "", "Still required:   " & m ) )
+                    ="Still required:   " &
+                     Trim(
+                       If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
+                       If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
+                       If( gEditMode = "New" && IsBlank(gPrRegion), "Region   ", "" ) &
+                       If( gEditMode = "New" && IsBlank(gPrType),   "Project type   ", "" ) )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.Danger
@@ -1523,7 +1532,11 @@ Screens:
                     =If( gEditMode = "Edit", "Save project", "Create project" ) &
                      If( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) > 0,
                          " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) ) & " item(s)", "" )
-                  DisplayMode: =If(Len(lblPrMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
+                  DisplayMode: |
+                    =If( Len(Trim(txtPrName.Text)) > 0
+                         && Len(gPrManager.Mail) > 0
+                         && ( gEditMode = "Edit" || ( !IsBlank(gPrRegion) && !IsBlank(gPrType) ) ),
+                         DisplayMode.Edit, DisplayMode.Disabled )
                   Width: =300
                   Height: =48
                   OnSelect: |
