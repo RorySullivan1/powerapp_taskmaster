@@ -96,7 +96,7 @@ lists:
       - { name: task_output_language,  type: Choice,          required: false,                 desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
       - { name: task_output_format,    type: Choice,          required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
       - { name: task_output_branding,  type: Choice,          required: false,                 desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
-      - { name: task_output_asset,     type: Lookup,          required: false,                 desc: "Linked asset", lookup: { list: asset_library, show: TBD }, review: "asset_library schema not yet supplied — this binding is blocked" }
+      - { name: task_output_asset,     type: Lookup,          required: false,                 desc: "Linked asset", lookup: { list: asset_library, show: asset_name } }
       - { name: task_client_name,      type: Lookup,          required: false,                 desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
       - { name: task_product_id,       type: Lookup,          required: false,                 desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
       - { name: task_client_stage,     type: Choice,          required: false,                 desc: "Client lifecycle stage", values: [Prospect, Active, Existing, "Post-Trade"] }
@@ -181,8 +181,14 @@ lists:
   asset_library:
     role: Linked output assets. Referenced by taskmaster_tasks.task_output_asset.
     provisioned: unknown
-    join_cost: null
-    columns: []          # SCHEMA NOT SUPPLIED — any binding to this list is blocked.
+    join_cost: 1
+    # MINIMAL BY INSTRUCTION (2026-08-05): "only the name is used as a lookup, just
+    # assume asset_name". The app therefore binds exactly one column. Whatever else
+    # this list carries is out of scope — the app neither reads nor writes it, so
+    # extra columns cannot break the binding. If the live list's name column is NOT
+    # `asset_name`, this is the one line to change.
+    columns:
+      - { name: asset_name, type: Text, required: true, indexed: true, desc: "Asset name — the lookup display column, and the only column the app touches" }
 
 # =============================================================================
 # PROVISIONING VERIFICATION — check the live lists against this file.

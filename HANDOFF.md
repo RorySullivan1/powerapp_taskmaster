@@ -7,7 +7,27 @@ in this repo into Power Apps Studio.
 > component contract inlined, so you don't cross-reference files while building. This file is the
 > *why/how/state* overview behind it.
 
-**Channel facts (validated 2026-08-03):** code-view paste of screens **works** (`scrAdmin` landed,
+> ## ⚠️ 2026-08-05 — THE APP IS BUILT, AND THE PASTE ROUTE IS CLOSED
+>
+> Every screen and component now exists in Studio, the lists are added, and `App.Formulas` is in.
+> **The remaining work is editing and refining, not creating** — and code-view paste has stopped
+> working, so changes are delivered as **per-property change sheets**:
+>
+> ```bash
+> python3 tools/change_sheet.py --since HEAD~1 src/authored/scrTaskEdit.pa.yaml
+> ```
+>
+> Each entry is `<control> · <property> · <formula>`, ready for the formula bar, with the leading
+> `=` stripped (the bar renders that `=` outside the editable area — pasting it gives `==` and an
+> error that looks like a fault in the formula). Select the control in the tree, pick the
+> property, paste the block. **Don't drag anything afterwards** — that re-freezes X/Y/Width/Height.
+>
+> Everything below this box describes the whole-file paste channel and is **historical** until the
+> paste failure is diagnosed. It may well be recoverable: clipboard permission for
+> `make.powerapps.com`, the Power Fx formula bar being switched off (which hides View code
+> entirely), or pasting into a container rather than a screen would each look exactly like this.
+
+**Channel facts (validated 2026-08-03, now historical):** code-view paste of screens **worked** (`scrAdmin` landed,
 and a `pac`-packed shell `.msapp` opened cleanly). `App.Formulas` goes in the **formula bar**.
 Component **bodies** paste; component **contracts** (custom properties) are **Studio-only, typed by
 hand** — packing them into an `.msapp` is impossible (`pac` returns `PA3004: … use Power Apps Studio

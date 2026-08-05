@@ -168,7 +168,47 @@ anyway, so what lands equals what was authored and there is no evaluation-order 
 all. Keep a formula only where genuine responsiveness is wanted, and tell the human not to drag
 that control.
 
-## The channel — code view mechanics
+## ⚠️ THE PASTE ROUTE IS CLOSED (2026-08-05) — deliver change sheets instead
+
+The user reports code-view paste no longer works. It demonstrably *did* — `scrAdmin` and
+`cmpAppBar` both landed through it — so something in the environment changed, and the exact
+failure has not been captured yet (see the open question at the end of this section).
+
+**Until it is diagnosed, the delivery unit is not a file. It is a property.**
+
+```
+repo  ──►  tools/change_sheet.py  ──►  <control> . <property> = <formula>  ──►  formula bar
+```
+
+```bash
+python3 tools/change_sheet.py --since HEAD~1 src/authored/scrTaskEdit.pa.yaml
+python3 tools/change_sheet.py --only galTasks src/authored/scrTask.pa.yaml
+```
+
+The `--since` mode is the one that matters during refinement: change three properties in the
+repo, hand over three lines. It emits the formula **without the leading `=`**, because the
+formula bar renders that `=` outside the editable area — pasting `=Set(x, 1)` gives `==Set(x, 1)`
+and an error that reads like a syntax fault in the formula.
+
+**This is the better unit for refinement anyway, paste or no paste.** Re-pasting a screen
+re-freezes every X/Y/Width/Height into constants and re-suffixes any colliding control name. A
+property edit touches exactly what it names. Once the screens exist — and they now do — whole-file
+pastes were always going to stop being the right tool.
+
+**What this costs, and where it hurts:** editing an existing control is cheap. **Adding** one is
+not — the human must insert the control by hand, rename it, then apply its properties. So prefer
+changes that re-use the controls already on the screen: change a formula, not the control tree.
+Where a new control is genuinely needed, say so explicitly and keep the count low.
+
+**Still open — ask before assuming the route is gone for good.** "Paste doesn't work" has several
+distinct causes with different fixes: the browser clipboard permission lapsing for
+`make.powerapps.com`; the formula bar being switched off (which hides View code entirely);
+pasting into a container or component canvas rather than a screen; or Studio rejecting the YAML
+and reporting it as nothing happening. The first three are recoverable in under a minute. Get the
+exact symptom — menu item missing, nothing happens, an error and its text — before rebuilding the
+delivery model around the loss.
+
+## The channel — code view mechanics *(historical — see the section above)*
 
 Code view (GA **17 Mar 2025**) is the interactive channel. Grounded on Microsoft Learn
 *Use code view for canvas app controls*:
