@@ -198,7 +198,15 @@ Screens:
         Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
         Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
         Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
-        Reset( txtNiName ); Reset( txtNiAssSearch )
+        Reset( txtNiName ); Reset( txtNiAssSearch );
+        // The SAME rule applies to every ModernCombobox: DefaultSelectedItems is
+        // re-read only on Reset. Without these six, opening project B after project A
+        // leaves A's phase/priority showing while gPrPhase already holds B's — and
+        // re-picking the displayed value fires no OnChange, so the correction can't
+        // be made by hand either.
+        Reset( cboPrPhase ); Reset( cboPrPriority );
+        Reset( cboNtPriority ); Reset( cboNxCcy );
+        Reset( cboNiStatus ); Reset( cboNiImpact )
     Children:
       # =======================================================================
       # HEADER BAND  ·  0 .. 64  (absolute — three controls, no collisions)
@@ -1714,7 +1722,12 @@ Screens:
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            OnSelect: =Set(gNtOpen, false)
+            OnSelect: |
+              =Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
+               Reset( cboNtPriority );
+               Set( gNtLead, { DisplayName: "", Mail: "" } );
+               Set( gNtPriority, "Moderate" );
+               Set( gNtOpen, false )
       - mdNtBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -1996,6 +2009,7 @@ Screens:
                     t_leadMail: gNtLead.Mail,
                     t_target:   dtpNtTarget.SelectedDate } );
                Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
+               Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
                Set( gNtOpen, false )
@@ -2011,6 +2025,7 @@ Screens:
             Height: =40
             OnSelect: |
               =Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
+               Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
                Set( gNtOpen, false )
@@ -2026,7 +2041,14 @@ Screens:
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            OnSelect: =Set(gNxOpen, false)
+            OnSelect: |
+              =Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
+               Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
+               Reset( cboNxCcy );
+               Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
+               Set( gNxSales, { DisplayName: "", Mail: "" } );
+               Set( gNxCcy, "USD" );
+               Set( gNxOpen, false )
       - mdNxBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -2586,6 +2608,7 @@ Screens:
                Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
                Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
+               Reset( cboNxCcy );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
                Set( gNxCcy, "USD" );
                Set( gNxOpen, false )
@@ -2603,6 +2626,7 @@ Screens:
               =Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
                Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
+               Reset( cboNxCcy );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
                Set( gNxCcy, "USD" );
                Set( gNxOpen, false )
@@ -2618,7 +2642,12 @@ Screens:
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            OnSelect: =Set(gNiOpen, false)
+            OnSelect: |
+              =Reset( txtNiName ); Reset( txtNiAssSearch );
+               Reset( cboNiStatus ); Reset( cboNiImpact );
+               Set( gNiAssignee, { DisplayName: "", Mail: "" } );
+               Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
+               Set( gNiOpen, false )
       - mdNiBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -2902,6 +2931,7 @@ Screens:
                     i_assigneeName: gNiAssignee.DisplayName,
                     i_assigneeMail: gNiAssignee.Mail } );
                Reset( txtNiName ); Reset( txtNiAssSearch );
+               Reset( cboNiStatus ); Reset( cboNiImpact );
                Set( gNiAssignee, { DisplayName: "", Mail: "" } );
                Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
                Set( gNiOpen, false )
@@ -2917,6 +2947,7 @@ Screens:
             Height: =40
             OnSelect: |
               =Reset( txtNiName ); Reset( txtNiAssSearch );
+               Reset( cboNiStatus ); Reset( cboNiImpact );
                Set( gNiAssignee, { DisplayName: "", Mail: "" } );
                Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
                Set( gNiOpen, false )
