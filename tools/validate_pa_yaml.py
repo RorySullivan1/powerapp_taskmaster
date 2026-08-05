@@ -190,6 +190,42 @@ def strip_comments(src: str) -> str:
     return "".join(out)
 
 
+PAIRS = {")": "(", "]": "[", "}": "{"}
+
+
+def bracket_error(formula: str) -> str | None:
+    """Unbalanced (), [] or {} in a formula.
+
+    A formula that does not close cannot work, and Studio reports it as a single
+    red control with no clue which paren is missing. It is also the classic
+    casualty of an edit that deletes some arms of a long `&`-chain and takes the
+    closing parens with them — which is exactly how `lblPrMissing` broke.
+    Strings and `//` comments are skipped so their brackets never count.
+    """
+    src = strip_comments(formula)
+    stack, in_str, i = [], False, 0
+    while i < len(src):
+        ch = src[i]
+        if in_str:
+            if ch == '"':
+                if src[i + 1:i + 2] == '"':   # "" is an escaped quote, not a close
+                    i += 1
+                else:
+                    in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch in "([{":
+            stack.append(ch)
+        elif ch in ")]}":
+            if not stack or stack[-1] != PAIRS[ch]:
+                return f"unbalanced brackets — unexpected {ch!r}"
+            stack.pop()
+        i += 1
+    if stack:
+        return f"unbalanced brackets — {len(stack)} unclosed {''.join(stack)!r}"
+    return None
+
+
 def walk(node, path=""):
     """Yield (path, dict) for every mapping in the tree."""
     if isinstance(node, dict):
@@ -290,6 +326,16 @@ def token_errors(doc) -> list[str]:
                         f"{path}/{prop}: `Icon.{name}` is not one of the {len(ICON_NAMES)} classic "
                         f"icon names" + (f" — did you mean {', '.join('Icon.' + n for n in near)}?" if near else "")
                     )
+
+    # A formula that does not close cannot work. Studio shows it as one red control
+    # with no indication of which bracket is missing, and across a one-way gap that
+    # comes back as "it's erroring" — so catch it here, where the position is known.
+    for path, node in walk(doc):
+        for prop, formula in (node.get("Properties") or {}).items():
+            if isinstance(formula, str):
+                bad = bracket_error(formula)
+                if bad:
+                    out.append(f"{path}/{prop}: {bad}")
 
     # IfError returns the value of one of its arguments, and MS Learn is explicit
     # that *currently* the types of ALL its arguments must be compatible — not just
