@@ -49,7 +49,10 @@ Screens:
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
         Reset( txtTxName );  
         Reset( txtTxProjectSearch ); Reset( txtTxClientSearch );
-        Reset( txtTxProductSearch ); Reset( txtTxSalesSearch )
+        Reset( txtTxProductSearch ); Reset( txtTxSalesSearch );
+        // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
+        // date — it blocked the save outright on every edit.
+        Reset( dtpTxDate )
     Children:
       # ---- Header ----------------------------------------------------------
       - HeaderBar:
@@ -395,6 +398,7 @@ Screens:
       - dtpTxDate:
           Control: ModernDatePicker@1.0.0
           Properties:
+            DefaultDate: =If(gEditMode = "Edit", gEditTransaction.transaction_date, Blank())
             Placeholder: ="Trade date"
             Format: =DatePickerFormat.LongAbbreviated
             StartOfWeek: =StartOfWeek.Monday

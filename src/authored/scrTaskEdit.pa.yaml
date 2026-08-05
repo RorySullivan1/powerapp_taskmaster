@@ -74,7 +74,11 @@ Screens:
         Reset( txtTkName ); Reset( txtTkDesc );
           
         Reset( txtTkProjectSearch ); Reset( txtTkLeadSearch ); Reset( txtTkSupporterSearch );
-        Reset( txtTkApprovalSearch ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch )
+        Reset( txtTkApprovalSearch ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch );
+        // A date picker re-reads DefaultDate ONLY on Reset. Without these three the
+        // seeds above never take on a second visit, and the Patch writes Blank()
+        // over task_date_start / _target / _completion.
+        Reset( dtpTkStart ); Reset( dtpTkTarget ); Reset( dtpTkDone )
     Children:
       # ---- Header ----------------------------------------------------------
       - HeaderBar:
@@ -453,6 +457,7 @@ Screens:
       - dtpTkStart:
           Control: ModernDatePicker@1.0.0
           Properties:
+            DefaultDate: =If(gEditMode = "Edit", gEditTask.task_date_start, Blank())
             Placeholder: ="Start date"
             Format: =DatePickerFormat.LongAbbreviated
             StartOfWeek: =StartOfWeek.Monday
@@ -477,6 +482,7 @@ Screens:
       - dtpTkTarget:
           Control: ModernDatePicker@1.0.0
           Properties:
+            DefaultDate: =If(gEditMode = "Edit", gEditTask.task_date_target, Blank())
             Placeholder: ="Target date"
             Format: =DatePickerFormat.LongAbbreviated
             StartOfWeek: =StartOfWeek.Monday
@@ -501,6 +507,7 @@ Screens:
       - dtpTkDone:
           Control: ModernDatePicker@1.0.0
           Properties:
+            DefaultDate: =If(gEditMode = "Edit", gEditTask.task_date_completion, Blank())
             Placeholder: ="Completion date"
             Format: =DatePickerFormat.LongAbbreviated
             StartOfWeek: =StartOfWeek.Monday

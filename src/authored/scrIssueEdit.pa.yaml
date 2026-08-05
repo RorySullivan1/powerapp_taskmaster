@@ -77,7 +77,9 @@ Screens:
         Reset( txtIssName ); Reset( txtIssDesc );
          
         Reset( txtIssProjectSearch ); Reset( txtIssTaskSearch ); Reset( txtIssTxSearch );
-        Reset( txtIssAssigneeSearch ); Reset( txtIssOwnerSearch )
+        Reset( txtIssAssigneeSearch ); Reset( txtIssOwnerSearch );
+        // Re-read DefaultDate; see the note on the pickers themselves.
+        Reset( dtpIssTarget ); Reset( dtpIssClose )
     Children:
       # ---- Header ----------------------------------------------------------
       - HeaderBar:
@@ -507,6 +509,7 @@ Screens:
       - dtpIssTarget:
           Control: ModernDatePicker@1.0.0
           Properties:
+            DefaultDate: =If(gEditMode = "Edit", gEditIssue.issue_date_target, Blank())
             Placeholder: ="Target date"
             Format: =DatePickerFormat.LongAbbreviated
             StartOfWeek: =StartOfWeek.Monday
@@ -529,6 +532,7 @@ Screens:
       - dtpIssClose:
           Control: ModernDatePicker@1.0.0
           Properties:
+            DefaultDate: =If(gEditMode = "Edit", gEditIssue.issue_date_close, Blank())
             Placeholder: ="Close date"
             Format: =DatePickerFormat.LongAbbreviated
             StartOfWeek: =StartOfWeek.Monday
