@@ -88,9 +88,10 @@ lists:
 
   mapping_activitytype:
     role: >-
-      Activity/project-type vocabulary, up to 3 levels. SHARED BY TWO LISTS at
-      different depths: a project stores its level1 (the family), and a task
-      picks a full row from WITHIN that family. See taskmaster_tasks.
+      Activity/project-type vocabulary, up to 3 levels. Consumed by
+      taskmaster_projects, which stores a resolved row exactly as it does for
+      region. Tasks carry NO classification of their own — see the note on
+      taskmaster_tasks.
     provisioned: pending
     join_cost: 0
     columns:
@@ -123,7 +124,8 @@ lists:
       - { name: project_region_id,       type: Number,          required: true,  indexed: true,  desc: "ID of the mapping_region row the user resolved to. Zero join cost; delegable on =", maps_to: mapping_region }
       - { name: project_region_path,     type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"EMEA > UK > London\". Denormalised so display needs no lookup and drill-down is StartsWith(), which delegates on Text" }
       - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
-      - { name: project_type_l1,         type: Text,            required: true,  indexed: true,  desc: "The ACTIVITY FAMILY — a level1 value from mapping_activitytype. Tasks on this project pick a full row from within this family, so this column constrains their picker", maps_to: mapping_activitytype }
+      - { name: project_type_id,         type: Number,          required: true,  indexed: true,  desc: "ID of the mapping_activitytype row the user resolved to", maps_to: mapping_activitytype }
+      - { name: project_type_path,       type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"Campaign > Email > Newsletter\". Same id+path pair as project_region" }
       - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user" }
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  desc: "Lifecycle phase", values: [Planning, Active, Blocked, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
@@ -135,15 +137,21 @@ lists:
 
   # ---------------------------------------------------------------------------
   taskmaster_tasks:
-    role: Units of work. The busiest list in the app.
+    role: >-
+      Units of work. The busiest list in the app.
+      DELIBERATELY UNCLASSIFIED (2026-08-05): a task has no activity-type column.
+      Its activity family is already reachable through task_project_id, so storing
+      it again on the task would be a second copy that can disagree with the first,
+      and task_output_format already answers "what kind of thing is this producing".
+      Add one only if tasks within a single project are found to differ in a way
+      neither the parent nor the output format captures — mapping_activitytype stays
+      in place, so that is a column, not a redesign.
     provisioned: live        # 2026-08-04
     join_cost: 7          # 5 Lookup + 2 Person (9 incl. Created By/Modified By; cap is 12). Was 8 — task_category's Managed Metadata became zero-join Number/Text
     columns:
       - { name: task_name,             type: Text,            required: true,  indexed: true,  desc: "Task title" }
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
-      - { name: task_type_id,          type: Number,          required: false, indexed: true,  desc: "ID of the mapping_activitytype row. The picker is FILTERED to level1 = the parent project's project_type_l1, so a task is always an activity within its project's family", maps_to: mapping_activitytype }
-      - { name: task_type_path,        type: Text,            required: false, indexed: true,  desc: "Composed path of that row. Denormalised for display and for delegable StartsWith() drill-down" }
       - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
       - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
@@ -345,7 +353,7 @@ migration:
     be written down, not remembered.
   retired_columns:
     taskmaster_projects: [project_region, project_type, project_coverage]
-    taskmaster_tasks:    [task_category]
+    taskmaster_tasks:    [task_category]   # retired outright — nothing replaces it
     taskmaster_clients:  [client_region, client_type, client_coverage]
     taskmaster_products: [product_type]
 
