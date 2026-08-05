@@ -10,10 +10,10 @@ description: >
   control into `src/authored/` — an ungrounded token fails the whole paste and comes back only
   as "it didn't work". Covers: classic vs modern control families, version suffixes, gallery
   `BrowseLayout_*` variants, the 180-value classic `Icon` enum, `GroupContainer` auto-layout,
-  the `Classic/` prefix rule, the four single-select controls and how each is seeded, forms and
-  data cards, toggles, ratings and the rich text editor, and the output property of every
-  control in use (`.Text`, `.Value`, `.Selected.Value`, `.SelectedDate`, `.HtmlText`).
-  Boundaries: the FORMULAS inside a control's properties are
+  the `Classic/` prefix rule, the five single-select controls and how each is seeded, forms and
+  data cards, toggles, ratings, sliders, radio groups and the rich text editor, and the output
+  property of every control in use (`.Text`, `.Value`, `.Selected.Value`, `.SelectedDate`,
+  `.HtmlText`). Boundaries: the FORMULAS inside a control's properties are
   powerapp-canvas-development and power-fx-development; screen layout and geometry are
   powerapp-canvas-design; getting the YAML into Studio is studio-transfer; reusable component
   contracts are power-apps-components. This skill owns *what a control is called and what it
@@ -57,7 +57,8 @@ Treat the generic docs as a guide to *structure*, never to *tokens*.
 
 `Classic/ComboBox@2.4.0`, `Classic/DropDown@2.3.1`, `ListBox@2.2.0`, `Form@2.4.4`
 (`Variant: Classic`), `TypedDataCard@1.0.7` (`Variant: ClassicTextualEdit`),
-`Classic/Toggle@2.1.0`, `RichTextEditor@2.7.0`, `Rating@2.1.0`.
+`Classic/Toggle@2.1.0`, `RichTextEditor@2.7.0`, `Rating@2.1.0`, `Classic/Slider@2.1.0`,
+`Classic/Radio@2.3.0`.
 
 ### The `Classic/` prefix has a rule — but it only predicts
 
@@ -66,7 +67,7 @@ control also uses**, and is absent where no modern namesake exists:
 
 | Prefixed (a modern namesake exists) | Bare (none exists) |
 |---|---|
-| `Classic/Icon`, `Classic/TextInput`, `Classic/Button`, `Classic/ComboBox`, `Classic/DropDown`, `Classic/Toggle` | `Timer`, `ListBox`, `RichTextEditor`, `Rating`, `Gallery`, `Image`, `HtmlViewer`, `Label`, `Rectangle`, `Form`, `TypedDataCard`, `GroupContainer` |
+| `Classic/Icon`, `Classic/TextInput`, `Classic/Button`, `Classic/ComboBox`, `Classic/DropDown`, `Classic/Toggle`, `Classic/Slider`, `Classic/Radio` | `Timer`, `ListBox`, `RichTextEditor`, `Rating`, `Gallery`, `Image`, `HtmlViewer`, `Label`, `Rectangle`, `Form`, `TypedDataCard`, `GroupContainer` |
 
 Use it to *guess which form to ask for* — never to author an ungrounded token. A wrong guess
 still fails the whole paste. **Casing stays per-token**: `DropDown` has a capital D mid-word,
@@ -105,6 +106,9 @@ mismatch is not a failure mode. **Only the control name and the `Variant` matter
 | `Classic/Toggle` | `.Value` | a boolean; seeded by `Default` |
 | `Rating` | `.Value` | a number, `0` when unrated; seeded by `Default` |
 | `RichTextEditor` | `.HtmlText` | **in and out are different names** — `Default` in, `.HtmlText` out |
+| `Classic/Slider` | `.Value` | a number; seeded by `Default`, bounded by `Min`/`Max` |
+| `ModernSlider` | `.Value` | **read-only** — the input is `Default`, not `Value` (it was `Value` before the revision) |
+| `Classic/Radio` | `.Selected.Value` | `SelectedText` is deprecated; display column via `Items.Value` |
 
 `RichTextEditor` is the one control whose in and out properties don't match, and its output is
 **markup, not text**. So the SharePoint column receiving it must be *Multiple lines of text →
@@ -153,26 +157,37 @@ powerapp-canvas-design for why that is the most important property in the whole 
 Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`,
 and the non-AutoLayout variant name.
 
-## Selecting one thing: four controls, four contracts
+## Selecting one thing: five controls, five contracts
 
-| Control | Seed the selection with | Read it as |
-|---|---|---|
-| `Classic/DropDown@2.3.1` | `Default` | `.Selected.<Column>` (`SelectedText` is deprecated) |
-| `ListBox@2.2.0` | `Default` (one item only) | `.Selected`, `.SelectedItems` when `SelectMultiple` |
-| `ModernDropdown@1.0.0` | `Default` — a **value** | `.Selected.Value` |
-| `ModernCombobox@1.0.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` |
+| Control | Seed the selection with | Read it as | Reach for it when |
+|---|---|---|---|
+| `Classic/DropDown@2.3.1` | `Default` | `.Selected.<Column>` (`SelectedText` is deprecated) | many options, one line of space |
+| `ListBox@2.2.0` | `Default` (one item only) | `.Selected`, `.SelectedItems` when `SelectMultiple` | multi-select in a fixed box |
+| `ModernDropdown@1.0.0` | `Default` — a **value** | `.Selected.Value` | the modern single-select |
+| `ModernCombobox@1.0.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable or multi-select |
+| `Classic/Radio@2.3.0` | `Default` | `.Selected.Value` | **2–7 options that must all stay visible** |
 
 The seeding property is where these differ most, and getting it wrong is silent: the control
 renders, it just never shows the current value. `DefaultSelectedItems` "must be a table of
 records from the Items data source" — so with `Items: =["A", "B"]`, the matching seed is
 `=[gVar]`, not `=gVar`.
 
-Classic `DropDown` and `ListBox` name their display column with a **dotted property key**:
+Classic `DropDown`, `ListBox` and `Radio` all name their display column with a **dotted
+property key**:
 
 ```yaml
 Items: =MyTable
 Items.Value: =ColumnName     # not a typo — a qualified property name
 ```
+
+Three controls now, so treat it as the **classic-family convention**, not a quirk of one
+control. The modern family uses `ItemDisplayText: =ThisItem.ColumnName` instead.
+
+A radio group costs vertical space per option and never collapses, which is the whole point —
+the choices stay readable without a click. It is the right control at 2–7 options (MS's own
+guidance, for the classic and modern versions alike) and the wrong one beyond that, where a
+combo box wins. `LineHeight` sets the gap between options; `Layout` (`Layout.Vertical` /
+`Layout.Horizontal`) sets the direction.
 
 **No property in this repo is inferred any more.** `DefaultSelectedItems` was the last one, and
 its own MS Learn page confirms it.
@@ -301,6 +316,52 @@ Then `Patch(..., { issue_description: RichTextEditor1.HtmlText })` — **the out
 different name from the in property**, the only control in this catalogue where that is true.
 It emits markup, so it pairs with an *Enhanced rich text* column and an `HtmlViewer@2.1.0` on
 the read side. It is also a heavy control: one per screen, never inside a gallery template.
+
+## Slider and radio
+
+```yaml
+- Slider1:
+    Control: Classic/Slider@2.1.0
+    Properties:
+      Default:    =gPct        # no numeric column in this schema binds a slider today —
+      Min:        =0           # a real Default must resolve to a name in schema/schema.yaml
+      Max:        =100                              # the 0–100 default silently clamps a real scale
+      Layout:     =Layout.Horizontal
+      ShowValue:  =true
+      ValueFill:  =RGBA(0, 120, 212, 1)             # the FILLED part, left of the handle
+      RailFill:   =RGBA(184, 187, 184, 1)           # the EMPTY track, right of the handle
+      OnChange:   =Set(gPct, Slider1.Value)
+```
+
+`ValueFill` and `RailFill` are easy to swap, and swapping them makes the slider read backwards
+with no error. And a slider **always has a number** — it cannot express `Blank()`, so it cannot
+represent an unset optional column; pair it with a "not set" checkbox or use a number input.
+
+```yaml
+- Radio1:
+    Control: Classic/Radio@2.3.0
+    Properties:
+      Items:       =Choices([@taskmaster_tasks].task_status)
+      Items.Value: =Value                           # the display column, dotted key
+      Default:     =gEditTask.task_status.Value
+      Layout:      =Layout.Vertical
+      LineHeight:  =28
+      RadioSelectionFill: =RGBA(0, 120, 212, 1)
+      OnChange:    =Set(gStatus, Radio1.Selected.Value)
+```
+
+**Two version traps on the modern slider.** `ModernSlider@1.0.0` was revised: the input used to
+be `Value` and is now `Default`, with `Value` demoted to a read-only output; and `Layout` became
+`LayoutDirection`, taking a typed enum instead of the string `"Horizontal"`. Any sample found
+online that assigns `Value:` predates the change and will not behave as written.
+
+**And the orientation enum has no single name.** The modern Radio takes `Layout.Vertical`, the
+modern Slider takes `LayoutDirection.Horizontal`, and a `GroupContainer` takes
+`LayoutDirection.Vertical`. Same concept, two enum names, no rule — check per control.
+
+The **modern radio group's token is not grounded**. Its semantics are on MS Learn (`Items`,
+`ItemDisplayText`, `Default`, `Selected`, `Required`, `TriggerOutput`) but the page never names
+the pa-yaml token, so do not author one — use `Classic/Radio@2.3.0`, which is grounded.
 
 ## How to ground a token you don't have
 

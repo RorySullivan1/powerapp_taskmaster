@@ -278,13 +278,36 @@
    "props": "Default, Max, ReadOnly, RatingFill, ShowValue, BorderThickness, FocusedBorderThickness, plus the usual colour/border set",
    "studio_defaults": "BorderColor RGBA(0,0,0,0) · BorderStyle.None · BorderThickness 2 · FocusedBorderThickness 4 · RatingFill RGBA(16,110,190,1)",
    "note": "NO Classic/ prefix. The modern Rating control adds Step (half stars); the classic one is whole stars only. Max defaults to 5 — set it explicitly if the column's scale is anything else."
+  },
+  "Classic/Slider@2.1.0": {
+   "output": "Value — a number",
+   "props": "Default (initial value), Min (default 0), Max (default 100), Layout (Layout.Horizontal|Vertical), HandleSize, ShowValue, ReadOnly, Reset, OnChange, RailFill/RailHoverFill, ValueFill/ValueHoverFill, HandleFill/HandleActiveFill/HandleHoverFill, plus the usual colour/border set",
+   "studio_defaults": "BorderColor RGBA(0,0,0,0) · BorderStyle.None · BorderThickness 2 · DisabledBorderColor RGBA(0,0,0,0) · FocusedBorderThickness 4 · HandleActiveFill RGBA(255,255,255,1) · HandleHoverFill RGBA(255,255,255,1) · HoverBorderColor RGBA(0,0,0,0) · PressedBorderColor RGBA(0,0,0,0) · RailFill RGBA(184,187,184,1) · RailHoverFill RGBA(222,236,249,1) · ValueFill RGBA(96,94,92,1) · ValueHoverFill RGBA(0,120,212,1)",
+   "note": "PREFIXED. RailFill is the track to the RIGHT of the handle, ValueFill the filled part to the LEFT — swap them and the slider reads backwards. A slider cannot express Blank(): it always has a number, so it cannot represent an unset optional column. Min/Max are inclusive; set them explicitly, because the 0–100 default silently clamps any real-world scale."
+  },
+  "ModernSlider@1.0.0": {
+   "output": "Value — a number, READ-ONLY on this control",
+   "props": "Default (the input — NOT Value), Min, Max, LayoutDirection (LayoutDirection.Horizontal|Vertical), Size (SliderSize.Small|Medium|Large), BasePaletteColor, AccessibleLabel, Tooltip, OnChange",
+   "note": "Grounded from MS Learn's own YAML sample, not a Studio export — same provenance as ModernDropdown@1.0.0. VERSION TRAP: this control was revised. The OLD shape set `Value:` as the INPUT and `Layout: =\"Horizontal\"` as a STRING; the current shape splits them — `Default` in, `Value` read-only out — and takes typed enums (`LayoutDirection.Horizontal`, `SliderSize.Medium`). Any sample found online that assigns `Value:` is pre-revision and will not behave as written."
+  },
+  "Classic/Radio@2.3.0": {
+   "output": "Selected — a record; .Selected.Value is the option text. SelectedText is DEPRECATED",
+   "display_column": "Items.Value  — the same dotted form as DropDown and ListBox",
+   "props": "Items, Items.Value, Default, Layout (Layout.Vertical|Horizontal), RadioSize, RadioBackgroundFill, RadioBorderColor, RadioSelectionFill, LineHeight, Padding*, Font, Size, Color/HoverColor/PressedColor/DisabledColor, plus the usual colour/border set",
+   "studio_defaults": "BorderColor RGBA(50,49,48,1) · BorderStyle.None · BorderThickness 2 · Color RGBA(50,49,48,1) · DisabledBorderColor RGBA(0,0,0,0) · DisabledColor RGBA(161,159,157,1) · FocusedBorderThickness 4 · Font.'Segoe UI' · HoverColor RGBA(50,49,48,1) · HoverFill RGBA(0,0,0,0) · Items.Value =Value · PaddingTop/Bottom 5 · PressedColor RGBA(50,49,48,1) · PressedFill RGBA(0,0,0,0) · RadioBorderColor RGBA(50,49,48,1) · RadioSelectionFill RGBA(0,120,212,1)",
+   "note": "PREFIXED. THIRD control to use the dotted `Items.Value:` display-column key, after DropDown and ListBox — that is now the classic-family convention, not a quirk. Single-select and always-visible, so it costs vertical space per option: right for 2–7 options, wrong beyond that (use a combo box). MS's guidance for the modern one is the same. LineHeight sets the gap between options."
+  },
+  "_modernRadio_TOKEN_UNKNOWN": {
+   "status": "Semantics grounded on MS Learn; the pa-yaml TOKEN is NOT grounded — do not author it. The docs page is 'Radio modern control' (modern-controls-radio-group) and never names the token.",
+   "semantics": "Items, ItemDisplayText, Default, Selected (out), Layout (Layout.Vertical|Horizontal), Required, TriggerOutput, RadioSize, RadioBackgroundFill/BorderColor/SelectionFill, BasePaletteColor",
+   "enum_trap": "The modern Radio's orientation enum is `Layout.Vertical`, but the modern Slider's is `LayoutDirection.Horizontal` and a GroupContainer's is `LayoutDirection.Vertical`. Same concept, two enum names, no rule — check per control."
   }
  },
  "_controlPrefixRule": {
   "rule": "`Classic/` appears on exactly those control names that a modern Fluent control also uses, and is absent where no modern namesake exists.",
-  "prefixed": ["Classic/Icon@2.5.0", "Classic/TextInput@2.3.2", "Classic/Button@2.2.0", "Classic/ComboBox@2.4.0", "Classic/DropDown@2.3.1", "Classic/Toggle@2.1.0"],
+  "prefixed": ["Classic/Icon@2.5.0", "Classic/TextInput@2.3.2", "Classic/Button@2.2.0", "Classic/ComboBox@2.4.0", "Classic/DropDown@2.3.1", "Classic/Toggle@2.1.0", "Classic/Slider@2.1.0", "Classic/Radio@2.3.0"],
   "bare": ["Timer", "ListBox@2.2.0", "RichTextEditor@2.7.0", "Rating@2.1.0", "Gallery@2.15.0", "Image@2.2.3", "HtmlViewer@2.1.0", "Label@2.5.1", "Rectangle@2.3.0", "Form@2.4.4", "TypedDataCard@1.0.7", "GroupContainer@1.5.0"],
-  "status": "PREDICTIVE ONLY — derived from every token grounded so far, 2026-08-05. Use it to guess which form to ask for; never to author an ungrounded token. Casing is still per-token (`DropDown` has a capital D, `ComboBox` a capital B)."
+  "status": "PREDICTIVE ONLY — derived from every token grounded so far, and re-tested against Slider and Radio on 2026-08-05 (both prefixed, both with modern namesakes). Use it to guess which form to ask for; never to author an ungrounded token. Casing is still per-token (`DropDown` has a capital D, `ComboBox` a capital B)."
  },
  "FormVariant": [
   "Classic"

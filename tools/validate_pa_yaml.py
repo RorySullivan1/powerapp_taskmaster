@@ -67,12 +67,16 @@ KNOWN_CONTROLS = {
     "Classic/Toggle@2.1.0":   "grounded",   # CONFIRMED 2026-08-05 — prefixed; a modern Toggle exists
     "RichTextEditor@2.7.0":   "grounded",   # CONFIRMED 2026-08-05 — NO prefix; out is .HtmlText
     "Rating@2.1.0":           "grounded",   # CONFIRMED 2026-08-05 — NO prefix; out is .Value
+    "Classic/Slider@2.1.0":   "grounded",   # CONFIRMED 2026-08-05 — prefixed; out is .Value
+    "Classic/Radio@2.3.0":    "grounded",   # CONFIRMED 2026-08-05 — prefixed; out is .Selected.Value
+    "ModernSlider@1.0.0":     "grounded",   # from MS Learn's own YAML sample, 2026-08-05 —
+                                            # same provenance as ModernDropdown@1.0.0
 }
 
 # The `Classic/` prefix is not decoration: it appears on exactly those controls whose
 # NAME is shared with a modern Fluent control, and is absent where no modern namesake
-# exists. Prefixed: Icon, TextInput, Button, ComboBox, DropDown, Toggle. Bare: Timer,
-# ListBox, RichTextEditor, Rating, Gallery, Image, HtmlViewer, Label, Rectangle.
+# exists. Prefixed: Icon, TextInput, Button, ComboBox, DropDown, Toggle, Slider, Radio.
+# Bare: Timer, ListBox, RichTextEditor, Rating, Gallery, Image, HtmlViewer, Label, Rectangle.
 # Useful for PREDICTING an unseen token — never for asserting one. Ground it, then add it.
 # Gallery Variant tokens are NOT "Vertical"/"Horizontal" — that was a guess this
 # repo carried for weeks. Studio's own generated YAML names them
