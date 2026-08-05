@@ -17,8 +17,8 @@
 # =============================================================================
 
 meta:
-  version: 2.1.0
-  updated: 2026-08-04
+  version: 3.0.0
+  updated: 2026-08-05
   authority: repo            # repo defines; SharePoint applies
   naming: snake_case
   source: user-supplied schema screenshots (see incoming-lists.md), then edited here
@@ -42,7 +42,9 @@ types:
   Person:          { sp: "Person or Group — ALLOW MULTIPLE = NO", delegates: ["= on .Email/.DisplayName"], indexable: true, join_cost: 1 }
   PersonMulti:     { sp: "Person or Group — allow multiple = yes",  delegates: [],     indexable: false, join_cost: 1 }
   Lookup:          { sp: "Lookup",               delegates: ["= via .Id/.Value"],        indexable: true,  join_cost: 1 }
-  ManagedMetadata: { sp: "Managed Metadata — ALLOW MULTIPLE VALUES = NO", delegates: ["= via subfield"], indexable: true, join_cost: 1 }
+  # RETIRED 2026-08-05 (C11). No column uses this type. Kept so older notes
+  # and docs/build-history.md still resolve against this file.
+  ManagedMetadata: { sp: "Managed Metadata — RETIRED, see migration: and C11", delegates: ["= via subfield"], indexable: true, join_cost: 1 }
   Hyperlink:       { sp: "Hyperlink or Picture", delegates: [],                          indexable: false, join_cost: 0 }
   Calculated:      { sp: "Calculated",           delegates: [],                          indexable: false, join_cost: 0 }
 
@@ -52,19 +54,74 @@ system_columns: [Created, Modified, Created By, Modified By]
 # =============================================================================
 lists:
 
+
+  # ---------------------------------------------------------------------------
+  # CLASSIFICATION MAPPING TABLES — three lists, IDENTICAL shape.
+  #
+  # One row IS one full path. `level2`/`level3` are blank when a term stops
+  # short, so a term at any depth is a single row and a single ID — which is why
+  # a consuming list needs ONE reference column, not one per level.
+  #
+  # The identical column names are deliberate: one settings screen on scrAdmin
+  # drives all three, parameterised by which list it points at.
+  #
+  # NOT stored here: the composed path ("EMEA > UK > London"). The app builds it
+  # from level1..3 on write, so the levels stay the single source and a stored
+  # copy cannot drift from them.
+  # ---------------------------------------------------------------------------
+  mapping_region:
+    role: >-
+      Region vocabulary, up to 3 levels. Consumed by taskmaster_projects and
+      taskmaster_clients. Maintained IN THE APP via the scrAdmin settings screen.
+    provisioned: pending
+    join_cost: 0
+    columns:
+      - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level, e.g. EMEA. Maps onto the list's built-in Title" }
+      - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
+      - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
+      - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete — a term in use must not vanish. Pickers filter on this; label resolution ignores it" }
+      - { name: sort_order, type: Number,  required: false,                 desc: "Display order within a level" }
+
+  mapping_activitytype:
+    role: >-
+      Activity/project-type vocabulary, up to 3 levels. SHARED BY TWO LISTS at
+      different depths: a project stores its level1 (the family), and a task
+      picks a full row from WITHIN that family. See taskmaster_tasks.
+    provisioned: pending
+    join_cost: 0
+    columns:
+      - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Activity family, e.g. Campaign. This is the value a project stores" }
+      - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
+      - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
+      - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete" }
+      - { name: sort_order, type: Number,  required: false,                 desc: "Display order within a level" }
+
+  mapping_producttype:
+    role: >-
+      Product-type vocabulary, up to 3 levels. Consumed by taskmaster_products.
+    provisioned: pending
+    join_cost: 0
+    columns:
+      - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level. Maps onto the list's built-in Title" }
+      - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
+      - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
+      - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete" }
+      - { name: sort_order, type: Number,  required: false,                 desc: "Display order within a level" }
+
   # ---------------------------------------------------------------------------
   taskmaster_projects:
     role: The parent. Tasks, transactions and issues all hang off it.
     provisioned: live        # 2026-08-04
-    join_cost: 6
+    join_cost: 3          # was 6 — the 3 Managed Metadata columns became zero-join Number/Text
     columns:
       - { name: project_name,            type: Text,            required: true,  indexed: true,  desc: "User-facing project title (unique by convention only)" }
       - { name: project_manager,         type: Person, multi: false, required: true,  indexed: true,  desc: "Accountable owner" }
-      - { name: project_coverage,        type: ManagedMetadata, multi: false, required: false,                 desc: "Business/product coverage area", term_set: Coverage }
+      - { name: project_coverage,        type: Choice,          required: false,                 desc: "Business/product coverage area", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning. The app binds Choices() rather than a literal, so the real values need no app change" }
       - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
-      - { name: project_region,          type: ManagedMetadata, multi: false, required: true,  indexed: true,  desc: "Regional ownership", values: [AMER, EMEA, APAC, JAPAN, GLOBAL] }
+      - { name: project_region_id,       type: Number,          required: true,  indexed: true,  desc: "ID of the mapping_region row the user resolved to. Zero join cost; delegable on =", maps_to: mapping_region }
+      - { name: project_region_path,     type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"EMEA > UK > London\". Denormalised so display needs no lookup and drill-down is StartsWith(), which delegates on Text" }
       - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
-      - { name: project_type,            type: ManagedMetadata, multi: false, required: true,                  desc: "Project classification", values: [Production, Campaign, Platform, Event, Operational] }
+      - { name: project_type_l1,         type: Text,            required: true,  indexed: true,  desc: "The ACTIVITY FAMILY — a level1 value from mapping_activitytype. Tasks on this project pick a full row from within this family, so this column constrains their picker", maps_to: mapping_activitytype }
       - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user" }
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  desc: "Lifecycle phase", values: [Planning, Active, Blocked, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
@@ -78,12 +135,13 @@ lists:
   taskmaster_tasks:
     role: Units of work. The busiest list in the app.
     provisioned: live        # 2026-08-04
-    join_cost: 8          # 5 Lookup + 2 Person + 1 ManagedMetadata (10 incl. Created By/Modified By; cap is 12)
+    join_cost: 7          # 5 Lookup + 2 Person (9 incl. Created By/Modified By; cap is 12). Was 8 — task_category's Managed Metadata became zero-join Number/Text
     columns:
       - { name: task_name,             type: Text,            required: true,  indexed: true,  desc: "Task title" }
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
-      - { name: task_category,         type: ManagedMetadata, multi: false, required: false,                 desc: "Task classification", term_set: Marketing }
+      - { name: task_type_id,          type: Number,          required: false, indexed: true,  desc: "ID of the mapping_activitytype row. The picker is FILTERED to level1 = the parent project's project_type_l1, so a task is always an activity within its project's family", maps_to: mapping_activitytype }
+      - { name: task_type_path,        type: Text,            required: false, indexed: true,  desc: "Composed path of that row. Denormalised for display and for delegable StartsWith() drill-down" }
       - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
       - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
@@ -147,23 +205,25 @@ lists:
   taskmaster_clients:
     role: Client dimension.
     provisioned: live        # 2026-08-04
-    join_cost: 4
+    join_cost: 1          # was 4 — 3 Managed Metadata columns became zero-join
     columns:
       - { name: client_name,     type: Text,            required: true,  indexed: true, desc: "Client display name" }
-      - { name: client_type,     type: ManagedMetadata, multi: false, required: true,                 desc: "Client classification", term_set: ClientType }
-      - { name: client_coverage, type: ManagedMetadata, multi: false, required: true,                 desc: "Coverage group", term_set: Coverage }
+      - { name: client_type,     type: Choice,          required: true,                 desc: "Client classification", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning" }
+      - { name: client_coverage, type: Choice,          required: true,                 desc: "Coverage group", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning" }
       - { name: client_sales,    type: Person, multi: false, required: true,                 desc: "Primary sales owner" }
-      - { name: client_region,   type: ManagedMetadata, multi: false, required: true,  indexed: true, desc: "Client region", values: [AMER, EMEA, APAC, JAPAN] }
+      - { name: client_region_id,   type: Number,       required: true,  indexed: true, desc: "ID of the mapping_region row", maps_to: mapping_region }
+      - { name: client_region_path, type: Text,         required: true,  indexed: true, desc: "Composed path of that row" }
       - { name: client_notes,    type: Note,            required: false,                desc: "Free-text notes (display only)" }
 
   # ---------------------------------------------------------------------------
   taskmaster_products:
     role: Product reference.
     provisioned: live        # 2026-08-04
-    join_cost: 1
+    join_cost: 0          # was 1 — product_type's Managed Metadata became zero-join
     columns:
       - { name: product_uid,         type: Text,            required: true, indexed: true, desc: "Product identifier (ISIN / Ticker / Internal ID). Business key — uniqueness by convention, not enforced" }
-      - { name: product_type,        type: ManagedMetadata, multi: false, required: true,                desc: "Product classification", term_set: Product }
+      - { name: product_type_id,     type: Number,          required: true, indexed: true, desc: "ID of the mapping_producttype row", maps_to: mapping_producttype }
+      - { name: product_type_path,   type: Text,            required: true, indexed: true, desc: "Composed path of that row" }
       - { name: product_description, type: Note,            required: true,                desc: "Description (display only)" }
 
   # ---------------------------------------------------------------------------
@@ -244,11 +304,89 @@ rollups:
       to that project.
 
 # =============================================================================
+# MIGRATION — how the LIVE lists reach the state defined above.
+#
+# `columns:` above is the target. This section is what has to happen to the
+# lists that went live on 2026-08-04. Nothing here is done.
+#
+# A Managed Metadata column CANNOT be converted in place — SharePoint does not
+# support changing that type. Every column below is a delete-and-recreate.
+#
+# ORDER MATTERS. Do not delete an old column until its data is carried across,
+# and do not point the app at a new column until it exists.
+# =============================================================================
+migration:
+  status: PLANNED — nothing applied
+  precondition: >-
+    Confirm how many rows actually carry a Managed Metadata value. The lists went
+    live 2026-08-04 and the app has only ever been driven in Studio, so this is
+    likely zero. If it IS zero, every step below is a straight delete-and-create
+    and no data has to be carried.
+  steps:
+    - 1. Provision mapping_region, mapping_activitytype and mapping_producttype.
+    - 2. Seed them from the existing term sets — one row per full path, level2/level3
+         blank where a term stops short.
+    - 3. Build the settings screen on scrAdmin so the vocabularies are maintainable
+         before anything depends on them.
+    - 4. Add the new columns alongside the old ones. New names are free EXCEPT
+         project_coverage, client_type and client_coverage, which keep their names
+         and therefore cannot be created until the old column is deleted.
+    - 5. Carry any existing values across, resolving each term to its mapping row.
+    - 6. Delete the Managed Metadata columns.
+    - 7. Point the app at the new columns and remove the term-store code paths.
+  internal_name_reuse: >-
+    project_coverage, client_type and client_coverage keep their internal names
+    while changing type, so the old column must be deleted before the new one is
+    created. SharePoint does not always release a deleted internal name
+    immediately. If creation is refused, provision with a `_c` suffix and record
+    the real name here — internal names freeze at creation, so the fallback must
+    be written down, not remembered.
+  retired_columns:
+    taskmaster_projects: [project_region, project_type, project_coverage]
+    taskmaster_tasks:    [task_category]
+    taskmaster_clients:  [client_region, client_type, client_coverage]
+    taskmaster_products: [product_type]
+
+# =============================================================================
 # Open recommendations — edits proposed but NOT yet applied above.
 # Reasoning for each lives in .claude/context/schema.md §Consequences.
 # =============================================================================
 open_recommendations:
+  - id: C11
+    supersedes: C10
+    what: >-
+      Managed Metadata is retired from the model. Three mapping lists hold the
+      vocabularies; a consuming list stores the resolved row's ID plus its composed
+      path text.
+    decided: >-
+      2026-08-05. C10 kept Managed Metadata and drove a cascading picker from the
+      `Path` field on the Choices() record. That field is community-reported and
+      never first-party documented, and the picker shipped showing its sentinel row
+      and nothing else — an empty Terms binding. Choices() on an MM column is also
+      capped at 20 terms by the connector, silently.
+
+      The replacement keeps what was RIGHT about C10 — a path-prefix cascade is the
+      correct shape — and changes whose data it is. The path is now a column this
+      repo defines on a list this repo owns, so StartsWith() on it is first-party
+      delegable Text rather than a bet on an undocumented field. Drill-down at any
+      depth is one formula: StartsWith(<col>_path, "EMEA > UK").
+
+      Storing the ID alone was considered and rejected: every gallery row would need
+      a LookUp() to render a label, and filtering by a level would mean resolving a
+      branch to a set of IDs and passing them all into an `in`. The extra Text column
+      costs a back-fill when a level1 term is renamed, which the settings screen can
+      do in one action.
+
+      A cache list was ALSO rejected under C10, as "a second copy of a vocabulary
+      that already exists". That reasoning held while the term store was the source.
+      These lists ARE the source, so it no longer applies.
+    consequence: >-
+      Join cost drops on every consuming list — projects 6 to 3, tasks 8 to 7,
+      clients 4 to 1, products 1 to 0. Power Query no longer has to expand taxonomy
+      records. The 20-term cap and the SPListExpandedTaxonomy write shape both
+      disappear.
   - id: C10
+    status: SUPERSEDED by C11 on 2026-08-05 — kept for its reasoning, not as guidance
     what: >-
       project_region and project_type are REQUIRED Managed Metadata, so nothing can create a project
       from the app without an MM write path. Decision: keep MM; build a cascading term picker that
