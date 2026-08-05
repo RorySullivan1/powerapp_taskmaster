@@ -72,7 +72,7 @@ Screens:
         // through Choices() on its instance.
         Set( gTkCatLabel, "" ); Set( gTkCatPath, "" ); Set( gTkCatDone, false );
         Reset( txtTkName ); Reset( txtTkDesc );
-        Reset( txtTkStart ); Reset( txtTkTarget ); Reset( txtTkDone );
+          
         Reset( txtTkProjectSearch ); Reset( txtTkLeadSearch ); Reset( txtTkSupporterSearch );
         Reset( txtTkApprovalSearch ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch )
     Children:
@@ -115,36 +115,22 @@ Screens:
       # gallery's selection in the same behaviour pass that sets it. Tab switching did
       # not work in Studio. A button carries its own value in its own OnSelect, so
       # there is nothing to propagate and nothing to race.
-      - btnTabTkTask:
-          Control: Classic/Button@2.2.0
+      - tabTaskEdit:
+          Control: ModernTabList@1.0.0
           Properties:
-            Text: ="Task"
-            Fill: =If(gTaskEditTab = 1, Theme.Color.Primary, Theme.Color.Surface)
-            Color: =If(gTaskEditTab = 1, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
-            BorderColor: =Theme.Color.Primary
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Items: =["Task", "Output"]
+            Default: ="Task"
+            Appearance: =TabListAppearance.Underline
+            Alignment: =TabListAlignment.Start
+            Size: =14
+            FontWeight: =FontWeight.Semibold
+            AccessibleLabel: ="scrTaskEdit sections"
             X: =24
             Y: =84
-            Width: =148
-            Height: =40
-            OnSelect: =Set(gTaskEditTab, 1)
-      - btnTabTkOutput:
-          Control: Classic/Button@2.2.0
-          Properties:
-            Text: ="Output"
-            Fill: =If(gTaskEditTab = 2, Theme.Color.Primary, Theme.Color.Surface)
-            Color: =If(gTaskEditTab = 2, Theme.Color.OnPrimary, Theme.Color.TextPrimary)
-            BorderColor: =Theme.Color.Primary
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            X: =24 + 152
-            Y: =84
-            Width: =148
-            Height: =40
-            OnSelect: =Set(gTaskEditTab, 2)
+            Width: =320
+            Height: =48
+            OnChange: |
+              =Set(gTaskEditTab, Switch(tabTaskEdit.Selected.Value, "Task", 1, 2))
       # ================= TAB 1 — TASK ======================================
       - lblTkNameCap:
           Control: Label@2.5.1
@@ -159,12 +145,12 @@ Screens:
             Width: =520
             Height: =18
       - txtTkName:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Visible: =gTaskEditTab = 1
             Default: |
               =If(gEditMode = "Edit", gEditTask.task_name, "")
-            HintText: ="What needs doing?"
+            Placeholder: ="What needs doing?"
             Font: =Theme.Font
             Size: =Theme.Size.Body
             X: =24
@@ -184,12 +170,13 @@ Screens:
             Width: =520
             Height: =18
       - txtTkProjectSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTkPicker, "Project")
             Visible: =gTaskEditTab = 1
-            HintText: ="Type to find a project…"
-            DelayOutput: =true
+            Placeholder: ="Type to find a project…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -236,12 +223,12 @@ Screens:
             Width: =520
             Height: =18
       - txtTkDesc:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Visible: =gTaskEditTab = 1
             Default: |
               =If(gEditMode = "Edit", gEditTask.task_description, "")
-            Mode: =TextMode.MultiLine
+            Type: =TextInputType.Multiline
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -261,12 +248,13 @@ Screens:
             Width: =520
             Height: =18
       - txtTkLeadSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTkPicker, "Lead")
             Visible: =gTaskEditTab = 1
-            HintText: ="Search people…"
-            DelayOutput: =true
+            Placeholder: ="Search people…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -315,12 +303,13 @@ Screens:
             Width: =520
             Height: =18
       - txtTkSupporterSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTkPicker, "Supporter")
             Visible: =gTaskEditTab = 1
-            HintText: ="Search people…"
-            DelayOutput: =true
+            Placeholder: ="Search people…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -461,39 +450,18 @@ Screens:
             Y: =282
             Width: =240
             Height: =18
-      - txtTkStart:
-          Control: Classic/TextInput@2.3.2
+      - dtpTkStart:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Visible: =gTaskEditTab = 1
-            Default: |
-              =If( gEditMode = "Edit",
-                   If( IsBlank(gEditTask.task_date_start), "",
-                       Text(gEditTask.task_date_start, "dd/mm/yyyy") ),
-                   Text(Today(), "dd/mm/yyyy") )
-            HintText: ="dd/mm/yyyy"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Placeholder: ="Start date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
+            Height: =32
             X: =580
             Y: =302
             Width: =160
-            Height: =36
-      - lblTkStartEcho:
-          Control: Label@2.5.1
-          Properties:
             Visible: =gTaskEditTab = 1
-            Text: |
-              =If( Len(txtTkStart.Text) = 0, "not set",
-                   IfError( Text(DateValue(txtTkStart.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: |
-              =If( Len(txtTkStart.Text) > 0 && IsError(DateValue(txtTkStart.Text)),
-                   Theme.Color.Danger, Theme.Color.TextMuted )
-            X: =748
-            Y: =302
-            Width: =160
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
       - lblTkTargetCap:
           Control: Label@2.5.1
           Properties:
@@ -506,37 +474,18 @@ Screens:
             Y: =282
             Width: =240
             Height: =18
-      - txtTkTarget:
-          Control: Classic/TextInput@2.3.2
+      - dtpTkTarget:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Visible: =gTaskEditTab = 1
-            Default: |
-              =If( gEditMode = "Edit" && !IsBlank(gEditTask.task_date_target),
-                   Text(gEditTask.task_date_target, "dd/mm/yyyy"), "" )
-            HintText: ="dd/mm/yyyy"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Placeholder: ="Target date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
+            Height: =32
             X: =920
             Y: =302
             Width: =160
-            Height: =36
-      - lblTkTargetEcho:
-          Control: Label@2.5.1
-          Properties:
             Visible: =gTaskEditTab = 1
-            Text: |
-              =If( Len(txtTkTarget.Text) = 0, "not set",
-                   IfError( Text(DateValue(txtTkTarget.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: |
-              =If( Len(txtTkTarget.Text) > 0 && IsError(DateValue(txtTkTarget.Text)),
-                   Theme.Color.Danger, Theme.Color.TextMuted )
-            X: =1088
-            Y: =302
-            Width: =160
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
       - lblTkDoneCap:
           Control: Label@2.5.1
           Properties:
@@ -549,37 +498,18 @@ Screens:
             Y: =348
             Width: =240
             Height: =18
-      - txtTkDone:
-          Control: Classic/TextInput@2.3.2
+      - dtpTkDone:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Visible: =gTaskEditTab = 1
-            Default: |
-              =If( gEditMode = "Edit" && !IsBlank(gEditTask.task_date_completion),
-                   Text(gEditTask.task_date_completion, "dd/mm/yyyy"), "" )
-            HintText: ="dd/mm/yyyy"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Placeholder: ="Completion date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
+            Height: =32
             X: =580
             Y: =368
             Width: =160
-            Height: =36
-      - lblTkDoneEcho:
-          Control: Label@2.5.1
-          Properties:
             Visible: =gTaskEditTab = 1
-            Text: |
-              =If( Len(txtTkDone.Text) = 0, "not set",
-                   IfError( Text(DateValue(txtTkDone.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: |
-              =If( Len(txtTkDone.Text) > 0 && IsError(DateValue(txtTkDone.Text)),
-                   Theme.Color.Danger, Theme.Color.TextMuted )
-            X: =748
-            Y: =368
-            Width: =200
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
       # ---- Category (Managed Metadata, C10) --------------------------------
       - lblTkCatCurrent:
           Control: Label@2.5.1
@@ -632,12 +562,13 @@ Screens:
             Width: =520
             Height: =18
       - txtTkApprovalSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTkPicker, "Approval")
             Visible: =gTaskEditTab = 2
-            HintText: ="e.g. MAW, Legal, Compliance…"
-            DelayOutput: =true
+            Placeholder: ="e.g. MAW, Legal, Compliance…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -684,12 +615,13 @@ Screens:
             Width: =520
             Height: =18
       - txtTkClientSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTkPicker, "Client")
             Visible: =gTaskEditTab = 2
-            HintText: ="Type to find a client…"
-            DelayOutput: =true
+            Placeholder: ="Type to find a client…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -736,12 +668,13 @@ Screens:
             Width: =520
             Height: =18
       - txtTkProductSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTkPicker, "Product")
             Visible: =gTaskEditTab = 2
-            HintText: ="Type an ISIN / ticker / internal id…"
-            DelayOutput: =true
+            Placeholder: ="Type an ISIN / ticker / internal id…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -941,16 +874,13 @@ Screens:
             Visible: =Len(Self.Text) > 0
       # ---- Save / Cancel ----------------------------------------------------
       - btnTkSave:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: |
               =If(gEditMode = "Edit", "Save task", "Create task")
             DisplayMode: |
               =If(Len(lblTkMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =200
             X: =24
@@ -978,9 +908,9 @@ Screens:
                                      DisplayName: gTkLead.DisplayName,
                                      Email:       gTkLead.Mail,
                                      Department: "", JobTitle: "", Picture: "" },
-                               task_date_start:      IfError( DateValue(txtTkStart.Text),  Blank() ),
-                               task_date_target:     IfError( DateValue(txtTkTarget.Text), Blank() ),
-                               task_date_completion: IfError( DateValue(txtTkDone.Text),   Blank() ) } ) ),
+                               task_date_start:      dtpTkStart.SelectedDate,
+                               task_date_target:     dtpTkTarget.SelectedDate,
+                               task_date_completion: dtpTkDone.SelectedDate } ) ),
                   Set( gTkErr, FirstError.Message )
               );
               If( Len(gTkErr) > 0,
@@ -1069,15 +999,10 @@ Screens:
                   Back()
               )
       - btnTkCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =140
             X: =240

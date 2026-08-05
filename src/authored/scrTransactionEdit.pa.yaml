@@ -47,7 +47,7 @@ Screens:
                   { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
-        Reset( txtTxName ); Reset( txtTxNotional ); Reset( txtTxDate );
+        Reset( txtTxName );  
         Reset( txtTxProjectSearch ); Reset( txtTxClientSearch );
         Reset( txtTxProductSearch ); Reset( txtTxSalesSearch )
     Children:
@@ -97,11 +97,11 @@ Screens:
             Width: =560
             Height: =18
       - txtTxName:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Default: |
               =If(gEditMode = "Edit", gEditTransaction.transaction_name, "")
-            HintText: ="e.g. QIS-2026-0417 EMEA autocall"
+            Placeholder: ="e.g. QIS-2026-0417 EMEA autocall"
             Font: =Theme.Font
             Size: =Theme.Size.Body
             X: =24
@@ -121,11 +121,12 @@ Screens:
             Width: =560
             Height: =18
       - txtTxProjectSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Project")
-            HintText: ="Type to find a project…"
-            DelayOutput: =true
+            Placeholder: ="Type to find a project…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -171,11 +172,12 @@ Screens:
             Width: =560
             Height: =18
       - txtTxClientSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Client")
-            HintText: ="Type to find a client…"
-            DelayOutput: =true
+            Placeholder: ="Type to find a client…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -221,11 +223,12 @@ Screens:
             Width: =560
             Height: =18
       - txtTxProductSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Product")
-            HintText: ="Type an ISIN / ticker / internal id…"
-            DelayOutput: =true
+            Placeholder: ="Type an ISIN / ticker / internal id…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -271,11 +274,12 @@ Screens:
             Width: =560
             Height: =18
       - txtTxSalesSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Sales")
-            HintText: ="Search people…"
-            DelayOutput: =true
+            Placeholder: ="Search people…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -347,35 +351,31 @@ Screens:
             Y: =160
             Width: =560
             Height: =18
-      - txtTxNotional:
-          Control: Classic/TextInput@2.3.2
+      - numTxNotional:
+          Control: ModernNumberInput@1.0.0
           Properties:
-            Default: |
-              =If( gEditMode = "Edit" && !IsBlank(gEditTransaction.transaction_notional),
-                   Text(gEditTransaction.transaction_notional, "[$-en-US]0.##"), "" )
+            Min: =0
+            Step: =1000
+            Precision: =DecimalPrecision.'0'
             HintText: ="e.g. 25000000"
-            Format: =TextFormat.Number
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
+            AccessibleLabel: ="Notional in the selected currency"
+            Align: =Align.Right
+            Height: =32
             X: =620
             Y: =180
             Width: =220
-            Height: =40
       # Echo of the figure that WILL be written, in its native currency. No USD
       # equivalent is shown, because none is stored — see the currency note above.
       - lblTxNotionalEcho:
           Control: Label@2.5.1
           Properties:
             Text: |
-              =If( Len(txtTxNotional.Text) = 0, "no notional entered",
-                   IsError(Value(txtTxNotional.Text)), "⚠ not a number",
-                   "= " & gTxCurrency & " " & Text(Value(txtTxNotional.Text), "[$-en-US]#,##0")
+              =If( IsBlank(numTxNotional.Value), "no notional entered",
+                   "= " & gTxCurrency & " " & Text(numTxNotional.Value, "[$-en-US]#,##0")
                      & "   (converted to a reporting currency in Power BI, not here)" )
             Font: =Theme.Font
             Size: =Theme.Size.Small
-            Color: |
-              =If( Len(txtTxNotional.Text) > 0 && IsError(Value(txtTxNotional.Text)),
-                   Theme.Color.Danger, Theme.Color.TextMuted )
+            Color: =Theme.Color.TextMuted
             X: =852
             Y: =180
             Width: =400
@@ -392,36 +392,17 @@ Screens:
             Y: =232
             Width: =560
             Height: =18
-      - txtTxDate:
-          Control: Classic/TextInput@2.3.2
+      - dtpTxDate:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Default: |
-              =If( gEditMode = "Edit" && !IsBlank(gEditTransaction.transaction_date),
-                   Text(gEditTransaction.transaction_date, "dd/mm/yyyy"),
-                   Text(Today(), "dd/mm/yyyy") )
-            HintText: ="dd/mm/yyyy"
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
+            Placeholder: ="Trade date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
+            Height: =32
             X: =620
             Y: =252
             Width: =220
-            Height: =40
-      - lblTxDateEcho:
-          Control: Label@2.5.1
-          Properties:
-            Text: |
-              =If( Len(txtTxDate.Text) = 0, "⚠ required",
-                   IfError( Text(DateValue(txtTxDate.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: |
-              =If( Len(txtTxDate.Text) = 0 || IsError(DateValue(txtTxDate.Text)),
-                   Theme.Color.Danger, Theme.Color.TextMuted )
-            X: =852
-            Y: =252
-            Width: =260
-            Height: =40
-            VerticalAlign: =VerticalAlign.Middle
       # ---- What is still missing -------------------------------------------
       - lblTxMissingCap:
           Control: Label@2.5.1
@@ -447,9 +428,9 @@ Screens:
                  If( gTxClient.Id  <= 0,             "client   ",  "" ) &
                  If( gTxProduct.Id <= 0,             "product   ", "" ) &
                  If( Len(gTxSales.Mail) = 0,         "sales owner   ", "" ) &
-                 If( Len(txtTxDate.Text) = 0 || IsError(DateValue(txtTxDate.Text)),
+                 If( IsBlank(dtpTxDate.SelectedDate),
                      "a valid trade date   ", "" ) &
-                 If( Len(txtTxNotional.Text) > 0 && IsError(Value(txtTxNotional.Text)),
+                 If( false,
                      "a numeric notional   ", "" ) )
             Font: =Theme.Font
             Size: =Theme.Size.Small
@@ -461,16 +442,13 @@ Screens:
             Visible: =Len(Self.Text) > 0
       # ---- Save / Cancel ----------------------------------------------------
       - btnTxSave:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: |
               =If(gEditMode = "Edit", "Save transaction", "Create transaction")
             DisplayMode: |
               =If(Len(lblTxMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =220
             X: =24
@@ -499,8 +477,8 @@ Screens:
                                  Department: "", JobTitle: "", Picture: "" },
                            transaction_currency:    { Value: gTxCurrency },
                            transaction_notional:
-                               If( Len(txtTxNotional.Text) = 0, Blank(), Value(txtTxNotional.Text) ),
-                           transaction_date:        DateValue(txtTxDate.Text) } ) ),
+                               numTxNotional.Value,
+                           transaction_date:        dtpTxDate.SelectedDate } ) ),
                   Set( gTxErr, FirstError.Message )
               );
               If( Len(gTxErr) > 0,
@@ -510,15 +488,10 @@ Screens:
                           NotificationType.Success );
                   Back() )
       - btnTxCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =140
             X: =260

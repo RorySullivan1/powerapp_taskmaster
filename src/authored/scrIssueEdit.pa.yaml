@@ -36,9 +36,10 @@
 # CONNECTION PREREQUISITE: Office 365 Users must be added in Studio before this
 # pastes (people pickers). See HANDOFF.md.
 #
-# Grounded tokens only: Label@2.5.1, Rectangle@2.3.0, Classic/Icon@2.5.0,
-# Classic/TextInput@2.3.2, Classic/Button@2.2.0, Gallery@2.15.0 (Vertical),
-# plus the cmpSelection / cmpSectionHeader components.
+# Grounded tokens only. Modern controls where they earn their place:
+# ModernTextInput (output is still `.Text`), ModernDatePicker (`.SelectedDate`)
+# and ModernButton. The two date fields no longer parse text, so their
+# "⚠ not a date" echo labels are gone — a picker cannot produce a bad date.
 # Every column token resolves to schema/schema.yaml (golden source).
 # =============================================================================
 Screens:
@@ -74,7 +75,7 @@ Screens:
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
         Reset( txtIssName ); Reset( txtIssDesc );
-        Reset( txtIssTarget ); Reset( txtIssClose );
+         
         Reset( txtIssProjectSearch ); Reset( txtIssTaskSearch ); Reset( txtIssTxSearch );
         Reset( txtIssAssigneeSearch ); Reset( txtIssOwnerSearch )
     Children:
@@ -123,10 +124,10 @@ Screens:
             Width: =560
             Height: =18
       - txtIssName:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Default: =If(gEditMode = "Edit", gEditIssue.issue_name, "")
-            HintText: ="What is the issue?"
+            Placeholder: ="What is the issue?"
             Font: =Theme.Font
             Size: =Theme.Size.Body
             X: =24
@@ -145,10 +146,10 @@ Screens:
             Width: =560
             Height: =18
       - txtIssDesc:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Default: =If(gEditMode = "Edit", gEditIssue.issue_description, "")
-            Mode: =TextMode.MultiLine
+            Type: =TextInputType.Multiline
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -168,11 +169,12 @@ Screens:
             Width: =560
             Height: =18
       - txtIssProjectSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gIssPicker, "Project")
-            HintText: ="Type to find a project…"
-            DelayOutput: =true
+            Placeholder: ="Type to find a project…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -216,11 +218,12 @@ Screens:
             Width: =560
             Height: =18
       - txtIssTaskSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gIssPicker, "Task")
-            HintText: ="Type to find a task…"
-            DelayOutput: =true
+            Placeholder: ="Type to find a task…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -264,11 +267,12 @@ Screens:
             Width: =560
             Height: =18
       - txtIssTxSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gIssPicker, "Tx")
-            HintText: ="Type to find a transaction…"
-            DelayOutput: =true
+            Placeholder: ="Type to find a transaction…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -312,11 +316,12 @@ Screens:
             Width: =560
             Height: =18
       - txtIssAssigneeSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gIssPicker, "Assignee")
-            HintText: ="Search people…"
-            DelayOutput: =true
+            Placeholder: ="Search people…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -360,11 +365,12 @@ Screens:
             Width: =560
             Height: =18
       - txtIssOwnerSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             OnChange: =Set(gIssPicker, "Owner")
-            HintText: ="Search people…"
-            DelayOutput: =true
+            Placeholder: ="Search people…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =24
@@ -498,35 +504,17 @@ Screens:
             Y: =298
             Width: =560
             Height: =18
-      - txtIssTarget:
-          Control: Classic/TextInput@2.3.2
+      - dtpIssTarget:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Default: |
-              =If( gEditMode = "Edit" && !IsBlank(gEditIssue.issue_date_target),
-                   Text(gEditIssue.issue_date_target, "dd/mm/yyyy"), "" )
-            HintText: ="dd/mm/yyyy"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Placeholder: ="Target date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
+            Height: =32
             X: =620
             Y: =318
             Width: =180
-            Height: =36
-      - lblIssTargetEcho:
-          Control: Label@2.5.1
-          Properties:
-            Text: |
-              =If( Len(txtIssTarget.Text) = 0, "not set",
-                   IfError( Text(DateValue(txtIssTarget.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: |
-              =If( Len(txtIssTarget.Text) > 0 && IsError(DateValue(txtIssTarget.Text)),
-                   Theme.Color.Danger, Theme.Color.TextMuted )
-            X: =808
-            Y: =318
-            Width: =200
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
       - lblIssCloseCap:
           Control: Label@2.5.1
           Properties:
@@ -538,35 +526,17 @@ Screens:
             Y: =364
             Width: =560
             Height: =18
-      - txtIssClose:
-          Control: Classic/TextInput@2.3.2
+      - dtpIssClose:
+          Control: ModernDatePicker@1.0.0
           Properties:
-            Default: |
-              =If( gEditMode = "Edit" && !IsBlank(gEditIssue.issue_date_close),
-                   Text(gEditIssue.issue_date_close, "dd/mm/yyyy"), "" )
-            HintText: ="dd/mm/yyyy"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            Placeholder: ="Close date"
+            Format: =DatePickerFormat.LongAbbreviated
+            StartOfWeek: =StartOfWeek.Monday
+            IsEditable: =true
+            Height: =32
             X: =620
             Y: =384
             Width: =180
-            Height: =36
-      - lblIssCloseEcho:
-          Control: Label@2.5.1
-          Properties:
-            Text: |
-              =If( Len(txtIssClose.Text) = 0, "not set",
-                   IfError( Text(DateValue(txtIssClose.Text), "dd mmm yyyy"), "⚠ not a date" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: |
-              =If( Len(txtIssClose.Text) > 0 && IsError(DateValue(txtIssClose.Text)),
-                   Theme.Color.Danger, Theme.Color.TextMuted )
-            X: =808
-            Y: =384
-            Width: =200
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
       # ---- What is still missing -------------------------------------------
       - lblIssMissing:
           Control: Label@2.5.1
@@ -598,14 +568,11 @@ Screens:
             Height: =18
       # ---- Save / Cancel ----------------------------------------------------
       - btnIssSave:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: =If(gEditMode = "Edit", "Save issue", "Create issue")
             DisplayMode: =If(Len(lblIssMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =200
             X: =24
@@ -650,8 +617,8 @@ Screens:
                                issue_status:      { Value: gIssStatus },
                                issue_date_open:
                                    If( gEditMode = "Edit", gEditIssue.issue_date_open, Now() ),
-                               issue_date_target: IfError( DateValue(txtIssTarget.Text), Blank() ),
-                               issue_date_close:  IfError( DateValue(txtIssClose.Text),  Blank() ) } ) ),
+                               issue_date_target: dtpIssTarget.SelectedDate,
+                               issue_date_close:  dtpIssClose.SelectedDate } ) ),
                   Set( gIssErr, FirstError.Message )
               );
               If( Len(gIssErr) > 0,
@@ -696,15 +663,10 @@ Screens:
                   Back()
               )
       - btnIssCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =140
             X: =240

@@ -7,13 +7,11 @@
 # (schema.yaml -> rollups:), so if this screen doesn't run, the figure is never
 # maintained anywhere.
 #
-# CONTROL BUDGET (deliberate): only control types with tokens grounded from the
-# genuine example export are used — Label, Rectangle, Classic/Icon,
-# Classic/TextInput, Classic/Button, Gallery, plus the cmpSelection component.
-# No DropDown / DatePicker: their version tokens are UNVERIFIED, and across a
-# one-way gap an unverified token is a failed paste we learn about only as
-# "it didn't work". Stage / health / priority are therefore picked with
-# cmpSelection (already proven in the kit), and dates are read-only here.
+# CONTROL BUDGET: every token here is grounded — either read off the genuine
+# example export or supplied from Studio's own code view (2026-08-04), which is
+# how the modern set arrived. Text inputs and buttons are the modern controls;
+# stage / health / priority still use cmpSelection strips because this screen is
+# the QUICK edit and a horizontal strip is one tap rather than two.
 # =============================================================================
 Screens:
   scrTask:
@@ -69,14 +67,10 @@ Screens:
       # else on the task (dates, owners, the output block, category) lives on
       # scrTaskEdit, which also maintains the same C3 rollup.
       - btnFullEditor:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Subtle
             Text: ="All fields…"
-            Fill: =Theme.Color.PrimaryDark
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.PrimaryDark
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
             Height: =32
             Width: =150
             X: =Parent.Width - 24 - Theme.Space.Gutter - 166
@@ -98,7 +92,7 @@ Screens:
             Width: =300
             Height: =20
       - txtTaskName:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Default: =gSelTask.task_name
             Font: =Theme.Font
@@ -224,14 +218,11 @@ Screens:
             Height: =80
       # ---- Save: patch the task, THEN rewrite the parent rollup (C3) --------
       - btnSave:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: =If(gTaskDirty, "Save changes", "Saved")
             DisplayMode: =If(gTaskDirty, DisplayMode.Edit, DisplayMode.Disabled)
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =200
             X: =Theme.Space.Gutter
@@ -300,15 +291,10 @@ Screens:
                   Back()
               )
       - btnCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =140
             X: =Theme.Space.Gutter + 216

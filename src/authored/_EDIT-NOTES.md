@@ -99,7 +99,9 @@ round-trip.
 
 ## 3. Overlay picker galleries are declared last
 
-No `ComboBox` or `DatePicker` token is grounded, so there are no dropdowns. Instead:
+Choice fields use `ModernCombobox@1.0.0` (`.Selected.Value`, with `SelectMultiple: =false`).
+Lookups and people are still search-plus-results, because they query a data source rather than a
+fixed list:
 
 - **People search uses `SearchUserV2`, not `SearchUser`.** The V1 docs claim `searchTerm` covers
   display name, given name, surname, mail, mail nickname and UPN, but in practice V1 matched only
@@ -131,9 +133,13 @@ No `ComboBox` or `DatePicker` token is grounded, so there are no dropdowns. Inst
      them until they clear the current search. Opening sideways covers only the chip label and
      empty space. (The two inline pickers inside `scrProjectEdit`'s staged-transaction row have
      no free space beside them and stay below, relying on rule 1 alone.)
-- **Dates** → a text box parsed with `DateValue()`, plus an echo label that renders the parse
-  (`12 Aug 2026`, or `⚠ not a date`). A mis-typed date cannot be silently stored as `Blank()`
-  without the user seeing it.
+- **Dates** → `ModernDatePicker@1.0.0`, read as `.SelectedDate` (Blank when unset). The old
+  pattern — a text box parsed with `DateValue()` plus an echo label rendering `12 Aug 2026` or
+  `⚠ not a date` — is **retired across all four edit screens**: a picker cannot produce an
+  unparseable date, so there is nothing left to echo and nothing left to parse. Dates now travel
+  as real date values from control to collection to `Patch`.
+- **Numbers** → `ModernNumberInput@1.0.0`, read as `.Value` (a number). Same reasoning: the two
+  notional fields no longer go through `Value()` and no longer need an `IsError` guard.
 - **Choice** → `cmpSelection` strips. Optional Choices carry a real `"(none)"` option,
   because `{Value: ""}` is not a legal write and an optional column has to be clearable.
   The strip's label size is the `FontSize` input (default **11**): a seven-option stage strip

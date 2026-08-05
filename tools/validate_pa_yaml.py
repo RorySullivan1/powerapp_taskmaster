@@ -50,6 +50,10 @@ KNOWN_CONTROLS = {
     "CanvasComponent":        "grounded",   # component instance, not a control
     "HtmlViewer@2.1.0":       "grounded",   # CONFIRMED 2026-08-03 — cmpStatusPill body pasted
     "Timer":                  "grounded",   # CONFIRMED 2026-08-03 — NOT Classic/Timer
+    "ModernTextInput@1.0.0":  "grounded",   # CONFIRMED 2026-08-04 — output is .Text, as classic
+    "ModernNumberInput@1.0.0":"grounded",   # CONFIRMED 2026-08-04 — output is .Value (a number)
+    "ModernTabList@1.0.0":    "grounded",   # CONFIRMED 2026-08-04 — output is .Selected.Value
+    "ModernButton@1.0.0":     "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "ModernCombobox@1.0.0":   "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "ModernDatePicker@1.0.0": "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "GroupContainer@1.5.0":   "grounded",   # CONFIRMED 2026-08-04 — auto-layout container,

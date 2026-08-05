@@ -109,7 +109,7 @@ Screens:
         Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
         Reset( txtPrManagerSearch ); Reset( txtPrRequestorSearch ); Reset( txtPrSupporterSearch );
         Reset( txtNtName );
-        Reset( txtNxName ); Reset( txtNxNotional );
+        Reset( txtNxName ); 
         Reset( txtNxClientSearch ); Reset( txtNxProductSearch );
         Reset( txtNiName )
         
@@ -208,10 +208,10 @@ Screens:
                   Width: =760
                   Height: =18
             - txtPrName:
-                Control: Classic/TextInput@2.3.2
+                Control: ModernTextInput@1.0.0
                 Properties:
                   Default: =If(gEditMode = "Edit", gEditProject.project_name, "")
-                  HintText: ="What is this project called?"
+                  Placeholder: ="What is this project called?"
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
                   Width: =520
@@ -247,10 +247,10 @@ Screens:
                   Width: =760
                   Height: =18
             - txtPrPathway:
-                Control: Classic/TextInput@2.3.2
+                Control: ModernTextInput@1.0.0
                 Properties:
                   Default: =If(gEditMode = "Edit", gEditProject.project_pathway, "")
-                  HintText: ="\\share\eqd\projects\…"
+                  Placeholder: ="\\share\eqd\projects\…"
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Width: =520
@@ -295,10 +295,10 @@ Screens:
                   Width: =240
                   Height: =18
             - txtPrDesc:
-                Control: Classic/TextInput@2.3.2
+                Control: ModernTextInput@1.0.0
                 Properties:
                   Default: =If(gEditMode = "Edit", gEditProject.project_description, "")
-                  Mode: =TextMode.MultiLine
+                  Type: =TextInputType.Multiline
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Width: =520
@@ -331,10 +331,11 @@ Screens:
                   Width: =520
                   Height: =18
             - txtPrManagerSearch:
-                Control: Classic/TextInput@2.3.2
+                Control: ModernTextInput@1.0.0
                 Properties:
-                  HintText: ="Search people…"
-                  DelayOutput: =true
+                  Type: =TextInputType.Search
+                  Placeholder: ="Search people…"
+                  TriggerOutput: =TriggerOutput.Delayed
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Width: =280
@@ -409,10 +410,11 @@ Screens:
                   Width: =520
                   Height: =18
             - txtPrRequestorSearch:
-                Control: Classic/TextInput@2.3.2
+                Control: ModernTextInput@1.0.0
                 Properties:
-                  HintText: ="Search people…"
-                  DelayOutput: =true
+                  Type: =TextInputType.Search
+                  Placeholder: ="Search people…"
+                  TriggerOutput: =TriggerOutput.Delayed
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Width: =280
@@ -487,10 +489,11 @@ Screens:
                   Width: =520
                   Height: =18
             - txtPrSupporterSearch:
-                Control: Classic/TextInput@2.3.2
+                Control: ModernTextInput@1.0.0
                 Properties:
-                  HintText: ="Search people…"
-                  DelayOutput: =true
+                  Type: =TextInputType.Search
+                  Placeholder: ="Search people…"
+                  TriggerOutput: =TriggerOutput.Delayed
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Width: =280
@@ -675,14 +678,10 @@ Screens:
                   Width: =900
                   Height: =18
             - btnAddNt:
-                Control: Classic/Button@2.2.0
+                Control: ModernButton@1.0.0
                 Properties:
+                  Appearance: =ButtonAppearance.Primary
                   Text: ="+  Add task"
-                  Fill: =Theme.Color.Primary
-                  Color: =Theme.Color.OnPrimary
-                  BorderColor: =Theme.Color.Primary
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
                   Width: =200
                   Height: =36
                   OnSelect: =Set(gNtOpen, true)
@@ -743,14 +742,10 @@ Screens:
                   Width: =1000
                   Height: =18
             - btnAddNx:
-                Control: Classic/Button@2.2.0
+                Control: ModernButton@1.0.0
                 Properties:
+                  Appearance: =ButtonAppearance.Primary
                   Text: ="+  Add transaction"
-                  Fill: =Theme.Color.Primary
-                  Color: =Theme.Color.OnPrimary
-                  BorderColor: =Theme.Color.Primary
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
                   Width: =200
                   Height: =36
                   OnSelect: =Set(gNxOpen, true)
@@ -771,7 +766,7 @@ Screens:
                         Text: |
                           =ThisItem.x_name & "   ·   " & ThisItem.x_clientValue & "   ·   " & ThisItem.x_productValue
                            & "   ·   " & ThisItem.x_ccy & " "
-                           & If( Len(ThisItem.x_notional) = 0, "—", Text(Value(ThisItem.x_notional), "[$-en-US]#,##0") )
+                           & If( IsBlank(ThisItem.x_notional), "—", Text(ThisItem.x_notional, "[$-en-US]#,##0") )
                            & "   ·   " & Text(ThisItem.x_date, "dd mmm yyyy")
                            & "   ·   sales " & ThisItem.x_salesName
                         Font: =Theme.Font
@@ -812,14 +807,10 @@ Screens:
                   Width: =900
                   Height: =18
             - btnAddNi:
-                Control: Classic/Button@2.2.0
+                Control: ModernButton@1.0.0
                 Properties:
+                  Appearance: =ButtonAppearance.Primary
                   Text: ="+  Add issue"
-                  Fill: =Theme.Color.Primary
-                  Color: =Theme.Color.OnPrimary
-                  BorderColor: =Theme.Color.Primary
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
                   Width: =200
                   Height: =36
                   OnSelect: =Set(gNiOpen, true)
@@ -905,17 +896,14 @@ Screens:
             Height: =30
             Visible: =Len(Self.Text) > 0
       - btnPrSave:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: |
               =If( gEditMode = "Edit", "Save project", "Create project" ) &
                If( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) > 0,
                    " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) ) & " item(s)", "" )
             DisplayMode: =If(Len(lblPrMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =340
             X: =24
@@ -1073,7 +1061,7 @@ Screens:
                                               Department: "", JobTitle: "", Picture: "" },
                                         transaction_currency:    { Value: x.x_ccy },
                                         transaction_notional:
-                                            If( Len(x.x_notional) = 0, Blank(), Value(x.x_notional) ),
+                                            x.x_notional,
                                         transaction_date:        x.x_date } )
                               .ID ),
                               FirstError.Message,
@@ -1145,15 +1133,10 @@ Screens:
                               NotificationType.Error ) )
               )
       - btnPrCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
             Height: =44
             Width: =140
             X: =380
@@ -1206,10 +1189,10 @@ Screens:
             Height: =18
             Visible: =gNtOpen
       - txtNtName:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Default: =""
-            HintText: ="What needs doing?"
+            Placeholder: ="What needs doing?"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 680) / 2 + 24
@@ -1281,10 +1264,11 @@ Screens:
             Height: =18
             Visible: =gNtOpen
       - txtNtLeadSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             Default: =""
-            HintText: ="Type a name…"
+            Placeholder: ="Type a name…"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 680) / 2 + 24
@@ -1359,14 +1343,10 @@ Screens:
                      Set(gNtLead, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
                      Reset(txtNtLeadSearch)
       - mdNtAdd:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: ="Add"
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
             DisplayMode: |
               =If( Len(Trim(txtNtName.Text)) > 0 && Len(gNtLead.Mail) > 0,
                    DisplayMode.Edit, DisplayMode.Disabled )
@@ -1388,15 +1368,10 @@ Screens:
                Set(gNtOpen, false)
             Visible: =gNtOpen
       - mdNtCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
             X: =(Parent.Width - 680) / 2 + 176
             Y: =(Parent.Height - 470) / 2 + 470 - 60
             Width: =120
@@ -1453,10 +1428,10 @@ Screens:
             Height: =18
             Visible: =gNxOpen
       - txtNxName:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Default: =""
-            HintText: ="e.g. QIS-2026-0417 EMEA autocall"
+            Placeholder: ="e.g. QIS-2026-0417 EMEA autocall"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 760) / 2 + 24
@@ -1501,10 +1476,11 @@ Screens:
             Height: =18
             Visible: =gNxOpen
       - txtNxClientSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             Default: =""
-            HintText: ="Type to find a client…"
+            Placeholder: ="Type to find a client…"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 760) / 2 + 24
@@ -1578,10 +1554,11 @@ Screens:
             Height: =18
             Visible: =gNxOpen
       - txtNxProductSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             Default: =""
-            HintText: ="Type to find a product…"
+            Placeholder: ="Type to find a product…"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 760) / 2 + 24
@@ -1654,17 +1631,19 @@ Screens:
             Width: =300
             Height: =18
             Visible: =gNxOpen
-      - txtNxNotional:
-          Control: Classic/TextInput@2.3.2
+      - numNxNotional:
+          Control: ModernNumberInput@1.0.0
           Properties:
-            Default: =""
+            Min: =0
+            Step: =1000
+            Precision: =DecimalPrecision.'0'
             HintText: ="e.g. 25000000"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
+            AccessibleLabel: ="Notional in the selected currency"
+            Align: =Align.Right
+            Height: =32
             X: =(Parent.Width - 760) / 2 + 372
             Y: =(Parent.Height - 560) / 2 + 156
             Width: =160
-            Height: =36
             Visible: =gNxOpen
       - cboNxCcy:
           Control: ModernCombobox@1.0.0
@@ -1694,10 +1673,11 @@ Screens:
             Height: =18
             Visible: =gNxOpen
       - txtNxSalesSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             Default: =""
-            HintText: ="Type a name…"
+            Placeholder: ="Type a name…"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 760) / 2 + 372
@@ -1772,18 +1752,14 @@ Screens:
                      Set(gNxSales, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
                      Reset(txtNxSalesSearch)
       - mdNxAdd:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: ="Add"
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
             DisplayMode: |
               =If( Len(Trim(txtNxName.Text)) > 0 && gNxClient.Id > 0 && gNxProduct.Id > 0
                 && !IsBlank(dtpNxDate.SelectedDate)
-                && ( Len(txtNxNotional.Text) = 0 || !IsError(Value(txtNxNotional.Text)) )
+                
                 && Len(gNxSales.Mail) > 0,
                    DisplayMode.Edit, DisplayMode.Disabled )
             X: =(Parent.Width - 760) / 2 + 24
@@ -1799,32 +1775,27 @@ Screens:
                     x_productId:    gNxProduct.Id,
                     x_productValue: gNxProduct.Value,
                     x_ccy:          gNxCcy,
-                    x_notional:     txtNxNotional.Text,
+                    x_notional:     numNxNotional.Value,
                     x_date:         dtpNxDate.SelectedDate,
                     x_salesName:    gNxSales.DisplayName,
                     x_salesMail:    gNxSales.Mail } );
-               Reset( txtNxName ); Reset( txtNxNotional );
+               Reset( txtNxName ); 
                Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
                Set(gNxOpen, false)
             Visible: =gNxOpen
       - mdNxCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
             X: =(Parent.Width - 760) / 2 + 176
             Y: =(Parent.Height - 560) / 2 + 560 - 60
             Width: =120
             Height: =40
             OnSelect: |
-              =Reset( txtNxName ); Reset( txtNxNotional );
+              =Reset( txtNxName ); 
                Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
@@ -1877,10 +1848,10 @@ Screens:
             Height: =18
             Visible: =gNiOpen
       - txtNiName:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
             Default: =""
-            HintText: ="What is the issue?"
+            Placeholder: ="What is the issue?"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 680) / 2 + 24
@@ -1955,10 +1926,11 @@ Screens:
             Height: =18
             Visible: =gNiOpen
       - txtNiAssSearch:
-          Control: Classic/TextInput@2.3.2
+          Control: ModernTextInput@1.0.0
           Properties:
+            Type: =TextInputType.Search
             Default: =""
-            HintText: ="Type a name…"
+            Placeholder: ="Type a name…"
             Font: =Theme.Font
             Size: =Theme.Size.Small
             X: =(Parent.Width - 680) / 2 + 24
@@ -2033,14 +2005,10 @@ Screens:
                      Set(gNiAssignee, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
                      Reset(txtNiAssSearch)
       - mdNiAdd:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Primary
             Text: ="Add"
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
             DisplayMode: |
               =If( Len(Trim(txtNiName.Text)) > 0 && Len(gNiAssignee.Mail) > 0,
                    DisplayMode.Edit, DisplayMode.Disabled )
@@ -2061,15 +2029,10 @@ Screens:
                Set(gNiOpen, false)
             Visible: =gNiOpen
       - mdNiCancel:
-          Control: Classic/Button@2.2.0
+          Control: ModernButton@1.0.0
           Properties:
+            Appearance: =ButtonAppearance.Outline
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.TextPrimary
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
             X: =(Parent.Width - 680) / 2 + 176
             Y: =(Parent.Height - 520) / 2 + 520 - 60
             Width: =120
