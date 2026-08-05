@@ -168,47 +168,36 @@ anyway, so what lands equals what was authored and there is no evaluation-order 
 all. Keep a formula only where genuine responsiveness is wanted, and tell the human not to drag
 that control.
 
-## ⚠️ THE PASTE ROUTE IS CLOSED (2026-08-05) — deliver change sheets instead
+## Refinement: deliver change sheets, not re-pastes (2026-08-05)
 
-The user reports code-view paste no longer works. It demonstrably *did* — `scrAdmin` and
-`cmpAppBar` both landed through it — so something in the environment changed, and the exact
-failure has not been captured yet (see the open question at the end of this section).
+The app is now BUILT — every screen populated, components in, lists added, `App.Formulas` in. The
+paste channel works exactly as this skill documents it, and it is a **hybrid**, not one route:
+screens paste through code view, `App.Formulas` goes through the formula bar, and component
+**bodies** paste while their **custom properties** are typed by hand.
 
-**Until it is diagnosed, the delivery unit is not a file. It is a property.**
+Once a screen exists, **re-pasting it to change a few properties is the wrong move**:
 
-```
-repo  ──►  tools/change_sheet.py  ──►  <control> . <property> = <formula>  ──►  formula bar
-```
+- it re-freezes every `X`/`Y`/`Width`/`Height` formula into the constant it evaluated to,
+- it re-suffixes any control whose name now collides (`galProjects` → `galProjects_1`), and
+- it creates a second control rather than patching the first — paste is never an in-place edit.
+
+So the refinement unit is one property:
 
 ```bash
 python3 tools/change_sheet.py --since HEAD~1 src/authored/scrTaskEdit.pa.yaml
 python3 tools/change_sheet.py --only galTasks src/authored/scrTask.pa.yaml
 ```
 
-The `--since` mode is the one that matters during refinement: change three properties in the
-repo, hand over three lines. It emits the formula **without the leading `=`**, because the
-formula bar renders that `=` outside the editable area — pasting `=Set(x, 1)` gives `==Set(x, 1)`
-and an error that reads like a syntax fault in the formula.
+It emits `<control> · <property> · <formula>`, ordered, with the leading `=` **stripped** — the
+formula bar renders that `=` outside the editable area, so pasting it gives `==` and an error that
+reads like a syntax fault in the formula. It flags a control that does not exist yet as a
+hand-insert, and flags a property that vanished from the source for manual deletion, because
+Studio keeps the old formula until someone clears it.
 
-**This is the better unit for refinement anyway, paste or no paste.** Re-pasting a screen
-re-freezes every X/Y/Width/Height into constants and re-suffixes any colliding control name. A
-property edit touches exactly what it names. Once the screens exist — and they now do — whole-file
-pastes were always going to stop being the right tool.
+**Whole-file paste stays right for a NEW screen or a rebuild.** Change sheets are for edits to a
+screen that already landed. Pick by what exists in Studio, not by habit.
 
-**What this costs, and where it hurts:** editing an existing control is cheap. **Adding** one is
-not — the human must insert the control by hand, rename it, then apply its properties. So prefer
-changes that re-use the controls already on the screen: change a formula, not the control tree.
-Where a new control is genuinely needed, say so explicitly and keep the count low.
-
-**Still open — ask before assuming the route is gone for good.** "Paste doesn't work" has several
-distinct causes with different fixes: the browser clipboard permission lapsing for
-`make.powerapps.com`; the formula bar being switched off (which hides View code entirely);
-pasting into a container or component canvas rather than a screen; or Studio rejecting the YAML
-and reporting it as nothing happening. The first three are recoverable in under a minute. Get the
-exact symptom — menu item missing, nothing happens, an error and its text — before rebuilding the
-delivery model around the loss.
-
-## The channel — code view mechanics *(historical — see the section above)*
+## The channel — code view mechanics
 
 Code view (GA **17 Mar 2025**) is the interactive channel. Grounded on Microsoft Learn
 *Use code view for canvas app controls*:
