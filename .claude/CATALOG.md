@@ -17,12 +17,17 @@
 - power-fx-development — Expert Power Fx developer for writing, architecting, and debugging formulas in canvas Power Apps … -> skills/power-fx-development/SKILL.md
 - power-fx-review — Expert Power Fx code reviewer for Power Apps canvas apps — delegation, performance, and … -> skills/power-fx-review/SKILL.md
 - power-query-m — Expert at Power Query and the M language — the ETL layer that shapes, cleans, and combines data … -> skills/power-query-m/SKILL.md
+- powerapp-canvas-controls — The grounded control catalogue for canvas-app YAML — which `Control:` tokens, `Variant:` values, … -> skills/powerapp-canvas-controls/SKILL.md
+- powerapp-canvas-design — Screen layout, geometry and interaction design for canvas apps — where controls go, how big they … -> skills/powerapp-canvas-design/SKILL.md
+- powerapp-canvas-development — Authoring canvas-app source in pa-yaml v3.0 — the file structure itself and the Power Fx that lives … -> skills/powerapp-canvas-development/SKILL.md
+- powerapp-canvas-project-management — Running a canvas-app project as a repo — source control, provisioning, hand-off discipline and the … -> skills/powerapp-canvas-project-management/SKILL.md
 - session-memory — Persist and recall project state across Claude Code sessions via a .claude/memory/ directory — a … -> skills/session-memory/SKILL.md
 - sharepoint-column-formatting — Expert at SharePoint column and view formatting — the declarative JSON that styles list cells and … -> skills/sharepoint-column-formatting/SKILL.md
 - sharepoint-list-architecture — Expert at designing SharePoint lists as an application backend — the schema, column types, … -> skills/sharepoint-list-architecture/SKILL.md
 - studio-transfer — Expert at moving canvas Power App source between Power Apps Studio (on a work machine) and this … -> skills/studio-transfer/SKILL.md
 
 ## Agents (agents/*.md)
+- powerapp-canvas-developer — End-to-end canvas-app developer for this repo — designs, authors and validates `.pa.yaml` source, … -> agents/powerapp-canvas-developer.md
 - pre-paste-review — Pre-paste auditor for authored canvas-app Power Fx — the last gate before a human pastes YAML into … -> agents/pre-paste-review.md
 
 ## Commands (commands/*.md)
@@ -30,3 +35,5 @@
 
 ## Workflows (workflows/*.md)
 - change-end-to-end — Orchestrate one canvas-app change from intent to landed-in-Studio across the clipboard air gap — … -> workflows/change-end-to-end.md
+- control-grounding — Workflow — ground an unknown control, property or enum -> workflows/control-grounding.md
+- screen-build — Workflow — build or rebuild a screen -> workflows/screen-build.md

@@ -30,7 +30,11 @@ clipboard, moved by hand, and it is ONE-WAY: repo → Studio.**
 Task-scoped **skills** (`.claude/skills/`) and the isolated **`pre-paste-review`** agent
 (`.claude/agents/`) auto-load by their `description:` — Claude picks the right one; don't invoke
 by hand. Coverage, **by category**:
-- **Canvas app** — Power Fx authoring + delegation, reusable components/HtmlText, and review.
+- **Canvas app (generic)** — the four `powerapp-canvas-*` skills: **controls** (grounded tokens
+  and output properties), **development** (pa-yaml v3.0 + Power Fx rules), **design** (geometry,
+  overlap, containers, paste-freezing) and **project-management** (records, provisioning,
+  hand-off). The **`powerapp-canvas-developer`** agent builds end to end across all four.
+- **Canvas app (this repo)** — Power Fx authoring + delegation, reusable components/HtmlText, and review.
 - **SharePoint backend** — list/schema architecture and declarative column/view formatting.
 - **Integration & reporting** — Microsoft Graph, Power BI DAX, and Power Query/M.
 - **The air gap** — Studio transfer discipline (skill) and pre-paste audit (agent), plus the
