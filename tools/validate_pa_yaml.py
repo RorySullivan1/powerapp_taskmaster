@@ -402,8 +402,12 @@ def targets(argv):
     if argv:
         return [pathlib.Path(a).resolve() for a in argv]
     src = ROOT / "src" / "authored"
+    # Bodies and variants are pasteable artefacts too — leaving them out of the
+    # default sweep made the "N/N valid" line a promise the run had not checked.
     return sorted([*src.glob("*.pa.yaml"),
-                   *(src / "components").glob("*.pa.yaml")])
+                   *(src / "components").glob("*.pa.yaml"),
+                   *(src / "components" / "bodies").glob("*.pa.yaml"),
+                   *(src / "variants").glob("*.pa.yaml")])
 
 def rel(p: pathlib.Path) -> str:
     try:
@@ -429,7 +433,7 @@ def contract_errors(files) -> list[str]:
             doc = yaml.safe_load(f.read_text(encoding="utf-8"))
         except yaml.YAMLError:
             continue
-        for cname, cdef in ((doc or {}).get("ComponentDefinitions") or {}).items():
+        for cname, cdef in ((doc if isinstance(doc, dict) else {}).get("ComponentDefinitions") or {}).items():
             comps[cname] = set((cdef.get("CustomProperties") or {}).keys())
     if not comps:
         return []
@@ -498,6 +502,12 @@ def main() -> int:
             print(f"FAIL {rel(f)}\n  YAML parse error: {e}\n"); bad += 1; continue
         if doc is None:
             print(f"SKIP {rel(f)} (empty)"); continue
+        # A component BODY is a bare control sequence, not a whole document — the
+        # same shape a screen's `Children:` holds. Wrap it in a synthetic screen so
+        # both passes apply: these files are what actually gets pasted, and they
+        # were unchecked while the summary line still said everything was valid.
+        if isinstance(doc, list):
+            doc = {"Screens": {"bodyFragment": {"Children": doc}}}
 
         tok = token_errors(doc)
         errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))

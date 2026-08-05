@@ -2,7 +2,7 @@
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **Phase: BUILDING IN STUDIO.** Authoring is essentially done — 11 screens + 11 components +
-  `App.Formulas`, 23/23 valid. `BUILD-BOOK.md` is the single linear runbook; work the checkboxes.
+  `App.Formulas`, 37/37 valid (bodies + skeletons now in the sweep). `BUILD-BOOK.md` is the single linear runbook; work the checkboxes.
 - **The shell is ONE component, `cmpAppBar`** (header bar + fly-out nav rail), built FIRST.
   `cmpNavMenu` and the per-screen `HeaderBar`/`AppTitle`/`ScreenTitle` blocks are deleted **on the
   five nav screens**. The four `scr*Edit` screens deliberately KEEP a local close-only header —

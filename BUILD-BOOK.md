@@ -41,7 +41,9 @@ page** — component contracts are inlined so you're not flipping between files 
 
 - [ ] Get the files on the work machine (clone/pull, or GitHub → **Raw** → copy). Copy files
       **whole**; don't retype.
-- [ ] `python tools/validate_pa_yaml.py` → expect **23/23 valid**. Re-copy from `main` right before
+- [ ] `python tools/validate_pa_yaml.py` → expect **all valid** (37 files today: 11 screens,
+      12 component contracts, 11 bodies, 3 skeletons). Check the word *valid*, not the count —
+      the count moves whenever a file is added. Re-copy from `main` right before
       each paste (a stale local copy is invisible from my side).
 - [ ] Studio: create the canvas app (**tablet** layout), turn on the **Power Fx formula bar**
       (Settings → General), allow clipboard for `make.powerapps.com`.

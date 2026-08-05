@@ -63,7 +63,8 @@ python tools/validate_pa_yaml.py
 
 Checks every authored file against **Microsoft's official `pa-yaml` v3.0 schema** (vendored at
 `tools/pa.schema.v3.0.yaml`). This is the only pre-paste check that exists on this side of the gap
-— it is what caught the component rejection. Expect `23/23 valid`.
+— it is what caught the component rejection. Expect every file to report `valid`; the sweep
+covers screens, component contracts, the pasteable bodies and the skeletons.
 
 ---
 
