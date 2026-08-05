@@ -131,8 +131,25 @@ fixed list:
      input.Width + 8`, same `Y`, width 280. Stacked pickers are 66px apart, so a 132px
      dropdown opening downwards covers the next *two* search boxes and locks the user out of
      them until they clear the current search. Opening sideways covers only the chip label and
-     empty space. (The two inline pickers inside `scrProjectEdit`'s staged-transaction row have
-     no free space beside them and stay below, relying on rule 1 alone.)
+     empty space.
+
+  **Both rules are ABSOLUTE-LAYOUT workarounds, and `scrProjectEdit` no longer needs either.**
+  Inside an auto-layout container a hidden child takes no space, so the results gallery is a
+  *sibling* of its row, declared immediately after it, full width, `Height: =132`, visible only
+  at 2+ typed characters with nothing yet picked. It expands the column and collapses again —
+  no z-order, no covering, no one-at-a-time gate, and nothing can ever sit on a row the user
+  needs to click. **Prefer this on any screen already built on containers**; rules 1 and 2 stand
+  for the screens still laid out absolutely.
+
+  Two things the gallery must NOT be gated on, both found live on 2026-08-05:
+  - **the modal's own `g*Open` flag** — that leaves it permanently open, and if it shares its
+    chip's X/Y it hides the pick entirely while querying `SearchUserV2` with an empty term;
+  - **nothing at all on clear** — clearing a pick must `Reset()` the search box too, or the
+    stale term re-opens the gallery the instant the chip is cleared.
+
+  The pick itself collapses to a flat `Classic/Button` reading `Name  ✕`
+  (`DisplayMode.Disabled` when empty), which is one control instead of a label plus a separate
+  clear icon, and gives the clear action a real hit target.
 - **Dates** → `ModernDatePicker@1.0.0`, read as `.SelectedDate` (Blank when unset). The old
   pattern — a text box parsed with `DateValue()` plus an echo label rendering `12 Aug 2026` or
   `⚠ not a date` — is **retired across all four edit screens**: a picker cannot produce an
@@ -280,14 +297,18 @@ create a second project**.
 `IfError(value, fallback, default)` is what records per-row success — the third argument is
 returned when nothing errored, so one pass classifies every row.
 
-Five tabs (Details · Classification · Tasks · Transactions · Issues) because a canvas screen
-does not scroll.
+**No tabs.** The screen is ONE scrolling auto-layout column (`frmPrScroll`) with a headed
+section per former tab: Details · People · Classification · Tasks · Transactions · Issues. The
+old claim that "a canvas screen does not scroll" is wrong — `LayoutOverflowY:
+=LayoutOverflow.Scroll` on a `GroupContainer` scrolls, and it is strictly better than tabs here
+because the container also makes every child immune to the X/Y freeze.
 
-Staged children take their owner from a two-option strip — **Manager** or **Me** — resolved
-at *staging* time, not at save time, so a later change of project manager cannot silently
-reassign rows the user already added. A full people picker per staged row would be four more
-overlay galleries on an already dense screen, and reassigning is one click on the child
-afterwards.
+**Staged children get a full people picker**, inside the modal that stages them — not the old
+two-option **Manager / Me** strip. A task lead, sales owner or assignee can be anyone in the
+directory, resolved at *staging* time so a later change of project manager cannot silently
+reassign rows the user already added. The modals are what made this affordable: the pickers live
+in a card that is only rendered while its `g*Open` flag is true, so they cost nothing on the
+form itself.
 
 ## Known limits, stated rather than hidden
 
@@ -303,8 +324,18 @@ afterwards.
   instance from a Power Automate call in the same `{Label, Path}` shape — the component doesn't
   change. The `Path` delimiter (`;`) is also not first-party documented, so it is a component
   input and the picker prints a raw path on screen to settle it at first paste.
-- **Dates are typed, not picked.** Locale governs how `DateValue()` reads `dd/mm/yyyy`; the
-  echo label is the check. A grounded `DatePicker` token would replace this whole pattern.
+- **A date picker with no `DefaultDate` silently wipes the stored date on an edit.** The control
+  opens blank, and a `Patch` writing `dtp.SelectedDate` unconditionally then overwrites the real
+  value with `Blank()`. No error, no warning — found live on `scrProjectEdit`'s
+  `project_date_start` / `project_date_target`, 2026-08-05. **Every date picker on an edit path
+  needs `DefaultDate` seeded from the edit record AND a `Reset()` in `OnVisible`.** (This
+  supersedes the old "dates are typed, not picked" limit — `DateValue()` parsing was retired
+  across all four edit screens on 2026-08-04.)
+- **A hardcoded combobox `Items` array drifts from the list exactly like an invented column name
+  does**, and the validator does not look inside array literals. `scrProjectEdit` shipped
+  "In Progress"/"Resolved" for `issue_status` and "Medium" for `issue_impact`, none of which are
+  members of those columns. Check every `Items: =[…]` against the Choice column's `values:` in
+  `schema/schema.yaml` before hand-off.
 - **A stale component strip can display a value the form will not write.** Point 1 makes the
   write correct, not the display. If that becomes confusing in use, it is a real thing to fix
   — but it is the safe direction of the two.
