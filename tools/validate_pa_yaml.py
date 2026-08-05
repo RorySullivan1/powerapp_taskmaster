@@ -56,6 +56,7 @@ KNOWN_CONTROLS = {
     "ModernButton@1.0.0":     "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "ModernCombobox@1.0.0":   "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "ModernDatePicker@1.0.0": "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
+    "Classic/ComboBox@2.4.0": "grounded",   # CONFIRMED 2026-08-04 — classic combo box
     "Form@2.4.4":             "grounded",   # CONFIRMED 2026-08-04 — Variant: Classic, Layout: Vertical
     "TypedDataCard@1.0.7":    "grounded",   # CONFIRMED 2026-08-04 — a Form's data card
     "GroupContainer@1.5.0":   "grounded",   # CONFIRMED 2026-08-04 — auto-layout container,

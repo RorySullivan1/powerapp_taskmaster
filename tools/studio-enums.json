@@ -222,7 +222,8 @@
   },
   "ModernCombobox@1.0.0": {
    "output": "Selected  \u2014 a record; .Selected.Value for a string array",
-   "props": "Items (array literal), ItemDisplayText, InputTextPlaceholder, SelectMultiple, IsSearchable, MultiValueDelimiter, Required, ValidationState"
+   "props": "Items (array literal), ItemDisplayText, InputTextPlaceholder, SelectMultiple, IsSearchable, MultiValueDelimiter, Required, ValidationState",
+   "seed": "DefaultSelectedItems \u2014 CORROBORATED, not proven. Confirmed on Classic/ComboBox@2.4.0 and listed for the Fluent combo box family in MS Learn, but never seen on ModernCombobox itself. Still the single inferred property in this repo."
   },
   "ModernDatePicker@1.0.0": {
    "output": "SelectedDate  \u2014 Blank() when unset",
@@ -236,7 +237,13 @@
    "output": "none \u2014 OnSelect only",
    "props": "Text, OnSelect, Appearance (ButtonAppearance.Primary|Outline|Subtle), Icon (a STRING Fluent icon name, e.g. \"Checkmark\" \u2014 not the classic Icon enum), IconStyle, Layout (ButtonLayout.IconBefore), Tooltip, AccessibleLabel"
   },
-  "kept_classic_deliberately": "Classic/Button for the ~30 transparent full-template gallery hit targets \u2014 they depend on Fill: =RGBA(0,0,0,0) and BorderThickness: =0, which a Fluent button does not expose. Classic/Icon throughout, for the same reason plus the 180-value Icon enum."
+  "kept_classic_deliberately": "Classic/Button for the ~30 transparent full-template gallery hit targets \u2014 they depend on Fill: =RGBA(0,0,0,0) and BorderThickness: =0, which a Fluent button does not expose. Classic/Icon throughout, for the same reason plus the 180-value Icon enum.",
+  "Classic/ComboBox@2.4.0": {
+   "output": "Selected / SelectedItems  \u2014 as the modern one",
+   "seed": "DefaultSelectedItems  \u2014 CONFIRMED on this control (=Parent.Default inside a data card)",
+   "props": "Items, SelectMultiple, DefaultSelectedItems, SelectionColor, SelectionFill, Chevron{Fill,Background,HoverFill,HoverBackground,DisabledFill,DisabledBackground}, DisplayMode, Tooltip, plus the usual colour/border set",
+   "note": "Distinct control from ModernCombobox@1.0.0. Studio generates this one inside classic data cards; the modern one is what you insert by hand today."
+  }
  },
  "FormVariant": [
   "Classic"
@@ -264,5 +271,9 @@
   ],
   "schema_keys_confirmed_in_the_wild": "Layout:, MetadataKey:, IsLocked: \u2014 all accepted by pa.schema.v3.0",
   "note": "DataSourceInfo's column argument is a SINGLE-QUOTED IDENTIFIER ('Title'), not a double-quoted string \u2014 consistent with the 3.24042 identifier change."
+ },
+ "_powerFxNotes": {
+  "Choices column argument": "Studio writes it as a SINGLE-QUOTED identifier \u2014 Choices([@asset_library].'asset_owner'). Quotes are only required when the identifier needs escaping, so this repo's unquoted snake_case form is equally valid; the quoted form is Studio being defensive.",
+  "Self": "PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0) \u2014 Self is available in a control's own property formulas."
  }
 }

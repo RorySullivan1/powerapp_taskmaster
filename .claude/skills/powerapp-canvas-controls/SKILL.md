@@ -53,9 +53,25 @@ Treat the generic docs as a guide to *structure*, never to *tokens*.
 `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`, `Gallery@2.15.0`, `Image@2.2.3`,
 `HtmlViewer@2.1.0`, `Timer`, `CanvasComponent`.
 
+`Classic/ComboBox@2.4.0`, `Form@2.4.4` (`Variant: Classic`), `TypedDataCard@1.0.7`
+(`Variant: ClassicTextualEdit`).
+
 **Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, `ModernCombobox@1.0.0`,
 `ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
 `GroupContainer@1.5.0` (`Variant: AutoLayout`).
+
+**`Classic/ComboBox@2.4.0` and `ModernCombobox@1.0.0` are different controls.** Studio generates
+the classic one inside data cards; the modern one is what you insert by hand today. The classic
+adds `Chevron*` styling properties and takes `DefaultSelectedItems` to seed the selection —
+which is how a card wires it up:
+
+```yaml
+Items: =Choices([@asset_library].'asset_owner')
+DefaultSelectedItems: =Parent.Default
+SelectMultiple: =false
+DisplayMode: =Parent.DisplayMode
+PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
+```
 
 Version suffixes are optional — Studio uses the current version if omitted — so a version
 mismatch is not a failure mode. **Only the control name and the `Variant` matter.**
@@ -112,6 +128,21 @@ powerapp-canvas-design for why that is the most important property in the whole 
 
 Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`,
 and the non-AutoLayout variant name.
+
+## The one property still not proven
+
+`DefaultSelectedItems` on **`ModernCombobox@1.0.0`** — the property that seeds a combobox's
+current value when editing. It is **confirmed on `Classic/ComboBox@2.4.0`** and listed for the
+Fluent combo box family on MS Learn, but never yet seen on the modern control itself. Treat it
+as corroborated, not proven: keep it, and if a paste is rejected delete that one line — the
+only loss is the pre-selection on an Edit.
+
+## Quoting a column inside a formula
+
+Studio writes `Choices([@asset_library].'asset_owner')` — a **single-quoted identifier**. Quotes
+are only *required* when the identifier needs escaping, so this repo's unquoted snake_case form
+is equally valid; Studio is just being defensive. Do not confuse this with a double-quoted
+string, which since 3.24042 is wrong in `ShowColumns`, `Ungroup`, `AddColumns` and friends.
 
 ## Edit form and data cards
 
