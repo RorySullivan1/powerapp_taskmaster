@@ -31,7 +31,7 @@
 - pre-paste-review — Pre-paste auditor for authored canvas-app Power Fx — the last gate before a human pastes YAML into … -> agents/pre-paste-review.md
 
 ## Commands (commands/*.md)
-- pull-reconcile — [DEPRECATED — the air gap is one-way; nothing is ever pulled from Studio] Formerly reconciled a … -> commands/pull-reconcile.md
+- (none)
 
 ## Workflows (workflows/*.md)
 - change-end-to-end — Orchestrate one canvas-app change from intent to landed-in-Studio across the clipboard air gap — … -> workflows/change-end-to-end.md
