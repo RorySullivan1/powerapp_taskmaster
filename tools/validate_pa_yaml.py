@@ -56,6 +56,8 @@ KNOWN_CONTROLS = {
     "ModernButton@1.0.0":     "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "ModernCombobox@1.0.0":   "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "ModernDatePicker@1.0.0": "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
+    "Form@2.4.4":             "grounded",   # CONFIRMED 2026-08-04 — Variant: Classic, Layout: Vertical
+    "TypedDataCard@1.0.7":    "grounded",   # CONFIRMED 2026-08-04 — a Form's data card
     "GroupContainer@1.5.0":   "grounded",   # CONFIRMED 2026-08-04 — auto-layout container,
                                             # read off a Studio code-view photo. Variant: AutoLayout
 }
@@ -65,7 +67,10 @@ KNOWN_CONTROLS = {
 # straight off a Studio code-view screenshot; the others are corroborated from
 # published .pa.yaml in the wild.
 KNOWN_VARIANTS = {
-    "AutoLayout",   # GroupContainer@1.5.0 — CONFIRMED from Studio code view 2026-08-04
+    "AutoLayout",        # GroupContainer@1.5.0
+    "Classic",           # Form@2.4.4 — CONFIRMED from Studio code view 2026-08-04
+    "ClassicTextualEdit",# TypedDataCard@1.0.7 — the text-field card
+   # GroupContainer@1.5.0 — CONFIRMED from Studio code view 2026-08-04
     "BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0",   # CONFIRMED from Studio
     "BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0",
     "BrowseLayout_Vertical_OneTextVariant_ver5.0",
@@ -192,7 +197,7 @@ def token_errors(doc) -> list[str]:
 
         var = node.get("Variant")
         if isinstance(var, str) and var not in KNOWN_VARIANTS:
-            out.append(f"{path}: unknown gallery Variant {var!r} — expected one of {sorted(KNOWN_VARIANTS)}")
+            out.append(f"{path}: unknown Variant {var!r} — not on the allow-list. Galleries take BrowseLayout_<Orientation>_<Template>_ver5.0; other controls have their own")
 
     # Action properties: does the implementation actually return what it declares?
     for _, node in walk(doc):

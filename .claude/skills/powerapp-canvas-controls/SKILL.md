@@ -113,6 +113,60 @@ powerapp-canvas-design for why that is the most important property in the whole 
 Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`,
 and the non-AutoLayout variant name.
 
+## Edit form and data cards
+
+```yaml
+- Form1:
+    Control: Form@2.4.4
+    Variant: Classic
+    Layout: Vertical                 # a top-level key, not a property
+    Properties:
+      DataSource: =asset_library
+    Children:
+      - asset_name_DataCard1:
+          Control: TypedDataCard@1.0.7
+          Variant: ClassicTextualEdit
+          IsLocked: true             # Studio locks generated cards
+          Properties:
+            DataField: ="Title"                       # a STRING — the internal name
+            Default: =ThisItem.asset_name             # value IN, from the form's Item
+            Update: =DataCardValue1.Text              # value OUT, read by SubmitForm
+            DisplayName: =DataSourceInfo([@asset_library], DataSourceInfo.DisplayName, 'Title')
+            MaxLength:   =DataSourceInfo([@asset_library], DataSourceInfo.MaxLength, 'Title')
+            Required: =false
+          Children:
+            - DataCardKey1:                # MetadataKey: FieldName    — the caption
+            - DataCardValue1:              # MetadataKey: FieldValue   — the input
+            - ErrorMessage1:               # MetadataKey: ErrorMessage — validation text
+```
+
+**The card is the contract.** `Default` is the way in, `Update` is the way out, and the
+children bind back to the card through `Parent`:
+
+```powerapps
+Text:        =Parent.DisplayName
+Default:     =Parent.Default
+MaxLength:   =Parent.MaxLength
+DisplayMode: =Parent.DisplayMode
+BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)
+```
+
+`MetadataKey` (`FieldName` / `FieldValue` / `ErrorMessage`) is what tells Studio which child
+plays which role — swap the input control and keep the key. `Layout:`, `MetadataKey:` and
+`IsLocked:` are all first-class pa-yaml keys, now confirmed in the wild.
+
+Note `DataSourceInfo`'s column argument is a **single-quoted identifier** (`'Title'`), not a
+double-quoted string — consistent with the 3.24042 identifier change.
+
+**When a form is the right tool:** a straightforward CRUD screen over one list, where you want
+`SubmitForm`, `Form.Error`, `Form.Unsaved` and per-field validation for free.
+
+**When it is not:** anything needing a *guarded write per column*. This app writes optional
+Choice, expanded-user (Person) and expanded-taxonomy (Managed Metadata) columns in separate
+`Patch` calls so one bad field can't take the whole record down, and it stages child rows
+before the parent exists. A single `SubmitForm` cannot express that. Forms and hand-rolled
+`Patch` screens are both legitimate — pick per screen, and say which you picked and why.
+
 ## Choosing between classic and modern
 
 Prefer modern for anything a user types into or picks from — it removes hand-parsing:
