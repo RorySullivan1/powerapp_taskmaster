@@ -175,12 +175,25 @@ Screens:
         // cached, so every separate reference is another SharePoint round trip —
         // three columns x (Items + DefaultSelectedItems + this seed) was nine.
         // The records are the connector's own, so they still Patch back unchanged.
-        ClearCollect( colPrRegionTerms, Sort(Choices([@taskmaster_projects].project_region), Label) );
-        ClearCollect( colPrTypeTerms,   Sort(Choices([@taskmaster_projects].project_type), Label) );
-        ClearCollect( colPrCovTerms,    Sort(Choices([@taskmaster_projects].project_coverage), Label) );
-        Set( gPrRegion, LookUp( colPrRegionTerms, Label = Coalesce(gEditProject.project_region.Value, "") ) );
-        Set( gPrType,   LookUp( colPrTypeTerms,   Label = Coalesce(gEditProject.project_type.Value, "") ) );
-        Set( gPrCov,    LookUp( colPrCovTerms,    Label = Coalesce(gEditProject.project_coverage.Value, "") ) );
+        // Classification (C11). The vocabularies are their own lists now, cached
+        // once on entry — the pickers filter these in memory, so opening a level
+        // costs nothing. `active` is honoured inside cmpNestedSelect, not here:
+        // a term that has been deactivated must still resolve for DISPLAY on a
+        // project that already carries it.
+        ClearCollect( colMapRegion,   mapping_region );
+        ClearCollect( colMapActivity, mapping_activitytype );
+        // The picker's answer, held as the id+path pair the columns store. The
+        // PATH is authoritative; the id is 0 when the pick names a branch the
+        // vocabulary has no row for.
+        Set( gPrRegionId,   If( gEditMode = "Edit", Coalesce(gEditProject.project_region_id, 0), 0 ) );
+        Set( gPrRegionPath, If( gEditMode = "Edit", Coalesce(gEditProject.project_region_path, ""), "" ) );
+        Set( gPrTypeId,     If( gEditMode = "Edit", Coalesce(gEditProject.project_type_id, 0), 0 ) );
+        Set( gPrTypePath,   If( gEditMode = "Edit", Coalesce(gEditProject.project_type_path, ""), "" ) );
+        // Coverage is an ordinary Choice column now. Its real values are not yet
+        // supplied, so the picker reads Choices() rather than a hardcoded literal
+        // and needs no app change when they land.
+        ClearCollect( colPrCovChoices, Choices([@taskmaster_projects].project_coverage) );
+        Set( gPrCov, If( gEditMode = "Edit", Coalesce(gEditProject.project_coverage.Value, ""), "" ) );
         // Staging areas. Cleared on every visit — a half-entered child list left
         // over from the previous project would be written to THIS one.
         Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
@@ -221,7 +234,9 @@ Screens:
         // re-picking the displayed value fires no OnChange, so the correction can't
         // be made by hand either.
         Reset( cboPrPhase ); Reset( cboPrPriority );
-        Reset( cboPrRegion ); Reset( cboPrType ); Reset( cboPrCov );
+        // Region and type are cmpNestedSelect instances now; they re-seed from
+        // DefaultPath and hold their own depth, so there is nothing to reset.
+        Reset( cboPrCov );
         Reset( cboNtPriority ); Reset( cboNxCcy );
         Reset( cboNiStatus ); Reset( cboNiImpact )
     Children:
@@ -895,43 +910,28 @@ Screens:
                   Color: =Theme.Color.TextMuted
                   Width: =Parent.Width - 48
                   Height: =18
-            - lblCapPrRegion:
-                Control: Label@2.5.1
+            # Region and Project type are 3-level vocabularies, so each gets a
+            # cmpNestedSelect. The instance is 760 x 64 because a canvas component
+            # cannot size itself to its content — see the component's header.
+            - pickPrRegion:
+                Control: CanvasComponent
+                ComponentName: cmpNestedSelect
                 Properties:
-                  Text: |
-                    ="Region  *" & If( CountRows(colPrRegionTerms) >= 20,
-                         "   ⚠ showing 20 terms — the connector caps Choices() there", "" )
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =18
-            - cboPrRegion:
-                Control: ModernCombobox@1.0.0
-                Properties:
-                  # Bound STRAIGHT to the term store. Choices() on a managed-metadata
-                  # column returns the term set; Label is the only field this reads,
-                  # and Selected hands the connector its own record back at save time.
-                  Items: =colPrRegionTerms
-                  ItemDisplayText: =ThisItem.Label
-                  # Seeds the current term on Edit. Filter (not LookUp) because
-                  # DefaultSelectedItems takes a TABLE of records from Items; an empty
-                  # table is the correct "nothing selected" value, so New needs no branch.
-                  DefaultSelectedItems: =Filter( colPrRegionTerms,
-                                                 Label = Coalesce(gEditProject.project_region.Value, "") )
-                  SelectMultiple: =false
-                  IsSearchable: =true
-                  InputTextPlaceholder: ="Select a region"
-                  Width: =Parent.Width - 48
-                  Height: =32
-                  OnChange: =Set( gPrRegion, cboPrRegion.Selected )
+                  Terms: =colMapRegion
+                  Caption: ="Region  *"
+                  DefaultPath: =gPrRegionPath
+                  Width: =760
+                  Height: =64
+                  OnChange: |
+                    =Set( gPrRegionId,   pickPrRegion.SelectedId );
+                     Set( gPrRegionPath, pickPrRegion.SelectedPath )
             - lblPrRegionState:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
-                    =If( !IsBlank(gPrRegion), "✓ " & gPrRegion.Label,
+                    =If( Len(gPrRegionPath) > 0, "✓ " & gPrRegionPath,
                          gEditMode = "Edit",
-                         "Currently: " & Coalesce(gEditProject.project_region.Value, "not set") & "   (leave alone to keep it)",
+                         "Currently: " & Coalesce(gEditProject.project_region_path, "not set") & "   (leave alone to keep it)",
                          "Nothing picked yet" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
@@ -939,43 +939,25 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =20
                   VerticalAlign: =VerticalAlign.Middle
-            - lblCapPrType:
-                Control: Label@2.5.1
+            - pickPrType:
+                Control: CanvasComponent
+                ComponentName: cmpNestedSelect
                 Properties:
-                  Text: |
-                    ="Project type  *" & If( CountRows(colPrTypeTerms) >= 20,
-                         "   ⚠ showing 20 terms — the connector caps Choices() there", "" )
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =18
-            - cboPrType:
-                Control: ModernCombobox@1.0.0
-                Properties:
-                  # Bound STRAIGHT to the term store. Choices() on a managed-metadata
-                  # column returns the term set; Label is the only field this reads,
-                  # and Selected hands the connector its own record back at save time.
-                  Items: =colPrTypeTerms
-                  ItemDisplayText: =ThisItem.Label
-                  # Seeds the current term on Edit. Filter (not LookUp) because
-                  # DefaultSelectedItems takes a TABLE of records from Items; an empty
-                  # table is the correct "nothing selected" value, so New needs no branch.
-                  DefaultSelectedItems: =Filter( colPrTypeTerms,
-                                                 Label = Coalesce(gEditProject.project_type.Value, "") )
-                  SelectMultiple: =false
-                  IsSearchable: =true
-                  InputTextPlaceholder: ="Select a project type"
-                  Width: =Parent.Width - 48
-                  Height: =32
-                  OnChange: =Set( gPrType, cboPrType.Selected )
+                  Terms: =colMapActivity
+                  Caption: ="Project type  *"
+                  DefaultPath: =gPrTypePath
+                  Width: =760
+                  Height: =64
+                  OnChange: |
+                    =Set( gPrTypeId,   pickPrType.SelectedId );
+                     Set( gPrTypePath, pickPrType.SelectedPath )
             - lblPrTypeState:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
-                    =If( !IsBlank(gPrType), "✓ " & gPrType.Label,
+                    =If( Len(gPrTypePath) > 0, "✓ " & gPrTypePath,
                          gEditMode = "Edit",
-                         "Currently: " & Coalesce(gEditProject.project_type.Value, "not set") & "   (leave alone to keep it)",
+                         "Currently: " & Coalesce(gEditProject.project_type_path, "not set") & "   (leave alone to keep it)",
                          "Nothing picked yet" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
@@ -983,12 +965,11 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =20
                   VerticalAlign: =VerticalAlign.Middle
+            # Coverage is flat — an ordinary Choice column, so an ordinary combobox.
             - lblCapPrCov:
                 Control: Label@2.5.1
                 Properties:
-                  Text: |
-                    ="Coverage" & If( CountRows(colPrCovTerms) >= 20,
-                         "   ⚠ showing 20 terms — the connector caps Choices() there", "" )
+                  Text: ="Coverage"
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
@@ -997,36 +978,15 @@ Screens:
             - cboPrCov:
                 Control: ModernCombobox@1.0.0
                 Properties:
-                  # Bound STRAIGHT to the term store. Choices() on a managed-metadata
-                  # column returns the term set; Label is the only field this reads,
-                  # and Selected hands the connector its own record back at save time.
-                  Items: =colPrCovTerms
-                  ItemDisplayText: =ThisItem.Label
-                  # Seeds the current term on Edit. Filter (not LookUp) because
-                  # DefaultSelectedItems takes a TABLE of records from Items; an empty
-                  # table is the correct "nothing selected" value, so New needs no branch.
-                  DefaultSelectedItems: =Filter( colPrCovTerms,
-                                                 Label = Coalesce(gEditProject.project_coverage.Value, "") )
+                  Items: =colPrCovChoices
+                  ItemDisplayText: =ThisItem.Value
+                  DefaultSelectedItems: =Filter( colPrCovChoices, Value = gPrCov )
                   SelectMultiple: =false
                   IsSearchable: =true
                   InputTextPlaceholder: ="Select a coverage area"
                   Width: =Parent.Width - 48
                   Height: =32
-                  OnChange: =Set( gPrCov, cboPrCov.Selected )
-            - lblPrCovState:
-                Control: Label@2.5.1
-                Properties:
-                  Text: |
-                    =If( !IsBlank(gPrCov), "✓ " & gPrCov.Label,
-                         gEditMode = "Edit",
-                         "Currently: " & Coalesce(gEditProject.project_coverage.Value, "not set") & "   (leave alone to keep it)",
-                         "Nothing picked yet" )
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =20
-                  VerticalAlign: =VerticalAlign.Middle
+                  OnChange: =Set( gPrCov, cboPrCov.Selected.Value )
             # -----------------------------------------------------------------
             # TASKS  (staged — written after the project's insert returns)
             # -----------------------------------------------------------------
@@ -1391,7 +1351,7 @@ Screens:
                   Visible: |
                     =Len(Trim(txtPrName.Text)) = 0
                      || Len(gPrManager.Mail) = 0
-                     || ( gEditMode = "New" && ( IsBlank(gPrRegion) || IsBlank(gPrType) ) )
+                     || ( gEditMode = "New" && ( Len(gPrRegionPath) = 0 || Len(gPrTypePath) = 0 ) )
                   # Deliberately flat: one Trim over an &-chain, no With and no inline
                   # record. The nested version was correct but fragile to hand-edit —
                   # a single `&` mistyped as `,` turns it into Trim(a, b) and Studio
@@ -1402,8 +1362,8 @@ Screens:
                      Trim(
                        If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
                        If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
-                       If( gEditMode = "New" && IsBlank(gPrRegion), "Region   ", "" ) &
-                       If( gEditMode = "New" && IsBlank(gPrType),   "Project type   ", "" ) )
+                       If( gEditMode = "New" && Len(gPrRegionPath) = 0, "Region   ", "" ) &
+                       If( gEditMode = "New" && Len(gPrTypePath) = 0,   "Project type   ", "" ) )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.Danger
@@ -1431,7 +1391,7 @@ Screens:
                   DisplayMode: |
                     =If( Len(Trim(txtPrName.Text)) > 0
                          && Len(gPrManager.Mail) > 0
-                         && ( gEditMode = "Edit" || ( !IsBlank(gPrRegion) && !IsBlank(gPrType) ) ),
+                         && ( gEditMode = "Edit" || ( Len(gPrRegionPath) > 0 && Len(gPrTypePath) > 0 ) ),
                          DisplayMode.Edit, DisplayMode.Disabled )
                   Width: =300
                   Height: =48
@@ -1454,12 +1414,14 @@ Screens:
                                             DisplayName: gPrManager.DisplayName,
                                             Email:       gPrManager.Mail,
                                             Department: "", JobTitle: "", Picture: "" },
-                                      // The MM value handed back is the connector's OWN
-                                      // record, found by the path the picker resolved — not
-                                      // a hand-built SPListExpandedTaxonomy literal. See
-                                      // _EDIT-NOTES.md for why that swap matters.
-                                      project_region: gPrRegion,
-                                      project_type:   gPrType,
+                                      // Classification is two plain columns per vocabulary
+                                      // now — a Number and a Text. No taxonomy record, no
+                                      // connector shape to get right (C11).
+                                      project_region_id:   gPrRegionId,
+                                      project_region_path: gPrRegionPath,
+                                      project_type_id:     gPrTypeId,
+                                      project_type_path:   gPrTypePath,
+                                      project_coverage:    If( Len(gPrCov) > 0, { Value: gPrCov }, Blank() ),
                                       project_date_start:    dtpPrStart.SelectedDate,
                                       project_date_target:   dtpPrTarget.SelectedDate,
                                       project_date_complete:
@@ -1517,15 +1479,20 @@ Screens:
                         // Managed metadata on EDIT only — on New these went in with the
                         // insert. Each stays its own Patch: MM is still the least-proven
                         // write in the app and must not take the rest of the record down.
-                        If( gEditMode = "Edit" && !IsBlank(gPrRegion),
+                        // Still one Patch per vocabulary. These are ordinary columns
+                        // now rather than the least-proven write in the app, but a
+                        // classification failing must still not take the record down.
+                        If( gEditMode = "Edit" && Len(gPrRegionPath) > 0,
                             IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_region: gPrRegion }) ), Set( gPrWarn, gPrWarn & "the region didn't stick: " & FirstError.Message & "   " )) );
-                        If( gEditMode = "Edit" && !IsBlank(gPrType),
+                                           { project_region_id: gPrRegionId,
+                                             project_region_path: gPrRegionPath }) ), Set( gPrWarn, gPrWarn & "the region didn't stick: " & FirstError.Message & "   " )) );
+                        If( gEditMode = "Edit" && Len(gPrTypePath) > 0,
                             IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_type: gPrType }) ), Set( gPrWarn, gPrWarn & "the type didn't stick: " & FirstError.Message & "   " )) );
-                        If( !IsBlank(gPrCov),
+                                           { project_type_id: gPrTypeId,
+                                             project_type_path: gPrTypePath }) ), Set( gPrWarn, gPrWarn & "the type didn't stick: " & FirstError.Message & "   " )) );
+                        If( gEditMode = "Edit" && Len(gPrCov) > 0,
                             IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_coverage: gPrCov }) ), Set( gPrWarn, gPrWarn & "the coverage didn't stick: " & FirstError.Message & "   " )) );
+                                           { project_coverage: { Value: gPrCov } }) ), Set( gPrWarn, gPrWarn & "the coverage didn't stick: " & FirstError.Message & "   " )) );
                         // --- 3. children ------------------------------------------
                         // IfError's third argument is the value returned when NOTHING
                         // errored, which is how each row records success or failure
