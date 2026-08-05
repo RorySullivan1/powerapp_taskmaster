@@ -5,61 +5,64 @@
 # per column: pass it the mapping list's rows, get back the path the user chose
 # and, when that path names an exact row, that row's ID.
 #
-# HOW IT READS: a dropdown. Pick a value and — only if terms exist beneath it —
-# the next dropdown appears below. Commit at whatever depth you reached.
+# LAYOUT
+#   caption ......................................... ✓     <- commit, top right
+#   [ level 1 ] [ level 2 ] [ level 3 ]  +  ✕              <- + adds, ✕ removes
+#
+# The depth is the USER'S choice: + opens the next level to the right, ✕ closes
+# the deepest one. One level is a complete answer; so is three.
 #
 # ---------------------------------------------------------------------------
-# ANY DEPTH IS A VALID ANSWER (revised 2026-08-05).
+# CORRECTION, 2026-08-05 — this file previously claimed it could hold no state.
 #
-# The first version required the chosen combination to match a row exactly, and
-# disabled the commit button otherwise. That made a vocabulary seeded as one row
-# per FULL path unusable above the leaf: with `Campaign > Email` on file but no
-# bare `Campaign` row, level 1 could never be committed.
+# That was wrong, and it distorted two rounds of this design. Microsoft's canvas
+# component documentation, Known limitations:
 #
-# So the PATH is the authoritative answer and is composed from what the user
-# actually picked. `SelectedId` is the exact row when one exists and 0 when the
-# pick names a branch rather than a row — which is why the consuming `_id`
-# columns are optional, while `_path` is not. Filtering still works at every
-# depth, because StartsWith() on the stored path is what drill-down uses.
+#   "Components don't support the UpdateContext function, but you can create and
+#    update variables in a component by using the Set function. THE SCOPE OF
+#    THESE VARIABLES IS LIMITED TO THE COMPONENT."
+#
+# So `Set()` here is component-scoped, not app-global, and two instances do not
+# tread on each other. `nsLevels` below is that state.
+#
+# ⚠ ONE THING TO PROVE ON FIRST USE: put TWO instances on one screen (region and
+# type) and open a third level on one of them. If the OTHER instance's depth
+# changes too, the scope is per-DEFINITION rather than per-instance, and the fix
+# is to move `nsLevels` out to the consumer — an Input for the depth plus
+# OnAddLevel/OnRemoveLevel events. Everything else in this file stays as it is.
 # ---------------------------------------------------------------------------
 #
-# ---------------------------------------------------------------------------
-# IT HOLDS NO STATE, AND THAT IS THE WHOLE DESIGN.
+# ANY DEPTH IS A VALID ANSWER. The PATH is the authoritative output and is
+# composed from what the user picked. `SelectedId` is the exact row when one
+# exists and 0 when the pick names a branch the vocabulary has no row for —
+# which is the normal case when a mapping list is seeded one row per FULL path.
+# That is why the consuming `_id` columns are optional and `_path` is not.
+# Drill-down is unaffected: it is StartsWith() on the path, at any depth.
 #
-# The three comboboxes ARE the state — each level reads the selection above it.
-# Nothing is written to a variable at any point.
+# `nsLevels` is never initialised. Every read is `Coalesce(nsLevels, 1)`, so
+# blank means one level and the component needs no OnVisible it cannot have.
 #
-# That is a correctness requirement, not tidiness. `scrProjectEdit` carries TWO
-# instances (region and type). A component cannot hold a context variable, so
-# internal state would have to be a GLOBAL, and the two instances would then
-# overwrite each other's picks. Any edit that reaches for `Set()` in here brings
-# that bug back.
-# ---------------------------------------------------------------------------
+# SIZING. The comboboxes carry a fixed 240 and the row is a horizontal
+# auto-layout, so hidden levels take no space and the control occupies exactly
+# what its depth needs. An earlier version sized them as thirds of the instance
+# width and clipped whenever the instance was narrower than it was authored
+# against. Height is a constant 64 — one header row plus one control row.
 #
-# SIZING: the root container stretches its children, and NO child sets a Width.
-# The first version gave each combobox a fixed 412 to sit three-across, which
-# clipped the moment the instance was narrower than the 1318 it was authored
-# against. Stretch has nothing to freeze and nothing to cut off — the levels
-# stack down the column instead of across it, so only the component's own width
-# matters and it is the consumer's to set.
-#
-# `Height` must fit all four rows, because a canvas component cannot size itself
-# to its content. Levels that are not showing leave blank space; that is the
-# trade for never clipping.
-#
-# SEEDING uses StartsWith rather than Split(): a stored path seeds level 1 when
+# SEEDING uses StartsWith rather than Split(): a stored path seeds a level when
 # it equals that level's value or begins with it followed by the separator. That
 # avoids depending on the column name Split() returns, which differs between
 # Power Fx versions and has never been confirmed against this tenant.
 #
-# Grounded tokens only: Label@2.5.1, ModernCombobox@1.0.0, ModernButton@1.0.0,
-# GroupContainer@1.5.0 (AutoLayout). `Distinct()` returns a single-column table
-# whose column is named `Value` — first-party documented, hence `.Selected.Value`.
+# Grounded tokens only: Label@2.5.1, ModernCombobox@1.0.0, Classic/Icon@2.5.0,
+# GroupContainer@1.5.0 (AutoLayout). Icon.Check / Icon.Add / Icon.Cancel are all
+# on the 180-name classic enum — there is no Subtract or Minus, hence ✕ to
+# remove. `Distinct()` returns a single-column table whose column is named
+# `Value` — first-party documented, hence `.Selected.Value`.
 # =============================================================================
 ComponentDefinitions:
   cmpNestedSelect:
     DefinitionType: CanvasComponent
-    Description: Cascading 1-3 level picker over a mapping_* table. Commits at any depth; outputs the chosen path and, when it names an exact row, that row's ID.
+    Description: Cascading 1-3 level picker over a mapping_* table. The user opens levels with +, closes with x, and commits at any depth.
     AccessAppScope: false
     CustomProperties:
       Terms:
@@ -70,7 +73,7 @@ ComponentDefinitions:
           =Table( { ID: 1, level1: "Example", level2: "", level3: "", active: true } )
       Caption:
         PropertyKind: Input
-        Description: Field caption shown above the dropdowns.
+        Description: Field caption, shown top left with the commit tick opposite it.
         DataType: Text
         Default: ="Classification"
       DefaultPath:
@@ -93,21 +96,21 @@ ComponentDefinitions:
         DataType: Number
       OnChange:
         PropertyKind: Event
-        Description: Raised when the user commits. Read SelectedPath and SelectedId in the handler.
+        Description: Raised when the user commits with the tick. Read SelectedPath and SelectedId in the handler.
         ReturnType: Boolean
     Properties:
-      Width: =1318
-      # 16 caption + 3x36 dropdowns + 36 commit + 4x8 gaps. A component cannot
-      # size itself to content, so this fits the deepest case.
-      Height: =192
+      Width: =820
+      Height: =64
       Fill: =RGBA(0, 0, 0, 0)
-      # Composed from the PICKS, not from a matched row — that is what lets a
-      # user stop at level 1 or 2.
+      # Composed from the PICKS, and only from levels currently open — closing a
+      # level with ✕ resets it, but the depth test makes that independent.
       SelectedPath: |
         =If( IsBlank(cboL1.Selected.Value), "",
              cboL1.Selected.Value
-             & If( IsBlank(cboL2.Selected.Value), "", cmpNestedSelect.Separator & cboL2.Selected.Value )
-             & If( IsBlank(cboL3.Selected.Value), "", cmpNestedSelect.Separator & cboL3.Selected.Value ) )
+             & If( Coalesce(nsLevels, 1) >= 2 && !IsBlank(cboL2.Selected.Value),
+                   cmpNestedSelect.Separator & cboL2.Selected.Value, "" )
+             & If( Coalesce(nsLevels, 1) >= 3 && !IsBlank(cboL3.Selected.Value),
+                   cmpNestedSelect.Separator & cboL3.Selected.Value, "" ) )
       # Coalesce on both sides so a blank level matches a blank column: a term
       # that genuinely stops at level 1 resolves to its own row and gets an ID.
       SelectedId: |
@@ -123,8 +126,6 @@ ComponentDefinitions:
           Variant: AutoLayout
           Properties:
             LayoutDirection: =LayoutDirection.Vertical
-            # Stretch is what makes every child fill the component's width with
-            # no Width formula of its own — nothing to freeze, nothing to clip.
             LayoutAlignItems: =LayoutAlignItems.Stretch
             LayoutGap: =8
             X: =0
@@ -132,106 +133,171 @@ ComponentDefinitions:
             Width: =Parent.Width
             Height: =Parent.Height
           Children:
-            - nsCaption:
-                Control: Label@2.5.1
+            # HEADER — caption left, commit tick hard right.
+            - nsHeader:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
                 Properties:
-                  Text: =cmpNestedSelect.Caption
-                  Font: =Font.'Segoe UI'
-                  Size: =12
-                  Color: =RGBA(110, 120, 130, 1)
-                  Height: =16
-            # LEVEL 1 — always visible. Distinct() gives one row per family.
-            - cboL1:
-                Control: ModernCombobox@1.0.0
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =8
+                  Height: =20
+                Children:
+                  # The one formula in here that depends on the instance's width.
+                  # If the tick does not sit hard right after pasting, this is the
+                  # property to correct in the formula bar — a paste can freeze a
+                  # width into the constant it evaluated to.
+                  - nsCaption:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =cmpNestedSelect.Caption
+                        Font: =Font.'Segoe UI'
+                        Size: =12
+                        Color: =RGBA(110, 120, 130, 1)
+                        VerticalAlign: =VerticalAlign.Middle
+                        Width: =Parent.Width - 28
+                        Height: =20
+                  # Filled badge once the picked path matches what is already
+                  # stored, so the tick shows committed-vs-pending rather than
+                  # being a button that looks the same before and after.
+                  - icoCommit:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        # Composes the path again rather than reading
+                        # cmpNestedSelect.SelectedPath. A control reading its own
+                        # component's Output is unverified here, and a construct
+                        # that fails only at paste time is not worth the saved line.
+                        Icon: |
+                          =If( !IsBlank(cmpNestedSelect.DefaultPath)
+                               && cmpNestedSelect.DefaultPath =
+                                  cboL1.Selected.Value
+                                  & If( Coalesce(nsLevels, 1) >= 2 && !IsBlank(cboL2.Selected.Value),
+                                        cmpNestedSelect.Separator & cboL2.Selected.Value, "" )
+                                  & If( Coalesce(nsLevels, 1) >= 3 && !IsBlank(cboL3.Selected.Value),
+                                        cmpNestedSelect.Separator & cboL3.Selected.Value, "" ),
+                               Icon.CheckBadge, Icon.Check )
+                        Color: |
+                          =If( IsBlank(cboL1.Selected.Value), RGBA(190, 195, 200, 1),
+                               RGBA(0, 90, 158, 1) )
+                        DisplayMode: |
+                          =If( IsBlank(cboL1.Selected.Value), DisplayMode.Disabled, DisplayMode.Edit )
+                        Tooltip: ="Use this selection"
+                        Width: =20
+                        Height: =20
+                        OnSelect: =cmpNestedSelect.OnChange()
+            # LEVELS — fixed widths, so hidden ones take no space and the control
+            # is exactly as wide as the depth in use.
+            - nsRow:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
                 Properties:
-                  Items: |
-                    =Sort( Distinct( Filter(cmpNestedSelect.Terms, active), level1 ), Value )
-                  ItemDisplayText: =ThisItem.Value
-                  # Seeds from the stored path: this level's value either IS the
-                  # whole path, or the path continues past it with the separator.
-                  DefaultSelectedItems: |
-                    =Filter( Distinct( Filter(cmpNestedSelect.Terms, active), level1 ),
-                             cmpNestedSelect.DefaultPath = Value
-                             || StartsWith( cmpNestedSelect.DefaultPath,
-                                            Value & cmpNestedSelect.Separator ) )
-                  SelectMultiple: =false
-                  IsSearchable: =true
-                  InputTextPlaceholder: ="Select…"
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =12
                   Height: =36
-                  # Changing a level invalidates everything below it. Without this
-                  # the box below keeps showing a value from the previous branch.
-                  OnChange: =Reset(cboL2); Reset(cboL3)
-            # LEVEL 2 — appears only if terms exist beneath the level-1 pick.
-            # Visibility recomputes the count rather than reading cboL2.Items:
-            # a control's Items is WRITE-ONLY and reading it is an error.
-            - cboL2:
-                Control: ModernCombobox@1.0.0
-                Properties:
-                  Visible: |
-                    =!IsBlank(cboL1.Selected.Value)
-                     && CountRows( Filter( cmpNestedSelect.Terms,
-                                           active && level1 = cboL1.Selected.Value
-                                           && !IsBlank(level2) ) ) > 0
-                  Items: |
-                    =Sort( Distinct( Filter( cmpNestedSelect.Terms,
-                                             active && level1 = cboL1.Selected.Value
-                                             && !IsBlank(level2) ), level2 ), Value )
-                  ItemDisplayText: =ThisItem.Value
-                  DefaultSelectedItems: |
-                    =Filter( Distinct( Filter( cmpNestedSelect.Terms,
-                                               active && level1 = cboL1.Selected.Value
-                                               && !IsBlank(level2) ), level2 ),
-                             cmpNestedSelect.DefaultPath
-                               = cboL1.Selected.Value & cmpNestedSelect.Separator & Value
-                             || StartsWith( cmpNestedSelect.DefaultPath,
-                                            cboL1.Selected.Value & cmpNestedSelect.Separator
-                                            & Value & cmpNestedSelect.Separator ) )
-                  SelectMultiple: =false
-                  IsSearchable: =true
-                  InputTextPlaceholder: ="Select… (optional)"
-                  Height: =36
-                  OnChange: =Reset(cboL3)
-            # LEVEL 3 — same rule one level down. Nothing sits below it, so the
-            # seed is an equality test rather than a prefix test.
-            - cboL3:
-                Control: ModernCombobox@1.0.0
-                Properties:
-                  Visible: |
-                    =!IsBlank(cboL2.Selected.Value)
-                     && CountRows( Filter( cmpNestedSelect.Terms,
-                                           active && level1 = cboL1.Selected.Value
-                                           && level2 = cboL2.Selected.Value
-                                           && !IsBlank(level3) ) ) > 0
-                  Items: |
-                    =Sort( Distinct( Filter( cmpNestedSelect.Terms,
-                                             active && level1 = cboL1.Selected.Value
-                                             && level2 = cboL2.Selected.Value
-                                             && !IsBlank(level3) ), level3 ), Value )
-                  ItemDisplayText: =ThisItem.Value
-                  DefaultSelectedItems: |
-                    =Filter( Distinct( Filter( cmpNestedSelect.Terms,
-                                               active && level1 = cboL1.Selected.Value
-                                               && level2 = cboL2.Selected.Value
-                                               && !IsBlank(level3) ), level3 ),
-                             cmpNestedSelect.DefaultPath
-                               = cboL1.Selected.Value & cmpNestedSelect.Separator
-                                 & cboL2.Selected.Value & cmpNestedSelect.Separator & Value )
-                  SelectMultiple: =false
-                  IsSearchable: =true
-                  InputTextPlaceholder: ="Select… (optional)"
-                  Height: =36
-            # COMMIT — enabled as soon as level 1 is chosen. Depth is the user's
-            # decision, not the vocabulary's.
-            - btnNsCommit:
-                Control: ModernButton@1.0.0
-                Properties:
-                  Text: |
-                    =If( IsBlank(cboL1.Selected.Value), "Pick a value",
-                         "✓  Use  " & cboL1.Selected.Value
-                         & If( IsBlank(cboL2.Selected.Value), "", cmpNestedSelect.Separator & cboL2.Selected.Value )
-                         & If( IsBlank(cboL3.Selected.Value), "", cmpNestedSelect.Separator & cboL3.Selected.Value ) )
-                  Appearance: =ButtonAppearance.Primary
-                  DisplayMode: |
-                    =If( IsBlank(cboL1.Selected.Value), DisplayMode.Disabled, DisplayMode.Edit )
-                  Height: =36
-                  OnSelect: =cmpNestedSelect.OnChange()
+                Children:
+                  - cboL1:
+                      Control: ModernCombobox@1.0.0
+                      Properties:
+                        Items: |
+                          =Sort( Distinct( Filter(cmpNestedSelect.Terms, active), level1 ), Value )
+                        ItemDisplayText: =ThisItem.Value
+                        # Seeds from the stored path: this level's value either IS
+                        # the whole path, or the path continues past it.
+                        DefaultSelectedItems: |
+                          =Filter( Distinct( Filter(cmpNestedSelect.Terms, active), level1 ),
+                                   cmpNestedSelect.DefaultPath = Value
+                                   || StartsWith( cmpNestedSelect.DefaultPath,
+                                                  Value & cmpNestedSelect.Separator ) )
+                        SelectMultiple: =false
+                        IsSearchable: =true
+                        InputTextPlaceholder: ="Select…"
+                        Width: =240
+                        Height: =36
+                        # Changing a level invalidates everything below it.
+                        OnChange: =Reset(cboL2); Reset(cboL3)
+                  - cboL2:
+                      Control: ModernCombobox@1.0.0
+                      Properties:
+                        Visible: =Coalesce(nsLevels, 1) >= 2
+                        Items: |
+                          =Sort( Distinct( Filter( cmpNestedSelect.Terms,
+                                                   active && level1 = cboL1.Selected.Value
+                                                   && !IsBlank(level2) ), level2 ), Value )
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: |
+                          =Filter( Distinct( Filter( cmpNestedSelect.Terms,
+                                                     active && level1 = cboL1.Selected.Value
+                                                     && !IsBlank(level2) ), level2 ),
+                                   cmpNestedSelect.DefaultPath
+                                     = cboL1.Selected.Value & cmpNestedSelect.Separator & Value
+                                   || StartsWith( cmpNestedSelect.DefaultPath,
+                                                  cboL1.Selected.Value & cmpNestedSelect.Separator
+                                                  & Value & cmpNestedSelect.Separator ) )
+                        SelectMultiple: =false
+                        IsSearchable: =true
+                        InputTextPlaceholder: ="Select…"
+                        Width: =240
+                        Height: =36
+                        OnChange: =Reset(cboL3)
+                  - cboL3:
+                      Control: ModernCombobox@1.0.0
+                      Properties:
+                        Visible: =Coalesce(nsLevels, 1) >= 3
+                        Items: |
+                          =Sort( Distinct( Filter( cmpNestedSelect.Terms,
+                                                   active && level1 = cboL1.Selected.Value
+                                                   && level2 = cboL2.Selected.Value
+                                                   && !IsBlank(level3) ), level3 ), Value )
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: |
+                          =Filter( Distinct( Filter( cmpNestedSelect.Terms,
+                                                     active && level1 = cboL1.Selected.Value
+                                                     && level2 = cboL2.Selected.Value
+                                                     && !IsBlank(level3) ), level3 ),
+                                   cmpNestedSelect.DefaultPath
+                                     = cboL1.Selected.Value & cmpNestedSelect.Separator
+                                       & cboL2.Selected.Value & cmpNestedSelect.Separator & Value )
+                        SelectMultiple: =false
+                        IsSearchable: =true
+                        InputTextPlaceholder: ="Select…"
+                        Width: =240
+                        Height: =36
+                  # ADD — offered only when the deepest OPEN level has a pick and
+                  # the vocabulary actually goes deeper. No empty level can open.
+                  - icoAddLevel:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        Visible: |
+                          =Coalesce(nsLevels, 1) < 3
+                           && If( Coalesce(nsLevels, 1) = 1,
+                                  !IsBlank(cboL1.Selected.Value)
+                                  && CountRows( Filter( cmpNestedSelect.Terms,
+                                                        active && level1 = cboL1.Selected.Value
+                                                        && !IsBlank(level2) ) ) > 0,
+                                  !IsBlank(cboL2.Selected.Value)
+                                  && CountRows( Filter( cmpNestedSelect.Terms,
+                                                        active && level1 = cboL1.Selected.Value
+                                                        && level2 = cboL2.Selected.Value
+                                                        && !IsBlank(level3) ) ) > 0 )
+                        Icon: =Icon.Add
+                        Color: =RGBA(0, 90, 158, 1)
+                        Tooltip: ="Narrow it down a level"
+                        Width: =24
+                        Height: =24
+                        OnSelect: =Set( nsLevels, Coalesce(nsLevels, 1) + 1 )
+                  # REMOVE — resets the level being closed BEFORE decrementing, so
+                  # a closed level never leaves a value behind to be composed into
+                  # the path if it is reopened.
+                  - icoDropLevel:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        Visible: =Coalesce(nsLevels, 1) > 1
+                        Icon: =Icon.Cancel
+                        Color: =RGBA(110, 120, 130, 1)
+                        Tooltip: ="Close the last level"
+                        Width: =24
+                        Height: =24
+                        OnSelect: |
+                          =If( Coalesce(nsLevels, 1) >= 3, Reset(cboL3), Reset(cboL2) );
+                           Set( nsLevels, Coalesce(nsLevels, 1) - 1 )
