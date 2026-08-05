@@ -175,9 +175,9 @@ Screens:
         // cached, so every separate reference is another SharePoint round trip —
         // three columns x (Items + DefaultSelectedItems + this seed) was nine.
         // The records are the connector's own, so they still Patch back unchanged.
-        ClearCollect( colPrRegionTerms, Choices([@taskmaster_projects].project_region) );
-        ClearCollect( colPrTypeTerms,   Choices([@taskmaster_projects].project_type) );
-        ClearCollect( colPrCovTerms,    Choices([@taskmaster_projects].project_coverage) );
+        ClearCollect( colPrRegionTerms, Sort(Choices([@taskmaster_projects].project_region), Label) );
+        ClearCollect( colPrTypeTerms,   Sort(Choices([@taskmaster_projects].project_type), Label) );
+        ClearCollect( colPrCovTerms,    Sort(Choices([@taskmaster_projects].project_coverage), Label) );
         Set( gPrRegion, LookUp( colPrRegionTerms, Label = Coalesce(gEditProject.project_region.Value, "") ) );
         Set( gPrType,   LookUp( colPrTypeTerms,   Label = Coalesce(gEditProject.project_type.Value, "") ) );
         Set( gPrCov,    LookUp( colPrCovTerms,    Label = Coalesce(gEditProject.project_coverage.Value, "") ) );
@@ -898,7 +898,9 @@ Screens:
             - lblCapPrRegion:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Region  *"
+                  Text: |
+                    ="Region  *" & If( CountRows(colPrRegionTerms) >= 20,
+                         "   ⚠ showing 20 terms — the connector caps Choices() there", "" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
@@ -940,7 +942,9 @@ Screens:
             - lblCapPrType:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Project type  *"
+                  Text: |
+                    ="Project type  *" & If( CountRows(colPrTypeTerms) >= 20,
+                         "   ⚠ showing 20 terms — the connector caps Choices() there", "" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
@@ -982,7 +986,9 @@ Screens:
             - lblCapPrCov:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Coverage"
+                  Text: |
+                    ="Coverage" & If( CountRows(colPrCovTerms) >= 20,
+                         "   ⚠ showing 20 terms — the connector caps Choices() there", "" )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
