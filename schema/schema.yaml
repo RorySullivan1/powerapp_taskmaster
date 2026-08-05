@@ -68,6 +68,11 @@ lists:
   # NOT stored here: the composed path ("EMEA > UK > London"). The app builds it
   # from level1..3 on write, so the levels stay the single source and a stored
   # copy cannot drift from them.
+  #
+  # ORDERING IS ALPHABETICAL, not a stored column. Every picker sorts on the level
+  # it is showing — Sort() on a Text column delegates, so this holds however long a
+  # vocabulary grows, and there is no per-row number for anyone to maintain or get
+  # wrong. A term that needs to lead its siblings has to be named so.
   # ---------------------------------------------------------------------------
   mapping_region:
     role: >-
@@ -80,7 +85,6 @@ lists:
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
       - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete — a term in use must not vanish. Pickers filter on this; label resolution ignores it" }
-      - { name: sort_order, type: Number,  required: false,                 desc: "Display order within a level" }
 
   mapping_activitytype:
     role: >-
@@ -94,7 +98,6 @@ lists:
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
       - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete" }
-      - { name: sort_order, type: Number,  required: false,                 desc: "Display order within a level" }
 
   mapping_producttype:
     role: >-
@@ -106,7 +109,6 @@ lists:
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
       - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete" }
-      - { name: sort_order, type: Number,  required: false,                 desc: "Display order within a level" }
 
   # ---------------------------------------------------------------------------
   taskmaster_projects:
