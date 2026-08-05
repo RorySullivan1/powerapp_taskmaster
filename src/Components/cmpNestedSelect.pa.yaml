@@ -1,88 +1,22 @@
-# =============================================================================
-# cmpNestedSelect — cascading picker over a mapping_* table (up to 3 levels)
-# =============================================================================
-# Drives the classification columns added in schema v3.0.0 (C11). One instance
-# per column: pass it the mapping list's rows, get back the path the user chose
-# and, when that path names an exact row, that row's ID.
+# cmpNestedSelect — cascading 1-3 level picker over a mapping_* table.
 #
-# LAYOUT
-#   caption ......................................... ✓     <- commit, top right
-#   [ level 1 ] [ level 2 ] [ level 3 ]  +  ✕              <- + adds, ✕ removes
+#   caption ........................... ✓      commit, top right
+#   [ level 1 ] [ level 2 ] [ level 3 ]  + ✕   + opens a level, ✕ closes one
 #
-# The depth is the USER'S choice: + opens the next level to the right, ✕ closes
-# the deepest one. One level is a complete answer; so is three.
+# Outputs SelectedPath (authoritative, composed from the picks) and SelectedId
+# (the exact row, or 0 when the pick names a branch with no row of its own).
 #
-# ---------------------------------------------------------------------------
-# CORRECTION, 2026-08-05 — this file previously claimed it could hold no state.
+# Four things that will re-break it if changed without knowing why:
+#   - Children of an auto-layout container default to flexible sizing, which makes
+#     an explicit Width advisory. FillPortions 0 pins them.
+#   - Layout formulas freeze into constants on paste, so this component's internal
+#     geometry is integers only.
+#   - nsLevels is never initialised; every read is Coalesce(nsLevels, 1).
+#   - Distinct() names its column Value, hence .Selected.Value.
 #
-# That was wrong, and it distorted two rounds of this design. Microsoft's canvas
-# component documentation, Known limitations:
-#
-#   "Components don't support the UpdateContext function, but you can create and
-#    update variables in a component by using the Set function. THE SCOPE OF
-#    THESE VARIABLES IS LIMITED TO THE COMPONENT."
-#
-# So `Set()` here is component-scoped, not app-global, and two instances do not
-# tread on each other. `nsLevels` below is that state.
-#
-# ⚠ ONE THING TO PROVE ON FIRST USE: put TWO instances on one screen (region and
-# type) and open a third level on one of them. If the OTHER instance's depth
-# changes too, the scope is per-DEFINITION rather than per-instance, and the fix
-# is to move `nsLevels` out to the consumer — an Input for the depth plus
-# OnAddLevel/OnRemoveLevel events. Everything else in this file stays as it is.
-# ---------------------------------------------------------------------------
-#
-# ANY DEPTH IS A VALID ANSWER. The PATH is the authoritative output and is
-# composed from what the user picked. `SelectedId` is the exact row when one
-# exists and 0 when the pick names a branch the vocabulary has no row for —
-# which is the normal case when a mapping list is seeded one row per FULL path.
-# That is why the consuming `_id` columns are optional and `_path` is not.
-# Drill-down is unaffected: it is StartsWith() on the path, at any depth.
-#
-# `nsLevels` is never initialised. Every read is `Coalesce(nsLevels, 1)`, so
-# blank means one level and the component needs no OnVisible it cannot have.
-#
-# SIZING — REBUILT 2026-08-05, fourth iteration. Read this before changing it.
-#
-# The previous version wrapped everything in a VERTICAL auto-layout whose Height
-# was `=Parent.Height`. Two conventions in this repo say why that failed:
-#
-#   design skill S4  — layout formulas FREEZE into constants on paste. Prefer
-#                      plain integers wherever the value is static.
-#   container notes  — LayoutOverflowY defaults to Hide.
-#
-# So that Height froze to whatever the component measured mid-paste, its children
-# needed exactly 20 + 8 + 36 = 64, and the moment the frozen value came up short
-# the overflowing child was not shrunk, it was CLIPPED OUT OF EXISTENCE. That is
-# why nsRow vanished.
-#
-# A component's internal geometry is STATIC — the component is a fixed-size
-# control, so nothing in here should be a formula. It is now:
-#
-#   nsCaption   absolute, integers        X 0    Y 0    732 x 20
-#   icoCommit   absolute, integers        X 736  Y 0     20 x 20
-#   nsRow       ONE horizontal container  X 0    Y 28   760 x 36
-#
-# The row stays auto-layout because that is the one thing it genuinely buys: a
-# hidden level takes no space, so + and ✕ slide left and right on their own as
-# depth changes, with no X formula to freeze. Nothing nests, nothing does height
-# arithmetic, and there is no vertical container left to clip anything.
-#
-# INSTANCE SIZE IS 760 x 64. A canvas component cannot size itself to its
-# content, so at depth 1 the right-hand side is simply empty. The row's widest
-# case is 3x220 + 4x12 gaps + 2x24 icons = 756, which is why 760.
-#
-# SEEDING uses StartsWith rather than Split(): a stored path seeds a level when
-# it equals that level's value or begins with it followed by the separator. That
-# avoids depending on the column name Split() returns, which differs between
-# Power Fx versions and has never been confirmed against this tenant.
-#
-# Grounded tokens only: Label@2.5.1, ModernCombobox@1.0.0, Classic/Icon@2.5.0,
-# GroupContainer@1.5.0 (AutoLayout). Icon.Check / Icon.Add / Icon.Cancel are all
-# on the 180-name classic enum — there is no Subtract or Minus, hence ✕ to
-# remove. `Distinct()` returns a single-column table whose column is named
-# `Value` — first-party documented, hence `.Selected.Value`.
-# =============================================================================
+# UNPROVEN: whether Set() in a component is scoped per instance or per definition.
+# If opening a level on one instance moves the other, move nsLevels out to the
+# consumer as an Input plus OnAddLevel/OnRemoveLevel events.
 ComponentDefinitions:
   cmpNestedSelect:
     DefinitionType: CanvasComponent
@@ -126,8 +60,6 @@ ComponentDefinitions:
       Width: =760
       Height: =64
       Fill: =RGBA(0, 0, 0, 0)
-      # Composed from the PICKS, and only from levels currently open — closing a
-      # level with ✕ resets it, but the depth test makes that independent.
       SelectedPath: |
         =If( IsBlank(cboL1.Selected.Value), "",
              cboL1.Selected.Value
@@ -135,8 +67,6 @@ ComponentDefinitions:
                    cmpNestedSelect.Separator & cboL2.Selected.Value, "" )
              & If( Coalesce(nsLevels, 1) >= 3 && !IsBlank(cboL3.Selected.Value),
                    cmpNestedSelect.Separator & cboL3.Selected.Value, "" ) )
-      # Coalesce on both sides so a blank level matches a blank column: a term
-      # that genuinely stops at level 1 resolves to its own row and gets an ID.
       SelectedId: |
         =Coalesce(
            LookUp( cmpNestedSelect.Terms,
@@ -145,7 +75,6 @@ ComponentDefinitions:
                    && Coalesce(level3, "") = Coalesce(cboL3.Selected.Value, "") ).ID,
            0 )
     Children:
-      # HEADER — absolute integers. Nothing here moves, so nothing here is a formula.
       - nsCaption:
           Control: Label@2.5.1
           Properties:
@@ -158,15 +87,9 @@ ComponentDefinitions:
             Y: =0
             Width: =732
             Height: =20
-      # Filled badge once the picked path matches what is already stored, so the
-      # tick reads committed-vs-pending rather than looking the same either way.
       - icoCommit:
           Control: Classic/Icon@2.5.0
           Properties:
-            # Composes the path again rather than reading
-            # cmpNestedSelect.SelectedPath. A control reading its own component's
-            # Output is unverified here, and a construct that fails only at paste
-            # time is not worth the saved line.
             Icon: |
               =If( !IsBlank(cmpNestedSelect.DefaultPath)
                    && cmpNestedSelect.DefaultPath =
@@ -186,9 +109,6 @@ ComponentDefinitions:
             Width: =20
             Height: =20
             OnSelect: =cmpNestedSelect.OnChange()
-      # THE ONE CONTAINER. Auto-layout earns its place here and nowhere else: a
-      # hidden level takes no space, so + and ✕ slide as depth changes with no X
-      # formula to freeze. Its own X/Y/Width/Height are integers.
       - nsRow:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -205,27 +125,20 @@ ComponentDefinitions:
                 Control: ModernCombobox@1.0.0
                 Properties:
                   Items: |
-                    =Sort( Distinct( Filter(cmpNestedSelect.Terms, active), level1 ), Value )
+                    =Sort( Distinct( Filter(cmpNestedSelect.Terms, Coalesce(active, true)), level1 ), Value )
                   ItemDisplayText: =ThisItem.Value
-                  # Seeds from the stored path: this level's value either IS the
-                  # whole path, or the path continues past it.
                   DefaultSelectedItems: |
-                    =Filter( Distinct( Filter(cmpNestedSelect.Terms, active), level1 ),
+                    =Filter( Distinct( Filter(cmpNestedSelect.Terms, Coalesce(active, true)), level1 ),
                              cmpNestedSelect.DefaultPath = Value
                              || StartsWith( cmpNestedSelect.DefaultPath,
                                             Value & cmpNestedSelect.Separator ) )
                   SelectMultiple: =false
                   IsSearchable: =true
                   InputTextPlaceholder: ="Select…"
-                  # Flexible width is ON by default for a child of an
-                  # auto-layout container, and it makes Width advisory.
-                  # FillPortions 0 claims no spare space; LayoutMinWidth
-                  # stops it being squeezed the other way.
                   FillPortions: =0
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =36
-                  # Changing a level invalidates everything below it.
                   OnChange: =Reset(cboL2); Reset(cboL3)
             - cboL2:
                 Control: ModernCombobox@1.0.0
@@ -233,12 +146,12 @@ ComponentDefinitions:
                   Visible: =Coalesce(nsLevels, 1) >= 2
                   Items: |
                     =Sort( Distinct( Filter( cmpNestedSelect.Terms,
-                                             active && level1 = cboL1.Selected.Value
+                                             Coalesce(active, true) && level1 = cboL1.Selected.Value
                                              && !IsBlank(level2) ), level2 ), Value )
                   ItemDisplayText: =ThisItem.Value
                   DefaultSelectedItems: |
                     =Filter( Distinct( Filter( cmpNestedSelect.Terms,
-                                               active && level1 = cboL1.Selected.Value
+                                               Coalesce(active, true) && level1 = cboL1.Selected.Value
                                                && !IsBlank(level2) ), level2 ),
                              cmpNestedSelect.DefaultPath
                                = cboL1.Selected.Value & cmpNestedSelect.Separator & Value
@@ -248,10 +161,6 @@ ComponentDefinitions:
                   SelectMultiple: =false
                   IsSearchable: =true
                   InputTextPlaceholder: ="Select…"
-                  # Flexible width is ON by default for a child of an
-                  # auto-layout container, and it makes Width advisory.
-                  # FillPortions 0 claims no spare space; LayoutMinWidth
-                  # stops it being squeezed the other way.
                   FillPortions: =0
                   LayoutMinWidth: =220
                   Width: =220
@@ -263,13 +172,13 @@ ComponentDefinitions:
                   Visible: =Coalesce(nsLevels, 1) >= 3
                   Items: |
                     =Sort( Distinct( Filter( cmpNestedSelect.Terms,
-                                             active && level1 = cboL1.Selected.Value
+                                             Coalesce(active, true) && level1 = cboL1.Selected.Value
                                              && level2 = cboL2.Selected.Value
                                              && !IsBlank(level3) ), level3 ), Value )
                   ItemDisplayText: =ThisItem.Value
                   DefaultSelectedItems: |
                     =Filter( Distinct( Filter( cmpNestedSelect.Terms,
-                                               active && level1 = cboL1.Selected.Value
+                                               Coalesce(active, true) && level1 = cboL1.Selected.Value
                                                && level2 = cboL2.Selected.Value
                                                && !IsBlank(level3) ), level3 ),
                              cmpNestedSelect.DefaultPath
@@ -278,16 +187,10 @@ ComponentDefinitions:
                   SelectMultiple: =false
                   IsSearchable: =true
                   InputTextPlaceholder: ="Select…"
-                  # Flexible width is ON by default for a child of an
-                  # auto-layout container, and it makes Width advisory.
-                  # FillPortions 0 claims no spare space; LayoutMinWidth
-                  # stops it being squeezed the other way.
                   FillPortions: =0
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =36
-            # ADD — offered only when the deepest OPEN level has a pick and the
-            # vocabulary actually goes deeper. No empty level can open.
             - icoAddLevel:
                 Control: Classic/Icon@2.5.0
                 Properties:
@@ -296,27 +199,21 @@ ComponentDefinitions:
                      && If( Coalesce(nsLevels, 1) = 1,
                             !IsBlank(cboL1.Selected.Value)
                             && CountRows( Filter( cmpNestedSelect.Terms,
-                                                  active && level1 = cboL1.Selected.Value
+                                                  Coalesce(active, true) && level1 = cboL1.Selected.Value
                                                   && !IsBlank(level2) ) ) > 0,
                             !IsBlank(cboL2.Selected.Value)
                             && CountRows( Filter( cmpNestedSelect.Terms,
-                                                  active && level1 = cboL1.Selected.Value
+                                                  Coalesce(active, true) && level1 = cboL1.Selected.Value
                                                   && level2 = cboL2.Selected.Value
                                                   && !IsBlank(level3) ) ) > 0 )
                   Icon: =Icon.Add
                   Color: =RGBA(0, 90, 158, 1)
                   Tooltip: ="Narrow it down a level"
-                  # Flexible width is ON by default for a child of an
-                  # auto-layout container, and it makes Width advisory.
-                  # FillPortions 0 claims no spare space; LayoutMinWidth
-                  # stops it being squeezed the other way.
                   FillPortions: =0
                   LayoutMinWidth: =24
                   Width: =24
                   Height: =24
                   OnSelect: =Set( nsLevels, Coalesce(nsLevels, 1) + 1 )
-            # REMOVE — resets the level being closed BEFORE decrementing, so
-            # reopening never finds a value left from the previous branch.
             - icoDropLevel:
                 Control: Classic/Icon@2.5.0
                 Properties:
@@ -324,10 +221,6 @@ ComponentDefinitions:
                   Icon: =Icon.Cancel
                   Color: =RGBA(110, 120, 130, 1)
                   Tooltip: ="Close the last level"
-                  # Flexible width is ON by default for a child of an
-                  # auto-layout container, and it makes Width advisory.
-                  # FillPortions 0 claims no spare space; LayoutMinWidth
-                  # stops it being squeezed the other way.
                   FillPortions: =0
                   LayoutMinWidth: =24
                   Width: =24
