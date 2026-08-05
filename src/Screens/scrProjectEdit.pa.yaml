@@ -171,18 +171,28 @@ Screens:
         // Managed metadata. Each global holds the CONNECTOR'S OWN record from
         // Choices(), which is what gets written back — nothing is hand-built and
         // no term path is parsed. On New the LookUp finds nothing and leaves blank.
-        Set( gPrRegion, LookUp( Choices([@taskmaster_projects].project_region),
-                                Label = Coalesce(gEditProject.project_region.Value, "") ) );
-        Set( gPrType,   LookUp( Choices([@taskmaster_projects].project_type),
-                                Label = Coalesce(gEditProject.project_type.Value, "") ) );
-        Set( gPrCov,    LookUp( Choices([@taskmaster_projects].project_coverage),
-                                Label = Coalesce(gEditProject.project_coverage.Value, "") ) );
+        // ONE fetch per term set, on entry. Choices() is not delegable and is not
+        // cached, so every separate reference is another SharePoint round trip —
+        // three columns x (Items + DefaultSelectedItems + this seed) was nine.
+        // The records are the connector's own, so they still Patch back unchanged.
+        ClearCollect( colPrRegionTerms, Choices([@taskmaster_projects].project_region) );
+        ClearCollect( colPrTypeTerms,   Choices([@taskmaster_projects].project_type) );
+        ClearCollect( colPrCovTerms,    Choices([@taskmaster_projects].project_coverage) );
+        Set( gPrRegion, LookUp( colPrRegionTerms, Label = Coalesce(gEditProject.project_region.Value, "") ) );
+        Set( gPrType,   LookUp( colPrTypeTerms,   Label = Coalesce(gEditProject.project_type.Value, "") ) );
+        Set( gPrCov,    LookUp( colPrCovTerms,    Label = Coalesce(gEditProject.project_coverage.Value, "") ) );
         // Staging areas. Cleared on every visit — a half-entered child list left
         // over from the previous project would be written to THIS one.
         Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
         Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
         // Modal state. Each `g*Open` gates one modal; all three start closed.
         Set( gNtOpen, false ); Set( gNxOpen, false ); Set( gNiOpen, false );
+        // Which staged row a modal is editing. 0 = adding a new one. The chips set
+        // it; Add reads it to decide between Patch and Collect.
+        Set( gNtEditSid, 0 ); Set( gNxEditSid, 0 ); Set( gNiEditSid, 0 );
+        Set( gNtName, "" ); Set( gNtTarget, Blank() );
+        Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
+        Set( gNiName, "" );
         // Modal field state. Every default below is a REAL member of the matching
         // Choice column in schema/schema.yaml — task_priority, transaction_currency,
         // issue_status, issue_impact. Do not seed a value the list does not have.
@@ -521,7 +531,7 @@ Screens:
                   LayoutAlignItems: =LayoutAlignItems.Center
                   LayoutGap: =24
                   Width: =Parent.Width - 48
-                  Height: =122
+                  Height: =110
                 Children:
                   - colPrDesc:
                       Control: GroupContainer@1.5.0
@@ -530,8 +540,8 @@ Screens:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =8
-                        Width: =((Parent.Width - 48) / 3) * 2 + 24
-                        Height: =122
+                        Width: =Parent.Width
+                        Height: =110
                       Children:
                         - lblPrDescCap:
                             Control: Label@2.5.1
@@ -551,44 +561,7 @@ Screens:
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
-                              Height: =96
-                  # Two things this form does NOT ask for, said out loud rather than
-                  # left to be discovered. project_date_complete is derived on save
-                  # and project_perc_completion is the C3 rollup — neither is a field.
-                  - colPrDerived:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =(Parent.Width - 48) / 3
-                        Height: =122
-                      Children:
-                        - lblPrDerivedCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Filled in for you"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        - lblPrDerived:
-                            Control: Label@2.5.1
-                            Properties:
-                              # Char(10) rather than a literal newline inside the string:
-                              # a block scalar would bake this file's indentation into
-                              # the value, and Studio's formula bar would show it.
-                              Text: |
-                                ="Completion date — stamped automatically when you set the phase to Complete, and kept if you save again."
-                                 & Char(10) & Char(10) &
-                                 "Progress % — recalculated from this project's task stages every time you save."
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =96
+                              Height: =84
             # -----------------------------------------------------------------
             # PEOPLE
             # -----------------------------------------------------------------
@@ -608,35 +581,25 @@ Screens:
                   Color: =Theme.Color.Primary
                   Width: =Parent.Width - 48
                   Height: =24
-            - lblPrPeopleNote:
-                Control: Label@2.5.1
-                Properties:
-                  Text: ="Type two or more characters to search the directory. Press a name chip to change it."
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =18
-            # --- Project manager (required) ---
-            - rowPrManager:
+            - rowPrPeople:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
                   LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =24
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
                   Width: =Parent.Width - 48
-                  Height: =62
+                  Height: =58
                 Children:
-                  - colPrMgrSearch:
+                  - colPrMgr:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =400
-                        Height: =62
+                        LayoutGap: =6
+                        Width: =(Parent.Width - 32) / 3
+                        Height: =58
                       Children:
                         - lblPrMgrCap:
                             Control: Label@2.5.1
@@ -646,10 +609,14 @@ Screens:
                               Size: =Theme.Size.Small
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
-                              Height: =18
+                              Height: =16
+                        # The search box and the chip occupy the SAME slot — a hidden
+                        # child of an auto-layout container takes no space, so the
+                        # column never shows both and never reserves room for both.
                         - txtPrManagerSearch:
                             Control: ModernTextInput@1.0.0
                             Properties:
+                              Visible: =Len(gPrManager.Mail) = 0
                               Type: =TextInputType.Search
                               Placeholder: ="Search people…"
                               TriggerOutput: =TriggerOutput.Delayed
@@ -657,54 +624,132 @@ Screens:
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
                               Height: =36
-                  - colPrMgrChip:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =Parent.Width - 424
-                        Height: =62
-                      Children:
-                        - lblPrMgrChipCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Selected"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        # A flat Classic/Button, not a Label + separate clear icon:
-                        # one hit target, and clearing also Resets the search box so
-                        # the stale term cannot immediately re-open the gallery.
                         - btnPrMgrChip:
                             Control: Classic/Button@2.2.0
                             Properties:
-                              Text: =If(Len(gPrManager.Mail) > 0, gPrManager.DisplayName & "     ✕", "— nobody selected —")
+                              Visible: =Len(gPrManager.Mail) > 0
+                              Text: =gPrManager.DisplayName & "     ✕"
                               Align: =Align.Left
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Fill: =RGBA(0, 0, 0, 0)
-                              Color: =If(Len(gPrManager.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+                              Color: =Theme.Color.TextPrimary
                               BorderColor: =Theme.Color.Border
                               BorderThickness: =1
-                              DisplayMode: =If(Len(gPrManager.Mail) > 0, DisplayMode.Edit, DisplayMode.Disabled)
                               Width: =Parent.Width
                               Height: =36
                               OnSelect: |
                                 =Set(gPrManager, { DisplayName: "", Mail: "" });
                                  Reset(txtPrManagerSearch)
-            # Sibling of the row, not a child of it: a hidden child takes no space,
-            # so this expands the column when it opens and collapses when it closes.
+                  - colPrReq:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =6
+                        Width: =(Parent.Width - 32) / 3
+                        Height: =58
+                      Children:
+                        - lblPrReqCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Requestor"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =16
+                        # The search box and the chip occupy the SAME slot — a hidden
+                        # child of an auto-layout container takes no space, so the
+                        # column never shows both and never reserves room for both.
+                        - txtPrRequestorSearch:
+                            Control: ModernTextInput@1.0.0
+                            Properties:
+                              Visible: =Len(gPrRequestor.Mail) = 0
+                              Type: =TextInputType.Search
+                              Placeholder: ="Search people…"
+                              TriggerOutput: =TriggerOutput.Delayed
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Width: =Parent.Width
+                              Height: =36
+                        - btnPrReqChip:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Visible: =Len(gPrRequestor.Mail) > 0
+                              Text: =gPrRequestor.DisplayName & "     ✕"
+                              Align: =Align.Left
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: =Theme.Color.TextPrimary
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set(gPrRequestor, { DisplayName: "", Mail: "" });
+                                 Reset(txtPrRequestorSearch)
+                  - colPrSup:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =6
+                        Width: =(Parent.Width - 32) / 3
+                        Height: =58
+                      Children:
+                        - lblPrSupCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Supporter"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =16
+                        # The search box and the chip occupy the SAME slot — a hidden
+                        # child of an auto-layout container takes no space, so the
+                        # column never shows both and never reserves room for both.
+                        - txtPrSupporterSearch:
+                            Control: ModernTextInput@1.0.0
+                            Properties:
+                              Visible: =Len(gPrSupporter.Mail) = 0
+                              Type: =TextInputType.Search
+                              Placeholder: ="Search people…"
+                              TriggerOutput: =TriggerOutput.Delayed
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Width: =Parent.Width
+                              Height: =36
+                        - btnPrSupChip:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Visible: =Len(gPrSupporter.Mail) > 0
+                              Text: =gPrSupporter.DisplayName & "     ✕"
+                              Align: =Align.Left
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: =Theme.Color.TextPrimary
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set(gPrSupporter, { DisplayName: "", Mail: "" });
+                                 Reset(txtPrSupporterSearch)
             - galPrManager:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
                 Properties:
                   Visible: =Len(txtPrManagerSearch.Text) >= 2 && Len(gPrManager.Mail) = 0
                   Items: |
-                    =Office365Users.SearchUserV2({ searchTerm: txtPrManagerSearch.Text, top: 8 }).value
+                    =If( Len(txtPrManagerSearch.Text) >= 2,
+                         Office365Users.SearchUserV2({ searchTerm: txtPrManagerSearch.Text, top: 8 }).value,
+                         Blank() )
                   TemplateSize: =32
                   TemplatePadding: =0
                   BorderColor: =Theme.Color.Border
@@ -716,16 +761,15 @@ Screens:
                   - rowPrManagerLbl:
                       Control: Label@2.5.1
                       Properties:
-                        Text: =ThisItem.DisplayName & "     " & ThisItem.Mail
+                        Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Color: =Theme.Color.TextPrimary
                         X: =12
-                        Y: =0
+                        Y: =6
                         Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - galPrManagerHit:
+                        Height: =20
+                  - rowPrManagerHit:
                       Control: Classic/Button@2.2.0
                       Properties:
                         Text: =""
@@ -737,90 +781,17 @@ Screens:
                         Height: =Parent.TemplateHeight
                         OnSelect: |
                           =Select(Parent);
-                           Set(gPrManager, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
-            # --- Requestor (optional) ---
-            - rowPrRequestor:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =24
-                  Width: =Parent.Width - 48
-                  Height: =62
-                Children:
-                  - colPrReqSearch:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =400
-                        Height: =62
-                      Children:
-                        - lblPrReqCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Requestor"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        - txtPrRequestorSearch:
-                            Control: ModernTextInput@1.0.0
-                            Properties:
-                              Type: =TextInputType.Search
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Width: =Parent.Width
-                              Height: =36
-                  - colPrReqChip:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =Parent.Width - 424
-                        Height: =62
-                      Children:
-                        - lblPrReqChipCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Selected"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        - btnPrReqChip:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Text: =If(Len(gPrRequestor.Mail) > 0, gPrRequestor.DisplayName & "     ✕", "— nobody selected —")
-                              Align: =Align.Left
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Fill: =RGBA(0, 0, 0, 0)
-                              Color: =If(Len(gPrRequestor.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              DisplayMode: =If(Len(gPrRequestor.Mail) > 0, DisplayMode.Edit, DisplayMode.Disabled)
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrRequestor, { DisplayName: "", Mail: "" });
-                                 Reset(txtPrRequestorSearch)
+                           Set(gPrManager, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
+                           Reset(txtPrManagerSearch)
             - galPrRequestor:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
                 Properties:
                   Visible: =Len(txtPrRequestorSearch.Text) >= 2 && Len(gPrRequestor.Mail) = 0
                   Items: |
-                    =Office365Users.SearchUserV2({ searchTerm: txtPrRequestorSearch.Text, top: 8 }).value
+                    =If( Len(txtPrRequestorSearch.Text) >= 2,
+                         Office365Users.SearchUserV2({ searchTerm: txtPrRequestorSearch.Text, top: 8 }).value,
+                         Blank() )
                   TemplateSize: =32
                   TemplatePadding: =0
                   BorderColor: =Theme.Color.Border
@@ -832,16 +803,15 @@ Screens:
                   - rowPrRequestorLbl:
                       Control: Label@2.5.1
                       Properties:
-                        Text: =ThisItem.DisplayName & "     " & ThisItem.Mail
+                        Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Color: =Theme.Color.TextPrimary
                         X: =12
-                        Y: =0
+                        Y: =6
                         Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - galPrRequestorHit:
+                        Height: =20
+                  - rowPrRequestorHit:
                       Control: Classic/Button@2.2.0
                       Properties:
                         Text: =""
@@ -853,90 +823,17 @@ Screens:
                         Height: =Parent.TemplateHeight
                         OnSelect: |
                           =Select(Parent);
-                           Set(gPrRequestor, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
-            # --- Supporter (optional) ---
-            - rowPrSupporter:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =24
-                  Width: =Parent.Width - 48
-                  Height: =62
-                Children:
-                  - colPrSuppSearch:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =400
-                        Height: =62
-                      Children:
-                        - lblPrSuppCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Supporter  (one extra person)"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        - txtPrSupporterSearch:
-                            Control: ModernTextInput@1.0.0
-                            Properties:
-                              Type: =TextInputType.Search
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Width: =Parent.Width
-                              Height: =36
-                  - colPrSuppChip:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =Parent.Width - 424
-                        Height: =62
-                      Children:
-                        - lblPrSuppChipCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Selected"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        - btnPrSuppChip:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Text: =If(Len(gPrSupporter.Mail) > 0, gPrSupporter.DisplayName & "     ✕", "— nobody selected —")
-                              Align: =Align.Left
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Fill: =RGBA(0, 0, 0, 0)
-                              Color: =If(Len(gPrSupporter.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              DisplayMode: =If(Len(gPrSupporter.Mail) > 0, DisplayMode.Edit, DisplayMode.Disabled)
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrSupporter, { DisplayName: "", Mail: "" });
-                                 Reset(txtPrSupporterSearch)
+                           Set(gPrRequestor, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
+                           Reset(txtPrRequestorSearch)
             - galPrSupporter:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
                 Properties:
                   Visible: =Len(txtPrSupporterSearch.Text) >= 2 && Len(gPrSupporter.Mail) = 0
                   Items: |
-                    =Office365Users.SearchUserV2({ searchTerm: txtPrSupporterSearch.Text, top: 8 }).value
+                    =If( Len(txtPrSupporterSearch.Text) >= 2,
+                         Office365Users.SearchUserV2({ searchTerm: txtPrSupporterSearch.Text, top: 8 }).value,
+                         Blank() )
                   TemplateSize: =32
                   TemplatePadding: =0
                   BorderColor: =Theme.Color.Border
@@ -948,16 +845,15 @@ Screens:
                   - rowPrSupporterLbl:
                       Control: Label@2.5.1
                       Properties:
-                        Text: =ThisItem.DisplayName & "     " & ThisItem.Mail
+                        Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Color: =Theme.Color.TextPrimary
                         X: =12
-                        Y: =0
+                        Y: =6
                         Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - galPrSupporterHit:
+                        Height: =20
+                  - rowPrSupporterHit:
                       Control: Classic/Button@2.2.0
                       Properties:
                         Text: =""
@@ -969,7 +865,8 @@ Screens:
                         Height: =Parent.TemplateHeight
                         OnSelect: |
                           =Select(Parent);
-                           Set(gPrSupporter, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+                           Set(gPrSupporter, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
+                           Reset(txtPrSupporterSearch)
             # -----------------------------------------------------------------
             # CLASSIFICATION  (managed metadata — one combobox bound to Choices() per column)
             # -----------------------------------------------------------------
@@ -1013,12 +910,12 @@ Screens:
                   # Bound STRAIGHT to the term store. Choices() on a managed-metadata
                   # column returns the term set; Label is the only field this reads,
                   # and Selected hands the connector its own record back at save time.
-                  Items: =Choices([@taskmaster_projects].project_region)
+                  Items: =colPrRegionTerms
                   ItemDisplayText: =ThisItem.Label
                   # Seeds the current term on Edit. Filter (not LookUp) because
                   # DefaultSelectedItems takes a TABLE of records from Items; an empty
                   # table is the correct "nothing selected" value, so New needs no branch.
-                  DefaultSelectedItems: =Filter( Choices([@taskmaster_projects].project_region),
+                  DefaultSelectedItems: =Filter( colPrRegionTerms,
                                                  Label = Coalesce(gEditProject.project_region.Value, "") )
                   SelectMultiple: =false
                   IsSearchable: =true
@@ -1055,12 +952,12 @@ Screens:
                   # Bound STRAIGHT to the term store. Choices() on a managed-metadata
                   # column returns the term set; Label is the only field this reads,
                   # and Selected hands the connector its own record back at save time.
-                  Items: =Choices([@taskmaster_projects].project_type)
+                  Items: =colPrTypeTerms
                   ItemDisplayText: =ThisItem.Label
                   # Seeds the current term on Edit. Filter (not LookUp) because
                   # DefaultSelectedItems takes a TABLE of records from Items; an empty
                   # table is the correct "nothing selected" value, so New needs no branch.
-                  DefaultSelectedItems: =Filter( Choices([@taskmaster_projects].project_type),
+                  DefaultSelectedItems: =Filter( colPrTypeTerms,
                                                  Label = Coalesce(gEditProject.project_type.Value, "") )
                   SelectMultiple: =false
                   IsSearchable: =true
@@ -1097,12 +994,12 @@ Screens:
                   # Bound STRAIGHT to the term store. Choices() on a managed-metadata
                   # column returns the term set; Label is the only field this reads,
                   # and Selected hands the connector its own record back at save time.
-                  Items: =Choices([@taskmaster_projects].project_coverage)
+                  Items: =colPrCovTerms
                   ItemDisplayText: =ThisItem.Label
                   # Seeds the current term on Edit. Filter (not LookUp) because
                   # DefaultSelectedItems takes a TABLE of records from Items; an empty
                   # table is the correct "nothing selected" value, so New needs no branch.
-                  DefaultSelectedItems: =Filter( Choices([@taskmaster_projects].project_coverage),
+                  DefaultSelectedItems: =Filter( colPrCovTerms,
                                                  Label = Coalesce(gEditProject.project_coverage.Value, "") )
                   SelectMultiple: =false
                   IsSearchable: =true
@@ -1164,81 +1061,78 @@ Screens:
                         Text: ="+  Add task"
                         Width: =172
                         Height: =36
-                        OnSelect: =Set(gNtOpen, true)
-            - lblNtEmpty:
-                Control: Label@2.5.1
-                Properties:
-                  Visible: =IsEmpty(colNewTasks)
-                  Text: ="No tasks staged. Anything you add here is written to SharePoint the moment the project is saved."
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            # Constant Height on purpose — a CountRows()-driven height would freeze
-            # at paste time, when the collection is always empty, and clip the list
-            # permanently. 200 shows 4 rows and scrolls internally past that.
+                        OnSelect: |
+                          =Set( gNtEditSid, 0 ); Set( gNtName, "" ); Set( gNtTarget, Blank() );
+                           Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
+                           Set( gNtOpen, true )
+            # Chips, not a list: four to a row, wrapping. A staged row is a small
+            # object, so it gets a small object on screen. Tap the body to reopen it
+            # in the modal, the ✕ to drop it. The ✕ is declared LAST so it sits above
+            # the body's hit target and wins the click.
             - galNewTasks:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
                 Properties:
                   Visible: =!IsEmpty(colNewTasks)
                   Items: =colNewTasks
-                  TemplateSize: =44
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
+                  WrapCount: =4
+                  TemplateSize: =34
+                  TemplatePadding: =4
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
                   Width: =Parent.Width - 48
-                  Height: =200
+                  Height: =76        # constant: a CountRows() height would freeze empty on paste
                 Children:
-                  - ntRowName:
+                  - chipNtBg:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =Theme.Color.Bg
+                        BorderColor: =Theme.Color.Border
+                        BorderThickness: =1
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 8
+                        Height: =30
+                  - chipNtLbl:
                       Control: Label@2.5.1
                       Properties:
                         Text: =ThisItem.t_name
                         Font: =Theme.Font
-                        Size: =Theme.Size.Body
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =4
-                        Width: =Parent.TemplateWidth - 60
-                        Height: =18
-                  - ntRowMeta:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =ThisItem.t_priority & "  ·  lead " & ThisItem.t_leadName
-                           & If( IsBlank(ThisItem.t_target), "",
-                                 "  ·  due " & Text(ThisItem.t_target, "dd mmm yyyy") )
-                        Font: =Theme.Font
                         Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
-                        X: =12
-                        Y: =22
-                        Width: =Parent.TemplateWidth - 60
-                        Height: =16
-                  - ntRemove:
+                        Color: =Theme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =10
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 44
+                        Height: =30
+                  - chipNtHit:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: =""
+                        Fill: =RGBA(0, 0, 0, 0)
+                        BorderThickness: =0
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 32
+                        Height: =30
+                        OnSelect: |
+                          =Select(Parent);
+                           Set( gNtName, ThisItem.t_name ); Set( gNtTarget, ThisItem.t_target );
+                           Set( gNtPriority, ThisItem.t_priority );
+                           Set( gNtLead, { DisplayName: ThisItem.t_leadName, Mail: ThisItem.t_leadMail } );
+                           Set( gNtEditSid, ThisItem.sid );
+                           Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
+                           Set( gNtOpen, true )
+                  - chipNtDel:
                       Control: Classic/Icon@2.5.0
                       Properties:
-                        Icon: =Icon.Trash
+                        Icon: =Icon.Cancel
                         Color: =Theme.Color.TextMuted
-                        Height: =16
-                        Width: =16
-                        X: =Parent.TemplateWidth - 36
-                        Y: =14
+                        X: =Parent.TemplateWidth - 30
+                        Y: =8
+                        Width: =14
+                        Height: =14
                         OnSelect: =RemoveIf(colNewTasks, sid = ThisItem.sid)
-                  - ntRowRule:
-                      Control: Rectangle@2.3.0
-                      Properties:
-                        Fill: =Theme.Color.Border
-                        X: =0
-                        Y: =Parent.TemplateHeight - 1
-                        Width: =Parent.TemplateWidth
-                        Height: =1
-            # -----------------------------------------------------------------
-            # TRANSACTIONS  (staged)
-            # -----------------------------------------------------------------
             - divPrTx:
                 Control: Rectangle@2.3.0
                 Properties:
@@ -1274,80 +1168,81 @@ Screens:
                         Text: ="+  Add transaction"
                         Width: =172
                         Height: =36
-                        OnSelect: =Set(gNxOpen, true)
-            - lblNxEmpty:
-                Control: Label@2.5.1
-                Properties:
-                  Visible: =IsEmpty(colNewTransactions)
-                  Text: ="No transactions staged. Notional is recorded in its native currency only — cross-currency totals are a Power BI job (Q14)."
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
+                        OnSelect: |
+                          =Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
+                           Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy); Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
+                           Set( gNxOpen, true )
+            # Chips, not a list: four to a row, wrapping. A staged row is a small
+            # object, so it gets a small object on screen. Tap the body to reopen it
+            # in the modal, the ✕ to drop it. The ✕ is declared LAST so it sits above
+            # the body's hit target and wins the click.
             - galNewTransactions:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
                 Properties:
                   Visible: =!IsEmpty(colNewTransactions)
                   Items: =colNewTransactions
-                  TemplateSize: =44
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
+                  WrapCount: =4
+                  TemplateSize: =34
+                  TemplatePadding: =4
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
                   Width: =Parent.Width - 48
-                  Height: =200
+                  Height: =76        # constant: a CountRows() height would freeze empty on paste
                 Children:
-                  - nxRowName:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =ThisItem.x_name & "     " & ThisItem.x_ccy & " "
-                           & If( IsBlank(ThisItem.x_notional), "—", Text(ThisItem.x_notional, "[$-en-US]#,##0") )
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Body
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =4
-                        Width: =Parent.TemplateWidth - 60
-                        Height: =18
-                  - nxRowMeta:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =ThisItem.x_clientValue & "  ·  " & ThisItem.x_productValue
-                           & "  ·  " & Text(ThisItem.x_date, "dd mmm yyyy")
-                           & "  ·  sales " & ThisItem.x_salesName
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
-                        X: =12
-                        Y: =22
-                        Width: =Parent.TemplateWidth - 60
-                        Height: =16
-                  - nxRemove:
-                      Control: Classic/Icon@2.5.0
-                      Properties:
-                        Icon: =Icon.Trash
-                        Color: =Theme.Color.TextMuted
-                        Height: =16
-                        Width: =16
-                        X: =Parent.TemplateWidth - 36
-                        Y: =14
-                        OnSelect: =RemoveIf(colNewTransactions, sid = ThisItem.sid)
-                  - nxRowRule:
+                  - chipNxBg:
                       Control: Rectangle@2.3.0
                       Properties:
-                        Fill: =Theme.Color.Border
+                        Fill: =Theme.Color.Bg
+                        BorderColor: =Theme.Color.Border
+                        BorderThickness: =1
                         X: =0
-                        Y: =Parent.TemplateHeight - 1
-                        Width: =Parent.TemplateWidth
-                        Height: =1
-            # -----------------------------------------------------------------
-            # ISSUES  (staged)
-            # -----------------------------------------------------------------
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 8
+                        Height: =30
+                  - chipNxLbl:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =ThisItem.x_name
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: =Theme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =10
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 44
+                        Height: =30
+                  - chipNxHit:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: =""
+                        Fill: =RGBA(0, 0, 0, 0)
+                        BorderThickness: =0
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 32
+                        Height: =30
+                        OnSelect: |
+                          =Select(Parent);
+                           Set( gNxName, ThisItem.x_name ); Set( gNxDate, ThisItem.x_date );
+                           Set( gNxNotional, ThisItem.x_notional ); Set( gNxCcy, ThisItem.x_ccy );
+                           Set( gNxClient, { Id: ThisItem.x_clientId, Value: ThisItem.x_clientValue } );
+                           Set( gNxProduct, { Id: ThisItem.x_productId, Value: ThisItem.x_productValue } );
+                           Set( gNxSales, { DisplayName: ThisItem.x_salesName, Mail: ThisItem.x_salesMail } );
+                           Set( gNxEditSid, ThisItem.sid );
+                           Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy);
+                           Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
+                           Set( gNxOpen, true )
+                  - chipNxDel:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        Icon: =Icon.Cancel
+                        Color: =Theme.Color.TextMuted
+                        X: =Parent.TemplateWidth - 30
+                        Y: =8
+                        Width: =14
+                        Height: =14
+                        OnSelect: =RemoveIf(colNewTransactions, sid = ThisItem.sid)
             - divPrIssues:
                 Control: Rectangle@2.3.0
                 Properties:
@@ -1383,83 +1278,78 @@ Screens:
                         Text: ="+  Add issue"
                         Width: =172
                         Height: =36
-                        OnSelect: =Set(gNiOpen, true)
-            - lblNiEmpty:
-                Control: Label@2.5.1
-                Properties:
-                  Visible: =IsEmpty(colNewIssues)
-                  Text: ="No issues staged. Raise one here if the project already has a known blocker."
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
+                        OnSelect: |
+                          =Set( gNiEditSid, 0 ); Set( gNiName, "" );
+                           Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
+                           Set( gNiOpen, true )
+            # Chips, not a list: four to a row, wrapping. A staged row is a small
+            # object, so it gets a small object on screen. Tap the body to reopen it
+            # in the modal, the ✕ to drop it. The ✕ is declared LAST so it sits above
+            # the body's hit target and wins the click.
             - galNewIssues:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
                 Properties:
                   Visible: =!IsEmpty(colNewIssues)
                   Items: =colNewIssues
-                  TemplateSize: =44
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
+                  WrapCount: =4
+                  TemplateSize: =34
+                  TemplatePadding: =4
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
                   Width: =Parent.Width - 48
-                  Height: =200
+                  Height: =76        # constant: a CountRows() height would freeze empty on paste
                 Children:
-                  - niRowName:
+                  - chipNiBg:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =Theme.Color.Bg
+                        BorderColor: =Theme.Color.Border
+                        BorderThickness: =1
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 8
+                        Height: =30
+                  - chipNiLbl:
                       Control: Label@2.5.1
                       Properties:
                         Text: =ThisItem.i_name
                         Font: =Theme.Font
-                        Size: =Theme.Size.Body
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =4
-                        Width: =Parent.TemplateWidth - 60
-                        Height: =18
-                  - niRowMeta:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =ThisItem.i_status & "  ·  " & ThisItem.i_impact & " impact  ·  "
-                           & ThisItem.i_assigneeName
-                        Font: =Theme.Font
                         Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
-                        X: =12
-                        Y: =22
-                        Width: =Parent.TemplateWidth - 60
-                        Height: =16
-                  - niRemove:
+                        Color: =Theme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =10
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 44
+                        Height: =30
+                  - chipNiHit:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: =""
+                        Fill: =RGBA(0, 0, 0, 0)
+                        BorderThickness: =0
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 32
+                        Height: =30
+                        OnSelect: |
+                          =Select(Parent);
+                           Set( gNiName, ThisItem.i_name );
+                           Set( gNiStatus, ThisItem.i_status ); Set( gNiImpact, ThisItem.i_impact );
+                           Set( gNiAssignee, { DisplayName: ThisItem.i_assigneeName, Mail: ThisItem.i_assigneeMail } );
+                           Set( gNiEditSid, ThisItem.sid );
+                           Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
+                           Set( gNiOpen, true )
+                  - chipNiDel:
                       Control: Classic/Icon@2.5.0
                       Properties:
-                        Icon: =Icon.Trash
+                        Icon: =Icon.Cancel
                         Color: =Theme.Color.TextMuted
-                        Height: =16
-                        Width: =16
-                        X: =Parent.TemplateWidth - 36
-                        Y: =14
+                        X: =Parent.TemplateWidth - 30
+                        Y: =8
+                        Width: =14
+                        Height: =14
                         OnSelect: =RemoveIf(colNewIssues, sid = ThisItem.sid)
-                  - niRowRule:
-                      Control: Rectangle@2.3.0
-                      Properties:
-                        Fill: =Theme.Color.Border
-                        X: =0
-                        Y: =Parent.TemplateHeight - 1
-                        Width: =Parent.TemplateWidth
-                        Height: =1
-      # =======================================================================
-      # ACTION BAR  ·  Parent.Height - 88 .. Parent.Height
-      # =======================================================================
-      # THE FIX FOR THE FLOATING SAVE BUTTON. The bar and its contents now share
-      # ONE anchor expression: `actionBarBg` and `actionBarRow` are both at
-      # `Y: =Parent.Height - 88`, and the buttons carry no Y at all because the
-      # row places them. Whatever the paste freezes, they freeze together.
-      # `actionBarBg` stays opaque so a stale Height still cannot let the
-      # scrolling form show through the Save row.
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -1776,6 +1666,7 @@ Screens:
                Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
+               Set( gNtEditSid, 0 ); Set( gNtName, "" ); Set( gNtTarget, Blank() );
                Set( gNtOpen, false )
       - mdNtBg:
           Control: Rectangle@2.3.0
@@ -1809,7 +1700,7 @@ Screens:
             - mdNtTitle:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Add a task"
+                  Text: =If( gNtEditSid > 0, "Edit task", "Add a task" )
                   Font: =Theme.Font
                   FontWeight: =FontWeight.Semibold
                   Size: =Theme.Size.H3
@@ -1838,7 +1729,7 @@ Screens:
                   - txtNtName:
                       Control: ModernTextInput@1.0.0
                       Properties:
-                        Default: =""
+                        Default: =gNtName
                         Placeholder: ="What needs doing?"
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
@@ -1908,6 +1799,7 @@ Screens:
                         - dtpNtTarget:
                             Control: ModernDatePicker@1.0.0
                             Properties:
+                              DefaultDate: =gNtTarget
                               Placeholder: ="Target date"
                               Format: =DatePickerFormat.LongAbbreviated
                               StartOfWeek: =StartOfWeek.Monday
@@ -2040,7 +1932,7 @@ Screens:
           Properties:
             Visible: =gNtOpen
             Appearance: =ButtonAppearance.Primary
-            Text: ="Add task"
+            Text: =If( gNtEditSid > 0, "Save task", "Add task" )
             DisplayMode: |
               =If( Len(Trim(txtNtName.Text)) > 0 && Len(gNtLead.Mail) > 0,
                    DisplayMode.Edit, DisplayMode.Disabled )
@@ -2049,18 +1941,26 @@ Screens:
             Width: =140
             Height: =40
             OnSelect: |
-              =Collect( colNewTasks,
-                  { sid:        If( IsEmpty(colNewTasks), 1, Max(colNewTasks, sid) + 1 ),
-                    t_name:     Trim(txtNtName.Text),
-                    t_stage:    "Not Started",
-                    t_priority: gNtPriority,
-                    t_leadName: gNtLead.DisplayName,
-                    t_leadMail: gNtLead.Mail,
-                    t_target:   dtpNtTarget.SelectedDate } );
+              =If( gNtEditSid > 0,
+                   Patch( colNewTasks, LookUp(colNewTasks, sid = gNtEditSid),
+                      { t_name:     Trim(txtNtName.Text),
+                      t_priority: gNtPriority,
+                      t_leadName: gNtLead.DisplayName,
+                      t_leadMail: gNtLead.Mail,
+                      t_target:   dtpNtTarget.SelectedDate } ),
+                   Collect( colNewTasks,
+                      { sid:        If( IsEmpty(colNewTasks), 1, Max(colNewTasks, sid) + 1 ),
+                        t_stage:    "Not Started",
+                        t_name:     Trim(txtNtName.Text),
+                        t_priority: gNtPriority,
+                        t_leadName: gNtLead.DisplayName,
+                        t_leadMail: gNtLead.Mail,
+                        t_target:   dtpNtTarget.SelectedDate } ) );
                Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
                Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
+               Set( gNtEditSid, 0 ); Set( gNtName, "" ); Set( gNtTarget, Blank() );
                Set( gNtOpen, false )
       - mdNtCancel:
           Control: ModernButton@1.0.0
@@ -2077,6 +1977,7 @@ Screens:
                Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
+               Set( gNtEditSid, 0 ); Set( gNtName, "" ); Set( gNtTarget, Blank() );
                Set( gNtOpen, false )
       # =======================================================================
       # MODAL — ADD A TRANSACTION   card 780 x 680, body scrolls, buttons pinned
@@ -2097,6 +1998,7 @@ Screens:
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
                Set( gNxCcy, "USD" );
+               Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
                Set( gNxOpen, false )
       - mdNxBg:
           Control: Rectangle@2.3.0
@@ -2130,7 +2032,7 @@ Screens:
             - mdNxTitle:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Add a transaction"
+                  Text: =If( gNxEditSid > 0, "Edit transaction", "Add a transaction" )
                   Font: =Theme.Font
                   FontWeight: =FontWeight.Semibold
                   Size: =Theme.Size.H3
@@ -2169,7 +2071,7 @@ Screens:
                         - txtNxName:
                             Control: ModernTextInput@1.0.0
                             Properties:
-                              Default: =""
+                              Default: =gNxName
                               Placeholder: ="e.g. QIS-2026-0417 EMEA autocall"
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
@@ -2197,6 +2099,7 @@ Screens:
                         - dtpNxDate:
                             Control: ModernDatePicker@1.0.0
                             Properties:
+                              DefaultDate: =gNxDate
                               Placeholder: ="Trade date"
                               Format: =DatePickerFormat.LongAbbreviated
                               StartOfWeek: =StartOfWeek.Monday
@@ -2235,6 +2138,7 @@ Screens:
                         - numNxNotional:
                             Control: ModernNumberInput@1.0.0
                             Properties:
+                              Default: =gNxNotional
                               Min: =0
                               Step: =1000
                               Precision: =DecimalPrecision.'0'
@@ -2632,7 +2536,7 @@ Screens:
           Properties:
             Visible: =gNxOpen
             Appearance: =ButtonAppearance.Primary
-            Text: ="Add transaction"
+            Text: =If( gNxEditSid > 0, "Save transaction", "Add transaction" )
             DisplayMode: |
               =If( Len(Trim(txtNxName.Text)) > 0 && gNxClient.Id > 0 && gNxProduct.Id > 0
                 && !IsBlank(dtpNxDate.SelectedDate) && Len(gNxSales.Mail) > 0,
@@ -2642,24 +2546,37 @@ Screens:
             Width: =170
             Height: =40
             OnSelect: |
-              =Collect( colNewTransactions,
-                  { sid:            If( IsEmpty(colNewTransactions), 1, Max(colNewTransactions, sid) + 1 ),
-                    x_name:         Trim(txtNxName.Text),
-                    x_clientId:     gNxClient.Id,
-                    x_clientValue:  gNxClient.Value,
-                    x_productId:    gNxProduct.Id,
-                    x_productValue: gNxProduct.Value,
-                    x_ccy:          gNxCcy,
-                    x_notional:     numNxNotional.Value,
-                    x_date:         dtpNxDate.SelectedDate,
-                    x_salesName:    gNxSales.DisplayName,
-                    x_salesMail:    gNxSales.Mail } );
+              =If( gNxEditSid > 0,
+                   Patch( colNewTransactions, LookUp(colNewTransactions, sid = gNxEditSid),
+                      { x_name:         Trim(txtNxName.Text),
+                      x_clientId:     gNxClient.Id,
+                      x_clientValue:  gNxClient.Value,
+                      x_productId:    gNxProduct.Id,
+                      x_productValue: gNxProduct.Value,
+                      x_ccy:          gNxCcy,
+                      x_notional:     numNxNotional.Value,
+                      x_date:         dtpNxDate.SelectedDate,
+                      x_salesName:    gNxSales.DisplayName,
+                      x_salesMail:    gNxSales.Mail } ),
+                   Collect( colNewTransactions,
+                      { sid: If( IsEmpty(colNewTransactions), 1, Max(colNewTransactions, sid) + 1 ),
+                        x_name:         Trim(txtNxName.Text),
+                        x_clientId:     gNxClient.Id,
+                        x_clientValue:  gNxClient.Value,
+                        x_productId:    gNxProduct.Id,
+                        x_productValue: gNxProduct.Value,
+                        x_ccy:          gNxCcy,
+                        x_notional:     numNxNotional.Value,
+                        x_date:         dtpNxDate.SelectedDate,
+                        x_salesName:    gNxSales.DisplayName,
+                        x_salesMail:    gNxSales.Mail } ) );
                Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
                Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Reset( cboNxCcy );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
                Set( gNxCcy, "USD" );
+               Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
                Set( gNxOpen, false )
       - mdNxCancel:
           Control: ModernButton@1.0.0
@@ -2678,6 +2595,7 @@ Screens:
                Reset( cboNxCcy );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
                Set( gNxCcy, "USD" );
+               Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
                Set( gNxOpen, false )
       # =======================================================================
       # MODAL — ADD AN ISSUE       card 700 x 540, body scrolls, buttons pinned
@@ -2696,6 +2614,7 @@ Screens:
                Reset( cboNiStatus ); Reset( cboNiImpact );
                Set( gNiAssignee, { DisplayName: "", Mail: "" } );
                Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
+               Set( gNiEditSid, 0 ); Set( gNiName, "" ); 
                Set( gNiOpen, false )
       - mdNiBg:
           Control: Rectangle@2.3.0
@@ -2729,7 +2648,7 @@ Screens:
             - mdNiTitle:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Add an issue"
+                  Text: =If( gNiEditSid > 0, "Edit issue", "Add an issue" )
                   Font: =Theme.Font
                   FontWeight: =FontWeight.Semibold
                   Size: =Theme.Size.H3
@@ -2758,7 +2677,7 @@ Screens:
                   - txtNiName:
                       Control: ModernTextInput@1.0.0
                       Properties:
-                        Default: =""
+                        Default: =gNiName
                         Placeholder: ="What is the issue?"
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
@@ -2963,7 +2882,7 @@ Screens:
           Properties:
             Visible: =gNiOpen
             Appearance: =ButtonAppearance.Primary
-            Text: ="Add issue"
+            Text: =If( gNiEditSid > 0, "Save issue", "Add issue" )
             DisplayMode: |
               =If( Len(Trim(txtNiName.Text)) > 0 && Len(gNiAssignee.Mail) > 0,
                    DisplayMode.Edit, DisplayMode.Disabled )
@@ -2972,17 +2891,25 @@ Screens:
             Width: =140
             Height: =40
             OnSelect: |
-              =Collect( colNewIssues,
-                  { sid:            If( IsEmpty(colNewIssues), 1, Max(colNewIssues, sid) + 1 ),
-                    i_name:         Trim(txtNiName.Text),
-                    i_status:       gNiStatus,
-                    i_impact:       gNiImpact,
-                    i_assigneeName: gNiAssignee.DisplayName,
-                    i_assigneeMail: gNiAssignee.Mail } );
+              =If( gNiEditSid > 0,
+                   Patch( colNewIssues, LookUp(colNewIssues, sid = gNiEditSid),
+                      { i_name:         Trim(txtNiName.Text),
+                      i_status:       gNiStatus,
+                      i_impact:       gNiImpact,
+                      i_assigneeName: gNiAssignee.DisplayName,
+                      i_assigneeMail: gNiAssignee.Mail } ),
+                   Collect( colNewIssues,
+                      { sid: If( IsEmpty(colNewIssues), 1, Max(colNewIssues, sid) + 1 ),
+                        i_name:         Trim(txtNiName.Text),
+                        i_status:       gNiStatus,
+                        i_impact:       gNiImpact,
+                        i_assigneeName: gNiAssignee.DisplayName,
+                        i_assigneeMail: gNiAssignee.Mail } ) );
                Reset( txtNiName ); Reset( txtNiAssSearch );
                Reset( cboNiStatus ); Reset( cboNiImpact );
                Set( gNiAssignee, { DisplayName: "", Mail: "" } );
                Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
+               Set( gNiEditSid, 0 ); Set( gNiName, "" ); 
                Set( gNiOpen, false )
       - mdNiCancel:
           Control: ModernButton@1.0.0
@@ -2999,4 +2926,5 @@ Screens:
                Reset( cboNiStatus ); Reset( cboNiImpact );
                Set( gNiAssignee, { DisplayName: "", Mail: "" } );
                Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
+               Set( gNiEditSid, 0 ); Set( gNiName, "" ); 
                Set( gNiOpen, false )
