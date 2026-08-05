@@ -57,6 +57,9 @@ KNOWN_CONTROLS = {
     "ModernCombobox@1.0.0":   "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "ModernDatePicker@1.0.0": "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "Classic/ComboBox@2.4.0": "grounded",   # CONFIRMED 2026-08-04 — classic combo box
+    "Classic/DropDown@2.3.1": "grounded",   # CONFIRMED 2026-08-04 — note the capital D in DropDown
+    "ListBox@2.2.0":          "grounded",   # CONFIRMED 2026-08-04 — NO Classic/ prefix, like Timer
+    "ModernDropdown@1.0.0":   "grounded",   # from MS Learn's own YAML sample, 2026-08-04
     "Form@2.4.4":             "grounded",   # CONFIRMED 2026-08-04 — Variant: Classic, Layout: Vertical
     "TypedDataCard@1.0.7":    "grounded",   # CONFIRMED 2026-08-04 — a Form's data card
     "GroupContainer@1.5.0":   "grounded",   # CONFIRMED 2026-08-04 — auto-layout container,

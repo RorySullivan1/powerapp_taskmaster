@@ -223,7 +223,7 @@
   "ModernCombobox@1.0.0": {
    "output": "Selected  \u2014 a record; .Selected.Value for a string array",
    "props": "Items (array literal), ItemDisplayText, InputTextPlaceholder, SelectMultiple, IsSearchable, MultiValueDelimiter, Required, ValidationState",
-   "seed": "DefaultSelectedItems \u2014 CORROBORATED, not proven. Confirmed on Classic/ComboBox@2.4.0 and listed for the Fluent combo box family in MS Learn, but never seen on ModernCombobox itself. Still the single inferred property in this repo."
+   "seed": "DefaultSelectedItems \u2014 CONFIRMED on this control's own MS Learn page: 'the initial items selected\u2026 Must be a TABLE OF RECORDS from the Items data source.' With Items as an array literal, =[gVar] is the matching shape. No longer inferred."
   },
   "ModernDatePicker@1.0.0": {
    "output": "SelectedDate  \u2014 Blank() when unset",
@@ -243,6 +243,23 @@
    "seed": "DefaultSelectedItems  \u2014 CONFIRMED on this control (=Parent.Default inside a data card)",
    "props": "Items, SelectMultiple, DefaultSelectedItems, SelectionColor, SelectionFill, Chevron{Fill,Background,HoverFill,HoverBackground,DisabledFill,DisabledBackground}, DisplayMode, Tooltip, plus the usual colour/border set",
    "note": "Distinct control from ModernCombobox@1.0.0. Studio generates this one inside classic data cards; the modern one is what you insert by hand today."
+  },
+  "Classic/DropDown@2.3.1": {
+   "output": "Selected \u2014 a record. SelectedText is DEPRECATED; read .Selected.<Column>",
+   "display_column": "Items.Value  \u2014 a DOTTED property name; the column of Items to show",
+   "props": "Items, Items.Value, Default, AllowEmptySelection, Chevron{Fill,Background,HoverFill,HoverBackground,DisabledFill,DisabledBackground}, Selection{Color,Fill}, Padding*, plus the usual colour/border set",
+   "note": "Capital D in DropDown. Single-select only \u2014 use a ListBox or ComboBox for multiple."
+  },
+  "ListBox@2.2.0": {
+   "output": "Selected (record) \u00b7 SelectedItems (table, when SelectMultiple)",
+   "display_column": "Items.Value  \u2014 same dotted form as the dropdown",
+   "props": "Items, Items.Value, Default, SelectMultiple, Selection{Color,Fill}, DisabledSelection{Color,Fill}, Padding*, plus the usual colour/border set",
+   "note": "NO Classic/ prefix \u2014 it is plain `ListBox@2.2.0`, the same trap as `Timer`. Only ONE item can be pre-selected via Default; for multiple defaults use a combo box."
+  },
+  "ModernDropdown@1.0.0": {
+   "output": "Selected \u2014 a record; .Selected.Value for a string array",
+   "props": "Items, ItemDisplayText, Default (a VALUE, not a table), Appearance, AccessibleLabel, ValidationState, OnChange",
+   "note": "Grounded from MS Learn's own YAML sample rather than a Studio export. Single-select; the combo box is the multi-select / searchable one. Note Default here takes a value, where ModernCombobox takes DefaultSelectedItems, a TABLE."
   }
  },
  "FormVariant": [
@@ -274,6 +291,7 @@
  },
  "_powerFxNotes": {
   "Choices column argument": "Studio writes it as a SINGLE-QUOTED identifier \u2014 Choices([@asset_library].'asset_owner'). Quotes are only required when the identifier needs escaping, so this repo's unquoted snake_case form is equally valid; the quoted form is Studio being defensive.",
-  "Self": "PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0) \u2014 Self is available in a control's own property formulas."
+  "Self": "PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0) \u2014 Self is available in a control's own property formulas.",
+  "Dotted property names": "A property key can be qualified with a dot: `Items.Value: =Value` on a classic DropDown or ListBox names the column of Items to display. Valid pa-yaml, and easy to mistake for a typo."
  }
 }

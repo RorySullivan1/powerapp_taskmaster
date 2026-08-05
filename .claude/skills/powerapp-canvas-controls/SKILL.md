@@ -53,8 +53,12 @@ Treat the generic docs as a guide to *structure*, never to *tokens*.
 `Classic/TextInput@2.3.2`, `Classic/Button@2.2.0`, `Gallery@2.15.0`, `Image@2.2.3`,
 `HtmlViewer@2.1.0`, `Timer`, `CanvasComponent`.
 
-`Classic/ComboBox@2.4.0`, `Form@2.4.4` (`Variant: Classic`), `TypedDataCard@1.0.7`
-(`Variant: ClassicTextualEdit`).
+`Classic/ComboBox@2.4.0`, `Classic/DropDown@2.3.1`, `ListBox@2.2.0`, `Form@2.4.4`
+(`Variant: Classic`), `TypedDataCard@1.0.7` (`Variant: ClassicTextualEdit`).
+
+**Two naming traps in that list.** `Classic/DropDown` has a **capital D** in the middle, unlike
+`Classic/ComboBox`. And `ListBox@2.2.0` carries **no `Classic/` prefix at all** — the same trap
+as `Timer`. There is no rule to infer here; check the catalogue.
 
 **Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, `ModernCombobox@1.0.0`,
 `ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
@@ -129,13 +133,29 @@ powerapp-canvas-design for why that is the most important property in the whole 
 Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`,
 and the non-AutoLayout variant name.
 
-## The one property still not proven
+## Selecting one thing: four controls, four contracts
 
-`DefaultSelectedItems` on **`ModernCombobox@1.0.0`** — the property that seeds a combobox's
-current value when editing. It is **confirmed on `Classic/ComboBox@2.4.0`** and listed for the
-Fluent combo box family on MS Learn, but never yet seen on the modern control itself. Treat it
-as corroborated, not proven: keep it, and if a paste is rejected delete that one line — the
-only loss is the pre-selection on an Edit.
+| Control | Seed the selection with | Read it as |
+|---|---|---|
+| `Classic/DropDown@2.3.1` | `Default` | `.Selected.<Column>` (`SelectedText` is deprecated) |
+| `ListBox@2.2.0` | `Default` (one item only) | `.Selected`, `.SelectedItems` when `SelectMultiple` |
+| `ModernDropdown@1.0.0` | `Default` — a **value** | `.Selected.Value` |
+| `ModernCombobox@1.0.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` |
+
+The seeding property is where these differ most, and getting it wrong is silent: the control
+renders, it just never shows the current value. `DefaultSelectedItems` "must be a table of
+records from the Items data source" — so with `Items: =["A", "B"]`, the matching seed is
+`=[gVar]`, not `=gVar`.
+
+Classic `DropDown` and `ListBox` name their display column with a **dotted property key**:
+
+```yaml
+Items: =MyTable
+Items.Value: =ColumnName     # not a typo — a qualified property name
+```
+
+**No property in this repo is inferred any more.** `DefaultSelectedItems` was the last one, and
+its own MS Learn page confirms it.
 
 ## Quoting a column inside a formula
 
