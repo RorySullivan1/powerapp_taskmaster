@@ -95,6 +95,17 @@ them. Since X/Y are exactly what freezes, container-laid-out content is **immune
       Height: =Parent.Height - 64 - 132        # stop above the action bar
 ```
 
+**A child's explicit Width/Height is ADVISORY until you turn flexible sizing off.** Every child
+of an auto-layout container starts with *Flexible width* (or height, along the parent's
+`Direction`) **on**, and the container then divides space by `FillPortions` — so setting a fixed
+width appears to do nothing. Pin it with `FillPortions: =0`, and add `LayoutMinWidth` as a floor:
+
+```yaml
+FillPortions:   =0        # claim none of the spare space
+LayoutMinWidth: =220      # and never shrink below this
+Width:          =220
+```
+
 **A hidden child takes no space.** That single fact replaces the whole absolute-overlay
 pattern: put a picker's results gallery *inline* after its search box and it expands the column
 when it opens, collapses when it closes. No z-order, no covering, no one-open-at-a-time gate.

@@ -197,67 +197,70 @@
    "LayoutOverflowX  = LayoutOverflow.Scroll  (also .Hide per docs)",
    "LayoutOverflowY  = LayoutOverflow.Scroll",
    "PaddingTop / PaddingBottom / PaddingLeft / PaddingRight",
-   "X / Y / Width / Height  \u2014 on the container itself only"
+   "X / Y / Width / Height  — on the container itself only"
   ],
   "child_properties": [
-   "LayoutMinWidth",
-   "LayoutMinHeight"
+   "FillPortions   = <number>. How much of the SPARE space along the parent's Direction this child claims, as a share of what all children claim. 0 = none, i.e. the formula-bar equivalent of turning \"Flexible width/height\" OFF.",
+   "LayoutMinWidth  = <number>. Minimum size along the parent's Direction.",
+   "LayoutMinHeight = <number>.",
+   "AlignInContainer = per-child override of the parent LayoutAlignItems (Set by container | Start | End | Center | Stretch) — display name confirmed, pa-yaml token NOT confirmed"
   ],
   "still_inferred": [
    "LayoutJustifyContent",
-   "LayoutWrap",
-   "FillPortions"
+   "LayoutWrap"
   ],
-  "why_it_matters": "Children of an AutoLayout container carry NO X/Y \u2014 the container places them. X/Y/Width/Height are exactly what Studio freezes to constants on paste, so container-laid-out content is the only layout that survives this gap intact."
+  "why_it_matters": "Children of an AutoLayout container carry NO X/Y — the container places them. X/Y/Width/Height are exactly what Studio freezes to constants on paste, so container-laid-out content is the only layout that survives this gap intact.",
+  "flexible_sizing_default": "A child of an auto-layout container has \"Flexible width\" (or height, along the parent's Direction) turned ON BY DEFAULT — MS Learn walks you through switching it off in \"Building responsive canvas apps\". While it is on, an explicit Width/Height on that child is ADVISORY: the container distributes space by FillPortions instead. This is why setting a child to a fixed width appears to do nothing. Set FillPortions: =0 to pin it, and LayoutMinWidth as a floor. Cost this repo four iterations of cmpNestedSelect, 2026-08-05.",
+  "fillportions_provenance": "Documented on the Horizontal container control page as \"Fill portions\": \"Defines how the individual component grows when there is more screen real-estate assigned to its parent... if child A has Fill portions 1 and child B has 2, A gets 1/3 of the extra space.\" Doc-grounded 2026-08-05, not yet seen in a Studio export."
  },
  "_modernControls": {
   "confirmed_from": "user-supplied Studio YAML + MS Learn output properties, 2026-08-04",
   "ModernTextInput@1.0.0": {
-   "output": "Text  \u2014 SAME as classic, so no formula that reads an input had to change",
+   "output": "Text  — SAME as classic, so no formula that reads an input had to change",
    "props": "Placeholder, Type (TextInputType.SingleLine|Multiline|Password|Search), TriggerOutput (TriggerOutput.Keypress|FocusOut|Delayed), MaxLength, Required, Default, Appearance, Align, AccessibleLabel"
   },
   "ModernNumberInput@1.0.0": {
-   "output": "Value  \u2014 a real number, not text",
+   "output": "Value  — a real number, not text",
    "props": "Default, Min, Max, Step, Precision (DecimalPrecision.'0'|'1'|'2'), HintText, Align, Appearance, AccessibleLabel. NOTE: TriggerOutput was REMOVED from this control"
   },
   "ModernCombobox@1.0.0": {
-   "output": "Selected  \u2014 a record; .Selected.Value for a string array",
+   "output": "Selected  — a record; .Selected.Value for a string array",
    "props": "Items (array literal), ItemDisplayText, InputTextPlaceholder, SelectMultiple, IsSearchable, MultiValueDelimiter, Required, ValidationState",
-   "seed": "DefaultSelectedItems \u2014 CONFIRMED on this control's own MS Learn page: 'the initial items selected\u2026 Must be a TABLE OF RECORDS from the Items data source.' With Items as an array literal, =[gVar] is the matching shape. No longer inferred."
+   "seed": "DefaultSelectedItems — CONFIRMED on this control's own MS Learn page: 'the initial items selected… Must be a TABLE OF RECORDS from the Items data source.' With Items as an array literal, =[gVar] is the matching shape. No longer inferred."
   },
   "ModernDatePicker@1.0.0": {
-   "output": "SelectedDate  \u2014 Blank() when unset",
+   "output": "SelectedDate  — Blank() when unset",
    "props": "Placeholder, DefaultDate, StartDate, EndDate, StartOfWeek, Format (DatePickerFormat.LongAbbreviated|Short|Long or a custom string), IsEditable, DateTimeZone"
   },
   "ModernTabList@1.0.0": {
-   "output": "Selected  \u2014 .Selected.Value is the tab label",
+   "output": "Selected  — .Selected.Value is the tab label",
    "props": "Items (array literal), Default (must match an item), Appearance (TabListAppearance.Underline|Filled|Subtle), Alignment (TabListAlignment.Start|Center), Size, FontWeight, AccessibleLabel"
   },
   "ModernButton@1.0.0": {
-   "output": "none \u2014 OnSelect only",
-   "props": "Text, OnSelect, Appearance (ButtonAppearance.Primary|Outline|Subtle), Icon (a STRING Fluent icon name, e.g. \"Checkmark\" \u2014 not the classic Icon enum), IconStyle, Layout (ButtonLayout.IconBefore), Tooltip, AccessibleLabel"
+   "output": "none — OnSelect only",
+   "props": "Text, OnSelect, Appearance (ButtonAppearance.Primary|Outline|Subtle), Icon (a STRING Fluent icon name, e.g. \"Checkmark\" — not the classic Icon enum), IconStyle, Layout (ButtonLayout.IconBefore), Tooltip, AccessibleLabel"
   },
-  "kept_classic_deliberately": "Classic/Button for the ~30 transparent full-template gallery hit targets \u2014 they depend on Fill: =RGBA(0,0,0,0) and BorderThickness: =0, which a Fluent button does not expose. Classic/Icon throughout, for the same reason plus the 180-value Icon enum.",
+  "kept_classic_deliberately": "Classic/Button for the ~30 transparent full-template gallery hit targets — they depend on Fill: =RGBA(0,0,0,0) and BorderThickness: =0, which a Fluent button does not expose. Classic/Icon throughout, for the same reason plus the 180-value Icon enum.",
   "Classic/ComboBox@2.4.0": {
-   "output": "Selected / SelectedItems  \u2014 as the modern one",
-   "seed": "DefaultSelectedItems  \u2014 CONFIRMED on this control (=Parent.Default inside a data card)",
+   "output": "Selected / SelectedItems  — as the modern one",
+   "seed": "DefaultSelectedItems  — CONFIRMED on this control (=Parent.Default inside a data card)",
    "props": "Items, SelectMultiple, DefaultSelectedItems, SelectionColor, SelectionFill, Chevron{Fill,Background,HoverFill,HoverBackground,DisabledFill,DisabledBackground}, DisplayMode, Tooltip, plus the usual colour/border set",
    "note": "Distinct control from ModernCombobox@1.0.0. Studio generates this one inside classic data cards; the modern one is what you insert by hand today."
   },
   "Classic/DropDown@2.3.1": {
-   "output": "Selected \u2014 a record. SelectedText is DEPRECATED; read .Selected.<Column>",
-   "display_column": "Items.Value  \u2014 a DOTTED property name; the column of Items to show",
+   "output": "Selected — a record. SelectedText is DEPRECATED; read .Selected.<Column>",
+   "display_column": "Items.Value  — a DOTTED property name; the column of Items to show",
    "props": "Items, Items.Value, Default, AllowEmptySelection, Chevron{Fill,Background,HoverFill,HoverBackground,DisabledFill,DisabledBackground}, Selection{Color,Fill}, Padding*, plus the usual colour/border set",
-   "note": "Capital D in DropDown. Single-select only \u2014 use a ListBox or ComboBox for multiple."
+   "note": "Capital D in DropDown. Single-select only — use a ListBox or ComboBox for multiple."
   },
   "ListBox@2.2.0": {
-   "output": "Selected (record) \u00b7 SelectedItems (table, when SelectMultiple)",
-   "display_column": "Items.Value  \u2014 same dotted form as the dropdown",
+   "output": "Selected (record) · SelectedItems (table, when SelectMultiple)",
+   "display_column": "Items.Value  — same dotted form as the dropdown",
    "props": "Items, Items.Value, Default, SelectMultiple, Selection{Color,Fill}, DisabledSelection{Color,Fill}, Padding*, plus the usual colour/border set",
-   "note": "NO Classic/ prefix \u2014 it is plain `ListBox@2.2.0`, the same trap as `Timer`. Only ONE item can be pre-selected via Default; for multiple defaults use a combo box."
+   "note": "NO Classic/ prefix — it is plain `ListBox@2.2.0`, the same trap as `Timer`. Only ONE item can be pre-selected via Default; for multiple defaults use a combo box."
   },
   "ModernDropdown@1.0.0": {
-   "output": "Selected \u2014 a record; .Selected.Value for a string array",
+   "output": "Selected — a record; .Selected.Value for a string array",
    "props": "Items, ItemDisplayText, Default (a VALUE, not a table), Appearance, AccessibleLabel, ValidationState, OnChange",
    "note": "Grounded from MS Learn's own YAML sample rather than a Studio export. Single-select; the combo box is the multi-select / searchable one. Note Default here takes a value, where ModernCombobox takes DefaultSelectedItems, a TABLE."
   },
@@ -305,8 +308,30 @@
  },
  "_controlPrefixRule": {
   "rule": "`Classic/` appears on exactly those control names that a modern Fluent control also uses, and is absent where no modern namesake exists.",
-  "prefixed": ["Classic/Icon@2.5.0", "Classic/TextInput@2.3.2", "Classic/Button@2.2.0", "Classic/ComboBox@2.4.0", "Classic/DropDown@2.3.1", "Classic/Toggle@2.1.0", "Classic/Slider@2.1.0", "Classic/Radio@2.3.0"],
-  "bare": ["Timer", "ListBox@2.2.0", "RichTextEditor@2.7.0", "Rating@2.1.0", "Gallery@2.15.0", "Image@2.2.3", "HtmlViewer@2.1.0", "Label@2.5.1", "Rectangle@2.3.0", "Form@2.4.4", "TypedDataCard@1.0.7", "GroupContainer@1.5.0"],
+  "prefixed": [
+   "Classic/Icon@2.5.0",
+   "Classic/TextInput@2.3.2",
+   "Classic/Button@2.2.0",
+   "Classic/ComboBox@2.4.0",
+   "Classic/DropDown@2.3.1",
+   "Classic/Toggle@2.1.0",
+   "Classic/Slider@2.1.0",
+   "Classic/Radio@2.3.0"
+  ],
+  "bare": [
+   "Timer",
+   "ListBox@2.2.0",
+   "RichTextEditor@2.7.0",
+   "Rating@2.1.0",
+   "Gallery@2.15.0",
+   "Image@2.2.3",
+   "HtmlViewer@2.1.0",
+   "Label@2.5.1",
+   "Rectangle@2.3.0",
+   "Form@2.4.4",
+   "TypedDataCard@1.0.7",
+   "GroupContainer@1.5.0"
+  ],
   "status": "PREDICTIVE ONLY — derived from every token grounded so far, and re-tested against Slider and Radio on 2026-08-05 (both prefixed, both with modern namesakes). Use it to guess which form to ask for; never to author an ungrounded token. Casing is still per-token (`DropDown` has a capital D, `ComboBox` a capital B)."
  },
  "FormVariant": [
@@ -317,28 +342,28 @@
  ],
  "_formNotes": {
   "confirmed_from": "two photos of Studio code view, 2026-08-04 (Edit form over asset_library)",
-  "form": "Form@2.4.4 \u00b7 Variant: Classic \u00b7 Layout: Vertical \u00b7 Properties.DataSource",
-  "card": "TypedDataCard@1.0.7 \u00b7 Variant: ClassicTextualEdit \u00b7 IsLocked: true",
+  "form": "Form@2.4.4 · Variant: Classic · Layout: Vertical · Properties.DataSource",
+  "card": "TypedDataCard@1.0.7 · Variant: ClassicTextualEdit · IsLocked: true",
   "card_properties": [
-   "DataField: =\"Title\"            \u2014 a STRING, the column's internal name",
-   "Default: =ThisItem.<column>     \u2014 the card's value in from the form's Item",
-   "Update: =DataCardValue1.Text    \u2014 the card's value OUT to SubmitForm",
+   "DataField: =\"Title\"            — a STRING, the column's internal name",
+   "Default: =ThisItem.<column>     — the card's value in from the form's Item",
+   "Update: =DataCardValue1.Text    — the card's value OUT to SubmitForm",
    "DisplayName / MaxLength: =DataSourceInfo([@list], DataSourceInfo.X, 'Title')",
    "Required: =false"
   ],
   "card_children_contract": [
-   "MetadataKey: FieldName     \u2014 the caption label, Text: =Parent.DisplayName",
-   "MetadataKey: FieldValue    \u2014 the input, Default: =Parent.Default, MaxLength: =Parent.MaxLength,",
+   "MetadataKey: FieldName     — the caption label, Text: =Parent.DisplayName",
+   "MetadataKey: FieldValue    — the input, Default: =Parent.Default, MaxLength: =Parent.MaxLength,",
    "                             DisplayMode: =Parent.DisplayMode,",
    "                             BorderColor: =If(IsBlank(Parent.Error), Parent.BorderColor, Color.Red)",
-   "MetadataKey: ErrorMessage  \u2014 the validation label"
+   "MetadataKey: ErrorMessage  — the validation label"
   ],
-  "schema_keys_confirmed_in_the_wild": "Layout:, MetadataKey:, IsLocked: \u2014 all accepted by pa.schema.v3.0",
-  "note": "DataSourceInfo's column argument is a SINGLE-QUOTED IDENTIFIER ('Title'), not a double-quoted string \u2014 consistent with the 3.24042 identifier change."
+  "schema_keys_confirmed_in_the_wild": "Layout:, MetadataKey:, IsLocked: — all accepted by pa.schema.v3.0",
+  "note": "DataSourceInfo's column argument is a SINGLE-QUOTED IDENTIFIER ('Title'), not a double-quoted string — consistent with the 3.24042 identifier change."
  },
  "_powerFxNotes": {
-  "Choices column argument": "Studio writes it as a SINGLE-QUOTED identifier \u2014 Choices([@asset_library].'asset_owner'). Quotes are only required when the identifier needs escaping, so this repo's unquoted snake_case form is equally valid; the quoted form is Studio being defensive.",
-  "Self": "PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0) \u2014 Self is available in a control's own property formulas.",
+  "Choices column argument": "Studio writes it as a SINGLE-QUOTED identifier — Choices([@asset_library].'asset_owner'). Quotes are only required when the identifier needs escaping, so this repo's unquoted snake_case form is equally valid; the quoted form is Studio being defensive.",
+  "Self": "PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0) — Self is available in a control's own property formulas.",
   "Dotted property names": "A property key can be qualified with a dot: `Items.Value: =Value` on a classic DropDown or ListBox names the column of Items to display. Valid pa-yaml, and easy to mistake for a typo."
  }
 }
