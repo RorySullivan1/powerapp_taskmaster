@@ -43,7 +43,7 @@ prefixed tokens:
 | `Button` | `Classic/Button@2.2.0` or `ModernButton@1.0.0` |
 | `TextInput` | `Classic/TextInput@2.3.2` or `ModernTextInput@1.0.0` |
 | `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` |
-| `Dropdown` / `Combobox` | `ModernCombobox@1.0.0` |
+| `Dropdown` / `Combobox` | `ModernCombobox@1.1.1` |
 | `DatePicker` | `ModernDatePicker@1.0.0` |
 | `Timer` | `Timer` — no prefix, no version |
 
@@ -73,11 +73,11 @@ Use it to *guess which form to ask for* — never to author an ungrounded token.
 still fails the whole paste. **Casing stays per-token**: `DropDown` has a capital D mid-word,
 `ComboBox` a capital B, `RichTextEditor` neither.
 
-**Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, `ModernCombobox@1.0.0`,
-`ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
+**Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`,
+`ModernCombobox@1.1.1`, `ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
 `GroupContainer@1.5.0` (`Variant: AutoLayout`).
 
-**`Classic/ComboBox@2.4.0` and `ModernCombobox@1.0.0` are different controls.** Studio generates
+**`Classic/ComboBox@2.4.0` and `ModernCombobox@1.1.1` are different controls.** Studio generates
 the classic one inside data cards; the modern one is what you insert by hand today. The classic
 adds `Chevron*` styling properties and takes `DefaultSelectedItems` to seed the selection —
 which is how a card wires it up:
@@ -90,8 +90,25 @@ DisplayMode: =Parent.DisplayMode
 PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
 ```
 
-Version suffixes are optional — Studio uses the current version if omitted — so a version
-mismatch is not a failure mode. **Only the control name and the `Variant` matter.**
+Version suffixes are optional on the CLASSIC family — Studio uses the current version if
+omitted. On the modern family they are not decoration; see below.
+
+### Modern controls get REVISED, and the revision renames properties
+
+A version suffix is not decoration on the modern family. `ModernCombobox@1.1.1` is the
+updated control and it is not property-compatible with `1.0.0`:
+
+| | 1.0.0 | 1.1.1 |
+|---|---|---|
+| delay | `TriggerOutput` | `DelayOutput` (boolean) |
+| display column | `Fields` | `ItemDisplayText` |
+| multi-select default | `false` | **`true`** — set it explicitly |
+| `Appearance` / `ValidationState` | strings | typed enums |
+
+**There is no `Reset` PROPERTY on the modern combo box.** Classic `ListBox` has one, which is
+where the idea comes from; authoring it here fails the paste. The `Reset()` *function* works
+fine. `ModernSlider` was revised the same way (`Value`→`Default`, `Layout`→`LayoutDirection`),
+so treat any modern-control sample found online as version-specific until checked.
 
 ## Output properties — get these wrong and every formula breaks
 

@@ -44,11 +44,6 @@ ComponentDefinitions:
         Description: What joins the levels in a composed path. Change it here and both composition and seeding follow.
         DataType: Text
         Default: =" > "
-      ResetSignal:
-        PropertyKind: Input
-        Description: Pulse true to clear every level back to DefaultPath. The consuming screen does this in OnVisible so one record's pick cannot survive into the next.
-        DataType: Boolean
-        Default: =false
       SelectedPath:
         PropertyKind: Output
         Description: The path the user has picked, at whatever depth. Empty until level 1 is chosen. THIS is the authoritative value.
@@ -144,7 +139,7 @@ ComponentDefinitions:
             Height: =36
           Children:
             - cboL1:
-                Control: ModernCombobox@1.0.0
+                Control: ModernCombobox@1.1.1
                 Properties:
                   Items: |
                     =Sort( Distinct( Filter(cmpNestedSelect.Terms, Coalesce(active, true)), level1 ), Value )
@@ -154,7 +149,6 @@ ComponentDefinitions:
                              cmpNestedSelect.DefaultPath = Value
                              || StartsWith( cmpNestedSelect.DefaultPath,
                                             Value & cmpNestedSelect.Separator ) )
-                  Reset: =cmpNestedSelect.ResetSignal
                   SelectMultiple: =false
                   IsSearchable: =true
                   InputTextPlaceholder: ="Select…"
@@ -164,7 +158,7 @@ ComponentDefinitions:
                   Height: =36
                   OnChange: =Reset(cboL2); Reset(cboL3)
             - cboL2:
-                Control: ModernCombobox@1.0.0
+                Control: ModernCombobox@1.1.1
                 Properties:
                   Visible: =Coalesce(nsLevels, Value(nsSeedDepth.Text)) >= 2
                   Items: |
@@ -181,7 +175,6 @@ ComponentDefinitions:
                              || StartsWith( cmpNestedSelect.DefaultPath,
                                             cboL1.Selected.Value & cmpNestedSelect.Separator
                                             & Value & cmpNestedSelect.Separator ) )
-                  Reset: =cmpNestedSelect.ResetSignal
                   SelectMultiple: =false
                   IsSearchable: =true
                   InputTextPlaceholder: ="Select…"
@@ -191,7 +184,7 @@ ComponentDefinitions:
                   Height: =36
                   OnChange: =Reset(cboL3)
             - cboL3:
-                Control: ModernCombobox@1.0.0
+                Control: ModernCombobox@1.1.1
                 Properties:
                   Visible: =Coalesce(nsLevels, Value(nsSeedDepth.Text)) >= 3
                   Items: |
@@ -208,7 +201,6 @@ ComponentDefinitions:
                              cmpNestedSelect.DefaultPath
                                = cboL1.Selected.Value & cmpNestedSelect.Separator
                                  & cboL2.Selected.Value & cmpNestedSelect.Separator & Value )
-                  Reset: =cmpNestedSelect.ResetSignal
                   SelectMultiple: =false
                   IsSearchable: =true
                   InputTextPlaceholder: ="Select…"

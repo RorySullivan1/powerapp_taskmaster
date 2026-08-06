@@ -54,7 +54,10 @@ KNOWN_CONTROLS = {
     "ModernNumberInput@1.0.0":"grounded",   # CONFIRMED 2026-08-04 — output is .Value (a number)
     "ModernTabList@1.0.0":    "grounded",   # CONFIRMED 2026-08-04 — output is .Selected.Value
     "ModernButton@1.0.0":     "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
-    "ModernCombobox@1.0.0":   "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
+    "ModernCombobox@1.1.1":   "grounded",   # CONFIRMED 2026-08-05 — the UPDATED control.
+                                            # No Reset PROPERTY (classic ListBox has one, this does not);
+                                            # SelectMultiple now defaults to true; TriggerOutput replaced
+                                            # by DelayOutput; Appearance/ValidationState take typed enums.
     "ModernDatePicker@1.0.0": "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "Classic/ComboBox@2.4.0": "grounded",   # CONFIRMED 2026-08-04 — classic combo box
     "Classic/DropDown@2.3.1": "grounded",   # CONFIRMED 2026-08-04 — note the capital D in DropDown
