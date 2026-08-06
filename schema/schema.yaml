@@ -91,10 +91,8 @@ lists:
       taskmaster_projects, which stores a resolved row exactly as it does for
       region. Tasks carry NO classification of their own — see the note on
       taskmaster_tasks.
-    provisioned: pending     # NAME UNCONFIRMED — mapping_regions turned out PLURAL,
-                             # so this may really be `mapping_activitytypes`. A wrong
-                             # data-source name yields a SILENTLY EMPTY picker, not an
-                             # error. Confirm before the next paste of scrProjectEdit.
+    provisioned: live        # 2026-08-06 — name CONFIRMED SINGULAR by the user.
+                             # Only mapping_regions carries the plural `s`.
     join_cost: 0
     columns:
       - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Activity family, e.g. Campaign. This is the value a project stores" }
@@ -104,7 +102,7 @@ lists:
   mapping_producttype:
     role: >-
       Product-type vocabulary, up to 3 levels. Consumed by taskmaster_products.
-    provisioned: pending     # NAME UNCONFIRMED — see mapping_activitytype above.
+    provisioned: live        # 2026-08-06 — name CONFIRMED SINGULAR by the user.
     join_cost: 0
     columns:
       - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level. An EXPLICIT column — Title is left unused and not required" }
@@ -344,6 +342,12 @@ migration:
     - 5. Carry any existing values across, resolving each term to its mapping row.
     - 6. Delete the Managed Metadata columns.
     - 7. Point the app at the new columns and remove the term-store code paths.
+  list_names: >-
+    `mapping_regions` is PLURAL; `mapping_activitytype` and `mapping_producttype` are
+    SINGULAR. All three confirmed against SharePoint 2026-08-06. The inconsistency is
+    real — do not "tidy" it. A data-source name that is wrong by one letter yields a
+    SILENTLY EMPTY picker, never an error, because ClearCollect against a source that
+    does not exist just leaves the collection empty.
   columns_are_exactly_three: >-
     A mapping list has `level1`, `level2`, `level3` and NOTHING ELSE beside the
     built-in ID and Title. An `active` flag was carried in this file from 2026-08-05
