@@ -43,7 +43,7 @@ prefixed tokens:
 | `Button` | `Classic/Button@2.2.0` or `ModernButton@1.0.0` |
 | `TextInput` | `Classic/TextInput@2.3.2` or `ModernTextInput@1.0.0` |
 | `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` |
-| `Dropdown` / `Combobox` | `ModernCombobox@1.1.1` |
+| `Dropdown` / `Combobox` | `Classic/ComboBox@2.4.0` (export-confirmed in this tenant) |
 | `DatePicker` | `ModernDatePicker@1.0.0` |
 | `Timer` | `Timer` — no prefix, no version |
 
@@ -74,11 +74,16 @@ still fails the whole paste. **Casing stays per-token**: `DropDown` has a capita
 `ComboBox` a capital B, `RichTextEditor` neither.
 
 **Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`,
-`ModernCombobox@1.1.1`, `ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
+`ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
 `GroupContainer@1.5.0` (`Variant: AutoLayout`).
 
-**`Classic/ComboBox@2.4.0` and `ModernCombobox@1.1.1` are different controls.** Studio generates
-the classic one inside data cards; the modern one is what you insert by hand today. The classic
+> **This repo uses `Classic/ComboBox@2.4.0` for every combo box — all 10 of them.** A Studio
+> code-view export on 2026-08-05 came back carrying the classic token for a control this repo
+> had authored as modern, so that is what the tenant actually inserts (a modern-controls-off app
+> setting is the likely cause). `ModernCombobox` appears nowhere in `src/` and should not be
+> reintroduced without a fresh export showing Studio accept it.
+
+**`Classic/ComboBox@2.4.0` and `ModernCombobox` are different controls.** The classic
 adds `Chevron*` styling properties and takes `DefaultSelectedItems` to seed the selection —
 which is how a card wires it up:
 
@@ -108,8 +113,15 @@ updated control and it is not property-compatible with `1.0.0`:
 **The two combo boxes name their display column differently, and it is not optional.**
 `Classic/ComboBox@2.4.0` takes string arrays — `DisplayFields: =["Value"]` and
 `SearchFields: =["Value"]`. `ModernCombobox` takes `ItemDisplayText: =ThisItem.Value`. Using the
-modern property on the classic control leaves the list rendering blank rows. Studio inserts the
-CLASSIC one, so check what you actually have before choosing the property.
+modern property on the classic control leaves the list rendering blank rows — which is what
+"the picker shows nothing" turned out to be. Studio inserts the CLASSIC one here, so the string
+arrays are the form to author.
+
+`Items` built by `Distinct()`, by a `["a","b"]` literal, or by `Choices()` all expose a single
+column named **`Value`**, so `=["Value"]` is right for every combo box in this repo. The classic
+control's `IsSearchable`, `SearchFields`, `DisplayFields` and `InputTextPlaceholder` are all
+first-party documented on MS Learn `controls/control-combo-box` — none is inferred. Setting
+`IsSearchable` and `SelectMultiple` both `=false` gives plain dropdown behaviour.
 
 **There is no `Reset` PROPERTY on the modern combo box.** Classic `ListBox` has one, which is
 where the idea comes from; authoring it here fails the paste. The `Reset()` *function* works
@@ -122,7 +134,7 @@ so treat any modern-control sample found online as version-specific until checke
 |---|---|---|
 | `ModernTextInput` | `.Text` | **Unchanged from classic** — converting inputs is a property rename only |
 | `ModernNumberInput` | `.Value` | a real number; `TriggerOutput` was removed from this control |
-| `ModernCombobox` | `.Selected.Value` | with `SelectMultiple: =false`, `Selected` is a record |
+| `Classic/ComboBox` | `.Selected.Value` | with `SelectMultiple: =false`, `Selected` is a record |
 | `ModernDatePicker` | `.SelectedDate` | `Blank()` when unset |
 | `ModernTabList` | `.Selected.Value` | the tab label |
 | `Gallery` | `.AllItems`, `.Selected` | **`.Items` is WRITE-ONLY** — reading it is an error |
@@ -187,7 +199,7 @@ and the non-AutoLayout variant name.
 | `Classic/DropDown@2.3.1` | `Default` | `.Selected.<Column>` (`SelectedText` is deprecated) | many options, one line of space |
 | `ListBox@2.2.0` | `Default` (one item only) | `.Selected`, `.SelectedItems` when `SelectMultiple` | multi-select in a fixed box |
 | `ModernDropdown@1.0.0` | `Default` — a **value** | `.Selected.Value` | the modern single-select |
-| `ModernCombobox@1.0.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable or multi-select |
+| `Classic/ComboBox@2.4.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable, multi-select, or plain dropdown with both flags off |
 | `Classic/Radio@2.3.0` | `Default` | `.Selected.Value` | **2–7 options that must all stay visible** |
 
 The seeding property is where these differ most, and getting it wrong is silent: the control

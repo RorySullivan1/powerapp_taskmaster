@@ -541,6 +541,36 @@ def catalogue_gaps() -> list[str]:
     return out
 
 
+# A duplicate key is the one corruption that passes every other check here.
+# PyYAML keeps the LAST of them silently, so a file can carry two copies of a
+# control's Control/Properties/Children and still load, validate and report
+# "ok" — while everything in the discarded copy is invisible to this script and
+# to any edit made against it. That is exactly what happened to scrProjectEdit
+# in 445f59d: 132 controls doubled, 360 duplicate keys, 24/24 valid. Studio is
+# the only thing downstream that would have caught it, by failing the paste.
+def duplicate_keys(text: str) -> list[str]:
+    hits: list[str] = []
+
+    class Detect(yaml.SafeLoader):
+        pass
+
+    def mapping(loader, node, deep=False):
+        out = {}
+        for k, v in node.value:
+            key = loader.construct_object(k, deep=deep)
+            if key in out:
+                hits.append(f"line {k.start_mark.line + 1}: duplicate key `{key}`")
+            out[key] = loader.construct_object(v, deep=deep)
+        return out
+
+    Detect.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+    try:
+        yaml.load(text, Detect)
+    except yaml.YAMLError:
+        return []          # the parse error is reported by the caller
+    return hits
+
+
 def main() -> int:
     validator = Draft7Validator(yaml.safe_load(SCHEMA.read_text(encoding="utf-8")))
     files = targets(sys.argv[1:])
@@ -549,12 +579,25 @@ def main() -> int:
 
     bad = 0
     for f in files:
+        text = f.read_text(encoding="utf-8")
         try:
-            doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+            doc = yaml.safe_load(text)
         except yaml.YAMLError as e:
             print(f"FAIL {rel(f)}\n  YAML parse error: {e}\n"); bad += 1; continue
         if doc is None:
             print(f"SKIP {rel(f)} (empty)"); continue
+        dups = duplicate_keys(text)
+        if dups:
+            bad += 1
+            print(f"FAIL {rel(f)}")
+            print(f"  {len(dups)} duplicate key(s) — PyYAML keeps the last silently, so")
+            print(f"  everything in the discarded copy is invisible to this validator.")
+            for d in dups[:12]:
+                print(f"    {d}")
+            if len(dups) > 12:
+                print(f"    ... and {len(dups) - 12} more")
+            print()
+            continue
         tok = token_errors(doc)
         errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
         hard_tok = [t for t in tok if "NOTE " not in t]
