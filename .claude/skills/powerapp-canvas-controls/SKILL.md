@@ -105,6 +105,12 @@ updated control and it is not property-compatible with `1.0.0`:
 | multi-select default | `false` | **`true`** — set it explicitly |
 | `Appearance` / `ValidationState` | strings | typed enums |
 
+**The two combo boxes name their display column differently, and it is not optional.**
+`Classic/ComboBox@2.4.0` takes string arrays — `DisplayFields: =["Value"]` and
+`SearchFields: =["Value"]`. `ModernCombobox` takes `ItemDisplayText: =ThisItem.Value`. Using the
+modern property on the classic control leaves the list rendering blank rows. Studio inserts the
+CLASSIC one, so check what you actually have before choosing the property.
+
 **There is no `Reset` PROPERTY on the modern combo box.** Classic `ListBox` has one, which is
 where the idea comes from; authoring it here fails the paste. The `Reset()` *function* works
 fine. `ModernSlider` was revised the same way (`Value`→`Default`, `Layout`→`LayoutDirection`),

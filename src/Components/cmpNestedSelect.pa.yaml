@@ -139,11 +139,12 @@ ComponentDefinitions:
             Height: =36
           Children:
             - cboL1:
-                Control: ModernCombobox@1.1.1
+                Control: Classic/ComboBox@2.4.0
                 Properties:
                   Items: |
                     =Sort( Distinct( Filter(cmpNestedSelect.Terms, Coalesce(active, true)), level1 ), Value )
-                  ItemDisplayText: =ThisItem.Value
+                  DisplayFields: =["Value"]
+                  SearchFields: =["Value"]
                   DefaultSelectedItems: |
                     =Filter( Sort( Distinct( Filter(cmpNestedSelect.Terms, Coalesce(active, true)), level1 ), Value ),
                              cmpNestedSelect.DefaultPath = Value
@@ -158,14 +159,15 @@ ComponentDefinitions:
                   Height: =36
                   OnChange: =Reset(cboL2); Reset(cboL3)
             - cboL2:
-                Control: ModernCombobox@1.1.1
+                Control: Classic/ComboBox@2.4.0
                 Properties:
                   Visible: =Coalesce(nsLevels, Value(nsSeedDepth.Text)) >= 2
                   Items: |
                     =Sort( Distinct( Filter( cmpNestedSelect.Terms,
                                              Coalesce(active, true) && level1 = cboL1.Selected.Value
                                              && !IsBlank(level2) ), level2 ), Value )
-                  ItemDisplayText: =ThisItem.Value
+                  DisplayFields: =["Value"]
+                  SearchFields: =["Value"]
                   DefaultSelectedItems: |
                     =Filter( Sort( Distinct( Filter( cmpNestedSelect.Terms,
                                                Coalesce(active, true) && level1 = cboL1.Selected.Value
@@ -184,7 +186,7 @@ ComponentDefinitions:
                   Height: =36
                   OnChange: =Reset(cboL3)
             - cboL3:
-                Control: ModernCombobox@1.1.1
+                Control: Classic/ComboBox@2.4.0
                 Properties:
                   Visible: =Coalesce(nsLevels, Value(nsSeedDepth.Text)) >= 3
                   Items: |
@@ -192,7 +194,8 @@ ComponentDefinitions:
                                              Coalesce(active, true) && level1 = cboL1.Selected.Value
                                              && level2 = cboL2.Selected.Value
                                              && !IsBlank(level3) ), level3 ), Value )
-                  ItemDisplayText: =ThisItem.Value
+                  DisplayFields: =["Value"]
+                  SearchFields: =["Value"]
                   DefaultSelectedItems: |
                     =Filter( Sort( Distinct( Filter( cmpNestedSelect.Terms,
                                                Coalesce(active, true) && level1 = cboL1.Selected.Value
