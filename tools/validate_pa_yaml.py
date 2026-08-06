@@ -336,6 +336,15 @@ def token_errors(doc) -> list[str]:
                 bad = bracket_error(formula)
                 if bad:
                     out.append(f"{path}/{prop}: {bad}")
+        # A component's CustomProperties[*].Default is a formula too, and it was
+        # outside this sweep — an unbalanced one there fails the same paste.
+        for cname, cdef in (node.get("ComponentDefinitions") or {}).items():
+            for pname, pdef in ((cdef or {}).get("CustomProperties") or {}).items():
+                dflt = (pdef or {}).get("Default")
+                if isinstance(dflt, str):
+                    bad = bracket_error(dflt)
+                    if bad:
+                        out.append(f"{path}/{cname}/{pname}/Default: {bad}")
 
     # IfError returns the value of one of its arguments, and MS Learn is explicit
     # that *currently* the types of ALL its arguments must be compatible — not just

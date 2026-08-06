@@ -5,7 +5,6 @@ description: >
   hand-off → record. Use when the user wants to make and land an app change end to end, "take
   this change through to Studio", "author and paste this", or asks how a change gets from the
   repo into the live app. Invokes the studio-transfer / power-fx-development skills, the
-  pre-paste-review agent, and the pull-reconcile command; stops at the human paste gate.
 ---
 
 # change-end-to-end
@@ -72,5 +71,4 @@ log, or **stopped** before a wasted paste — with the reason and the next step.
   existing formula), `sharepoint-list-architecture` (when the change needs a schema decision),
   `session-memory`.
 - Agents: `../agents/pre-paste-review.md`.
-- Commands: `../commands/pull-reconcile.md`.
 - Context: `../context/schema.md` (internal names), `../context/app-structure.md`.
