@@ -53,13 +53,27 @@
   `powerapp-canvas-controls` skill (repo-wide classic-combo-box callout, the display-column
   trap, the `Value` column rule, the token table row).
 
+## CORRECTION (same day, after modern controls were activated)
+- **The classic conversion was a misdiagnosis and has been reverted.** Modern controls are
+  **ENABLED**; the user activated them and said *"all modern controls can remain"*. All 10 combo
+  boxes are `ModernCombobox@1.0.0` with `ItemDisplayText: =ThisItem.Value`.
+- **The real defect was the VERSION TOKEN.** `@x.y.z` in a pa-yaml token is the TEMPLATE version,
+  not the revision number Studio shows in its properties pane. Studio reports the combo box as
+  **1.1.1**; `ModernCombobox@1.1.1` rejects the whole paste as an unknown control — which is the
+  "error on trying to input the nestedselect" that started the detour. MS Learn's YAML example on
+  `modern-controls/modern-control-combobox` emits **`@1.0.0`** on the *updated* control (same page
+  documents DelayOutput, typed enums, SelectMultiple defaulting true). Every other modern token in
+  this repo is `@1.0.0` — that should have been the tell.
+- **Never derive a `@version` from a number a human read off Studio's UI.** Take it from an export
+  or a first-party YAML sample.
+- The duplicate-key finding and the six re-applied fixes below are UNAFFECTED — that repair stands.
+
 ## Open threads
-- **Unverified in Studio:** whether the classic switch fixes the region picker, and whether
-  the other six converted pickers on `scrProjectEdit` now render. Needs a paste + a photo.
-- **Why classic?** Best hypothesis is a **modern-controls-off app setting** in this tenant.
-  If true it implicates the other modern tokens still in `src/` — `ModernTextInput` (36),
-  `ModernButton` (20), `ModernDatePicker` (10), `ModernTabList` (2), `ModernNumberInput` (2).
-  Do NOT convert on the hypothesis alone; ask for one export of a text input to settle it.
+- **Unverified in Studio:** whether the region picker renders now that the token is `@1.0.0` and
+  the display column is `ItemDisplayText`. The user reports the last push pasted correctly;
+  whether the picker POPULATES is the open question.
+- ~~Why classic?~~ **CLOSED — modern controls are on; it was the `@1.1.1` token.** No other
+  modern control needs changing.
 - Clearing a picker between records is still unsolved (`ResetSignal` removed as ungrounded).
 - `schema.yaml`'s `migration:` section still reads `PLANNED — nothing applied`, so
   `scrProjectEdit` binds `project_region_id/_path` and `project_type_id/_path` columns that

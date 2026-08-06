@@ -74,17 +74,16 @@ lists:
   # vocabulary grows, and there is no per-row number for anyone to maintain or get
   # wrong. A term that needs to lead its siblings has to be named so.
   # ---------------------------------------------------------------------------
-  mapping_region:
+  mapping_regions:
     role: >-
       Region vocabulary, up to 3 levels. Consumed by taskmaster_projects and
       taskmaster_clients. Maintained IN THE APP via the scrAdmin settings screen.
-    provisioned: pending
+    provisioned: live        # 2026-08-06 — name CONFIRMED PLURAL by the user
     join_cost: 0
     columns:
       - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level, e.g. EMEA. An EXPLICIT column — Title is left unused and not required" }
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
-      - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete — a term in use must not vanish. Pickers filter on this; label resolution ignores it" }
 
   mapping_activitytype:
     role: >-
@@ -92,24 +91,25 @@ lists:
       taskmaster_projects, which stores a resolved row exactly as it does for
       region. Tasks carry NO classification of their own — see the note on
       taskmaster_tasks.
-    provisioned: pending
+    provisioned: pending     # NAME UNCONFIRMED — mapping_regions turned out PLURAL,
+                             # so this may really be `mapping_activitytypes`. A wrong
+                             # data-source name yields a SILENTLY EMPTY picker, not an
+                             # error. Confirm before the next paste of scrProjectEdit.
     join_cost: 0
     columns:
       - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Activity family, e.g. Campaign. This is the value a project stores" }
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
-      - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete" }
 
   mapping_producttype:
     role: >-
       Product-type vocabulary, up to 3 levels. Consumed by taskmaster_products.
-    provisioned: pending
+    provisioned: pending     # NAME UNCONFIRMED — see mapping_activitytype above.
     join_cost: 0
     columns:
       - { name: level1,     type: Text,    required: true,  indexed: true,  desc: "Top level. An EXPLICIT column — Title is left unused and not required" }
       - { name: level2,     type: Text,    required: false, indexed: true,  desc: "Second level, blank if the term stops at level1" }
       - { name: level3,     type: Text,    required: false, indexed: true,  desc: "Third level, blank if the term stops at level2" }
-      - { name: active,     type: Boolean, required: false, indexed: true,  default: true, desc: "Deactivate rather than delete" }
 
   # ---------------------------------------------------------------------------
   taskmaster_projects:
@@ -121,7 +121,7 @@ lists:
       - { name: project_manager,         type: Person, multi: false, required: true,  indexed: true,  desc: "Accountable owner" }
       - { name: project_coverage,        type: Choice,          required: false,                 desc: "Business/product coverage area", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning. The app binds Choices() rather than a literal, so the real values need no app change" }
       - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
-      - { name: project_region_id,       type: Number,          required: false, indexed: true,  desc: "ID of the mapping_region row when the picked path names one exactly; 0 when it names a BRANCH the vocabulary has no row for. The path column is the authoritative value — see C11", maps_to: mapping_region }
+      - { name: project_region_id,       type: Number,          required: false, indexed: true,  desc: "ID of the mapping_regions row when the picked path names one exactly; 0 when it names a BRANCH the vocabulary has no row for. The path column is the authoritative value — see C11", maps_to: mapping_regions }
       - { name: project_region_path,     type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"EMEA > UK > London\". Denormalised so display needs no lookup and drill-down is StartsWith(), which delegates on Text" }
       - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
       - { name: project_type_id,         type: Number,          required: false, indexed: true,  desc: "ID of the mapping_activitytype row when the picked path names one exactly; 0 when it names a branch", maps_to: mapping_activitytype }
@@ -221,7 +221,7 @@ lists:
       - { name: client_type,     type: Choice,          required: true,                 desc: "Client classification", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning" }
       - { name: client_coverage, type: Choice,          required: true,                 desc: "Coverage group", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning" }
       - { name: client_sales,    type: Person, multi: false, required: true,                 desc: "Primary sales owner" }
-      - { name: client_region_id,   type: Number,       required: false, indexed: true, desc: "ID of the mapping_region row, or 0 when the path names a branch", maps_to: mapping_region }
+      - { name: client_region_id,   type: Number,       required: false, indexed: true, desc: "ID of the mapping_regions row, or 0 when the path names a branch", maps_to: mapping_regions }
       - { name: client_region_path, type: Text,         required: true,  indexed: true, desc: "Composed path of that row" }
       - { name: client_notes,    type: Note,            required: false,                desc: "Free-text notes (display only)" }
 
@@ -333,7 +333,7 @@ migration:
     likely zero. If it IS zero, every step below is a straight delete-and-create
     and no data has to be carried.
   steps:
-    - 1. Provision mapping_region, mapping_activitytype and mapping_producttype.
+    - 1. Provision mapping_regions, mapping_activitytype and mapping_producttype.
     - 2. Seed them from the existing term sets — one row per full path, level2/level3
          blank where a term stops short.
     - 3. Build the settings screen on scrAdmin so the vocabularies are maintainable
@@ -344,6 +344,13 @@ migration:
     - 5. Carry any existing values across, resolving each term to its mapping row.
     - 6. Delete the Managed Metadata columns.
     - 7. Point the app at the new columns and remove the term-store code paths.
+  columns_are_exactly_three: >-
+    A mapping list has `level1`, `level2`, `level3` and NOTHING ELSE beside the
+    built-in ID and Title. An `active` flag was carried in this file from 2026-08-05
+    to 2026-08-06 as a soft-delete design — it was never provisioned, and every
+    cmpNestedSelect formula filtered on it. Filtering on a column the list does not
+    have leaves the picker BLANK with no error. Do not reintroduce it without
+    provisioning it first.
   title_column: >-
     All three mapping lists use an EXPLICIT `level1` column; the built-in Title is
     left unused and set not-required. An earlier draft of this file told two of the

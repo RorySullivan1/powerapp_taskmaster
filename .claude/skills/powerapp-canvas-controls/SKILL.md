@@ -43,7 +43,7 @@ prefixed tokens:
 | `Button` | `Classic/Button@2.2.0` or `ModernButton@1.0.0` |
 | `TextInput` | `Classic/TextInput@2.3.2` or `ModernTextInput@1.0.0` |
 | `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` |
-| `Dropdown` / `Combobox` | `Classic/ComboBox@2.4.0` (export-confirmed in this tenant) |
+| `Dropdown` / `Combobox` | `ModernCombobox@1.0.0` (or `Classic/ComboBox@2.4.0`) |
 | `DatePicker` | `ModernDatePicker@1.0.0` |
 | `Timer` | `Timer` — no prefix, no version |
 
@@ -73,17 +73,12 @@ Use it to *guess which form to ask for* — never to author an ungrounded token.
 still fails the whole paste. **Casing stays per-token**: `DropDown` has a capital D mid-word,
 `ComboBox` a capital B, `RichTextEditor` neither.
 
-**Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`,
+**Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, `ModernCombobox@1.0.0`,
 `ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
-`GroupContainer@1.5.0` (`Variant: AutoLayout`).
+`GroupContainer@1.5.0` (`Variant: AutoLayout`). **Every one of them is `@1.0.0`** — see the
+version trap below before you type anything else.
 
-> **This repo uses `Classic/ComboBox@2.4.0` for every combo box — all 10 of them.** A Studio
-> code-view export on 2026-08-05 came back carrying the classic token for a control this repo
-> had authored as modern, so that is what the tenant actually inserts (a modern-controls-off app
-> setting is the likely cause). `ModernCombobox` appears nowhere in `src/` and should not be
-> reintroduced without a fresh export showing Studio accept it.
-
-**`Classic/ComboBox@2.4.0` and `ModernCombobox` are different controls.** The classic
+**`Classic/ComboBox@2.4.0` and `ModernCombobox@1.0.0` are different controls.** The classic
 adds `Chevron*` styling properties and takes `DefaultSelectedItems` to seed the selection —
 which is how a card wires it up:
 
@@ -98,35 +93,52 @@ PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
 Version suffixes are optional on the CLASSIC family — Studio uses the current version if
 omitted. On the modern family they are not decoration; see below.
 
-### Modern controls get REVISED, and the revision renames properties
+### THE VERSION TRAP — `@x.y.z` is the TEMPLATE version, not the control's revision number
 
-A version suffix is not decoration on the modern family. `ModernCombobox@1.1.1` is the
-updated control and it is not property-compatible with `1.0.0`:
+**This cost a failed paste. Read it before typing any modern token.**
 
-| | 1.0.0 | 1.1.1 |
-|---|---|---|
-| delay | `TriggerOutput` | `DelayOutput` (boolean) |
-| display column | `Fields` | `ItemDisplayText` |
-| multi-select default | `false` | **`true`** — set it explicitly |
-| `Appearance` / `ValidationState` | strings | typed enums |
+Studio's properties pane shows modern controls a **revision number** — the combo box reports
+**1.1.1**. That number is *not* the pa-yaml `@version`, and authoring
+`ModernCombobox@1.1.1` **rejects the entire paste** as an unknown control.
+
+The proof is first-party: MS Learn's YAML example on
+`modern-controls/modern-control-combobox` emits **`ModernCombobox@1.0.0`** — and that page is
+documenting the *updated* control, because the same page lists `DelayOutput`, the typed enums
+and `SelectMultiple` defaulting to `true` in its "Recent updates". Revised control, unchanged
+template version. Every modern token in this repo is `@1.0.0` for exactly that reason.
+
+> **Rule: never derive a `@version` from a version number a human read off Studio's UI.**
+> Take it from an export or from a first-party YAML sample, or leave the control alone.
+
+### Modern controls still get REVISED — the revision renames properties
+
+The revision is real even though the token doesn't move. The combo box's current shape:
+
+| Old | Current |
+|---|---|
+| `TriggerOutput` | `DelayOutput` (boolean) |
+| `Fields = ["Col"]` | `ItemDisplayText = ThisItem.Col` |
+| `SelectMultiple` default `false` | default **`true`** — set it explicitly |
+| `Appearance` / `ValidationState` as strings | typed enums |
+| `FontColor` / `FontSize` / `BorderRadius` | `Color` / `Size` / `Radius{TopLeft,…}` |
+
+So any sample found online is version-specific *in its properties* while its token stays
+`@1.0.0`. `ModernSlider` was revised the same way (`Value`→`Default`,
+`Layout`→`LayoutDirection`).
 
 **The two combo boxes name their display column differently, and it is not optional.**
-`Classic/ComboBox@2.4.0` takes string arrays — `DisplayFields: =["Value"]` and
-`SearchFields: =["Value"]`. `ModernCombobox` takes `ItemDisplayText: =ThisItem.Value`. Using the
-modern property on the classic control leaves the list rendering blank rows — which is what
-"the picker shows nothing" turned out to be. Studio inserts the CLASSIC one here, so the string
-arrays are the form to author.
+`ModernCombobox@1.0.0` takes `ItemDisplayText: =ThisItem.Value`. `Classic/ComboBox@2.4.0` takes
+string arrays — `DisplayFields: =["Value"]` **and** `SearchFields: =["Value"]`. Crossing them
+renders **blank rows** rather than erroring. `Items` built by `Distinct()`, by a `["a","b"]`
+literal, or by `Choices()` all expose a single column named **`Value`**, so `ThisItem.Value` is
+right for every combo box in this repo.
 
-`Items` built by `Distinct()`, by a `["a","b"]` literal, or by `Choices()` all expose a single
-column named **`Value`**, so `=["Value"]` is right for every combo box in this repo. The classic
-control's `IsSearchable`, `SearchFields`, `DisplayFields` and `InputTextPlaceholder` are all
-first-party documented on MS Learn `controls/control-combo-box` — none is inferred. Setting
-`IsSearchable` and `SelectMultiple` both `=false` gives plain dropdown behaviour.
+`IsSearchable` and `SelectMultiple` both `=false` gives plain dropdown behaviour on either
+control.
 
 **There is no `Reset` PROPERTY on the modern combo box.** Classic `ListBox` has one, which is
 where the idea comes from; authoring it here fails the paste. The `Reset()` *function* works
-fine. `ModernSlider` was revised the same way (`Value`→`Default`, `Layout`→`LayoutDirection`),
-so treat any modern-control sample found online as version-specific until checked.
+fine — and on the current control it now clears `SearchText` as well as the selection.
 
 ## Output properties — get these wrong and every formula breaks
 
@@ -134,7 +146,7 @@ so treat any modern-control sample found online as version-specific until checke
 |---|---|---|
 | `ModernTextInput` | `.Text` | **Unchanged from classic** — converting inputs is a property rename only |
 | `ModernNumberInput` | `.Value` | a real number; `TriggerOutput` was removed from this control |
-| `Classic/ComboBox` | `.Selected.Value` | with `SelectMultiple: =false`, `Selected` is a record |
+| `ModernCombobox` | `.Selected.Value` | with `SelectMultiple: =false`, `Selected` is a record; also `.SelectedItems`, `.SearchText` |
 | `ModernDatePicker` | `.SelectedDate` | `Blank()` when unset |
 | `ModernTabList` | `.Selected.Value` | the tab label |
 | `Gallery` | `.AllItems`, `.Selected` | **`.Items` is WRITE-ONLY** — reading it is an error |
@@ -199,7 +211,7 @@ and the non-AutoLayout variant name.
 | `Classic/DropDown@2.3.1` | `Default` | `.Selected.<Column>` (`SelectedText` is deprecated) | many options, one line of space |
 | `ListBox@2.2.0` | `Default` (one item only) | `.Selected`, `.SelectedItems` when `SelectMultiple` | multi-select in a fixed box |
 | `ModernDropdown@1.0.0` | `Default` — a **value** | `.Selected.Value` | the modern single-select |
-| `Classic/ComboBox@2.4.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable, multi-select, or plain dropdown with both flags off |
+| `ModernCombobox@1.0.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable, multi-select, or plain dropdown with both flags off |
 | `Classic/Radio@2.3.0` | `Default` | `.Selected.Value` | **2–7 options that must all stay visible** |
 
 The seeding property is where these differ most, and getting it wrong is silent: the control

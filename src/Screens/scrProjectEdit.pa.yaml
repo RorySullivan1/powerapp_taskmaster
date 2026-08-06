@@ -163,10 +163,8 @@ Screens:
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
         // Classification (C11). The vocabularies are their own lists now, cached
         // once on entry — the pickers filter these in memory, so opening a level
-        // costs nothing. `active` is honoured inside cmpNestedSelect, not here:
-        // a term that has been deactivated must still resolve for DISPLAY on a
-        // project that already carries it.
-        ClearCollect( colMapRegion,   mapping_region );
+        // costs nothing. A mapping list is level1/level2/level3 and nothing else.
+        ClearCollect( colMapRegion,   mapping_regions );
         ClearCollect( colMapActivity, mapping_activitytype );
         // The picker's answer, held as the id+path pair the columns store. The
         // PATH is authoritative; the id is 0 when the pick names a branch the
@@ -382,11 +380,10 @@ Screens:
                               Width: =Parent.Width
                               Height: =18
                         - cboPrPhase:
-                            Control: Classic/ComboBox@2.4.0
+                            Control: ModernCombobox@1.0.0
                             Properties:
                               Items: =["Planning", "Active", "Blocked", "Complete", "Archived"]
-                              DisplayFields: =["Value"]
-                              SearchFields: =["Value"]
+                              ItemDisplayText: =ThisItem.Value
                               InputTextPlaceholder: ="Select a phase"
                               SelectMultiple: =false
                               IsSearchable: =false
@@ -414,11 +411,10 @@ Screens:
                               Width: =Parent.Width
                               Height: =18
                         - cboPrPriority:
-                            Control: Classic/ComboBox@2.4.0
+                            Control: ModernCombobox@1.0.0
                             Properties:
                               Items: =["Lowest", "Low", "Moderate", "High", "Critical"]
-                              DisplayFields: =["Value"]
-                              SearchFields: =["Value"]
+                              ItemDisplayText: =ThisItem.Value
                               InputTextPlaceholder: ="Select a priority"
                               SelectMultiple: =false
                               IsSearchable: =false
@@ -964,11 +960,10 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =18
             - cboPrCov:
-                Control: Classic/ComboBox@2.4.0
+                Control: ModernCombobox@1.0.0
                 Properties:
                   Items: =colPrCovChoices
-                  DisplayFields: =["Value"]
-                  SearchFields: =["Value"]
+                  ItemDisplayText: =ThisItem.Value
                   DefaultSelectedItems: =Filter( colPrCovChoices, Value = gPrCov )
                   SelectMultiple: =false
                   IsSearchable: =true
@@ -1727,11 +1722,10 @@ Screens:
                               Height: =18
                         # Matches task_priority in schema/schema.yaml exactly.
                         - cboNtPriority:
-                            Control: Classic/ComboBox@2.4.0
+                            Control: ModernCombobox@1.0.0
                             Properties:
                               Items: =["Low", "Moderate", "High", "Critical"]
-                              DisplayFields: =["Value"]
-                              SearchFields: =["Value"]
+                              ItemDisplayText: =ThisItem.Value
                               InputTextPlaceholder: ="Priority"
                               SelectMultiple: =false
                               IsSearchable: =false
@@ -2099,11 +2093,10 @@ Screens:
                               Width: =Parent.Width
                               Height: =18
                         - cboNxCcy:
-                            Control: Classic/ComboBox@2.4.0
+                            Control: ModernCombobox@1.0.0
                             Properties:
                               Items: =["USD", "EUR", "GBP", "JPY", "CHF"]
-                              DisplayFields: =["Value"]
-                              SearchFields: =["Value"]
+                              ItemDisplayText: =ThisItem.Value
                               InputTextPlaceholder: ="Currency"
                               SelectMultiple: =false
                               IsSearchable: =false
@@ -2564,11 +2557,10 @@ Screens:
                         # are not members of issue_status. schema/schema.yaml is the
                         # golden source: [Open, Review, Waiting, Blocked, Closed].
                         - cboNiStatus:
-                            Control: Classic/ComboBox@2.4.0
+                            Control: ModernCombobox@1.0.0
                             Properties:
                               Items: =["Open", "Review", "Waiting", "Blocked", "Closed"]
-                              DisplayFields: =["Value"]
-                              SearchFields: =["Value"]
+                              ItemDisplayText: =ThisItem.Value
                               InputTextPlaceholder: ="Status"
                               SelectMultiple: =false
                               IsSearchable: =false
@@ -2598,11 +2590,10 @@ Screens:
                         # WAS ["Low","Medium","High"] — "Medium" is not a member of
                         # issue_impact, which is [Low, Moderate, High, Critical].
                         - cboNiImpact:
-                            Control: Classic/ComboBox@2.4.0
+                            Control: ModernCombobox@1.0.0
                             Properties:
                               Items: =["Low", "Moderate", "High", "Critical"]
-                              DisplayFields: =["Value"]
-                              SearchFields: =["Value"]
+                              ItemDisplayText: =ThisItem.Value
                               InputTextPlaceholder: ="Impact"
                               SelectMultiple: =false
                               IsSearchable: =false
