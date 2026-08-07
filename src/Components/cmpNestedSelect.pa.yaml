@@ -68,6 +68,13 @@ ComponentDefinitions:
       Width: =760
       Height: =64
       Fill: =RGBA(0, 0, 0, 0)
+      # Fired by Reset(<instance>) on the consuming screen. Clearing nsLevels sends the
+      # depth back to whatever DefaultPath seeds, and each Reset re-reads that combo
+      # box's DefaultSelectedItems — which is otherwise read ONCE, so a picker keeps the
+      # previous record's selection when the screen is reused for a new one.
+      OnReset: |
+        =Set( nsLevels, Blank() );
+         Reset( cboL1 ); Reset( cboL2 ); Reset( cboL3 )
       SelectedPath: |
         =With( { depth: Coalesce( nsLevels,
                                   If( IsBlank(cmpNestedSelect.DefaultPath), 1,
