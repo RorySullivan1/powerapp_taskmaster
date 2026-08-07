@@ -324,7 +324,7 @@ rollups:
 # and do not point the app at a new column until it exists.
 # =============================================================================
 migration:
-  status: PLANNED — nothing applied
+  status: PLANNED — nothing applied. See `blocking_now:` — the unapplied old columns are now actively breaking saves.
   precondition: >-
     Confirm how many rows actually carry a Managed Metadata value. The lists went
     live 2026-08-04 and the app has only ever been driven in Studio, so this is
@@ -342,6 +342,19 @@ migration:
     - 5. Carry any existing values across, resolving each term to its mapping row.
     - 6. Delete the Managed Metadata columns.
     - 7. Point the app at the new columns and remove the term-store code paths.
+  blocking_now: >-
+    **A REQUIRED OLD COLUMN IS REJECTING EVERY PROJECT INSERT (2026-08-06).** Saving a
+    project returns `"Project_Type" is required`. Nothing in the app writes a column by
+    that name — it writes `project_type_id` and `project_type_path` — so this is the
+    pre-C11 Managed Metadata column still sitting on `taskmaster_projects` with
+    Required = Yes. SharePoint refuses the insert before any of the new columns matter,
+    which is why the failure survived a fix aimed at the child writes. Steps 4-7 above
+    were never applied, so the same is likely true of `project_region` and of the old
+    `client_type` / `client_coverage` / `product_type` columns on the other lists.
+    FIX IN SHAREPOINT, NOT IN CODE — the app must not start writing a retired column:
+    set the old column to Required = No (fastest), or delete it once nothing reads it.
+    Then re-check every list for any other column left Required that the app never
+    writes. Until this is done, `taskmaster_projects` cannot accept a new row.
   path_separator: >-
     The `*_path` columns store levels joined by " | " (space pipe space), e.g.
     "EMEA | UK | London". It was " > " until 2026-08-06. THE SEPARATOR IS PART OF
