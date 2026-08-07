@@ -100,7 +100,7 @@ Screens:
             Width: =560
             Height: =18
       - txtTxName:
-          Control: ModernTextInput@1.0.0
+          Control: ModernTextInput@1.1.1
           Properties:
             Default: |
               =If(gEditMode = "Edit", gEditTransaction.transaction_name, "")
@@ -124,7 +124,7 @@ Screens:
             Width: =560
             Height: =18
       - txtTxProjectSearch:
-          Control: ModernTextInput@1.0.0
+          Control: ModernTextInput@1.1.1
           Properties:
             Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Project")
@@ -175,7 +175,7 @@ Screens:
             Width: =560
             Height: =18
       - txtTxClientSearch:
-          Control: ModernTextInput@1.0.0
+          Control: ModernTextInput@1.1.1
           Properties:
             Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Client")
@@ -226,7 +226,7 @@ Screens:
             Width: =560
             Height: =18
       - txtTxProductSearch:
-          Control: ModernTextInput@1.0.0
+          Control: ModernTextInput@1.1.1
           Properties:
             Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Product")
@@ -277,7 +277,7 @@ Screens:
             Width: =560
             Height: =18
       - txtTxSalesSearch:
-          Control: ModernTextInput@1.0.0
+          Control: ModernTextInput@1.1.1
           Properties:
             Type: =TextInputType.Search
             OnChange: =Set(gTxPicker, "Sales")
@@ -355,11 +355,8 @@ Screens:
             Width: =560
             Height: =18
       - numTxNotional:
-          Control: ModernNumberInput@1.0.0
+          Control: Classic/TextInput@2.3.2
           Properties:
-            Min: =0
-            Step: =1000
-            Precision: =DecimalPrecision.'0'
             HintText: ="e.g. 25000000"
             AccessibleLabel: ="Notional in the selected currency"
             Align: =Align.Right
@@ -373,8 +370,8 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Text: |
-              =If( IsBlank(numTxNotional.Value), "no notional entered",
-                   "= " & gTxCurrency & " " & Text(numTxNotional.Value, "[$-en-US]#,##0")
+              =If( IsBlank(Value(numTxNotional.Text)), "no notional entered",
+                   "= " & gTxCurrency & " " & Text(Value(numTxNotional.Text), "[$-en-US]#,##0")
                      & "   (converted to a reporting currency in Power BI, not here)" )
             Font: =Theme.Font
             Size: =Theme.Size.Small
@@ -396,7 +393,7 @@ Screens:
             Width: =560
             Height: =18
       - dtpTxDate:
-          Control: ModernDatePicker@1.0.0
+          Control: ModernDatePicker@1.0.1
           Properties:
             DefaultDate: =If(gEditMode = "Edit", gEditTransaction.transaction_date, Blank())
             Placeholder: ="Trade date"
@@ -446,9 +443,14 @@ Screens:
             Visible: =Len(Self.Text) > 0
       # ---- Save / Cancel ----------------------------------------------------
       - btnTxSave:
-          Control: ModernButton@1.0.0
+          Control: Classic/Button@2.2.0
           Properties:
-            Appearance: =ButtonAppearance.Primary
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
             Text: |
               =If(gEditMode = "Edit", "Save transaction", "Create transaction")
             DisplayMode: |
@@ -481,7 +483,7 @@ Screens:
                                  Department: "", JobTitle: "", Picture: "" },
                            transaction_currency:    { Value: gTxCurrency },
                            transaction_notional:
-                               numTxNotional.Value,
+                               Value(numTxNotional.Text),
                            transaction_date:        dtpTxDate.SelectedDate } ) ),
                   Set( gTxErr, FirstError.Message )
               );
@@ -492,9 +494,14 @@ Screens:
                           NotificationType.Success );
                   Back() )
       - btnTxCancel:
-          Control: ModernButton@1.0.0
+          Control: Classic/Button@2.2.0
           Properties:
-            Appearance: =ButtonAppearance.Outline
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.Primary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
             Text: ="Cancel"
             Height: =44
             Width: =140

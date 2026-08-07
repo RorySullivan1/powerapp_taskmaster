@@ -215,15 +215,24 @@
  },
  "_modernControls": {
   "confirmed_from": "user-supplied Studio YAML + MS Learn output properties, 2026-08-04",
-  "ModernTextInput@1.0.0": {
+  "_modernVersions": {
+   "source": "Read off the LIVE Studio controls by the user, 2026-08-07. This is the only trustworthy source for a modern control's pa-yaml version.",
+   "table": "Text Input 1.1.1 | Combo box 1.1.1 | Dropdown 1.0.2 | Date picker 1.0.1 | Radio 1.0.1 | Data grid 1.5.0",
+   "the_rule": "VERSIONS ARE PER-CONTROL AND NOT GUESSABLE. Nothing in that table is 1.0.0 and no two entries share a version, so a version can never be pattern-matched across the modern family or assumed from a sibling. This repo previously carried @1.0.0 on every modern token purely because the first few grounded that way.",
+   "when_unsure": "USE THE CLASSIC CONTROL. A wrong version rejects the WHOLE paste and comes back as \"it didn't work\", so an unverified modern token is never worth it. ModernButton and ModernNumberInput were converted to Classic/Button@2.2.0 and Classic/TextInput@2.3.2 on 2026-08-07 for exactly this reason — their versions are unknown.",
+   "ModernRadio@1.0.1": "Version confirmed; properties not yet needed. Items, ItemDisplayText, Default (an ITEM from Items), Selected, Layout.",
+   "ModernDataGrid@1.5.0": "Version confirmed; unused. Note the 1.5.x line — further evidence that modern versions do not cluster near 1.0.0."
+  },
+  "ModernTextInput@1.1.1": {
    "output": "Text  — SAME as classic, so no formula that reads an input had to change",
-   "props": "Placeholder, Type (TextInputType.SingleLine|Multiline|Password|Search), TriggerOutput (TriggerOutput.Keypress|FocusOut|Delayed), MaxLength, Required, Default, Appearance, Align, AccessibleLabel"
+   "props": "Placeholder, Type, TriggerOutput, MaxLength, Required, Default, Appearance, Align, AccessibleLabel, ValidationState, DisplayMode, Color/Size/Italic/Underline/Strikethrough",
+   "two_traps_paid_for": "Type, NOT Mode. The modern text input takes Type: =TextInputType.Multiline; `Mode: =TextMode.MultiLine` is the CLASSIC text input's property and authoring it on the modern control is a property error. And TriggerOutput, NOT DelayOutput: =TriggerOutput.Delayed is right here — DelayOutput belongs to the COMBO BOX. Both authored wrongly on scrTaskEdit 2026-08-07 and both confirmed on MS Learn modern-control-text-input. Sibling modern controls do NOT share property names."
   },
   "ModernNumberInput@1.0.0": {
    "output": "Value  — a real number, not text",
    "props": "Default, Min, Max, Step, Precision (DecimalPrecision.'0'|'1'|'2'), HintText, Align, Appearance, AccessibleLabel. NOTE: TriggerOutput was REMOVED from this control"
   },
-  "ModernDatePicker@1.0.0": {
+  "ModernDatePicker@1.0.1": {
    "output": "SelectedDate  — Blank() when unset",
    "props": "Placeholder, DefaultDate, StartDate, EndDate, StartOfWeek, Format (DatePickerFormat.LongAbbreviated|Short|Long or a custom string), IsEditable, DateTimeZone"
   },
@@ -259,7 +268,7 @@
    "props": "Items, Items.Value, Default, SelectMultiple, Selection{Color,Fill}, DisabledSelection{Color,Fill}, Padding*, plus the usual colour/border set",
    "note": "NO Classic/ prefix — it is plain `ListBox@2.2.0`, the same trap as `Timer`. Only ONE item can be pre-selected via Default; for multiple defaults use a combo box."
   },
-  "ModernDropdown@1.0.0": {
+  "ModernDropdown@1.0.2": {
    "output": "Selected — a record; .Selected.Value for a string array",
    "props": "Items, ItemDisplayText, Default (a VALUE, not a table), Appearance, AccessibleLabel, ValidationState, OnChange",
    "note": "Grounded from MS Learn's own YAML sample rather than a Studio export. Single-select; the combo box is the multi-select / searchable one. Note Default here takes a value, where ModernCombobox takes DefaultSelectedItems, a TABLE."

@@ -40,11 +40,11 @@ prefixed tokens:
 
 | Generic doc says | Studio actually writes |
 |---|---|
-| `Button` | `Classic/Button@2.2.0` or `ModernButton@1.0.0` |
-| `TextInput` | `Classic/TextInput@2.3.2` or `ModernTextInput@1.0.0` |
+| `Button` | `Classic/Button@2.2.0` — modern button version UNKNOWN, so classic |
+| `TextInput` | `ModernTextInput@1.1.1` or `Classic/TextInput@2.3.2` |
 | `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` |
 | `Dropdown` / `Combobox` | `ModernCombobox@1.1.1` (or `Classic/ComboBox@2.4.0`) |
-| `DatePicker` | `ModernDatePicker@1.0.0` |
+| `DatePicker` | `ModernDatePicker@1.0.1` |
 | `Timer` | `Timer` — no prefix, no version |
 
 Treat the generic docs as a guide to *structure*, never to *tokens*.
@@ -73,10 +73,12 @@ Use it to *guess which form to ask for* — never to author an ungrounded token.
 still fails the whole paste. **Casing stays per-token**: `DropDown` has a capital D mid-word,
 `ComboBox` a capital B, `RichTextEditor` neither.
 
-**Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, **`ModernCombobox@1.1.1`**,
-`ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
-`GroupContainer@1.5.0` (`Variant: AutoLayout`). The combo box is the one that is NOT `@1.0.0`
-— versions are per-control, so read each one, never pattern-match across the family.
+**Modern family IN USE** — `ModernTextInput@1.1.1`, `ModernCombobox@1.1.1`,
+`ModernDatePicker@1.0.1`, `GroupContainer@1.5.0` (`Variant: AutoLayout`). Version-confirmed
+but unused: `ModernDropdown@1.0.2`, `ModernRadio@1.0.1`, `ModernDataGrid@1.5.0`.
+
+**Version UNKNOWN, so NOT used** — `ModernButton`, `ModernNumberInput`, `ModernTabList`,
+`ModernSlider`. Author the classic control for these; see the standing rule below.
 
 **`Classic/ComboBox@2.4.0` and `ModernCombobox@1.1.1` are different controls.** The classic
 adds `Chevron*` styling properties and takes `DefaultSelectedItems` to seed the selection —
@@ -93,28 +95,46 @@ PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
 Version suffixes are optional on the CLASSIC family — Studio uses the current version if
 omitted. On the modern family they are not decoration; see below.
 
-### Which `@version` for the modern combo box — RESOLVED as `@1.1.1`
+### MODERN VERSIONS ARE PER-CONTROL — read them, never infer them
 
-Author **`ModernCombobox@1.1.1`**. That is what Studio reports for the control in this
-tenant, confirmed twice by the user reading it off the live app.
+Read off the live Studio controls by the user, **2026-08-07**:
 
-There is one piece of contrary evidence, recorded so nobody re-opens this from the doc
-alone: **MS Learn's YAML sample on `modern-controls/modern-control-combobox` still emits
-`@1.0.0`** — on the very page whose prose documents the revision (`DelayOutput`, typed enums,
-`SelectMultiple` defaulting true). Doc samples lag a control revision even when the text
-beside them is current, so the sample loses to the live app. **`ModernCombobox@1.0.0` stays
-allow-listed as a fallback**, not as the preferred token — reach for it only if `@1.1.1` is
-ever rejected in an app where modern controls are confirmed ON.
+| Modern control | pa-yaml token |
+|---|---|
+| Text input | `ModernTextInput@1.1.1` |
+| Combo box | `ModernCombobox@1.1.1` |
+| Dropdown | `ModernDropdown@1.0.2` |
+| Date picker | `ModernDatePicker@1.0.1` |
+| Radio | `ModernRadio@1.0.1` |
+| Data grid | `ModernDataGrid@1.5.0` |
 
-**A `@1.1.1` paste DID fail once — and that failure proves nothing about the version.** It
-happened while **modern controls were switched off** in the app. A disabled template is
-unavailable whatever version you name it, so that rejection is fully explained without
-blaming the token. Diagnosing it as a version problem sent this repo through a needless
-conversion of all 10 combo boxes to the classic control and back.
+**Nothing in that table is `@1.0.0`, and no two entries share a version.** This repo
+carried `@1.0.0` on every modern token for days purely because the first few happened to
+ground that way — a pattern that was never real. A version cannot be inferred from a
+sibling control, from the family, or from a number in MS Learn's sample code.
 
-> **The transferable rule is about EVIDENCE, not about versions.** Before concluding that a
-> token is wrong, rule out the app-level settings that make a whole control FAMILY
-> unavailable. A failed paste has many possible causes and names only itself.
+> **THE STANDING RULE: if you are unsure of a modern control's version, author the CLASSIC
+> control instead.** A wrong version rejects the *whole* paste and returns as "it didn't
+> work". `ModernButton` and `ModernNumberInput` were converted to `Classic/Button@2.2.0`
+> and `Classic/TextInput@2.3.2` on 2026-08-07 for exactly that reason — their versions are
+> unknown, and a working classic control beats a guessed modern one every time.
+
+Converting a button means dropping `Appearance` (modern-only) and carrying the look on
+`Fill` / `Color` / `BorderColor` / `BorderThickness`. Converting a number input means
+dropping `Min` / `Step` / `Precision` and reading it as `Value(ctl.Text)` rather than
+`ctl.Value`, because a classic text input outputs text.
+
+### Sibling modern controls do NOT share property names
+
+Two property errors on one screen, both from assuming a neighbour's spelling:
+
+| Control | Right | Wrong — and what it belongs to |
+|---|---|---|
+| `ModernTextInput` | `Type: =TextInputType.Multiline` | `Mode: =TextMode.MultiLine` — the **classic** text input |
+| `ModernTextInput` | `TriggerOutput: =TriggerOutput.Delayed` | `DelayOutput: =true` — the **combo box** |
+
+`TriggerOutput` takes `Keypress` (default) / `FocusOut` / `Delayed`. The combo box is the
+control that renamed `TriggerOutput` to `DelayOutput`; the text input did **not**.
 
 ### Modern controls still get REVISED — the revision renames properties
 
@@ -147,13 +167,13 @@ fine — and on the current control it now clears `SearchText` as well as the se
 
 ### `Default` on a tab list is an ITEM, on a dropdown it is a VALUE
 
-`ModernTabList@1.0.0` — **`Default: ="Tasks"` errors.** A string-array `Items` yields
+`ModernTabList` (version UNKNOWN — see the standing rule) — **`Default: ="Tasks"` errors.** A string-array `Items` yields
 *records* with a `Value` column (which is why the output is `.Selected.Value`), and MS Learn
 says `Default` "must match an item from the Items source" — an item, not something equal to
 one. Author `=First(["Tasks", "Transactions", "Issues"])`, or
 `=LookUp([...], Value = "Tasks")` when it is not the first tab.
 
-`ModernDropdown@1.0.0` is the opposite: its `Default` takes a **value**. Two modern controls,
+`ModernDropdown@1.0.2` is the opposite: its `Default` takes a **value**. Two modern controls,
 two contracts, same property name — check per control.
 
 Its `Limitations` also warn that "very small or very large width and height values might not be
@@ -230,7 +250,7 @@ and the non-AutoLayout variant name.
 |---|---|---|---|
 | `Classic/DropDown@2.3.1` | `Default` | `.Selected.<Column>` (`SelectedText` is deprecated) | many options, one line of space |
 | `ListBox@2.2.0` | `Default` (one item only) | `.Selected`, `.SelectedItems` when `SelectMultiple` | multi-select in a fixed box |
-| `ModernDropdown@1.0.0` | `Default` — a **value** | `.Selected.Value` | the modern single-select |
+| `ModernDropdown@1.0.2` | `Default` — a **value** | `.Selected.Value` | the modern single-select |
 | `ModernCombobox@1.1.1` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable, multi-select, or plain dropdown with both flags off |
 | `Classic/Radio@2.3.0` | `Default` | `.Selected.Value` | **2–7 options that must all stay visible** |
 
@@ -417,7 +437,7 @@ represent an unset optional column; pair it with a "not set" checkbox or use a n
       OnChange:    =Set(gStatus, Radio1.Selected.Value)
 ```
 
-**Two version traps on the modern slider.** `ModernSlider@1.0.0` was revised: the input used to
+**Two version traps on the modern slider.** `ModernSlider` (version UNKNOWN — author `Classic/Slider@2.1.0`) was revised: the input used to
 be `Value` and is now `Default`, with `Value` demoted to a read-only output; and `Layout` became
 `LayoutDirection`, taking a typed enum instead of the string `"Horizontal"`. Any sample found
 online that assigns `Value:` predates the change and will not behave as written.

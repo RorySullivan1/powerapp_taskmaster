@@ -50,10 +50,20 @@ KNOWN_CONTROLS = {
     "CanvasComponent":        "grounded",   # component instance, not a control
     "HtmlViewer@2.1.0":       "grounded",   # CONFIRMED 2026-08-03 — cmpStatusPill body pasted
     "Timer":                  "grounded",   # CONFIRMED 2026-08-03 — NOT Classic/Timer
-    "ModernTextInput@1.0.0":  "grounded",   # CONFIRMED 2026-08-04 — output is .Text, as classic
-    "ModernNumberInput@1.0.0":"grounded",   # CONFIRMED 2026-08-04 — output is .Value (a number)
-    "ModernTabList@1.0.0":    "grounded",   # CONFIRMED 2026-08-04 — output is .Selected.Value
-    "ModernButton@1.0.0":     "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
+    # MODERN VERSIONS ARE PER-CONTROL AND NOT GUESSABLE. Read off the live Studio
+    # controls by the user, 2026-08-07:
+    #     Text Input 1.1.1 · Combo box 1.1.1 · Dropdown 1.0.2
+    #     Date picker 1.0.1 · Radio 1.0.1 · Data grid 1.5.0
+    # Nothing in that list is 1.0.0, and no two share a version. Any modern token
+    # NOT on it is unverified — and the standing rule is then to author the
+    # CLASSIC control instead of guessing, because a wrong version rejects the
+    # whole paste. ModernButton and ModernNumberInput were converted to
+    # Classic/Button and Classic/TextInput for exactly that reason.
+    "ModernTextInput@1.1.1":  "grounded",   # user-confirmed from Studio 2026-08-07
+    "ModernDatePicker@1.0.1": "grounded",   # user-confirmed from Studio 2026-08-07
+    "ModernDropdown@1.0.2":   "grounded",   # user-confirmed from Studio 2026-08-07 (unused)
+    "ModernRadio@1.0.1":      "grounded",   # user-confirmed from Studio 2026-08-07 (unused)
+    "ModernDataGrid@1.5.0":   "grounded",   # user-confirmed from Studio 2026-08-07 (unused)
     # TWO VERSIONS, both allow-listed on purpose. `@1.1.1` is what Studio reports for this
     # control and is what src/ authors. `@1.0.0` is what MS Learn's YAML sample still shows;
     # doc samples lag a revision even when the prose beside them is updated, so it is kept
@@ -61,15 +71,9 @@ KNOWN_CONTROLS = {
     # failure happened while MODERN CONTROLS WERE DISABLED in the app — a disabled template
     # is unavailable regardless of version — so it is not evidence against the token.
     "ModernCombobox@1.1.1":   "grounded",   # user-confirmed from Studio, 2026-08-05 and -06
-    "ModernCombobox@1.0.0":   "grounded",   # MS Learn modern-control-combobox YAML sample
-                                            # No Reset PROPERTY (classic ListBox has one, this does not);
-                                            # SelectMultiple now defaults to true; TriggerOutput replaced
-                                            # by DelayOutput; Appearance/ValidationState take typed enums.
-    "ModernDatePicker@1.0.0": "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
     "Classic/ComboBox@2.4.0": "grounded",   # CONFIRMED 2026-08-04 — classic combo box
     "Classic/DropDown@2.3.1": "grounded",   # CONFIRMED 2026-08-04 — note the capital D in DropDown
     "ListBox@2.2.0":          "grounded",   # CONFIRMED 2026-08-04 — NO Classic/ prefix, like Timer
-    "ModernDropdown@1.0.0":   "grounded",   # from MS Learn's own YAML sample, 2026-08-04
     "Form@2.4.4":             "grounded",   # CONFIRMED 2026-08-04 — Variant: Classic, Layout: Vertical
     "TypedDataCard@1.0.7":    "grounded",   # CONFIRMED 2026-08-04 — a Form's data card
     "GroupContainer@1.5.0":   "grounded",   # CONFIRMED 2026-08-04 — auto-layout container,
@@ -79,8 +83,6 @@ KNOWN_CONTROLS = {
     "Rating@2.1.0":           "grounded",   # CONFIRMED 2026-08-05 — NO prefix; out is .Value
     "Classic/Slider@2.1.0":   "grounded",   # CONFIRMED 2026-08-05 — prefixed; out is .Value
     "Classic/Radio@2.3.0":    "grounded",   # CONFIRMED 2026-08-05 — prefixed; out is .Selected.Value
-    "ModernSlider@1.0.0":     "grounded",   # from MS Learn's own YAML sample, 2026-08-05 —
-                                            # same provenance as ModernDropdown@1.0.0
 }
 
 # The `Classic/` prefix is not decoration: it appears on exactly those controls whose
