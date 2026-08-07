@@ -888,7 +888,7 @@ Screens:
             - lblPrClassNote:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Region and Project type are required. Pick a value, press + to narrow it down a level, then press the ✓ to record it. One level is a complete answer."
+                  Text: ="Region and Project type are required. Pick a value — it is recorded as soon as you choose it. Press + to narrow it down a level, ✕ to close one. One level is a complete answer."
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.TextMuted
@@ -904,6 +904,7 @@ Screens:
                   Terms: =colMapRegion
                   Caption: ="Region  *"
                   DefaultPath: =gPrRegionPath
+                  Separator: =" | "
                   Width: =Parent.Width - 48
                   Height: =64
                   OnChange: |
@@ -930,6 +931,7 @@ Screens:
                   Terms: =colMapActivity
                   Caption: ="Project type  *"
                   DefaultPath: =gPrTypePath
+                  Separator: =" | "
                   Width: =Parent.Width - 48
                   Height: =64
                   OnChange: |
@@ -1383,7 +1385,12 @@ Screens:
                     =Set( gPrSaved, Blank() );
                     Set( gPrErr, "" );
                     Set( gPrWarn, "" );
-                    If( gEditMode = "New",
+                    // gEditMode says Edit only because a previous save SAID it
+                    // succeeded. If there is no record behind it, patching that
+                    // record fails forever and no amount of re-typing helps — so
+                    // treat a missing ID as New and insert instead. This is the
+                    // self-heal for the state described at step 4 below.
+                    If( gEditMode = "New" || IsBlank(gEditProject.ID),
                         IfError(
                             Set( gPrSaved,
                                 Patch( taskmaster_projects, Defaults(taskmaster_projects),
@@ -1434,11 +1441,21 @@ Screens:
                                                             Coalesce(gEditProject.project_date_complete, Now()),
                                                             gEditProject.project_date_complete ) } ) ),
                             Set( gPrErr, FirstError.Message ) ) );
+                    // TRUST THE RECORD, NEVER THE MESSAGE. A write can fail and
+                    // still leave FirstError.Message empty, and the old code read
+                    // that empty message as success: it then set gEditProject to a
+                    // BLANK gPrSaved and flipped gEditMode to "Edit". After that
+                    // txtPrName.Default reads gEditProject.project_name — blank, so
+                    // the name appears to clear — and every later save patches a
+                    // record that does not exist, so it fails no matter what is
+                    // typed back in. If there is no ID, nothing was written.
+                    If( IsBlank(gPrSaved.ID) && Len(gPrErr) = 0,
+                        Set( gPrErr, "SharePoint returned no record and no error message, so nothing was saved. Check the required columns on taskmaster_projects." ) );
                     If( Len(gPrErr) > 0,
                         Notify( If(gEditMode = "New", "Couldn't create the project: ", "Couldn't save the project: ")
                                   & gPrErr,
                                 NotificationType.Error ) );
-                    If( Len(gPrErr) = 0,
+                    If( Len(gPrErr) = 0 && !IsBlank(gPrSaved.ID),
                         // --- 2. optional / re-picked parent fields ----------------
                         If( Len(gPrRequestor.Mail) > 0,
                             IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,

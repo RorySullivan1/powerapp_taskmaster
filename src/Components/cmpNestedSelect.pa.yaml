@@ -1,10 +1,15 @@
 # cmpNestedSelect — cascading 1-3 level picker over a mapping_* table.
 #
-#   caption ........................... ✓      commit, top right
+#   caption
 #   [ level 1 ] [ level 2 ] [ level 3 ]  + ✕   + opens a level, ✕ closes one
 #
 # Outputs SelectedPath (authoritative, composed from the picks) and SelectedId
 # (the exact row, or 0 when the pick names a branch with no row of its own).
+#
+# THERE IS NO COMMIT TICK. Every pick raises OnChange immediately, so a
+# selection IS the acceptance — the consumer writes on each change and a user
+# can never leave a chosen value unrecorded by forgetting a second click.
+# + and ✕ raise it too: closing a level shortens the path, which is a change.
 #
 # Four things that will re-break it if changed without knowing why:
 #   - Children of an auto-layout container default to flexible sizing, which makes
@@ -20,7 +25,7 @@
 ComponentDefinitions:
   cmpNestedSelect:
     DefinitionType: CanvasComponent
-    Description: Cascading 1-3 level picker over a mapping_* table. The user opens levels with +, closes with x, and commits at any depth.
+    Description: Cascading 1-3 level picker over a mapping_* table. The user opens levels with + and closes them with x; every change is raised immediately, so a selection at any depth is a complete answer.
     AccessAppScope: false
     CustomProperties:
       Terms:
@@ -31,19 +36,19 @@ ComponentDefinitions:
           =Table( { ID: 1, level1: "Example", level2: "", level3: "" } )
       Caption:
         PropertyKind: Input
-        Description: Field caption, shown top left with the commit tick opposite it.
+        Description: Field caption, shown above the row of combo boxes.
         DataType: Text
         Default: ="Classification"
       DefaultPath:
         PropertyKind: Input
-        Description: Stored path to show on open, e.g. "Campaign > Email". Empty for a fresh pick. Seeds each level in turn.
+        Description: Stored path to show on open, e.g. "Campaign | Email". Empty for a fresh pick. Seeds each level in turn. Must use the same Separator it was written with.
         DataType: Text
         Default: =""
       Separator:
         PropertyKind: Input
-        Description: What joins the levels in a composed path. Change it here and both composition and seeding follow.
+        Description: What joins the levels in a composed path, e.g. "EMEA | UK | London". Change it here and both composition and seeding follow — but any path ALREADY STORED with the old separator stops matching on seed.
         DataType: Text
-        Default: =" > "
+        Default: =" | "
       SelectedPath:
         PropertyKind: Output
         Description: The path the user has picked, at whatever depth. Empty until level 1 is chosen. THIS is the authoritative value.
@@ -54,7 +59,7 @@ ComponentDefinitions:
         DataType: Number
       OnChange:
         PropertyKind: Event
-        Description: Raised when the user commits with the tick. Read SelectedPath and SelectedId in the handler.
+        Description: Raised on EVERY change — each combo box pick, and the + / x that open and close a level. There is no commit step. Read SelectedPath and SelectedId in the handler.
         ReturnType: Boolean
     Properties:
       Width: =760
@@ -102,30 +107,8 @@ ComponentDefinitions:
             VerticalAlign: =VerticalAlign.Middle
             X: =0
             Y: =0
-            Width: =732
+            Width: =760
             Height: =20
-      - icoCommit:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            Icon: |
-              =If( !IsBlank(cmpNestedSelect.DefaultPath)
-                   && cmpNestedSelect.DefaultPath =
-                      cboL1.Selected.Value
-                      & If( Coalesce(nsLevels, Value(nsSeedDepth.Text)) >= 2 && !IsBlank(cboL2.Selected.Value),
-                            cmpNestedSelect.Separator & cboL2.Selected.Value, "" )
-                      & If( Coalesce(nsLevels, Value(nsSeedDepth.Text)) >= 3 && !IsBlank(cboL3.Selected.Value),
-                            cmpNestedSelect.Separator & cboL3.Selected.Value, "" ),
-                   Icon.CheckBadge, Icon.Check )
-            Color: |
-              =If( IsBlank(cboL1.Selected.Value), RGBA(190, 195, 200, 1), RGBA(0, 90, 158, 1) )
-            DisplayMode: |
-              =If( IsBlank(cboL1.Selected.Value), DisplayMode.Disabled, DisplayMode.Edit )
-            Tooltip: ="Use this selection"
-            X: =736
-            Y: =0
-            Width: =20
-            Height: =20
-            OnSelect: =cmpNestedSelect.OnChange()
       - nsRow:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -156,7 +139,7 @@ ComponentDefinitions:
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =36
-                  OnChange: =Reset(cboL2); Reset(cboL3)
+                  OnChange: =Reset(cboL2); Reset(cboL3); cmpNestedSelect.OnChange()
             - cboL2:
                 Control: ModernCombobox@1.1.1
                 Properties:
@@ -182,7 +165,7 @@ ComponentDefinitions:
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =36
-                  OnChange: =Reset(cboL3)
+                  OnChange: =Reset(cboL3); cmpNestedSelect.OnChange()
             - cboL3:
                 Control: ModernCombobox@1.1.1
                 Properties:
@@ -208,6 +191,7 @@ ComponentDefinitions:
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =36
+                  OnChange: =cmpNestedSelect.OnChange()
             - icoAddLevel:
                 Control: Classic/Icon@2.5.0
                 Properties:
@@ -230,7 +214,7 @@ ComponentDefinitions:
                   LayoutMinWidth: =24
                   Width: =24
                   Height: =24
-                  OnSelect: =Set( nsLevels, Coalesce(nsLevels, Value(nsSeedDepth.Text)) + 1 )
+                  OnSelect: =Set( nsLevels, Coalesce(nsLevels, Value(nsSeedDepth.Text)) + 1 ); cmpNestedSelect.OnChange()
             - icoDropLevel:
                 Control: Classic/Icon@2.5.0
                 Properties:
@@ -242,4 +226,4 @@ ComponentDefinitions:
                   LayoutMinWidth: =24
                   Width: =24
                   Height: =24
-                  OnSelect: =Set( nsLevels, Coalesce(nsLevels, Value(nsSeedDepth.Text)) - 1 )
+                  OnSelect: =Set( nsLevels, Coalesce(nsLevels, Value(nsSeedDepth.Text)) - 1 ); cmpNestedSelect.OnChange()

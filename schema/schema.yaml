@@ -65,7 +65,7 @@ lists:
   # The identical column names are deliberate: one settings screen on scrAdmin
   # drives all three, parameterised by which list it points at.
   #
-  # NOT stored here: the composed path ("EMEA > UK > London"). The app builds it
+  # NOT stored here: the composed path ("EMEA | UK | London"). The app builds it
   # from level1..3 on write, so the levels stay the single source and a stored
   # copy cannot drift from them.
   #
@@ -120,10 +120,10 @@ lists:
       - { name: project_coverage,        type: Choice,          required: false,                 desc: "Business/product coverage area", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning. The app binds Choices() rather than a literal, so the real values need no app change" }
       - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
       - { name: project_region_id,       type: Number,          required: false, indexed: true,  desc: "ID of the mapping_regions row when the picked path names one exactly; 0 when it names a BRANCH the vocabulary has no row for. The path column is the authoritative value — see C11", maps_to: mapping_regions }
-      - { name: project_region_path,     type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"EMEA > UK > London\". Denormalised so display needs no lookup and drill-down is StartsWith(), which delegates on Text" }
+      - { name: project_region_path,     type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"EMEA | UK | London\". Denormalised so display needs no lookup and drill-down is StartsWith(), which delegates on Text" }
       - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
       - { name: project_type_id,         type: Number,          required: false, indexed: true,  desc: "ID of the mapping_activitytype row when the picked path names one exactly; 0 when it names a branch", maps_to: mapping_activitytype }
-      - { name: project_type_path,       type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"Campaign > Email > Newsletter\". Same id+path pair as project_region" }
+      - { name: project_type_path,       type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"Campaign | Email | Newsletter\". Same id+path pair as project_region" }
       - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user" }
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  desc: "Lifecycle phase", values: [Planning, Active, Blocked, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
@@ -342,6 +342,16 @@ migration:
     - 5. Carry any existing values across, resolving each term to its mapping row.
     - 6. Delete the Managed Metadata columns.
     - 7. Point the app at the new columns and remove the term-store code paths.
+  path_separator: >-
+    The `*_path` columns store levels joined by " | " (space pipe space), e.g.
+    "EMEA | UK | London". It was " > " until 2026-08-06. THE SEPARATOR IS PART OF
+    THE STORED DATA: cmpNestedSelect re-seeds a picker by StartsWith() on the path
+    and counts separators to work out the depth, so a row written with the old
+    separator opens at level 1 with nothing selected. Any rows created before the
+    change need their `*_path` values rewritten, or simply re-picked. It is passed
+    explicitly as `Separator: =" | "` on each picker instance in scrProjectEdit,
+    not left to the component default — a screen paste carries an instance property,
+    while a component default has to be retyped by hand in Studio.
   list_names: >-
     `mapping_regions` is PLURAL; `mapping_activitytype` and `mapping_producttype` are
     SINGULAR. All three confirmed against SharePoint 2026-08-06. The inconsistency is
@@ -396,7 +406,7 @@ open_recommendations:
       correct shape — and changes whose data it is. The path is now a column this
       repo defines on a list this repo owns, so StartsWith() on it is first-party
       delegable Text rather than a bet on an undocumented field. Drill-down at any
-      depth is one formula: StartsWith(<col>_path, "EMEA > UK").
+      depth is one formula: StartsWith(<col>_path, "EMEA | UK").
 
       Storing the ID alone was considered and rejected: every gallery row would need
       a LookUp() to render a label, and filtering by a level would mean resolving a
