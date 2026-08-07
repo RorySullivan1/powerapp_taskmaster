@@ -145,6 +145,21 @@ control.
 where the idea comes from; authoring it here fails the paste. The `Reset()` *function* works
 fine — and on the current control it now clears `SearchText` as well as the selection.
 
+### `Default` on a tab list is an ITEM, on a dropdown it is a VALUE
+
+`ModernTabList@1.0.0` — **`Default: ="Tasks"` errors.** A string-array `Items` yields
+*records* with a `Value` column (which is why the output is `.Selected.Value`), and MS Learn
+says `Default` "must match an item from the Items source" — an item, not something equal to
+one. Author `=First(["Tasks", "Transactions", "Issues"])`, or
+`=LookUp([...], Value = "Tasks")` when it is not the first tab.
+
+`ModernDropdown@1.0.0` is the opposite: its `Default` takes a **value**. Two modern controls,
+two contracts, same property name — check per control.
+
+Its `Limitations` also warn that "very small or very large width and height values might not be
+fully respected", so never lay out the band beneath a tab list from a height you *assumed* it
+would take.
+
 ## Output properties — get these wrong and every formula breaks
 
 | Control | Read it as | Note |
@@ -153,7 +168,7 @@ fine — and on the current control it now clears `SearchText` as well as the se
 | `ModernNumberInput` | `.Value` | a real number; `TriggerOutput` was removed from this control |
 | `ModernCombobox` | `.Selected.Value` | with `SelectMultiple: =false`, `Selected` is a record; also `.SelectedItems`, `.SearchText` |
 | `ModernDatePicker` | `.SelectedDate` | `Blank()` when unset |
-| `ModernTabList` | `.Selected.Value` | the tab label |
+| `ModernTabList` | `.Selected.Value` | the tab label — and `Default` must be an **item**, not a value; see below |
 | `Gallery` | `.AllItems`, `.Selected` | **`.Items` is WRITE-ONLY** — reading it is an error |
 | `Classic/Toggle` | `.Value` | a boolean; seeded by `Default` |
 | `Rating` | `.Value` | a number, `0` when unrated; seeded by `Default` |
