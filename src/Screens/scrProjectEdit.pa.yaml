@@ -57,14 +57,22 @@
 #    The button is `DisplayMode.Disabled` when nothing is picked, which is what
 #    greys the "— nobody selected —" placeholder.
 #
-# 6. STAGED LISTS COST NOTHING WHEN EMPTY.  The three staged galleries were a
-#    fixed 400 / 380 / 380 tall whether or not they held a row — 1,160px of
-#    blank space in the scroll on every new project.  Each is now `Visible:
-#    =!IsEmpty(col…)` with a one-line empty state in its place, a constant 200px
-#    when populated (4 rows of 44 + internal scroll past that), and its live
-#    count in the section heading.  The height is a CONSTANT on purpose: a
+# 6. THE STAGED CHILDREN ARE THREE COLUMNS, AND COST A FIXED 248px.  They were
+#    three stacked sections — divider, heading, Add button, list — that each grew
+#    as items were added, so staging a few children pushed the action bar right
+#    off the bottom of the scroll.  `rowPrStaged` is now one horizontal container
+#    of three vertical columns; each column is its Add button (which carries the
+#    live count) over a list of the staged rows, and each list SCROLLS inside its
+#    own 196px gallery rather than expanding.  The section is the same height
+#    empty or full.  Every height here is a CONSTANT on purpose: a
 #    `CountRows(...)`-driven height would freeze at paste, when the collection is
 #    always empty, and clip the list forever.
+#
+#    The row inside each gallery template is an auto-layout container, not
+#    absolute coordinates — the ✕ is pinned right by `FillPortions: =0` against a
+#    label with `FillPortions: =1`, so it cannot drift over the text the way a
+#    frozen `Parent.TemplateWidth - 30` did.  The label carries `OnSelect`, so
+#    there is no transparent overlay button to keep aligned.
 #
 # 7. THE MODALS ARE CONTAINERS NOW.  Each was ~20 absolutely-positioned controls
 #    repeating `(Parent.Width - 680) / 2 + 24` by hand.  Each is now
@@ -190,6 +198,8 @@ Screens:
         // Which staged row a modal is editing. 0 = adding a new one. The chips set
         // it; Add reads it to decide between Patch and Collect.
         Set( gNtEditSid, 0 ); Set( gNxEditSid, 0 ); Set( gNiEditSid, 0 );
+        // Delete is a TWO-PRESS action and must never open already armed.
+        Set( gPrDelArm, false );
         Set( gNtName, "" ); Set( gNtTarget, Blank() );
         Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
         Set( gNiName, "" );
@@ -983,371 +993,324 @@ Screens:
             # -----------------------------------------------------------------
             # TASKS  (staged — written after the project's insert returns)
             # -----------------------------------------------------------------
-            - divPrTasks:
+            - divPrStaged:
                 Control: Rectangle@2.3.0
                 Properties:
                   Fill: =Theme.Color.Border
                   Width: =Parent.Width - 48
                   Height: =1
-            - rowHeadTasks:
+            # ---------------------------------------------------------------------
+            # STAGED CHILDREN — three columns, side by side, at the bottom.
+            #
+            # Was three stacked sections, each a divider + header row + Add button +
+            # a strip of tags, and each expanded as items were added. Three columns
+            # cost a FIXED 248px no matter how many items are staged; the lists
+            # scroll inside their own column instead of pushing the action bar down.
+            #
+            # Each column is: the Add button as its own header, then the staged rows
+            # by name with a x on the far right.
+            #
+            # The row inside the gallery template is an auto-layout container, NOT
+            # absolute coordinates. That is deliberate: the x is pinned right by
+            # FillPortions 0 against a label with FillPortions 1, so it cannot drift
+            # over the text the way a frozen `Parent.TemplateWidth - 30` did. The
+            # label carries OnSelect, so no transparent overlay button is needed.
+            # ---------------------------------------------------------------------
+            - rowPrStaged:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
                   LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =12
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =24
                   Width: =Parent.Width - 48
-                  Height: =36
+                  Height: =248
                 Children:
-                  - secHeadTasks:
-                      Control: Label@2.5.1
+                  - colStgNt:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Text: |
-                          ="Tasks" & If( IsEmpty(colNewTasks), "", "   (" & CountRows(colNewTasks) & " staged)" )
-                        Font: =Theme.Font
-                        FontWeight: =FontWeight.Semibold
-                        Size: =Theme.Size.H3
-                        Color: =Theme.Color.Primary
-                        Width: =Parent.Width - 184
-                        Height: =24
-                        VerticalAlign: =VerticalAlign.Middle
-                  # Outline, not Primary: there is exactly ONE primary action on
-                  # this screen and it lives in the action bar.
-                  - btnAddNt:
-                      Control: ModernButton@1.0.0
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        Width: =(Parent.Width - 48) / 3
+                        Height: =248
+                      Children:
+                        - btnAddNt:
+                            Control: ModernButton@1.0.0
+                            Properties:
+                              Appearance: =ButtonAppearance.Outline
+                              Text: |
+                                ="+  Add task" &
+                                 If( IsEmpty(colNewTasks), "", "   (" & CountRows(colNewTasks) & ")" )
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set( gNtEditSid, 0 ); Set( gNtName, "" ); Set( gNtTarget, Blank() );
+                                Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
+                                Set( gNtOpen, true )
+                        - lblStgNtEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(colNewTasks)
+                              Text: ="No tasks added yet."
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =24
+                              VerticalAlign: =VerticalAlign.Middle
+                        - galNewNt:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              Visible: =!IsEmpty(colNewTasks)
+                              Items: =colNewTasks
+                              # One per row. TemplatePadding is taken off BOTH edges,
+                              # so usable height is 32 - 2*2 = 28, which clears the
+                              # 28px row exactly.
+                              WrapCount: =1
+                              TemplateSize: =32
+                              TemplatePadding: =2
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              Width: =Parent.Width
+                              Height: =196
+                            Children:
+                              - rowStgNt:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =6
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =28
+                                  Children:
+                                    - lblStgNtName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.t_name
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =60
+                                          Height: =24
+                                          OnSelect: |
+                                            =Set( gNtName, ThisItem.t_name ); Set( gNtTarget, ThisItem.t_target );
+                                            Set( gNtPriority, ThisItem.t_priority );
+                                            Set( gNtLead, { DisplayName: ThisItem.t_leadName, Mail: ThisItem.t_leadMail } );
+                                            Set( gNtEditSid, ThisItem.sid );
+                                            Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
+                                            Set( gNtOpen, true )
+                                    - icoStgNtDel:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Cancel
+                                          Color: =Theme.Color.TextMuted
+                                          Tooltip: ="Remove this task"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =16
+                                          Width: =16
+                                          Height: =16
+                                          OnSelect: =RemoveIf(colNewTasks, sid = ThisItem.sid)
+                  - colStgNx:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Appearance: =ButtonAppearance.Outline
-                        Text: ="+  Add task"
-                        Width: =172
-                        Height: =36
-                        OnSelect: |
-                          =Set( gNtEditSid, 0 ); Set( gNtName, "" ); Set( gNtTarget, Blank() );
-                           Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
-                           Set( gNtOpen, true )
-            # A one-row strip of small tags, not a list — a staged row is a small
-            # object, so it gets a small object on screen and the section grows by 38px
-            # rather than by a block. Tap the body to reopen it in the modal, the ✕ to
-            # drop it. The ✕ is declared LAST so it sits above the body's hit target
-            # and wins the click.
-            - galNewTasks:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =!IsEmpty(colNewTasks)
-                  Items: =colNewTasks
-                  WrapCount: =4
-                  # TemplatePadding comes off BOTH edges, so usable height is
-                  # TemplateSize - 2*TemplatePadding. 38 - 8 = 30 clears a 26px tag.
-                  # Getting this wrong clips the tag instead of resizing it.
-                  TemplateSize: =38
-                  TemplatePadding: =4
-                  TemplateFill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  # Same width expression as every sibling in frmPrScroll. The old
-                  # constant 1316 made TemplateWidth exactly 329 for a 321px chip — no
-                  # slack at all, so any container narrower than one specific screen
-                  # clipped the chip sideways too. At 3 across the chip is 300 in a cell
-                  # of Width/3, which stays roomy down to a ~925px container.
-                  Width: =Parent.Width - 48
-                  # ONE row, 38px — the tag strip is meant to read as a footnote to the
-                  # Add button, not as a list. Four fit across; a fifth scrolls rather
-                  # than pushing every section below it further down the screen. A
-                  # constant because a CountRows() height freezes empty on paste.
-                  Height: =38
-                Children:
-                  - chipNtBg:
-                      Control: Rectangle@2.3.0
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        Width: =(Parent.Width - 48) / 3
+                        Height: =248
+                      Children:
+                        - btnAddNx:
+                            Control: ModernButton@1.0.0
+                            Properties:
+                              Appearance: =ButtonAppearance.Outline
+                              Text: |
+                                ="+  Add transaction" &
+                                 If( IsEmpty(colNewTransactions), "", "   (" & CountRows(colNewTransactions) & ")" )
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
+                                Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy); Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
+                                Set( gNxOpen, true )
+                        - lblStgNxEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(colNewTransactions)
+                              Text: ="No transactions added yet."
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =24
+                              VerticalAlign: =VerticalAlign.Middle
+                        - galNewNx:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              Visible: =!IsEmpty(colNewTransactions)
+                              Items: =colNewTransactions
+                              # One per row. TemplatePadding is taken off BOTH edges,
+                              # so usable height is 32 - 2*2 = 28, which clears the
+                              # 28px row exactly.
+                              WrapCount: =1
+                              TemplateSize: =32
+                              TemplatePadding: =2
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              Width: =Parent.Width
+                              Height: =196
+                            Children:
+                              - rowStgNx:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =6
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =28
+                                  Children:
+                                    - lblStgNxName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.x_name
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =60
+                                          Height: =24
+                                          OnSelect: |
+                                            =Set( gNxName, ThisItem.x_name ); Set( gNxDate, ThisItem.x_date );
+                                            Set( gNxNotional, ThisItem.x_notional ); Set( gNxCcy, ThisItem.x_ccy );
+                                            Set( gNxClient, { Id: ThisItem.x_clientId, Value: ThisItem.x_clientValue } );
+                                            Set( gNxProduct, { Id: ThisItem.x_productId, Value: ThisItem.x_productValue } );
+                                            Set( gNxSales, { DisplayName: ThisItem.x_salesName, Mail: ThisItem.x_salesMail } );
+                                            Set( gNxEditSid, ThisItem.sid );
+                                            Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy);
+                                            Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
+                                            Set( gNxOpen, true )
+                                    - icoStgNxDel:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Cancel
+                                          Color: =Theme.Color.TextMuted
+                                          Tooltip: ="Remove this transaction"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =16
+                                          Width: =16
+                                          Height: =16
+                                          OnSelect: =RemoveIf(colNewTransactions, sid = ThisItem.sid)
+                  - colStgNi:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Fill: =Theme.Color.Bg
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        X: =0
-                        Y: =0
-                        Width: =230                 # fits any cell >= 238 wide
-                        Height: =26
-                  - chipNtLbl:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.t_name
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =8
-                        Y: =0
-                        Width: =186                 # 230 - 44, leaves room for the ✕
-                        Height: =26
-                  - chipNtHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =198                 # 230 - 32, stops short of the ✕
-                        Height: =26
-                        OnSelect: |
-                          =Select(Parent);
-                           Set( gNtName, ThisItem.t_name ); Set( gNtTarget, ThisItem.t_target );
-                           Set( gNtPriority, ThisItem.t_priority );
-                           Set( gNtLead, { DisplayName: ThisItem.t_leadName, Mail: ThisItem.t_leadMail } );
-                           Set( gNtEditSid, ThisItem.sid );
-                           Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
-                           Set( gNtOpen, true )
-                  - chipNtDel:
-                      Control: Classic/Icon@2.5.0
-                      Properties:
-                        Icon: =Icon.Cancel
-                        Color: =Theme.Color.TextMuted
-                        X: =202                     # 230 - 28: hard right of the tag
-                        Y: =6
-                        Width: =14
-                        Height: =14
-                        OnSelect: =RemoveIf(colNewTasks, sid = ThisItem.sid)
-            - divPrTx:
-                Control: Rectangle@2.3.0
-                Properties:
-                  Fill: =Theme.Color.Border
-                  Width: =Parent.Width - 48
-                  Height: =1
-            - rowHeadTransactions:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =12
-                  Width: =Parent.Width - 48
-                  Height: =36
-                Children:
-                  - secHeadTransactions:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          ="Transactions" & If( IsEmpty(colNewTransactions), "", "   (" & CountRows(colNewTransactions) & " staged)" )
-                        Font: =Theme.Font
-                        FontWeight: =FontWeight.Semibold
-                        Size: =Theme.Size.H3
-                        Color: =Theme.Color.Primary
-                        Width: =Parent.Width - 184
-                        Height: =24
-                        VerticalAlign: =VerticalAlign.Middle
-                  - btnAddNx:
-                      Control: ModernButton@1.0.0
-                      Properties:
-                        Appearance: =ButtonAppearance.Outline
-                        Text: ="+  Add transaction"
-                        Width: =172
-                        Height: =36
-                        OnSelect: |
-                          =Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
-                           Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy); Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
-                           Set( gNxOpen, true )
-            # A one-row strip of small tags, not a list — a staged row is a small
-            # object, so it gets a small object on screen and the section grows by 38px
-            # rather than by a block. Tap the body to reopen it in the modal, the ✕ to
-            # drop it. The ✕ is declared LAST so it sits above the body's hit target
-            # and wins the click.
-            - galNewTransactions:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =!IsEmpty(colNewTransactions)
-                  Items: =colNewTransactions
-                  WrapCount: =4
-                  # TemplatePadding comes off BOTH edges, so usable height is
-                  # TemplateSize - 2*TemplatePadding. 38 - 8 = 30 clears a 26px tag.
-                  # Getting this wrong clips the tag instead of resizing it.
-                  TemplateSize: =38
-                  TemplatePadding: =4
-                  TemplateFill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  # Same width expression as every sibling in frmPrScroll. The old
-                  # constant 1316 made TemplateWidth exactly 329 for a 321px chip — no
-                  # slack at all, so any container narrower than one specific screen
-                  # clipped the chip sideways too. At 3 across the chip is 300 in a cell
-                  # of Width/3, which stays roomy down to a ~925px container.
-                  Width: =Parent.Width - 48
-                  # ONE row, 38px — the tag strip is meant to read as a footnote to the
-                  # Add button, not as a list. Four fit across; a fifth scrolls rather
-                  # than pushing every section below it further down the screen. A
-                  # constant because a CountRows() height freezes empty on paste.
-                  Height: =38
-                Children:
-                  - chipNxBg:
-                      Control: Rectangle@2.3.0
-                      Properties:
-                        Fill: =Theme.Color.Bg
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        X: =0
-                        Y: =0
-                        Width: =230                 # fits any cell >= 238 wide
-                        Height: =26
-                  - chipNxLbl:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.x_name
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =8
-                        Y: =0
-                        Width: =186                 # 230 - 44, leaves room for the ✕
-                        Height: =26
-                  - chipNxHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =198                 # 230 - 32, stops short of the ✕
-                        Height: =26
-                        OnSelect: |
-                          =Select(Parent);
-                           Set( gNxName, ThisItem.x_name ); Set( gNxDate, ThisItem.x_date );
-                           Set( gNxNotional, ThisItem.x_notional ); Set( gNxCcy, ThisItem.x_ccy );
-                           Set( gNxClient, { Id: ThisItem.x_clientId, Value: ThisItem.x_clientValue } );
-                           Set( gNxProduct, { Id: ThisItem.x_productId, Value: ThisItem.x_productValue } );
-                           Set( gNxSales, { DisplayName: ThisItem.x_salesName, Mail: ThisItem.x_salesMail } );
-                           Set( gNxEditSid, ThisItem.sid );
-                           Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy);
-                           Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
-                           Set( gNxOpen, true )
-                  - chipNxDel:
-                      Control: Classic/Icon@2.5.0
-                      Properties:
-                        Icon: =Icon.Cancel
-                        Color: =Theme.Color.TextMuted
-                        X: =202                     # 230 - 28: hard right of the tag
-                        Y: =6
-                        Width: =14
-                        Height: =14
-                        OnSelect: =RemoveIf(colNewTransactions, sid = ThisItem.sid)
-            - divPrIssues:
-                Control: Rectangle@2.3.0
-                Properties:
-                  Fill: =Theme.Color.Border
-                  Width: =Parent.Width - 48
-                  Height: =1
-            - rowHeadIssues:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =12
-                  Width: =Parent.Width - 48
-                  Height: =36
-                Children:
-                  - secHeadIssues:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          ="Issues" & If( IsEmpty(colNewIssues), "", "   (" & CountRows(colNewIssues) & " staged)" )
-                        Font: =Theme.Font
-                        FontWeight: =FontWeight.Semibold
-                        Size: =Theme.Size.H3
-                        Color: =Theme.Color.Primary
-                        Width: =Parent.Width - 184
-                        Height: =24
-                        VerticalAlign: =VerticalAlign.Middle
-                  - btnAddNi:
-                      Control: ModernButton@1.0.0
-                      Properties:
-                        Appearance: =ButtonAppearance.Outline
-                        Text: ="+  Add issue"
-                        Width: =172
-                        Height: =36
-                        OnSelect: |
-                          =Set( gNiEditSid, 0 ); Set( gNiName, "" );
-                           Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
-                           Set( gNiOpen, true )
-            # A one-row strip of small tags, not a list — a staged row is a small
-            # object, so it gets a small object on screen and the section grows by 38px
-            # rather than by a block. Tap the body to reopen it in the modal, the ✕ to
-            # drop it. The ✕ is declared LAST so it sits above the body's hit target
-            # and wins the click.
-            - galNewIssues:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =!IsEmpty(colNewIssues)
-                  Items: =colNewIssues
-                  WrapCount: =4
-                  # TemplatePadding comes off BOTH edges, so usable height is
-                  # TemplateSize - 2*TemplatePadding. 38 - 8 = 30 clears a 26px tag.
-                  # Getting this wrong clips the tag instead of resizing it.
-                  TemplateSize: =38
-                  TemplatePadding: =4
-                  TemplateFill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  # Same width expression as every sibling in frmPrScroll. The old
-                  # constant 1316 made TemplateWidth exactly 329 for a 321px chip — no
-                  # slack at all, so any container narrower than one specific screen
-                  # clipped the chip sideways too. At 3 across the chip is 300 in a cell
-                  # of Width/3, which stays roomy down to a ~925px container.
-                  Width: =Parent.Width - 48
-                  # ONE row, 38px — the tag strip is meant to read as a footnote to the
-                  # Add button, not as a list. Four fit across; a fifth scrolls rather
-                  # than pushing every section below it further down the screen. A
-                  # constant because a CountRows() height freezes empty on paste.
-                  Height: =38
-                Children:
-                  - chipNiBg:
-                      Control: Rectangle@2.3.0
-                      Properties:
-                        Fill: =Theme.Color.Bg
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        X: =0
-                        Y: =0
-                        Width: =230                 # fits any cell >= 238 wide
-                        Height: =26
-                  - chipNiLbl:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.i_name
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =8
-                        Y: =0
-                        Width: =186                 # 230 - 44, leaves room for the ✕
-                        Height: =26
-                  - chipNiHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =198                 # 230 - 32, stops short of the ✕
-                        Height: =26
-                        OnSelect: |
-                          =Select(Parent);
-                           Set( gNiName, ThisItem.i_name );
-                           Set( gNiStatus, ThisItem.i_status ); Set( gNiImpact, ThisItem.i_impact );
-                           Set( gNiAssignee, { DisplayName: ThisItem.i_assigneeName, Mail: ThisItem.i_assigneeMail } );
-                           Set( gNiEditSid, ThisItem.sid );
-                           Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
-                           Set( gNiOpen, true )
-                  - chipNiDel:
-                      Control: Classic/Icon@2.5.0
-                      Properties:
-                        Icon: =Icon.Cancel
-                        Color: =Theme.Color.TextMuted
-                        X: =202                     # 230 - 28: hard right of the tag
-                        Y: =6
-                        Width: =14
-                        Height: =14
-                        OnSelect: =RemoveIf(colNewIssues, sid = ThisItem.sid)
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        Width: =(Parent.Width - 48) / 3
+                        Height: =248
+                      Children:
+                        - btnAddNi:
+                            Control: ModernButton@1.0.0
+                            Properties:
+                              Appearance: =ButtonAppearance.Outline
+                              Text: |
+                                ="+  Add issue" &
+                                 If( IsEmpty(colNewIssues), "", "   (" & CountRows(colNewIssues) & ")" )
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set( gNiEditSid, 0 ); Set( gNiName, "" );
+                                Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
+                                Set( gNiOpen, true )
+                        - lblStgNiEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(colNewIssues)
+                              Text: ="No issues added yet."
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =24
+                              VerticalAlign: =VerticalAlign.Middle
+                        - galNewNi:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              Visible: =!IsEmpty(colNewIssues)
+                              Items: =colNewIssues
+                              # One per row. TemplatePadding is taken off BOTH edges,
+                              # so usable height is 32 - 2*2 = 28, which clears the
+                              # 28px row exactly.
+                              WrapCount: =1
+                              TemplateSize: =32
+                              TemplatePadding: =2
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              Width: =Parent.Width
+                              Height: =196
+                            Children:
+                              - rowStgNi:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =6
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =28
+                                  Children:
+                                    - lblStgNiName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.i_name
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =60
+                                          Height: =24
+                                          OnSelect: |
+                                            =Set( gNiName, ThisItem.i_name );
+                                            Set( gNiStatus, ThisItem.i_status ); Set( gNiImpact, ThisItem.i_impact );
+                                            Set( gNiAssignee, { DisplayName: ThisItem.i_assigneeName, Mail: ThisItem.i_assigneeMail } );
+                                            Set( gNiEditSid, ThisItem.sid );
+                                            Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
+                                            Set( gNiOpen, true )
+                                    - icoStgNiDel:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Cancel
+                                          Color: =Theme.Color.TextMuted
+                                          Tooltip: ="Remove this issue"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =16
+                                          Width: =16
+                                          Height: =16
+                                          OnSelect: =RemoveIf(colNewIssues, sid = ThisItem.sid)
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -1402,8 +1365,64 @@ Screens:
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.Danger
                   VerticalAlign: =VerticalAlign.Middle
-                  Width: =Parent.Width - 512
+                  Width: =Parent.Width - 684
                   Height: =48
+            # DELETE — Edit mode only, and two presses. There is no undo behind this,
+            # so the first press only arms it; the label changes so the second press is
+            # a deliberate act rather than a slip. OnVisible disarms it.
+            - btnPrDelete:
+                Control: ModernButton@1.0.0
+                Properties:
+                  Visible: =gEditMode = "Edit" && !IsBlank(gEditProject.ID)
+                  Appearance: =ButtonAppearance.Outline
+                  Text: =If( gPrDelArm, "Confirm delete", "Delete project" )
+                  Width: =160
+                  Height: =48
+                  OnSelect: |
+                    =If( !gPrDelArm,
+                         Set( gPrDelArm, true ),
+                         Set( gPrErr, "" );
+                         // Children first. Every child carries a REQUIRED lookup to the
+                         // project, so removing the parent while they exist would leave
+                         // rows SharePoint will not let anything edit afterwards.
+                         //
+                         // Each removal is wrapped in a Set. MS Learn's own idiom is
+                         // IfError( Remove(...), Notify(...) ), but Remove and RemoveIf
+                         // "return the modified data source as a TABLE" while Notify and
+                         // Set return a boolean, and IfError currently requires ALL its
+                         // arguments to be type-compatible — so the documented form is
+                         // rejected. gPrDelScrap exists only to make both arms a Set.
+                         //
+                         // RemoveIf is NOT delegable: it pulls matching rows up to the
+                         // data row limit and deletes them one by one, so a project with
+                         // more children than that limit needs a second press. Pressing
+                         // Delete again finishes the job rather than erroring.
+                         IfError( Set( gPrDelScrap,
+                                       RemoveIf( taskmaster_issues,
+                                                 issue_project_id.Id = gEditProject.ID ) ),
+                                  Set( gPrErr, FirstError.Message ) );
+                         IfError( Set( gPrDelScrap,
+                                       RemoveIf( taskmaster_transactions,
+                                                 transaction_project_id.Id = gEditProject.ID ) ),
+                                  Set( gPrErr, FirstError.Message ) );
+                         IfError( Set( gPrDelScrap,
+                                       RemoveIf( taskmaster_tasks,
+                                                 task_project_id.Id = gEditProject.ID ) ),
+                                  Set( gPrErr, FirstError.Message ) );
+                         If( Len(gPrErr) = 0,
+                             IfError( Set( gPrDelScrap,
+                                           Remove( taskmaster_projects, gEditProject ) ),
+                                      Set( gPrErr, FirstError.Message ) ) );
+                         If( Len(gPrErr) > 0,
+                             Notify( "Couldn't delete the project: " & gPrErr,
+                                     NotificationType.Error ),
+                             Set( gEditProject, Blank() );
+                             Set( gSelProject, Blank() );
+                             Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
+                             Notify( "Project deleted, with everything attached to it.",
+                                     NotificationType.Success );
+                             Navigate( scrProjects, ScreenTransition.UnCover ) );
+                         Set( gPrDelArm, false ) )
             - btnPrCancel:
                 Control: ModernButton@1.0.0
                 Properties:
@@ -1413,7 +1432,7 @@ Screens:
                          "Discard", "Cancel" )
                   Width: =140
                   Height: =48
-                  OnSelect: =Back()
+                  OnSelect: =Set( gPrDelArm, false ); Back()
             - btnPrSave:
                 Control: ModernButton@1.0.0
                 Properties:
