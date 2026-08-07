@@ -78,7 +78,7 @@ Screens:
         // the previous task's stage/health/priority survive into the next one.
         Reset( cboTkStage ); Reset( cboTkStatus ); Reset( cboTkPriority );
         Reset( cboTkLanguage ); Reset( cboTkFormat ); Reset( cboTkBranding ); Reset( cboTkClientStage );
-        Reset( tglTkOutput );
+        Reset( tglTkOutput ); Reset( tglTkClient );
         // A date picker re-reads DefaultDate ONLY on Reset. Without these the seeds
         // never take on a second visit and the Patch writes Blank() over the stored
         // dates. The completion date is derived on save and has no picker at all.
@@ -435,7 +435,7 @@ Screens:
                                     Width: =Parent.Width
                                     Height: =36
                                     OnChange: =Set(gTkPriority, cboTkPriority.Selected.Value)
-            - secTkPeople:
+            - secTkPeopleDates:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
@@ -450,14 +450,14 @@ Screens:
                   BorderColor: =Theme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =116
+                  LayoutMinHeight: =212
                   Width: =Parent.Width
-                  Height: =116
+                  Height: =212
                 Children:
-                  - lblsecTkPeopleHead:
+                  - lblsecTkPeopleDatesHead:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="People"
+                        Text: ="People and dates"
                         Font: =Theme.Font
                         Size: =Theme.Size.H3
                         FontWeight: =FontWeight.Semibold
@@ -467,7 +467,7 @@ Screens:
                         LayoutMinHeight: =26
                         Width: =Parent.Width
                         Height: =26
-                  - rowTkPeople:
+                  - rowTkPeopleDates:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
@@ -475,173 +475,270 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Start
                         LayoutGap: =20
                         FillPortions: =0
-                        LayoutMinHeight: =62
+                        LayoutMinHeight: =148
                         Width: =Parent.Width
-                        Height: =62
+                        Height: =148
                       Children:
-                        - colTkLead:
+                        - colTkPeopleStack:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
                             Properties:
                               LayoutDirection: =LayoutDirection.Vertical
                               LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
+                              LayoutGap: =12
                               FillPortions: =1
                               LayoutMinWidth: =260
-                              Height: =62
+                              Height: =148
                             Children:
-                              - lblTkLeadCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Lead  *"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - txtTkLeadSearch:
-                                  Control: ModernTextInput@1.1.1
-                                  Properties:
-                                    Visible: =Len(gTkLead.Mail) = 0
-                                    Placeholder: ="Search by name…"
-                                    TriggerOutput: =TriggerOutput.Delayed
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Body
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set( gTkPicker, "Lead" )
-                              # The chip REPLACES the search box once somebody is chosen —
-                              # same shape as scrProjectEdit. One row either way.
-                              - chipTkLead:
+                              - colTkLead:
                                   Control: GroupContainer@1.5.0
                                   Variant: AutoLayout
                                   Properties:
-                                    Visible: =Len(gTkLead.Mail) > 0
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =10
-                                    PaddingRight: =10
-                                    Fill: =Theme.Color.Bg
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =4
                                     FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
+                                    LayoutMinWidth: =260
+                                    Height: =62
                                   Children:
-                                    - lblchipTkLeadName:
+                                    - lblTkLeadCap:
                                         Control: Label@2.5.1
                                         Properties:
-                                          Text: =gTkLead.DisplayName
+                                          Text: ="Lead  *"
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinHeight: =18
+                                          Width: =Parent.Width
+                                          Height: =18
+                                    - txtTkLeadSearch:
+                                        Control: ModernTextInput@1.1.1
+                                        Properties:
+                                          Visible: =Len(gTkLead.Mail) = 0
+                                          Placeholder: ="Search by name…"
+                                          TriggerOutput: =TriggerOutput.Delayed
                                           Font: =Theme.Font
                                           Size: =Theme.Size.Body
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =80
-                                          Height: =24
-                                    - icoTkLeadClear:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Clear"
                                           FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Set( gTkLead, { DisplayName: "", Mail: "" } );
-                                             Reset( txtTkLeadSearch );
-                                             Set( gTkPicker, "" )
-                        - colTkSupp:
+                                          LayoutMinHeight: =36
+                                          Width: =Parent.Width
+                                          Height: =36
+                                          OnChange: =Set( gTkPicker, "Lead" )
+                                    # The chip REPLACES the search box once somebody is chosen —
+                                    # same shape as scrProjectEdit. One row either way.
+                                    - chipTkLead:
+                                        Control: GroupContainer@1.5.0
+                                        Variant: AutoLayout
+                                        Properties:
+                                          Visible: =Len(gTkLead.Mail) > 0
+                                          LayoutDirection: =LayoutDirection.Horizontal
+                                          LayoutAlignItems: =LayoutAlignItems.Center
+                                          LayoutGap: =6
+                                          PaddingLeft: =10
+                                          PaddingRight: =10
+                                          Fill: =Theme.Color.Bg
+                                          BorderColor: =Theme.Color.Border
+                                          BorderThickness: =1
+                                          FillPortions: =0
+                                          LayoutMinHeight: =36
+                                          Width: =Parent.Width
+                                          Height: =36
+                                        Children:
+                                          - lblchipTkLeadName:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: =gTkLead.DisplayName
+                                                Font: =Theme.Font
+                                                Size: =Theme.Size.Body
+                                                Color: =Theme.Color.TextPrimary
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =1
+                                                LayoutMinWidth: =80
+                                                Height: =24
+                                          - icoTkLeadClear:
+                                              Control: Classic/Icon@2.5.0
+                                              Properties:
+                                                Icon: =Icon.Cancel
+                                                Color: =Theme.Color.TextMuted
+                                                Tooltip: ="Clear"
+                                                FillPortions: =0
+                                                LayoutMinWidth: =16
+                                                Width: =16
+                                                Height: =16
+                                                OnSelect: |
+                                                  =Set( gTkLead, { DisplayName: "", Mail: "" } );
+                                                   Reset( txtTkLeadSearch );
+                                                   Set( gTkPicker, "" )
+                              - colTkSupp:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =4
+                                    FillPortions: =0
+                                    LayoutMinWidth: =260
+                                    Height: =62
+                                  Children:
+                                    - lblTkSuppCap:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: ="Supporter"
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinHeight: =18
+                                          Width: =Parent.Width
+                                          Height: =18
+                                    - txtTkSupporterSearch:
+                                        Control: ModernTextInput@1.1.1
+                                        Properties:
+                                          Visible: =Len(gTkSupporter.Mail) = 0
+                                          Placeholder: ="Search by name…"
+                                          TriggerOutput: =TriggerOutput.Delayed
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Body
+                                          FillPortions: =0
+                                          LayoutMinHeight: =36
+                                          Width: =Parent.Width
+                                          Height: =36
+                                          OnChange: =Set( gTkPicker, "Supporter" )
+                                    # The chip REPLACES the search box once somebody is chosen —
+                                    # same shape as scrProjectEdit. One row either way.
+                                    - chipTkSupp:
+                                        Control: GroupContainer@1.5.0
+                                        Variant: AutoLayout
+                                        Properties:
+                                          Visible: =Len(gTkSupporter.Mail) > 0
+                                          LayoutDirection: =LayoutDirection.Horizontal
+                                          LayoutAlignItems: =LayoutAlignItems.Center
+                                          LayoutGap: =6
+                                          PaddingLeft: =10
+                                          PaddingRight: =10
+                                          Fill: =Theme.Color.Bg
+                                          BorderColor: =Theme.Color.Border
+                                          BorderThickness: =1
+                                          FillPortions: =0
+                                          LayoutMinHeight: =36
+                                          Width: =Parent.Width
+                                          Height: =36
+                                        Children:
+                                          - lblchipTkSuppName:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: =gTkSupporter.DisplayName
+                                                Font: =Theme.Font
+                                                Size: =Theme.Size.Body
+                                                Color: =Theme.Color.TextPrimary
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =1
+                                                LayoutMinWidth: =80
+                                                Height: =24
+                                          - icoTkSuppClear:
+                                              Control: Classic/Icon@2.5.0
+                                              Properties:
+                                                Icon: =Icon.Cancel
+                                                Color: =Theme.Color.TextMuted
+                                                Tooltip: ="Clear"
+                                                FillPortions: =0
+                                                LayoutMinWidth: =16
+                                                Width: =16
+                                                Height: =16
+                                                OnSelect: |
+                                                  =Set( gTkSupporter, { DisplayName: "", Mail: "" } );
+                                                   Reset( txtTkSupporterSearch );
+                                                   Set( gTkPicker, "" )
+                        - colTkDatesStack:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
                             Properties:
                               LayoutDirection: =LayoutDirection.Vertical
                               LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
+                              LayoutGap: =12
                               FillPortions: =1
-                              LayoutMinWidth: =260
-                              Height: =62
+                              LayoutMinWidth: =200
+                              Height: =148
                             Children:
-                              - lblTkSuppCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Supporter"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - txtTkSupporterSearch:
-                                  Control: ModernTextInput@1.1.1
-                                  Properties:
-                                    Visible: =Len(gTkSupporter.Mail) = 0
-                                    Placeholder: ="Search by name…"
-                                    TriggerOutput: =TriggerOutput.Delayed
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Body
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set( gTkPicker, "Supporter" )
-                              # The chip REPLACES the search box once somebody is chosen —
-                              # same shape as scrProjectEdit. One row either way.
-                              - chipTkSupp:
+                              - colTkStart:
                                   Control: GroupContainer@1.5.0
                                   Variant: AutoLayout
                                   Properties:
-                                    Visible: =Len(gTkSupporter.Mail) > 0
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =10
-                                    PaddingRight: =10
-                                    Fill: =Theme.Color.Bg
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =4
                                     FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
+                                    LayoutMinWidth: =180
+                                    Height: =62
                                   Children:
-                                    - lblchipTkSuppName:
+                                    - lblTkStartCap:
                                         Control: Label@2.5.1
                                         Properties:
-                                          Text: =gTkSupporter.DisplayName
+                                          Text: ="Start date"
                                           Font: =Theme.Font
-                                          Size: =Theme.Size.Body
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =80
-                                          Height: =24
-                                    - icoTkSuppClear:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
+                                          Size: =Theme.Size.Small
                                           Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Clear"
+                                          VerticalAlign: =VerticalAlign.Middle
                                           FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Set( gTkSupporter, { DisplayName: "", Mail: "" } );
-                                             Reset( txtTkSupporterSearch );
-                                             Set( gTkPicker, "" )
-            - secTkDates:
+                                          LayoutMinHeight: =18
+                                          Width: =Parent.Width
+                                          Height: =18
+                                    - dtpTkStart:
+                                        Control: ModernDatePicker@1.0.1
+                                        Properties:
+                                          DefaultDate: |
+                                            =If(gEditMode = "Edit", gEditTask.task_date_start, Blank())
+                                          Placeholder: ="Pick a date"
+                                          FillPortions: =0
+                                          LayoutMinHeight: =36
+                                          Width: =Parent.Width
+                                          Height: =36
+                              - colTkTarget:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =4
+                                    FillPortions: =0
+                                    LayoutMinWidth: =180
+                                    Height: =62
+                                  Children:
+                                    - lblTkTargetCap:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            ="Due date" &
+                                             If( !IsBlank(dtpTkTarget.SelectedDate)
+                                             && dtpTkTarget.SelectedDate < Today()
+                                             && gTkStage <> "Complete" && gTkStage <> "Archived",
+                                                 "   ·   OVERDUE", "" )
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =|
+                                            =If( !IsBlank(dtpTkTarget.SelectedDate)
+                                            && dtpTkTarget.SelectedDate < Today()
+                                            && gTkStage <> "Complete" && gTkStage <> "Archived",
+                                                 Theme.Color.Danger, Theme.Color.TextMuted )
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinHeight: =18
+                                          Width: =Parent.Width
+                                          Height: =18
+                                    - dtpTkTarget:
+                                        Control: ModernDatePicker@1.0.1
+                                        Properties:
+                                          DefaultDate: |
+                                            =If(gEditMode = "Edit", gEditTask.task_date_target, Blank())
+                                          Placeholder: ="Pick a date"
+                                          FillPortions: =0
+                                          LayoutMinHeight: =36
+                                          Width: =Parent.Width
+                                          Height: =36
+            - secTkClient:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
@@ -656,14 +753,14 @@ Screens:
                   BorderColor: =Theme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =116
+                  LayoutMinHeight: =172
                   Width: =Parent.Width
-                  Height: =116
+                  Height: =172
                 Children:
-                  - lblsecTkDatesHead:
+                  - lblsecTkClientHead:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="Dates"
+                        Text: ="Client"
                         Font: =Theme.Font
                         Size: =Theme.Size.H3
                         FontWeight: =FontWeight.Semibold
@@ -673,7 +770,41 @@ Screens:
                         LayoutMinHeight: =26
                         Width: =Parent.Width
                         Height: =26
-                  - rowTkDates:
+                  - rowTkClientToggle:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =12
+                        FillPortions: =0
+                        LayoutMinHeight: =36
+                        Width: =Parent.Width
+                        Height: =36
+                      Children:
+                        - tglTkClient:
+                            Control: Classic/Toggle@2.1.0
+                            Properties:
+                              Default: |
+                                =If( gEditMode = "Edit", gEditTask.task_client_name.Id > 0, false )
+                              FalseText: =""
+                              TrueText: =""
+                              FillPortions: =0
+                              LayoutMinWidth: =60
+                              Width: =60
+                              Height: =30
+                        - lbltglTkClientCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Client Section?"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Body
+                              Color: =Theme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =200
+                              Height: =24
+                  - rowTkClientFields:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
@@ -681,11 +812,12 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Start
                         LayoutGap: =20
                         FillPortions: =0
+                        Visible: =tglTkClient.Value
                         LayoutMinHeight: =62
                         Width: =Parent.Width
                         Height: =62
                       Children:
-                        - colTkStart:
+                        - colTkClient:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
                             Properties:
@@ -693,13 +825,13 @@ Screens:
                               LayoutAlignItems: =LayoutAlignItems.Start
                               LayoutGap: =4
                               FillPortions: =1
-                              LayoutMinWidth: =180
+                              LayoutMinWidth: =200
                               Height: =62
                             Children:
-                              - lblTkStartCap:
+                              - lblTkClientCap:
                                   Control: Label@2.5.1
                                   Properties:
-                                    Text: ="Start date"
+                                    Text: ="Client"
                                     Font: =Theme.Font
                                     Size: =Theme.Size.Small
                                     Color: =Theme.Color.TextMuted
@@ -708,101 +840,101 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              - dtpTkStart:
-                                  Control: ModernDatePicker@1.0.1
+                              - txtTkClientSearch:
+                                  Control: ModernTextInput@1.1.1
                                   Properties:
-                                    DefaultDate: |
-                                      =If(gEditMode = "Edit", gEditTask.task_date_start, Blank())
-                                    Placeholder: ="Pick a date"
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                        - colTkTarget:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =180
-                              Height: =62
-                            Children:
-                              - lblTkTargetCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      ="Due date" &
-                                       If( !IsBlank(dtpTkTarget.SelectedDate)
-                                       && dtpTkTarget.SelectedDate < Today()
-                                       && gTkStage <> "Complete" && gTkStage <> "Archived",
-                                           "   ·   OVERDUE", "" )
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =|
-                                      =If( !IsBlank(dtpTkTarget.SelectedDate)
-                                      && dtpTkTarget.SelectedDate < Today()
-                                      && gTkStage <> "Complete" && gTkStage <> "Archived",
-                                           Theme.Color.Danger, Theme.Color.TextMuted )
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - dtpTkTarget:
-                                  Control: ModernDatePicker@1.0.1
-                                  Properties:
-                                    DefaultDate: |
-                                      =If(gEditMode = "Edit", gEditTask.task_date_target, Blank())
-                                    Placeholder: ="Pick a date"
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                        - colTkDone:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =180
-                              Height: =62
-                            Children:
-                              - lblTkDoneCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Completed  (set automatically)"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - lblTkDoneValue:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    # Derived, never entered — see the header note. Shown so the
-                                    # stored value is visible without being editable.
-                                    Text: |
-                                      =If( gTkStage = "Complete",
-                                           Text( Coalesce(gEditTask.task_date_completion, Now()), "dd mmm yyyy" ),
-                                           gTkStage = "Archived" && !IsBlank(gEditTask.task_date_completion),
-                                           Text( gEditTask.task_date_completion, "dd mmm yyyy" ),
-                                           "—  not complete" )
+                                    Visible: =gTkClient.Id = 0
+                                    Placeholder: ="Search…"
+                                    TriggerOutput: =TriggerOutput.Delayed
                                     Font: =Theme.Font
                                     Size: =Theme.Size.Body
+                                    FillPortions: =0
+                                    LayoutMinHeight: =36
+                                    Width: =Parent.Width
+                                    Height: =36
+                                    OnChange: =Set( gTkPicker, "Client" )
+                              - chipTkClient:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    Visible: =gTkClient.Id > 0
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =6
+                                    PaddingLeft: =10
+                                    PaddingRight: =10
+                                    Fill: =Theme.Color.Bg
+                                    BorderColor: =Theme.Color.Border
+                                    BorderThickness: =1
+                                    FillPortions: =0
+                                    LayoutMinHeight: =36
+                                    Width: =Parent.Width
+                                    Height: =36
+                                  Children:
+                                    - lblchipTkClientName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =gTkClient.Value
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Body
+                                          Color: =Theme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =80
+                                          Height: =24
+                                    - icoTkClientClear:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Cancel
+                                          Color: =Theme.Color.TextMuted
+                                          Tooltip: ="Clear"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =16
+                                          Width: =16
+                                          Height: =16
+                                          OnSelect: |
+                                            =Set( gTkClient, { Id: 0, Value: "" } );
+                                             Reset( txtTkClientSearch );
+                                             Set( gTkPicker, "" )
+                        - colTkCliStage:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Vertical
+                              LayoutAlignItems: =LayoutAlignItems.Start
+                              LayoutGap: =4
+                              FillPortions: =1
+                              LayoutMinWidth: =150
+                              Height: =62
+                            Children:
+                              - lblTkClientStageCap:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: ="Client lifecycle stage"
+                                    Font: =Theme.Font
+                                    Size: =Theme.Size.Small
+                                    Color: =Theme.Color.TextMuted
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =0
+                                    LayoutMinHeight: =18
+                                    Width: =Parent.Width
+                                    Height: =18
+                              - cboTkClientStage:
+                                  Control: ModernCombobox@1.1.1
+                                  Properties:
+                                    Items: =["(none)", "Prospect", "Active", "Existing", "Post-Trade"]
+                                    ItemDisplayText: =ThisItem.Value
+                                    DefaultSelectedItems: =Filter( [gTkClientStage], !IsBlank(Value) )
+                                    SelectMultiple: =false
+                                    IsSearchable: =false
+                                    InputTextPlaceholder: ="Select…"
                                     Color: |
-                                      =If( gTkStage = "Complete", Theme.Color.Success, Theme.Color.TextMuted )
-                                    VerticalAlign: =VerticalAlign.Middle
+                                      =Theme.Color.TextPrimary
                                     FillPortions: =0
                                     LayoutMinHeight: =36
                                     Width: =Parent.Width
                                     Height: =36
+                                    OnChange: =Set(gTkClientStage, cboTkClientStage.Selected.Value)
             - secTkOutput:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -818,9 +950,9 @@ Screens:
                   BorderColor: =Theme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =254
+                  LayoutMinHeight: =274
                   Width: =Parent.Width
-                  Height: =254
+                  Height: =274
                 Children:
                   - lblsecTkOutputHead:
                       Control: Label@2.5.1
@@ -851,24 +983,20 @@ Screens:
                             Control: Classic/Toggle@2.1.0
                             Properties:
                               Default: |
-                                =If( gEditMode = "Edit",
-                                     !IsBlank(gEditTask.task_output_format.Value), false )
+                                =If( gEditMode = "Edit", !IsBlank(gEditTask.task_output_format.Value), false )
                               FalseText: =""
                               TrueText: =""
                               FillPortions: =0
                               LayoutMinWidth: =60
                               Width: =60
                               Height: =30
-                        - lblTkOutputToggleCap:
+                        - lbltglTkOutputCap:
                             Control: Label@2.5.1
                             Properties:
-                              Text: |
-                                =If( tglTkOutput.Value,
-                                     "This task produces an output",
-                                     "This task produces an output  —  switch on to fill it in" )
+                              Text: ="Task Produces Output?"
                               Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
+                              Size: =Theme.Size.Body
+                              Color: =Theme.Color.TextPrimary
                               VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =200
@@ -964,85 +1092,6 @@ Screens:
                                           OnSelect: |
                                             =Set( gTkApproval, { Id: 0, Value: "" } );
                                              Reset( txtTkApprovalSearch );
-                                             Set( gTkPicker, "" )
-                        - colTkClient:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =200
-                              Height: =62
-                            Children:
-                              - lblTkClientCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Client"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - txtTkClientSearch:
-                                  Control: ModernTextInput@1.1.1
-                                  Properties:
-                                    Visible: =gTkClient.Id = 0
-                                    Placeholder: ="Search…"
-                                    TriggerOutput: =TriggerOutput.Delayed
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Body
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set( gTkPicker, "Client" )
-                              - chipTkClient:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
-                                  Properties:
-                                    Visible: =gTkClient.Id > 0
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =10
-                                    PaddingRight: =10
-                                    Fill: =Theme.Color.Bg
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                  Children:
-                                    - lblchipTkClientName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =gTkClient.Value
-                                          Font: =Theme.Font
-                                          Size: =Theme.Size.Body
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =80
-                                          Height: =24
-                                    - icoTkClientClear:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Clear"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Set( gTkClient, { Id: 0, Value: "" } );
-                                             Reset( txtTkClientSearch );
                                              Set( gTkPicker, "" )
                         - colTkProduct:
                             Control: GroupContainer@1.5.0
@@ -1253,45 +1302,6 @@ Screens:
                                     Width: =Parent.Width
                                     Height: =36
                                     OnChange: =Set(gTkBranding, cboTkBranding.Selected.Value)
-                        - colTkCliStage:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =150
-                              Height: =62
-                            Children:
-                              - lblTkClientStageCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Client lifecycle stage"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - cboTkClientStage:
-                                  Control: ModernCombobox@1.1.1
-                                  Properties:
-                                    Items: =["(none)", "Prospect", "Active", "Existing", "Post-Trade"]
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkClientStage], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =Theme.Color.TextPrimary
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set(gTkClientStage, cboTkClientStage.Selected.Value)
                   - lblTkAssetNote:
                       Control: Label@2.5.1
                       Properties:
@@ -1708,14 +1718,15 @@ Screens:
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_supporter: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      ClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" } }) ), Set( gTkWarn, gTkWarn & "the supporter didn't stick: " & FirstError.Message & "   " )),
                     gEditMode = "Edit",
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_supporter: Blank() }) ), Set( gTkWarn, gTkWarn & "the supporter didn't clear: " & FirstError.Message & "   " )) );
-                    // EVERY output field is gated on the TOGGLE as well as its own value.
-                    // Switching the section off on an edit has to CLEAR what is stored, or the
-                    // form would be hiding values that are still on the record.
+                    // EVERY optional field is gated on its SECTION TOGGLE as well as its own
+                    // value. Switching a section off on an edit has to CLEAR what is stored, or
+                    // the form would hide values that are still on the record. Client and client
+                    // stage follow tglTkClient; the rest follow tglTkOutput.
                     If( tglTkOutput.Value && gTkApproval.Id > 0,
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_approval: { Id: gTkApproval.Id, Value: gTkApproval.Value } }) ), Set( gTkWarn, gTkWarn & "the approval link didn't stick: " & FirstError.Message & "   " )),
                     gEditMode = "Edit",
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_approval: Blank() }) ), Set( gTkWarn, gTkWarn & "the approval link didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkOutput.Value && gTkClient.Id > 0,
+                    If( tglTkClient.Value && gTkClient.Id > 0,
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_name: { Id: gTkClient.Id, Value: gTkClient.Value } }) ), Set( gTkWarn, gTkWarn & "the client link didn't stick: " & FirstError.Message & "   " )),
                     gEditMode = "Edit",
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_name: Blank() }) ), Set( gTkWarn, gTkWarn & "the client link didn't clear: " & FirstError.Message & "   " )) );
@@ -1735,7 +1746,7 @@ Screens:
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_branding: { Value: gTkBranding } }) ), Set( gTkWarn, gTkWarn & "the branding didn't stick: " & FirstError.Message & "   " )),
                     gEditMode = "Edit",
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_branding: Blank() }) ), Set( gTkWarn, gTkWarn & "the branding didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkOutput.Value && gTkClientStage <> "(none)",
+                    If( tglTkClient.Value && gTkClientStage <> "(none)",
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_stage: { Value: gTkClientStage } }) ), Set( gTkWarn, gTkWarn & "the client stage didn't stick: " & FirstError.Message & "   " )),
                     gEditMode = "Edit",
                     IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_stage: Blank() }) ), Set( gTkWarn, gTkWarn & "the client stage didn't clear: " & FirstError.Message & "   " )) );
