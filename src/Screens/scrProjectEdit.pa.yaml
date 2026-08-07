@@ -1385,6 +1385,10 @@ Screens:
                     =Set( gPrSaved, Blank() );
                     Set( gPrErr, "" );
                     Set( gPrWarn, "" );
+                    // The name as TYPED. Patch returns a record that does not reliably
+                    // carry project_name, and a blank there was writing a blank Value
+                    // into every child's parent Lookup — see the note below.
+                    Set( gPrNameSaved, Trim(txtPrName.Text) );
                     // gEditMode says Edit only because a previous save SAID it
                     // succeeded. If there is no record behind it, patching that
                     // record fails forever and no amount of re-typing helps — so
@@ -1512,7 +1516,7 @@ Screens:
                                     IfError( Text(
                                         Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
                                             { task_name:       t.t_name,
-                                              task_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                              task_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
                                               task_stage:      { Value: t.t_stage },
                                               task_status:     { Value: "Green" },
                                               task_priority:   { Value: t.t_priority },
@@ -1534,7 +1538,7 @@ Screens:
                                     IfError( Text(
                                         Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
                                             { transaction_name:        x.x_name,
-                                              transaction_project_id:  { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                              transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
                                               transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
                                               transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
                                               transaction_sales:
@@ -1559,7 +1563,7 @@ Screens:
                                     IfError( Text(
                                         Patch( taskmaster_issues, Defaults(taskmaster_issues),
                                             { issue_name:       i.i_name,
-                                              issue_project_id: { Id: gPrSaved.ID, Value: gPrSaved.project_name },
+                                              issue_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
                                               issue_status:     { Value: i.i_status },
                                               issue_impact:     { Value: i.i_impact },
                                               issue_date_open:  Now(),
@@ -1586,9 +1590,19 @@ Screens:
                         RemoveIf( colNewIssues,
                                   sid in ShowColumns( Filter(colChildOk, Kind = "Issue"), Sid ) );
                         // --- 4. the project now EXISTS. Never insert it twice. -----
-                        Set( gEditProject, gPrSaved );
+                        // READ IT BACK rather than reusing Patch's return value. That
+                        // record is not guaranteed to carry every column, and this one
+                        // seeds the whole form: txtPrName.Default is
+                        // If(gEditMode = "Edit", gEditProject.project_name, "") and
+                        // flipping the mode re-evaluates it, so a thin record empties
+                        // the name box in front of the user. This is the "project name
+                        // pops" defect. Two statements rather than Coalesce: Coalesce
+                        // is documented over VALUES, not records, so falling back to
+                        // the thin record is written as an explicit If.
+                        Set( gEditProject, LookUp(taskmaster_projects, ID = gPrSaved.ID) );
+                        If( IsBlank(gEditProject.ID), Set( gEditProject, gPrSaved ) );
                         Set( gEditMode, "Edit" );
-                        Set( gSelProject, gPrSaved );
+                        Set( gSelProject, gEditProject );
                         // --- 5. C3 rollup, read back from the server ---------------
                         With( { pid: gPrSaved.ID },
                             With( { scored:
@@ -1616,7 +1630,14 @@ Screens:
                         If( IsEmpty(colChildErrors),
                             Notify("Project saved with everything attached.", NotificationType.Success);
                             Navigate( scrProject, ScreenTransition.Cover ),
-                            Notify( CountRows(colChildErrors) & " item(s) could not be created — they are still listed below, press Save to retry.",
+                            // Show what SharePoint actually SAID, not just how many
+                            // failed. A count is undiagnosable across the air gap: it
+                            // comes back as "the submission failed" and the next fix is
+                            // a guess. First() because one cause almost always explains
+                            // every row in the batch.
+                            Notify( CountRows(colChildErrors) & " item(s) could not be created — they are still listed below, press Save to retry."
+                                      & "   " & First(colChildErrors).Kind & " """ & First(colChildErrors).Name & """: "
+                                      & First(colChildErrors).Message,
                                     NotificationType.Error ) )
                     )
       # =======================================================================
