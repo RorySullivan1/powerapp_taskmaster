@@ -57,7 +57,7 @@
 #    The button is `DisplayMode.Disabled` when nothing is picked, which is what
 #    greys the "— nobody selected —" placeholder.
 #
-# 6. THE STAGED CHILDREN ARE THREE COLUMNS, AND COST A FIXED 248px.  They were
+# 6. THE STAGED CHILDREN ARE TWO COLUMNS, AND COST A FIXED 332px.  They were
 #    three stacked sections — divider, heading, Add button, list — that each grew
 #    as items were added, so staging a few children pushed the action bar right
 #    off the bottom of the scroll.  `rowPrStaged` is now one horizontal container
@@ -984,12 +984,21 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =1
             # ---------------------------------------------------------------------
-            # STAGED CHILDREN — three columns, side by side, at the bottom.
+            # STAGED CHILDREN — two columns, side by side, at the bottom.
             #
             # Was three stacked sections, each a divider + header row + Add button +
             # a strip of tags, and each expanded as items were added. Three columns
-            # cost a FIXED 248px no matter how many items are staged; the lists
+            # cost a FIXED 332px no matter how many items are staged; the lists
             # scroll inside their own column instead of pushing the action bar down.
+            #
+            # 332 = 36 button + 8 gap + 288 gallery, and 288 is 9 WHOLE rows of 32.
+            # The exact multiple is the point: a gallery height that is not one leaves
+            # a half-drawn last row, which is what "the 2nd is cut off" was.
+            #
+            # THREE levels of FillPortions have to agree, and each defaults to 1:
+            # rowPrStaged inside frmPrScroll (vertical, so FillPortions is height),
+            # then the button and the gallery inside each column. Pin everything that
+            # has a fixed size at 0 and let exactly ONE child absorb the slack.
             #
             # Each column is: the Add button as its own header, then the staged rows
             # by name with a x on the far right.
@@ -1007,8 +1016,10 @@ Screens:
                   LayoutDirection: =LayoutDirection.Horizontal
                   LayoutAlignItems: =LayoutAlignItems.Start
                   LayoutGap: =24
+                  FillPortions: =0
+                  LayoutMinHeight: =332
                   Width: =Parent.Width - 48
-                  Height: =248
+                  Height: =332
                 Children:
                   - colStgNt:
                       Control: GroupContainer@1.5.0
@@ -1018,7 +1029,8 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Start
                         LayoutGap: =8
                         Width: =(Parent.Width - 24) / 2
-                        Height: =248
+                        LayoutMinHeight: =332
+                        Height: =332
                       Children:
                         - btnAddNt:
                             Control: ModernButton@1.0.0
@@ -1066,13 +1078,13 @@ Screens:
                               # flexible sizing ON by default, so Height is advisory and
                               # the container splits its own height by FillPortions.
                               # Button and gallery both defaulted to 1, so the gallery
-                              # got (248-8)/2 = 120px = 3.75 rows, and item 4 onward was
-                              # simply not there. Pinning the button at 0 and giving the
-                              # gallery 1 hands it every remaining pixel.
+                              # got half the column and the list was cut off mid-row.
+                              # Pinning the button at 0 and giving the gallery 1 hands it
+                              # every remaining pixel — here, exactly 288.
                               FillPortions: =1
-                              LayoutMinHeight: =120
+                              LayoutMinHeight: =288
                               Width: =Parent.Width
-                              Height: =196
+                              Height: =288
                             Children:
                               - rowStgNt:
                                   Control: GroupContainer@1.5.0
@@ -1125,7 +1137,8 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Start
                         LayoutGap: =8
                         Width: =(Parent.Width - 24) / 2
-                        Height: =248
+                        LayoutMinHeight: =332
+                        Height: =332
                       Children:
                         - btnAddNx:
                             Control: ModernButton@1.0.0
@@ -1173,13 +1186,13 @@ Screens:
                               # flexible sizing ON by default, so Height is advisory and
                               # the container splits its own height by FillPortions.
                               # Button and gallery both defaulted to 1, so the gallery
-                              # got (248-8)/2 = 120px = 3.75 rows, and item 4 onward was
-                              # simply not there. Pinning the button at 0 and giving the
-                              # gallery 1 hands it every remaining pixel.
+                              # got half the column and the list was cut off mid-row.
+                              # Pinning the button at 0 and giving the gallery 1 hands it
+                              # every remaining pixel — here, exactly 288.
                               FillPortions: =1
-                              LayoutMinHeight: =120
+                              LayoutMinHeight: =288
                               Width: =Parent.Width
-                              Height: =196
+                              Height: =288
                             Children:
                               - rowStgNx:
                                   Control: GroupContainer@1.5.0
