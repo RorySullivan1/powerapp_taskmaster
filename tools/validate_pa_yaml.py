@@ -54,13 +54,14 @@ KNOWN_CONTROLS = {
     "ModernNumberInput@1.0.0":"grounded",   # CONFIRMED 2026-08-04 — output is .Value (a number)
     "ModernTabList@1.0.0":    "grounded",   # CONFIRMED 2026-08-04 — output is .Selected.Value
     "ModernButton@1.0.0":     "grounded",   # CONFIRMED 2026-08-04 — user-supplied Studio YAML
-    # VERSION TRAP, paid for with a failed paste. The @x.y.z in a pa-yaml token is the
-    # TEMPLATE version, NOT the product revision Studio shows in its properties pane.
-    # `@1.1.1` was authored from a spoken "current version is 1.1.1" and rejected the whole
-    # paste. MS Learn's own YAML example for the UPDATED control — same page that documents
-    # DelayOutput, typed enums and SelectMultiple defaulting true — emits @1.0.0, which is
-    # also what every other modern token in this repo is.
-    "ModernCombobox@1.0.0":   "grounded",   # MS Learn modern-control-combobox, 2026-08-06.
+    # TWO VERSIONS, both allow-listed on purpose. `@1.1.1` is what Studio reports for this
+    # control and is what src/ authors. `@1.0.0` is what MS Learn's YAML sample still shows;
+    # doc samples lag a revision even when the prose beside them is updated, so it is kept
+    # here as a fallback rather than as the preferred token. The one earlier @1.1.1 paste
+    # failure happened while MODERN CONTROLS WERE DISABLED in the app — a disabled template
+    # is unavailable regardless of version — so it is not evidence against the token.
+    "ModernCombobox@1.1.1":   "grounded",   # user-confirmed from Studio, 2026-08-05 and -06
+    "ModernCombobox@1.0.0":   "grounded",   # MS Learn modern-control-combobox YAML sample
                                             # No Reset PROPERTY (classic ListBox has one, this does not);
                                             # SelectMultiple now defaults to true; TriggerOutput replaced
                                             # by DelayOutput; Appearance/ValidationState take typed enums.

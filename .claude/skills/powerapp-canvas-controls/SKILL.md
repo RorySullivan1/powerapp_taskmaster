@@ -43,7 +43,7 @@ prefixed tokens:
 | `Button` | `Classic/Button@2.2.0` or `ModernButton@1.0.0` |
 | `TextInput` | `Classic/TextInput@2.3.2` or `ModernTextInput@1.0.0` |
 | `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` |
-| `Dropdown` / `Combobox` | `ModernCombobox@1.0.0` (or `Classic/ComboBox@2.4.0`) |
+| `Dropdown` / `Combobox` | `ModernCombobox@1.1.1` (or `Classic/ComboBox@2.4.0`) |
 | `DatePicker` | `ModernDatePicker@1.0.0` |
 | `Timer` | `Timer` — no prefix, no version |
 
@@ -73,12 +73,12 @@ Use it to *guess which form to ask for* — never to author an ungrounded token.
 still fails the whole paste. **Casing stays per-token**: `DropDown` has a capital D mid-word,
 `ComboBox` a capital B, `RichTextEditor` neither.
 
-**Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, `ModernCombobox@1.0.0`,
+**Modern family** — `ModernTextInput@1.0.0`, `ModernNumberInput@1.0.0`, **`ModernCombobox@1.1.1`**,
 `ModernDatePicker@1.0.0`, `ModernTabList@1.0.0`, `ModernButton@1.0.0`,
-`GroupContainer@1.5.0` (`Variant: AutoLayout`). **Every one of them is `@1.0.0`** — see the
-version trap below before you type anything else.
+`GroupContainer@1.5.0` (`Variant: AutoLayout`). The combo box is the one that is NOT `@1.0.0`
+— versions are per-control, so read each one, never pattern-match across the family.
 
-**`Classic/ComboBox@2.4.0` and `ModernCombobox@1.0.0` are different controls.** The classic
+**`Classic/ComboBox@2.4.0` and `ModernCombobox@1.1.1` are different controls.** The classic
 adds `Chevron*` styling properties and takes `DefaultSelectedItems` to seed the selection —
 which is how a card wires it up:
 
@@ -93,22 +93,28 @@ PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0)
 Version suffixes are optional on the CLASSIC family — Studio uses the current version if
 omitted. On the modern family they are not decoration; see below.
 
-### THE VERSION TRAP — `@x.y.z` is the TEMPLATE version, not the control's revision number
+### Which `@version` for the modern combo box — RESOLVED as `@1.1.1`
 
-**This cost a failed paste. Read it before typing any modern token.**
+Author **`ModernCombobox@1.1.1`**. That is what Studio reports for the control in this
+tenant, confirmed twice by the user reading it off the live app.
 
-Studio's properties pane shows modern controls a **revision number** — the combo box reports
-**1.1.1**. That number is *not* the pa-yaml `@version`, and authoring
-`ModernCombobox@1.1.1` **rejects the entire paste** as an unknown control.
+There is one piece of contrary evidence, recorded so nobody re-opens this from the doc
+alone: **MS Learn's YAML sample on `modern-controls/modern-control-combobox` still emits
+`@1.0.0`** — on the very page whose prose documents the revision (`DelayOutput`, typed enums,
+`SelectMultiple` defaulting true). Doc samples lag a control revision even when the text
+beside them is current, so the sample loses to the live app. **`ModernCombobox@1.0.0` stays
+allow-listed as a fallback**, not as the preferred token — reach for it only if `@1.1.1` is
+ever rejected in an app where modern controls are confirmed ON.
 
-The proof is first-party: MS Learn's YAML example on
-`modern-controls/modern-control-combobox` emits **`ModernCombobox@1.0.0`** — and that page is
-documenting the *updated* control, because the same page lists `DelayOutput`, the typed enums
-and `SelectMultiple` defaulting to `true` in its "Recent updates". Revised control, unchanged
-template version. Every modern token in this repo is `@1.0.0` for exactly that reason.
+**A `@1.1.1` paste DID fail once — and that failure proves nothing about the version.** It
+happened while **modern controls were switched off** in the app. A disabled template is
+unavailable whatever version you name it, so that rejection is fully explained without
+blaming the token. Diagnosing it as a version problem sent this repo through a needless
+conversion of all 10 combo boxes to the classic control and back.
 
-> **Rule: never derive a `@version` from a version number a human read off Studio's UI.**
-> Take it from an export or from a first-party YAML sample, or leave the control alone.
+> **The transferable rule is about EVIDENCE, not about versions.** Before concluding that a
+> token is wrong, rule out the app-level settings that make a whole control FAMILY
+> unavailable. A failed paste has many possible causes and names only itself.
 
 ### Modern controls still get REVISED — the revision renames properties
 
@@ -122,12 +128,11 @@ The revision is real even though the token doesn't move. The combo box's current
 | `Appearance` / `ValidationState` as strings | typed enums |
 | `FontColor` / `FontSize` / `BorderRadius` | `Color` / `Size` / `Radius{TopLeft,…}` |
 
-So any sample found online is version-specific *in its properties* while its token stays
-`@1.0.0`. `ModernSlider` was revised the same way (`Value`→`Default`,
-`Layout`→`LayoutDirection`).
+So a sample found online is version-specific in its PROPERTIES as well as its token — check
+both. `ModernSlider` was revised the same way (`Value`→`Default`, `Layout`→`LayoutDirection`).
 
 **The two combo boxes name their display column differently, and it is not optional.**
-`ModernCombobox@1.0.0` takes `ItemDisplayText: =ThisItem.Value`. `Classic/ComboBox@2.4.0` takes
+`ModernCombobox@1.1.1` takes `ItemDisplayText: =ThisItem.Value`. `Classic/ComboBox@2.4.0` takes
 string arrays — `DisplayFields: =["Value"]` **and** `SearchFields: =["Value"]`. Crossing them
 renders **blank rows** rather than erroring. `Items` built by `Distinct()`, by a `["a","b"]`
 literal, or by `Choices()` all expose a single column named **`Value`**, so `ThisItem.Value` is
@@ -211,7 +216,7 @@ and the non-AutoLayout variant name.
 | `Classic/DropDown@2.3.1` | `Default` | `.Selected.<Column>` (`SelectedText` is deprecated) | many options, one line of space |
 | `ListBox@2.2.0` | `Default` (one item only) | `.Selected`, `.SelectedItems` when `SelectMultiple` | multi-select in a fixed box |
 | `ModernDropdown@1.0.0` | `Default` — a **value** | `.Selected.Value` | the modern single-select |
-| `ModernCombobox@1.0.0` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable, multi-select, or plain dropdown with both flags off |
+| `ModernCombobox@1.1.1` | `DefaultSelectedItems` — a **table** | `.Selected.Value` | searchable, multi-select, or plain dropdown with both flags off |
 | `Classic/Radio@2.3.0` | `Default` | `.Selected.Value` | **2–7 options that must all stay visible** |
 
 The seeding property is where these differ most, and getting it wrong is silent: the control
