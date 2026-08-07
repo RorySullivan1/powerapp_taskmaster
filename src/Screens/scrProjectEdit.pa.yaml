@@ -85,9 +85,9 @@
 # DEFECTS FOUND DURING THE REVIEW AND FIXED HERE
 # -----------------------------------------------------------------------------
 #
-# a. `OnVisible` DID NOT PARSE.  `Reset( txtNiName )` was followed by a blank
-#    line and then `Set( gNtOpen, false )` with NO `;` between them — two
-#    statements, no separator.  Studio would have rejected the whole screen.
+# a. `OnVisible` DID NOT PARSE — two statements with no `;` between them, and
+#    Studio would have rejected the whole screen.  Historical: the controls
+#    involved were the issue modal's, which this screen no longer carries.
 #
 # b. EDITING A PROJECT SILENTLY WIPED ITS DATES.  `dtpPrStart` / `dtpPrTarget`
 #    carried no `DefaultDate`, so on Edit they opened blank while the Patch still
@@ -96,11 +96,10 @@
 #    `gEditProject` and are `Reset()` in `OnVisible`.  This is the quiet-wrong
 #    class the edit-screen notes warn about: no error, just a lost date.
 #
-# c. THREE INVALID CHOICE VALUES.  `cboNiStatus` offered "In Progress" and
-#    "Resolved"; `schema/schema.yaml` says `issue_status` is
-#    [Open, Review, Waiting, Blocked, Closed].  `cboNiImpact` offered "Medium";
-#    `issue_impact` is [Low, Moderate, High, Critical].  Both now match the
-#    golden source exactly.
+# c. THREE INVALID CHOICE VALUES, in the issue combo boxes that used to live
+#    here.  The lesson outlived them: a hardcoded `Items: =[...]` drifts from
+#    the Choice column's `values:` exactly like an invented column name does,
+#    and no check in this repo looks inside an array literal.
 #
 # d. `issue_impact` WAS COLLECTED AND THEN DROPPED.  `i_impact` was staged on
 #    every row and never appeared in the issues `Patch`.  It is written now.
@@ -125,7 +124,9 @@
 # * CHILDREN ARE STAGED, NOT WRITTEN.  A task/transaction/issue carries a
 #   REQUIRED Lookup to the project, and a Lookup needs an ID that does not exist
 #   until the insert returns.  So Add collects into colNewTasks /
-#   colNewTransactions / colNewIssues and Save writes them after the parent.
+#   colNewTransactions and Save writes them after the parent.  ISSUES ARE NOT
+#   STAGED HERE — they are raised against a project that already exists, from
+#   the Issues tab on scrProject.
 #   Successes leave staging, failures stay and are retried by pressing Save
 #   again; `gEditMode` flips to "Edit" so a retry can never create a second
 #   project.  All of §"scrProjectEdit — creating children with the parent" in
@@ -191,18 +192,15 @@ Screens:
         Set( gPrCov, If( gEditMode = "Edit", Coalesce(gEditProject.project_coverage.Value, ""), "" ) );
         // Staging areas. Cleared on every visit — a half-entered child list left
         // over from the previous project would be written to THIS one.
-        Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
+        Clear( colNewTasks ); Clear( colNewTransactions );
         Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
         // Modal state. Each `g*Open` gates one modal; all three start closed.
-        Set( gNtOpen, false ); Set( gNxOpen, false ); Set( gNiOpen, false );
+        Set( gNtOpen, false ); Set( gNxOpen, false );
         // Which staged row a modal is editing. 0 = adding a new one. The chips set
         // it; Add reads it to decide between Patch and Collect.
-        Set( gNtEditSid, 0 ); Set( gNxEditSid, 0 ); Set( gNiEditSid, 0 );
-        // Delete is a TWO-PRESS action and must never open already armed.
-        Set( gPrDelArm, false );
+        Set( gNtEditSid, 0 ); Set( gNxEditSid, 0 );
         Set( gNtName, "" ); Set( gNtTarget, Blank() );
         Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
-        Set( gNiName, "" );
         // Modal field state. Every default below is a REAL member of the matching
         // Choice column in schema/schema.yaml — task_priority, transaction_currency,
         // issue_status, issue_impact. Do not seed a value the list does not have.
@@ -212,9 +210,6 @@ Screens:
         Set( gNxSales,    { DisplayName: "", Mail: "" } );
         Set( gNxClient,   { Id: 0, Value: "" } );
         Set( gNxProduct,  { Id: 0, Value: "" } );
-        Set( gNiStatus,   "Open" );
-        Set( gNiImpact,   "Moderate" );
-        Set( gNiAssignee, { DisplayName: "", Mail: "" } );
         // Text inputs re-read their Default only on Reset; the date pickers re-read
         // DefaultDate the same way. Missing these was how an Edit used to open with
         // blank dates and then write Blank() over the stored ones.
@@ -224,7 +219,6 @@ Screens:
         Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
         Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
         Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
-        Reset( txtNiName ); Reset( txtNiAssSearch );
         // The SAME rule applies to every combo box: DefaultSelectedItems is
         // re-read only on Reset. Without these six, opening project B after project A
         // leaves A's phase/priority showing while gPrPhase already holds B's — and
@@ -238,8 +232,7 @@ Screens:
         // Must come after the Set()s above, so DefaultPath is already cleared.
         Reset( pickPrRegion ); Reset( pickPrType );
         Reset( cboPrCov );
-        Reset( cboNtPriority ); Reset( cboNxCcy );
-        Reset( cboNiStatus ); Reset( cboNiImpact )
+        Reset( cboNtPriority ); Reset( cboNxCcy )
     Children:
       # =======================================================================
       # HEADER BAND  ·  0 .. 64  (absolute — three controls, no collisions)
@@ -271,10 +264,10 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Visible: |
-              =CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) > 0
+              =CountRows(colNewTasks) + CountRows(colNewTransactions) > 0
             Text: |
               =CountRows(colNewTasks) & " task · " & CountRows(colNewTransactions)
-               & " transaction · " & CountRows(colNewIssues) & " issue  —  staged, not yet saved"
+               & " transaction  —  staged, not yet saved"
             Color: =Theme.Color.OnPrimary
             Font: =Theme.Font
             Size: =Theme.Size.Small
@@ -902,15 +895,6 @@ Screens:
                   Color: =Theme.Color.Primary
                   Width: =Parent.Width - 48
                   Height: =24
-            - lblPrClassNote:
-                Control: Label@2.5.1
-                Properties:
-                  Text: ="Region and Project type are required. Pick a value — it is recorded as soon as you choose it. Press + to narrow it down a level, ✕ to close one. One level is a complete answer."
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  Width: =Parent.Width - 48
-                  Height: =18
             # Region and Project type are 3-level vocabularies, so each gets a
             # cmpNestedSelect. Height is fixed at 64: a canvas component cannot
             # size itself to its content — see the component's header.
@@ -1033,7 +1017,7 @@ Screens:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Start
                         LayoutGap: =8
-                        Width: =(Parent.Width - 48) / 3
+                        Width: =(Parent.Width - 24) / 2
                         Height: =248
                       Children:
                         - btnAddNt:
@@ -1043,6 +1027,8 @@ Screens:
                               Text: |
                                 ="+  Add task" &
                                  If( IsEmpty(colNewTasks), "", "   (" & CountRows(colNewTasks) & ")" )
+                              FillPortions: =0
+                              LayoutMinHeight: =36
                               Width: =Parent.Width
                               Height: =36
                               OnSelect: |
@@ -1057,6 +1043,8 @@ Screens:
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Color: =Theme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =24
                               Width: =Parent.Width
                               Height: =24
                               VerticalAlign: =VerticalAlign.Middle
@@ -1074,6 +1062,15 @@ Screens:
                               TemplatePadding: =2
                               TemplateFill: =RGBA(0, 0, 0, 0)
                               BorderThickness: =0
+                              # THE SCROLL FIX. A child of an auto-layout container has
+                              # flexible sizing ON by default, so Height is advisory and
+                              # the container splits its own height by FillPortions.
+                              # Button and gallery both defaulted to 1, so the gallery
+                              # got (248-8)/2 = 120px = 3.75 rows, and item 4 onward was
+                              # simply not there. Pinning the button at 0 and giving the
+                              # gallery 1 hands it every remaining pixel.
+                              FillPortions: =1
+                              LayoutMinHeight: =120
                               Width: =Parent.Width
                               Height: =196
                             Children:
@@ -1127,7 +1124,7 @@ Screens:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Start
                         LayoutGap: =8
-                        Width: =(Parent.Width - 48) / 3
+                        Width: =(Parent.Width - 24) / 2
                         Height: =248
                       Children:
                         - btnAddNx:
@@ -1137,6 +1134,8 @@ Screens:
                               Text: |
                                 ="+  Add transaction" &
                                  If( IsEmpty(colNewTransactions), "", "   (" & CountRows(colNewTransactions) & ")" )
+                              FillPortions: =0
+                              LayoutMinHeight: =36
                               Width: =Parent.Width
                               Height: =36
                               OnSelect: |
@@ -1151,6 +1150,8 @@ Screens:
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Color: =Theme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =24
                               Width: =Parent.Width
                               Height: =24
                               VerticalAlign: =VerticalAlign.Middle
@@ -1168,6 +1169,15 @@ Screens:
                               TemplatePadding: =2
                               TemplateFill: =RGBA(0, 0, 0, 0)
                               BorderThickness: =0
+                              # THE SCROLL FIX. A child of an auto-layout container has
+                              # flexible sizing ON by default, so Height is advisory and
+                              # the container splits its own height by FillPortions.
+                              # Button and gallery both defaulted to 1, so the gallery
+                              # got (248-8)/2 = 120px = 3.75 rows, and item 4 onward was
+                              # simply not there. Pinning the button at 0 and giving the
+                              # gallery 1 hands it every remaining pixel.
+                              FillPortions: =1
+                              LayoutMinHeight: =120
                               Width: =Parent.Width
                               Height: =196
                             Children:
@@ -1217,100 +1227,6 @@ Screens:
                                           Width: =16
                                           Height: =16
                                           OnSelect: =RemoveIf(colNewTransactions, sid = ThisItem.sid)
-                  - colStgNi:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Start
-                        LayoutGap: =8
-                        Width: =(Parent.Width - 48) / 3
-                        Height: =248
-                      Children:
-                        - btnAddNi:
-                            Control: ModernButton@1.0.0
-                            Properties:
-                              Appearance: =ButtonAppearance.Outline
-                              Text: |
-                                ="+  Add issue" &
-                                 If( IsEmpty(colNewIssues), "", "   (" & CountRows(colNewIssues) & ")" )
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set( gNiEditSid, 0 ); Set( gNiName, "" );
-                                Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
-                                Set( gNiOpen, true )
-                        - lblStgNiEmpty:
-                            Control: Label@2.5.1
-                            Properties:
-                              Visible: =IsEmpty(colNewIssues)
-                              Text: ="No issues added yet."
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =24
-                              VerticalAlign: =VerticalAlign.Middle
-                        - galNewNi:
-                            Control: Gallery@2.15.0
-                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
-                            Properties:
-                              Visible: =!IsEmpty(colNewIssues)
-                              Items: =colNewIssues
-                              # One per row. TemplatePadding is taken off BOTH edges,
-                              # so usable height is 32 - 2*2 = 28, which clears the
-                              # 28px row exactly.
-                              WrapCount: =1
-                              TemplateSize: =32
-                              TemplatePadding: =2
-                              TemplateFill: =RGBA(0, 0, 0, 0)
-                              BorderThickness: =0
-                              Width: =Parent.Width
-                              Height: =196
-                            Children:
-                              - rowStgNi:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
-                                  Properties:
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =8
-                                    PaddingRight: =8
-                                    X: =0
-                                    Y: =0
-                                    Width: =Parent.TemplateWidth
-                                    Height: =28
-                                  Children:
-                                    - lblStgNiName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =ThisItem.i_name
-                                          Font: =Theme.Font
-                                          Size: =Theme.Size.Small
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =60
-                                          Height: =24
-                                          OnSelect: |
-                                            =Set( gNiName, ThisItem.i_name );
-                                            Set( gNiStatus, ThisItem.i_status ); Set( gNiImpact, ThisItem.i_impact );
-                                            Set( gNiAssignee, { DisplayName: ThisItem.i_assigneeName, Mail: ThisItem.i_assigneeMail } );
-                                            Set( gNiEditSid, ThisItem.sid );
-                                            Reset(txtNiName); Reset(cboNiStatus); Reset(cboNiImpact); Reset(txtNiAssSearch);
-                                            Set( gNiOpen, true )
-                                    - icoStgNiDel:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Remove this issue"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: =RemoveIf(colNewIssues, sid = ThisItem.sid)
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -1365,82 +1281,26 @@ Screens:
                   Size: =Theme.Size.Small
                   Color: =Theme.Color.Danger
                   VerticalAlign: =VerticalAlign.Middle
-                  Width: =Parent.Width - 684
+                  Width: =Parent.Width - 512
                   Height: =48
-            # DELETE — Edit mode only, and two presses. There is no undo behind this,
-            # so the first press only arms it; the label changes so the second press is
-            # a deliberate act rather than a slip. OnVisible disarms it.
-            - btnPrDelete:
-                Control: ModernButton@1.0.0
-                Properties:
-                  Visible: =gEditMode = "Edit" && !IsBlank(gEditProject.ID)
-                  Appearance: =ButtonAppearance.Outline
-                  Text: =If( gPrDelArm, "Confirm delete", "Delete project" )
-                  Width: =160
-                  Height: =48
-                  OnSelect: |
-                    =If( !gPrDelArm,
-                         Set( gPrDelArm, true ),
-                         Set( gPrErr, "" );
-                         // Children first. Every child carries a REQUIRED lookup to the
-                         // project, so removing the parent while they exist would leave
-                         // rows SharePoint will not let anything edit afterwards.
-                         //
-                         // Each removal is wrapped in a Set. MS Learn's own idiom is
-                         // IfError( Remove(...), Notify(...) ), but Remove and RemoveIf
-                         // "return the modified data source as a TABLE" while Notify and
-                         // Set return a boolean, and IfError currently requires ALL its
-                         // arguments to be type-compatible — so the documented form is
-                         // rejected. gPrDelScrap exists only to make both arms a Set.
-                         //
-                         // RemoveIf is NOT delegable: it pulls matching rows up to the
-                         // data row limit and deletes them one by one, so a project with
-                         // more children than that limit needs a second press. Pressing
-                         // Delete again finishes the job rather than erroring.
-                         IfError( Set( gPrDelScrap,
-                                       RemoveIf( taskmaster_issues,
-                                                 issue_project_id.Id = gEditProject.ID ) ),
-                                  Set( gPrErr, FirstError.Message ) );
-                         IfError( Set( gPrDelScrap,
-                                       RemoveIf( taskmaster_transactions,
-                                                 transaction_project_id.Id = gEditProject.ID ) ),
-                                  Set( gPrErr, FirstError.Message ) );
-                         IfError( Set( gPrDelScrap,
-                                       RemoveIf( taskmaster_tasks,
-                                                 task_project_id.Id = gEditProject.ID ) ),
-                                  Set( gPrErr, FirstError.Message ) );
-                         If( Len(gPrErr) = 0,
-                             IfError( Set( gPrDelScrap,
-                                           Remove( taskmaster_projects, gEditProject ) ),
-                                      Set( gPrErr, FirstError.Message ) ) );
-                         If( Len(gPrErr) > 0,
-                             Notify( "Couldn't delete the project: " & gPrErr,
-                                     NotificationType.Error ),
-                             Set( gEditProject, Blank() );
-                             Set( gSelProject, Blank() );
-                             Clear( colNewTasks ); Clear( colNewTransactions ); Clear( colNewIssues );
-                             Notify( "Project deleted, with everything attached to it.",
-                                     NotificationType.Success );
-                             Navigate( scrProjects, ScreenTransition.UnCover ) );
-                         Set( gPrDelArm, false ) )
             - btnPrCancel:
                 Control: ModernButton@1.0.0
                 Properties:
                   Appearance: =ButtonAppearance.Outline
                   Text: |
-                    =If( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) > 0,
+                    =If( CountRows(colNewTasks) + CountRows(colNewTransactions) > 0,
                          "Discard", "Cancel" )
                   Width: =140
                   Height: =48
-                  OnSelect: =Set( gPrDelArm, false ); Back()
+                  OnSelect: =Back()
             - btnPrSave:
                 Control: ModernButton@1.0.0
                 Properties:
                   Appearance: =ButtonAppearance.Primary
                   Text: |
                     =If( gEditMode = "Edit", "Save project", "Create project" ) &
-                     If( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) > 0,
-                         " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) + CountRows(colNewIssues) ) & " item(s)", "" )
+                     If( CountRows(colNewTasks) + CountRows(colNewTransactions) > 0,
+                         " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) ) & " item(s)", "" )
                   DisplayMode: |
                     =If( Len(Trim(txtPrName.Text)) > 0
                          && Len(gPrManager.Mail) > 0
@@ -1622,28 +1482,6 @@ Screens:
                                     .ID ),
                                     FirstError.Message,
                                     "" ) } ) );
-                        // issue_impact IS written now — it used to be staged on every
-                        // row and then silently dropped from this record.
-                        ForAll( colNewIssues As i,
-                            Collect( colChildResult,
-                                { Kind: "Issue", Sid: i.sid, Name: i.i_name,
-                                  Message:
-                                    IfError( Text(
-                                        Patch( taskmaster_issues, Defaults(taskmaster_issues),
-                                            { issue_name:       i.i_name,
-                                              issue_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
-                                              issue_status:     { Value: i.i_status },
-                                              issue_impact:     { Value: i.i_impact },
-                                              issue_date_open:  Now(),
-                                              issue_assignee:
-                                                  { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                    Claims:      ClaimPrefix & Lower(i.i_assigneeMail),
-                                                    DisplayName: i.i_assigneeName,
-                                                    Email:       i.i_assigneeMail,
-                                                    Department: "", JobTitle: "", Picture: "" } } )
-                                    .ID ),
-                                    FirstError.Message,
-                                    "" ) } ) );
                         // Split the one result table into the two the screen already uses,
                         // so nothing downstream changes.
                         Collect( colChildErrors,
@@ -1655,8 +1493,6 @@ Screens:
                                   sid in ShowColumns( Filter(colChildOk, Kind = "Task"), Sid ) );
                         RemoveIf( colNewTransactions,
                                   sid in ShowColumns( Filter(colChildOk, Kind = "Transaction"), Sid ) );
-                        RemoveIf( colNewIssues,
-                                  sid in ShowColumns( Filter(colChildOk, Kind = "Issue"), Sid ) );
                         // --- 4. the project now EXISTS. Never insert it twice. -----
                         // READ IT BACK rather than reusing Patch's return value. That
                         // record is not guaranteed to carry every column, and this one
@@ -2547,303 +2383,3 @@ Screens:
       # =======================================================================
       # MODAL — ADD AN ISSUE       card 700 x 540, body scrolls, buttons pinned
       # =======================================================================
-      - mdNiScrim:
-          Control: Rectangle@2.3.0
-          Properties:
-            Visible: =gNiOpen
-            Fill: =RGBA(32, 38, 45, 0.45)
-            X: =0
-            Y: =0
-            Width: =Parent.Width
-            Height: =Parent.Height
-            OnSelect: |
-              =Reset( txtNiName ); Reset( txtNiAssSearch );
-               Reset( cboNiStatus ); Reset( cboNiImpact );
-               Set( gNiAssignee, { DisplayName: "", Mail: "" } );
-               Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
-               Set( gNiEditSid, 0 ); Set( gNiName, "" ); 
-               Set( gNiOpen, false )
-      - mdNiBg:
-          Control: Rectangle@2.3.0
-          Properties:
-            Visible: =gNiOpen
-            Fill: =Theme.Color.Surface
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =(Parent.Width - 700) / 2
-            Y: =(Parent.Height - 540) / 2
-            Width: =700
-            Height: =540
-      - mdNiBody:
-          Control: GroupContainer@1.5.0
-          Variant: AutoLayout
-          Properties:
-            Visible: =gNiOpen
-            LayoutDirection: =LayoutDirection.Vertical
-            LayoutAlignItems: =LayoutAlignItems.Center
-            LayoutGap: =12
-            LayoutOverflowY: =LayoutOverflow.Scroll
-            PaddingTop: =24
-            PaddingBottom: =16
-            PaddingLeft: =24
-            PaddingRight: =24
-            X: =(Parent.Width - 700) / 2
-            Y: =(Parent.Height - 540) / 2
-            Width: =700
-            Height: =460
-          Children:
-            - mdNiTitle:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =If( gNiEditSid > 0, "Edit issue", "Add an issue" )
-                  Font: =Theme.Font
-                  FontWeight: =FontWeight.Semibold
-                  Size: =Theme.Size.H3
-                  Color: =Theme.Color.TextPrimary
-                  Width: =Parent.Width - 48
-                  Height: =28
-            - rowNiName:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Vertical
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =8
-                  Width: =Parent.Width - 48
-                  Height: =62
-                Children:
-                  - lblNiNameCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Issue summary  *"
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
-                        Width: =Parent.Width
-                        Height: =18
-                  - txtNiName:
-                      Control: ModernTextInput@1.0.0
-                      Properties:
-                        Default: =gNiName
-                        Placeholder: ="What is the issue?"
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Width: =Parent.Width
-                        Height: =36
-            - rowNiMeta:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =24
-                  Width: =Parent.Width - 48
-                  Height: =62
-                Children:
-                  - colNiStatus:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =(Parent.Width - 24) / 2
-                        Height: =62
-                      Children:
-                        - lblNiStatCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Status"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        # WAS ["Open","In Progress","Blocked","Resolved"] — two of those
-                        # are not members of issue_status. schema/schema.yaml is the
-                        # golden source: [Open, Review, Waiting, Blocked, Closed].
-                        - cboNiStatus:
-                            Control: ModernCombobox@1.1.1
-                            Properties:
-                              Items: =["Open", "Review", "Waiting", "Blocked", "Closed"]
-                              ItemDisplayText: =ThisItem.Value
-                              InputTextPlaceholder: ="Status"
-                              SelectMultiple: =false
-                              IsSearchable: =false
-                              DefaultSelectedItems: =[gNiStatus]
-                              Width: =Parent.Width
-                              Height: =36
-                              OnChange: =Set(gNiStatus, cboNiStatus.Selected.Value)
-                  - colNiImpact:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =(Parent.Width - 24) / 2
-                        Height: =62
-                      Children:
-                        - lblNiImpCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Impact"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        # WAS ["Low","Medium","High"] — "Medium" is not a member of
-                        # issue_impact, which is [Low, Moderate, High, Critical].
-                        - cboNiImpact:
-                            Control: ModernCombobox@1.1.1
-                            Properties:
-                              Items: =["Low", "Moderate", "High", "Critical"]
-                              ItemDisplayText: =ThisItem.Value
-                              InputTextPlaceholder: ="Impact"
-                              SelectMultiple: =false
-                              IsSearchable: =false
-                              DefaultSelectedItems: =[gNiImpact]
-                              Width: =Parent.Width
-                              Height: =36
-                              OnChange: =Set(gNiImpact, cboNiImpact.Selected.Value)
-            - rowNiAssignee:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Vertical
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =6
-                  Width: =Parent.Width - 48
-                  Height: =58
-                Children:
-                  - lblNiAssCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Assignee  *  —  anyone in the directory"
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
-                        Width: =Parent.Width
-                        Height: =18
-                  - txtNiAssSearch:
-                      Control: ModernTextInput@1.0.0
-                      Properties:
-                        Visible: =!(Len(gNiAssignee.Mail) > 0)
-                        Type: =TextInputType.Search
-                        Default: =""
-                        Placeholder: ="Type a name…"
-                        TriggerOutput: =TriggerOutput.Delayed
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Width: =Parent.Width
-                        Height: =36
-                  - btnNiAssChip:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =Len(gNiAssignee.Mail) > 0
-                        Text: =gNiAssignee.DisplayName & "     ✕"
-                        Align: =Align.Left
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Fill: =RGBA(0, 0, 0, 0)
-                        Color: =Theme.Color.TextPrimary
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
-                          =Set(gNiAssignee, { DisplayName: "", Mail: "" });
-                           Reset(txtNiAssSearch)
-            - galNiAss:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtNiAssSearch.Text) >= 2 && Len(gNiAssignee.Mail) = 0
-                  Items: |
-                    =Office365Users.SearchUserV2({ searchTerm: txtNiAssSearch.Text, top: 6 }).value
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - rowNiAss:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.DisplayName & "     " & ThisItem.Mail
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =0
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - hitNiAss:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gNiAssignee, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
-                           Reset(txtNiAssSearch)
-      - mdNiAdd:
-          Control: ModernButton@1.0.0
-          Properties:
-            Visible: =gNiOpen
-            Appearance: =ButtonAppearance.Primary
-            Text: =If( gNiEditSid > 0, "Save issue", "Add issue" )
-            DisplayMode: |
-              =If( Len(Trim(txtNiName.Text)) > 0 && Len(gNiAssignee.Mail) > 0,
-                   DisplayMode.Edit, DisplayMode.Disabled )
-            X: =(Parent.Width - 700) / 2 + 700 - 24 - 140
-            Y: =(Parent.Height - 540) / 2 + 540 - 24 - 40
-            Width: =140
-            Height: =40
-            OnSelect: |
-              =If( gNiEditSid > 0,
-                   Patch( colNewIssues, LookUp(colNewIssues, sid = gNiEditSid),
-                      { i_name:         Trim(txtNiName.Text),
-                      i_status:       gNiStatus,
-                      i_impact:       gNiImpact,
-                      i_assigneeName: gNiAssignee.DisplayName,
-                      i_assigneeMail: gNiAssignee.Mail } ),
-                   Collect( colNewIssues,
-                      { sid: If( IsEmpty(colNewIssues), 1, Max(colNewIssues, sid) + 1 ),
-                        i_name:         Trim(txtNiName.Text),
-                        i_status:       gNiStatus,
-                        i_impact:       gNiImpact,
-                        i_assigneeName: gNiAssignee.DisplayName,
-                        i_assigneeMail: gNiAssignee.Mail } ) );
-               Reset( txtNiName ); Reset( txtNiAssSearch );
-               Reset( cboNiStatus ); Reset( cboNiImpact );
-               Set( gNiAssignee, { DisplayName: "", Mail: "" } );
-               Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
-               Set( gNiEditSid, 0 ); Set( gNiName, "" ); 
-               Set( gNiOpen, false )
-      - mdNiCancel:
-          Control: ModernButton@1.0.0
-          Properties:
-            Visible: =gNiOpen
-            Appearance: =ButtonAppearance.Outline
-            Text: ="Cancel"
-            X: =(Parent.Width - 700) / 2 + 700 - 24 - 140 - 12 - 120
-            Y: =(Parent.Height - 540) / 2 + 540 - 24 - 40
-            Width: =120
-            Height: =40
-            OnSelect: |
-              =Reset( txtNiName ); Reset( txtNiAssSearch );
-               Reset( cboNiStatus ); Reset( cboNiImpact );
-               Set( gNiAssignee, { DisplayName: "", Mail: "" } );
-               Set( gNiStatus, "Open" ); Set( gNiImpact, "Moderate" );
-               Set( gNiEditSid, 0 ); Set( gNiName, "" ); 
-               Set( gNiOpen, false )
