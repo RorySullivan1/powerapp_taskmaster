@@ -30,12 +30,14 @@
   change the property in Studio directly.
 - **Backend: LISTS ARE LIVE (2026-08-04).** 7 lists `provisioned: live`; `asset_library` is defined
   minimally (`asset_name` only, by instruction). `schema/schema.yaml` is the golden source and
-  carries a provisioning-verification block. Managed metadata is RETIRED (C11) — three `mapping_*`
-  lists with `level1..level3` + `active`, read through `cmpNestedSelect`. `migration:` still says
-  `PLANNED — nothing applied`, so the new project columns may not exist on the list yet.
+  carries a provisioning-verification block. Managed metadata is RETIRED (C11) — three live
+  `mapping_*` lists (**`mapping_regions` plural**, the other two singular) whose columns are
+  **exactly `level1 / level2 / level3`** — there is no `active` — read through `cmpNestedSelect`.
+  `migration.blocking_now`: the user must set the retired Managed Metadata columns
+  (`project_type` et al.) to Required = No, or a save fails with `"Project_Type" is required`.
 - **Every combo box is `ModernCombobox@1.1.1`** (10 of them) with `ItemDisplayText: =ThisItem.Value`.
-  **Modern controls are ENABLED and all stay.** Versions are per-control: the combo box is
-  `@1.1.1`, every other modern token is `@1.0.0`. Do not pattern-match across the family.
+  **Modern controls are ENABLED and all stay.** Versions are per-control — see the line above;
+  **nothing is `@1.0.0`**. Never pattern-match a version across the family.
 - **Open gates:** Office 365 Users connection; arity of the other 8 Person and 6 Managed Metadata
   columns (three were provisioned multi and corrected).
 
@@ -186,8 +188,19 @@
 - Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
 - ~~Settle whether this tenant has MODERN CONTROLS OFF.~~ **ANSWERED 2026-08-06: they are ON.**
-  The hypothesis was wrong; the defect was the `@1.1.1` version token. No modern control needs
-  converting — all of them stay.
+  (The follow-on claim that `@1.1.1` was the defect is RETRACTED — `@1.1.1` is correct for the
+  combo box and the text input. Versions are per-control; unsure → author the classic control.)
+- **Awaiting the user's Studio test of the `ModernTextInput@1.1.1` properties** (`Type:`,
+  `TriggerOutput:`). If it fails, the fallback is `Classic/TextInput@2.3.2`.
+- **Both reworked screens are unverified in Studio** — `scrProject` and `scrTaskEdit` need FULL
+  re-pastes. Orphaned controls the human must delete by hand: `tabProject`, `ProjMeta`,
+  `btnNewChild`, `lblTasksMeta`, `tabTaskEdit`, four `cmpSelection` instances, `dtpTkDone`,
+  the `mdNi*` modal.
+- **Owed by the user, in SharePoint (blocks saving a project):** set the retired Managed Metadata
+  columns (`project_type`, likely `project_region`/`client_type`/`client_coverage`/`product_type`)
+  to Required = No, or delete them.
+- The transactions section on `scrProject` reads "N loaded" rather than "completed / total" —
+  the schema carries no completion state for a transaction. Ask what split the user wants.
 - **Verify in Studio that the 7 converted pickers on `scrProjectEdit` render.** The screen was
   rebuilt from `5edcd66` and needs a full re-paste, not a property edit.
 - **AUDIT the other three edit screens** (`scrTaskEdit`, `scrTransactionEdit`, `scrIssueEdit`) for the
@@ -274,3 +287,4 @@
 - 2026-08-07 0540 | scrTaskEdit reworked: tabs->optional output toggle, coloured state combos, derived completion date, overdue caption, project dropped | sessions/2026-08-06-2059-classic-combobox-and-corruption.md
 - 2026-08-07 0620 | real modern versions applied (TextInput 1.1.1, DatePicker 1.0.1); ModernButton+NumberInput converted to classic (version unknown); Mode->Type and DelayOutput->TriggerOutput fixed | sessions/2026-08-06-2059-classic-combobox-and-corruption.md
 - 2026-08-07 0710 | scrTaskEdit: completion date off the form, People/Dates 2x2, static output caption, new Client toggle section | sessions/2026-08-06-2059-classic-combobox-and-corruption.md
+- 2026-08-09 0110 | session log written; the 2026-08-06 "@1.0.0 correction" marked SUPERSEDED in place; INDEX State corrected (no `active` column on the mapping lists, no `@1.0.0` modern tokens) | sessions/2026-08-09-0108-modern-versions-and-screen-reworks.md

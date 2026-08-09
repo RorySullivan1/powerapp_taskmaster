@@ -53,7 +53,19 @@
   `powerapp-canvas-controls` skill (repo-wide classic-combo-box callout, the display-column
   trap, the `Value` column rule, the token table row).
 
-## CORRECTION (same day, after modern controls were activated)
+## ⚠ SUPERSEDED 2026-08-09 — the "@1.0.0" correction below is WRONG. Do not act on it.
+- Modern-control versions are **per control** and **nothing is `@1.0.0`**: Text Input **1.1.1**,
+  Combo box **1.1.1**, Dropdown **1.0.2**, Date picker **1.0.1**, Radio **1.0.1**, Data grid
+  **1.5.0**. The user stated this authoritatively; it is enforced by the validator allow-list.
+- The `@1.0.0` reasoning below rested on a stale MS Learn sample and on a paste failure that
+  happened while modern controls were still **disabled** in the app — so that failure never
+  implicated the token at all. The rule "never derive a version from a number read off Studio's
+  UI" was **retracted**: Studio's properties pane was right and I was wrong, twice.
+- Standing rule now: **if unsure of a modern control's version, use the classic control.**
+- Read the rest of this section as history only. The duplicate-key finding and the six
+  re-applied fixes are unaffected and still stand.
+
+## CORRECTION (same day, after modern controls were activated) — SUPERSEDED, see above
 - **The classic conversion was a misdiagnosis and has been reverted.** Modern controls are
   **ENABLED**; the user activated them and said *"all modern controls can remain"*. All 10 combo
   boxes are `ModernCombobox@1.0.0` with `ItemDisplayText: =ThisItem.Value`.
