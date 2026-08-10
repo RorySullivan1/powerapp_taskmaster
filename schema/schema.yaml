@@ -158,7 +158,7 @@ lists:
       - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
       - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
       - { name: task_date_completion,  type: DateTime,        required: false,                 desc: "Date completed" }
-      - { name: task_output_approval,  type: Lookup,          required: false,                 desc: "Approval required for output", lookup: { list: asset_approval, show: approval_id } }
+      - { name: task_output_approval_id, type: Text,          required: false,                 desc: "ID of the approval task in the EXTERNAL approval portal (out of scope). Free-text pointer only — NOT a lookup, not validated, not indexed. Replaced the task_output_approval lookup on 2026-08-09 when asset_approval was retired." }
       - { name: task_output_language,  type: Choice,          required: false,                 desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
       - { name: task_output_format,    type: Choice,          required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
       - { name: task_output_branding,  type: Choice,          required: false,                 desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
@@ -235,15 +235,20 @@ lists:
       - { name: product_description, type: Note,            required: true,                desc: "Description (display only)" }
 
   # ---------------------------------------------------------------------------
-  asset_approval:
-    role: Approval reference. Tasks point at it via task_output_approval.
-    provisioned: live        # 2026-08-04
-    join_cost: 0
-    columns:
-      - { name: approval_id,     type: Text,      required: true, indexed: true, desc: "Approval identifier (e.g. MAW, Legal, Compliance, Brand)" }
-      - { name: approval_region, type: Choice,    required: true,                desc: "Applicable region — BROAD-STROKE by design; deliberately coarser than project/client region and never used alongside them", values: [GLOBAL, AMER, EMEA, APAC, JAPAN] }
-      - { name: approval_status, type: Boolean,   required: false, indexed: true, desc: "Active state (true = active)" }
-      - { name: approval_link,   type: Hyperlink, required: false,               desc: "Link to approval guidance (display only)" }
+  # asset_approval — RETIRED 2026-08-09.  Approvals now live in a SEPARATE portal (out of scope);
+  # tasks point at them by free-text id (taskmaster_tasks.task_output_approval_id).  This list's ONLY
+  # role was being the target of the now-dropped task_output_approval lookup, so it is orphaned.
+  # It was provisioned live (2026-08-04): DEPROVISION it in SharePoint.  Kept commented-out as a
+  # record of what it held — DO NOT PROVISION.
+  # asset_approval:
+  #   role: Approval reference. Tasks pointed at it via task_output_approval (dropped 2026-08-09).
+  #   provisioned: live        # 2026-08-04 — now to be DEPROVISIONED
+  #   join_cost: 0
+  #   columns:
+  #     - { name: approval_id,     type: Text,      required: true, indexed: true, desc: "Approval identifier (e.g. MAW, Legal, Compliance, Brand)" }
+  #     - { name: approval_region, type: Choice,    required: true,                desc: "Applicable region — BROAD-STROKE by design", values: [GLOBAL, AMER, EMEA, APAC, JAPAN] }
+  #     - { name: approval_status, type: Boolean,   required: false, indexed: true, desc: "Active state (true = active)" }
+  #     - { name: approval_link,   type: Hyperlink, required: false,               desc: "Link to approval guidance (display only)" }
 
   # ---------------------------------------------------------------------------
   asset_library:
@@ -518,9 +523,9 @@ open_recommendations:
       date. Until that exists there is no blended notional anywhere - which is the
       accepted cost, not an oversight.
   - id: C6
-    what: "region modelled three ways — INTENTIONAL. approval_region is broad-stroke; project_region/client_region carry granularity. They are never used in the same setting, so no conformed dimension is needed."
+    what: "region was modelled three ways; approval_region RETIRED 2026-08-09 with the asset_approval list. Now TWO ways — project_region and client_region, both granular. They serve different purposes and are never used in the same setting, so still no conformed dimension is needed."
     options: ["leave as-is (chosen)"]
-    status: BY DESIGN  # regions serve different purposes and are never used together — not a defect, do not "fix"
+    status: BY DESIGN  # project_region/client_region serve different purposes and are never used together — not a defect, do not "fix"
   - id: C8
     what: "casing anomalies Issue_owner and product_UID; no enforced uniqueness anywhere"
     options: ["rename to issue_owner / product_uid before creation (recommended)", "keep as-is and match exactly in every formula"]
