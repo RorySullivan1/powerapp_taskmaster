@@ -37,7 +37,8 @@ Screens:
       OnVisible: |
         =Set( gTkProject,
               If( gEditMode = "Edit",
-                  { Id: gEditTask.task_project_id.Id, Value: gEditTask.task_project_id.Value },
+                  { Id: gEditTask.task_project_id.Id,
+                    Value: LookUp(taskmaster_projects, ID = gEditTask.task_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
                   { Id: 0, Value: "" } ) );
@@ -716,7 +717,7 @@ Screens:
                                                  "   ·   OVERDUE", "" )
                                           Font: =Theme.Font
                                           Size: =Theme.Size.Small
-                                          Color: =|
+                                          Color: |
                                             =If( !IsBlank(dtpTkTarget.SelectedDate)
                                             && dtpTkTarget.SelectedDate < Today()
                                             && gTkStage <> "Complete" && gTkStage <> "Archived",
