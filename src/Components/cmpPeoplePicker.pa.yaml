@@ -1,0 +1,347 @@
+# =============================================================================
+# cmpPeoplePicker  —  modal single-person search dialog (component)
+# =============================================================================
+# Click a person box on the form -> this opens over the whole screen -> type a
+# name -> ENTER runs the search -> tap a result to highlight it -> press the
+# check to commit. Selecting and committing are two separate acts, so a mistap
+# in the results list never writes a person to the record.
+#
+# WHY THIS IS ONE FULL-SCREEN INSTANCE PER SCREEN, NOT ONE PER FIELD:
+# a component clips its children to its own Width/Height, so an instance sized
+# to a 36px form field cannot paint a dialog over the form. The instance is
+# therefore absolute and screen-sized, and the consuming screen names the field
+# being picked in its own global (scrTaskEdit already had `gTkPicker` doing
+# exactly this). Two person fields on a screen share ONE instance.
+#
+# THE PERSON BOX STAYS ON THE SCREEN. This component is the dialog only. The
+# chip that shows the chosen person, and its clear X, remain screen controls —
+# they are cheap, they already exist, and keeping them out here means clearing a
+# field never has to open a dialog.
+#
+# Contract:
+#   Title     (Input, Text)    — dialog heading, e.g. "Select lead"
+#   Picked    (Output, Record) — {DisplayName, Mail} highlighted at confirm time
+#   OnConfirm (Event)          — check pressed with somebody highlighted
+#   OnCancel  (Event)          — dismissed via the X or the scrim
+#   OnReset   (built-in)       — see below; not a custom property, nothing to type
+#
+# ONRESET IS LOAD-BEARING, NOT HOUSEKEEPING.
+# One instance serves every person field on the screen AND every record the
+# screen is reused for. Without OnReset, opening the dialog for Supporter would
+# still show Lead's highlighted row and a check press would write the wrong
+# person — the exact defect that made cmpSelection unusable for per-record state
+# (it has no OnReset). The consuming screen MUST call `Reset(<instance>)` at the
+# moment it opens the dialog. Grounded in cmpNestedSelect, whose OnReset is
+# documented as "Fired by Reset(<instance>) on the consuming screen".
+#
+# ppQuery / ppPicked / ppTried are INSTANCE-scoped: with AccessAppScope false,
+# MS Learn states Set() results are scoped to the component instance. Same basis
+# as cmpNestedSelect's nsLevels.
+#
+# SEARCH RUNS ON SUBMIT, NOT PER KEYSTROKE. The gallery binds to `ppQuery`, not
+# to the search box's live text. `TriggerOutput.FocusOut` means a single-line
+# input commits on ENTER (or on leaving the field), which fires OnChange, which
+# is what fills ppQuery. That is the whole "type, press enter, list appears"
+# mechanic, and it also means one Office365Users call per search instead of one
+# per character.
+# =============================================================================
+ComponentDefinitions:
+  cmpPeoplePicker:
+    DefinitionType: CanvasComponent
+    Description: Modal single-person search. Enter runs the search, tap highlights, the check commits. Call Reset(<instance>) when opening.
+    AccessAppScope: false
+    CustomProperties:
+      Title:
+        PropertyKind: Input
+        Description: Heading shown at the top of the dialog, e.g. "Select lead".
+        DataType: Text
+        Default: ="Select a person"
+      Picked:
+        PropertyKind: Output
+        Description: The highlighted person as {DisplayName, Mail}. Read it inside OnConfirm; it is cleared by OnReset.
+        DataType: Record
+      OnConfirm:
+        PropertyKind: Event
+        Description: Raised when the check is pressed with somebody highlighted. The app writes Picked into its own person global.
+        ReturnType: Boolean
+      OnCancel:
+        PropertyKind: Event
+        Description: Raised when the dialog is dismissed without choosing. The app clears whatever global drives Visible.
+        ReturnType: Boolean
+    Properties:
+      # Screen-sized by default — the instance is meant to cover the form.
+      Width: =1366
+      Height: =768
+      Fill: =RGBA(0, 0, 0, 0)
+      # Falls back to a blank-mailed record rather than Blank(), so the consuming
+      # screen can test `Len(inst.Picked.Mail) > 0` without a type surprise.
+      # If(), not Coalesce(): Coalesce is grounded for scalars here, not records.
+      Picked: |
+        =If( IsBlank(ppPicked), { DisplayName: "", Mail: "" }, ppPicked )
+      OnReset: |
+        =Set( ppQuery, "" );
+         Set( ppPicked, Blank() );
+         Set( ppTried, false );
+         Reset( txtPpSearch )
+    Children:
+      # ---- Scrim: dims the form and swallows clicks aimed past the dialog ----
+      - ppScrim:
+          Control: Classic/Button@2.2.0
+          Properties:
+            # A button, not a rectangle: it has to be CLICKABLE to dismiss, and a
+            # rectangle's OnSelect is not a reliable hit target behind a dialog.
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0.35)
+            HoverFill: =RGBA(0, 0, 0, 0.35)
+            PressedFill: =RGBA(0, 0, 0, 0.35)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =cmpPeoplePicker.OnCancel()
+      # ---- Dialog card -------------------------------------------------------
+      - ppCard:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            X: =(Parent.Width - 620) / 2
+            Y: =(Parent.Height - 460) / 2
+            Width: =620
+            Height: =460
+      - ppHeadBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            X: =(Parent.Width - 620) / 2
+            Y: =(Parent.Height - 460) / 2
+            Width: =620
+            Height: =52
+      - ppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpPeoplePicker.Title
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            FontWeight: =FontWeight.Semibold
+            VerticalAlign: =VerticalAlign.Middle
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2
+            Width: =520
+            Height: =52
+      - ppClose:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.OnPrimary
+            Tooltip: ="Close without choosing"
+            X: =(Parent.Width - 620) / 2 + 620 - 16 - 20
+            Y: =(Parent.Height - 460) / 2 + 16
+            Width: =20
+            Height: =20
+            OnSelect: =cmpPeoplePicker.OnCancel()
+      # ---- Search row --------------------------------------------------------
+      - txtPpSearch:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="Type a name, then press Enter"
+            # FocusOut commits on ENTER (and on leaving the field), which fires
+            # OnChange. That is what makes the search run on submit rather than
+            # on every keystroke — see the header note.
+            TriggerOutput: =TriggerOutput.FocusOut
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 68
+            Width: =520
+            Height: =40
+            OnChange: |
+              =Set( ppQuery, Trim(txtPpSearch.Text) );
+               Set( ppPicked, Blank() );
+               Set( ppTried, false )
+      - ppSearchGo:
+          Control: Classic/Button@2.2.0
+          Properties:
+            # Does exactly what Enter does. Present because "press Enter to
+            # search" is a convention some users never reach for, and a visible
+            # affordance costs one control.
+            Text: ="Search"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =(Parent.Width - 620) / 2 + 16 + 528
+            Y: =(Parent.Height - 460) / 2 + 68
+            Width: =60
+            Height: =40
+            OnSelect: |
+              =Set( ppQuery, Trim(txtPpSearch.Text) );
+               Set( ppPicked, Blank() );
+               Set( ppTried, false )
+      # ---- Results -----------------------------------------------------------
+      - galPpResults:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            # Bound to ppQuery, NOT to txtPpSearch.Text — that is the difference
+            # between searching on submit and searching per keystroke. Two
+            # characters is the floor because a one-letter directory search
+            # returns noise and costs a round trip to produce it.
+            Items: |
+              =If( Len(Coalesce(ppQuery, "")) >= 2,
+                   Office365Users.SearchUserV2({ searchTerm: ppQuery, top: 25 }).value )
+            WrapCount: =1
+            TemplateSize: =44
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            ShowScrollbar: =true
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 120
+            Width: =588
+            Height: =264
+          Children:
+            - ppRowSel:
+                Control: Rectangle@2.3.0
+                Properties:
+                  # Highlight for the row currently held in ppPicked. Compared on
+                  # Mail, not on the record — a record comparison against a value
+                  # rebuilt by Set() is not an identity match.
+                  Fill: =Theme.Color.Accent
+                  Visible: |
+                    =Len(Coalesce(ppPicked.Mail, "")) > 0 && ppPicked.Mail = ThisItem.Mail
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =43
+            - ppRowName:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.DisplayName
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =24
+            - ppRowMail:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Mail
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =23
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
+            - ppRowLine:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =Theme.Color.Border
+                  X: =0
+                  Y: =43
+                  Width: =Parent.TemplateWidth
+                  Height: =1
+            - ppRowHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # The row's action lives HERE, on a transparent full-template
+                  # button declared LAST. A gallery's own OnSelect does not
+                  # reliably fire when the click lands on a child control, so
+                  # without this the rows look right and do nothing. Confirmed in
+                  # Studio 2026-08-03.
+                  #
+                  # HIGHLIGHTS ONLY. Committing is the check button's job — that
+                  # is the two-step the whole dialog exists to provide.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( ppPicked, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail } );
+                     Set( ppTried, false )
+      # ---- Empty / prompt state ---------------------------------------------
+      - ppHint:
+          Control: Label@2.5.1
+          Properties:
+            # One label covering both quiet states, so an empty dialog is never
+            # just blank space.
+            Visible: =Len(Coalesce(ppQuery, "")) < 2
+            Text: |
+              =If( Len(Coalesce(ppQuery, "")) = 0,
+                   "Type a name and press Enter to search.",
+                   "Type at least two characters." )
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            Color: =Theme.Color.TextMuted
+            Align: =Align.Center
+            VerticalAlign: =VerticalAlign.Middle
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 120
+            Width: =588
+            Height: =264
+      # ---- Footer ------------------------------------------------------------
+      - ppNudge:
+          Control: Label@2.5.1
+          Properties:
+            # Shown only after the check has been pressed with nothing chosen.
+            # The check is NOT disabled: a disabled button cannot say why it is
+            # disabled, which on 2026-08-10 cost a round trip on btnTkSave.
+            # `= true` rather than Coalesce(): blank compares false, and Coalesce
+            # on a Boolean is not grounded in this repo.
+            Visible: =ppTried = true
+            Text: ="Pick somebody from the list first."
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.Danger
+            VerticalAlign: =VerticalAlign.Middle
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 400
+            Width: =300
+            Height: =40
+      - ppCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.Primary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =(Parent.Width - 620) / 2 + 620 - 16 - 120 - 8 - 120
+            Y: =(Parent.Height - 460) / 2 + 400
+            Width: =120
+            Height: =40
+            OnSelect: =cmpPeoplePicker.OnCancel()
+      - ppConfirm:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="✓  Use this person"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =(Parent.Width - 620) / 2 + 620 - 16 - 120
+            Y: =(Parent.Height - 460) / 2 + 400
+            Width: =120
+            Height: =40
+            # ALWAYS ENABLED. With nothing picked it explains itself via ppNudge
+            # rather than sitting inert — see ppNudge.
+            OnSelect: |
+              =If( Len(Coalesce(ppPicked.Mail, "")) = 0,
+                   Set( ppTried, true ),
+                   cmpPeoplePicker.OnConfirm() )

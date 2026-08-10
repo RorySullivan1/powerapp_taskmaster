@@ -71,7 +71,11 @@ Screens:
         Set( gTkClientStage, If( gEditMode = "Edit", Coalesce(gEditTask.task_client_stage.Value, "(none)"), "(none)" ) );
         Set( gTkPicker, "" );
         Reset( txtTkName ); Reset( txtTkDesc );
-        Reset( txtTkLeadSearch ); Reset( txtTkSupporterSearch );
+        // Reset(<instance>) fires the component's OnReset, which clears its query,
+        // its highlight and its search box. The lead and supporter pickers are the
+        // SAME instance, reused across every record this screen opens, so this is
+        // what stops task B's dialog opening on task A's highlighted person.
+        Reset( cmpTkPeople );
         Reset( txtTkApprovalId ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without these
         // the previous task's stage/health/priority survive into the next one.
@@ -512,19 +516,31 @@ Screens:
                                           LayoutMinHeight: =18
                                           Width: =Parent.Width
                                           Height: =18
-                                    - txtTkLeadSearch:
-                                        Control: ModernTextInput@1.1.1
+                                    # THE EMPTY PERSON BOX. Was a search input that filtered a
+                                    # floating gallery as you typed; it is now a button that
+                                    # opens cmpTkPeople, where the search lives. Reset() on the
+                                    # instance is what clears the previous field's query and
+                                    # highlight — without it the dialog opens showing whatever
+                                    # was picked last, and the check would commit it.
+                                    - btnTkLeadPick:
+                                        Control: Classic/Button@2.2.0
                                         Properties:
                                           Visible: =Len(gTkLead.Mail) = 0
-                                          Placeholder: ="Search by name…"
-                                          TriggerOutput: =TriggerOutput.Delayed
+                                          Text: ="＋  Choose a lead"
+                                          Align: =Align.Left
+                                          Fill: =Theme.Color.Bg
+                                          Color: =Theme.Color.TextMuted
+                                          BorderColor: =Theme.Color.Border
+                                          BorderThickness: =1
                                           Font: =Theme.Font
                                           Size: =Theme.Size.Body
                                           FillPortions: =0
                                           LayoutMinHeight: =36
                                           Width: =Parent.Width
                                           Height: =36
-                                          OnChange: =Set( gTkPicker, "Lead" )
+                                          OnSelect: |
+                                            =Set( gTkPicker, "Lead" );
+                                             Reset( cmpTkPeople )
                                     # The chip REPLACES the search box once somebody is chosen —
                                     # same shape as scrProjectEdit. One row either way.
                                     - chipTkLead:
@@ -568,7 +584,7 @@ Screens:
                                                 Height: =16
                                                 OnSelect: |
                                                   =Set( gTkLead, { DisplayName: "", Mail: "" } );
-                                                   Reset( txtTkLeadSearch );
+                                                   Reset( cmpTkPeople );
                                                    Set( gTkPicker, "" )
                               - colTkSupp:
                                   Control: GroupContainer@1.5.0
@@ -593,19 +609,26 @@ Screens:
                                           LayoutMinHeight: =18
                                           Width: =Parent.Width
                                           Height: =18
-                                    - txtTkSupporterSearch:
-                                        Control: ModernTextInput@1.1.1
+                                    # Empty person box — see btnTkLeadPick.
+                                    - btnTkSuppPick:
+                                        Control: Classic/Button@2.2.0
                                         Properties:
                                           Visible: =Len(gTkSupporter.Mail) = 0
-                                          Placeholder: ="Search by name…"
-                                          TriggerOutput: =TriggerOutput.Delayed
+                                          Text: ="＋  Choose a supporter"
+                                          Align: =Align.Left
+                                          Fill: =Theme.Color.Bg
+                                          Color: =Theme.Color.TextMuted
+                                          BorderColor: =Theme.Color.Border
+                                          BorderThickness: =1
                                           Font: =Theme.Font
                                           Size: =Theme.Size.Body
                                           FillPortions: =0
                                           LayoutMinHeight: =36
                                           Width: =Parent.Width
                                           Height: =36
-                                          OnChange: =Set( gTkPicker, "Supporter" )
+                                          OnSelect: |
+                                            =Set( gTkPicker, "Supporter" );
+                                             Reset( cmpTkPeople )
                                     # The chip REPLACES the search box once somebody is chosen —
                                     # same shape as scrProjectEdit. One row either way.
                                     - chipTkSupp:
@@ -649,7 +672,7 @@ Screens:
                                                 Height: =16
                                                 OnSelect: |
                                                   =Set( gTkSupporter, { DisplayName: "", Mail: "" } );
-                                                   Reset( txtTkSupporterSearch );
+                                                   Reset( cmpTkPeople );
                                                    Set( gTkPicker, "" )
                         - colTkDatesStack:
                             Control: GroupContainer@1.5.0
@@ -1286,7 +1309,9 @@ Screens:
       - pnlTkPickerBg:
           Control: Rectangle@2.3.0
           Properties:
-            Visible: =Len(gTkPicker) > 0
+            # Client and product only — the person pickers moved to cmpTkPeople,
+            # which brings its own card, heading and close.
+            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
             Fill: =Theme.Color.Surface
             BorderColor: =Theme.Color.Primary
             BorderThickness: =1
@@ -1297,7 +1322,9 @@ Screens:
       - lblTkPickerHead:
           Control: Label@2.5.1
           Properties:
-            Visible: =Len(gTkPicker) > 0
+            # Client and product only — the person pickers moved to cmpTkPeople,
+            # which brings its own card, heading and close.
+            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
             Text: ="Pick a " & Lower(gTkPicker)
             Font: =Theme.Font
             Size: =Theme.Size.Small
@@ -1310,7 +1337,9 @@ Screens:
       - icoTkPickerClose:
           Control: Classic/Icon@2.5.0
           Properties:
-            Visible: =Len(gTkPicker) > 0
+            # Client and product only — the person pickers moved to cmpTkPeople,
+            # which brings its own card, heading and close.
+            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
             Icon: =Icon.Cancel
             Color: =Theme.Color.TextMuted
             Tooltip: ="Close"
@@ -1319,102 +1348,6 @@ Screens:
             Width: =16
             Height: =16
             OnSelect: =Set( gTkPicker, "" )
-      - galTkLead:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
-          Properties:
-            Visible: |
-              =gTkPicker = "Lead" && Len(txtTkLeadSearch.Text) >= 2
-            Items: |
-              =Office365Users.SearchUserV2({ searchTerm: txtTkLeadSearch.Text, top: 15 }).value
-            WrapCount: =1
-            TemplateSize: =40
-            TemplatePadding: =0
-            TemplateFill: =RGBA(0, 0, 0, 0)
-            BorderThickness: =0
-            ShowScrollbar: =true
-            X: =(Parent.Width - 620) / 2 + 8
-            Y: =Theme.Space.HeaderH + 108
-            Width: =604
-            Height: =288
-          Children:
-            - rowTkLeadRow:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
-                  Color: =Theme.Color.TextPrimary
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =12
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 24
-                  Height: =39
-            - galTkLeadHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # A gallery's own OnSelect does not reliably fire when the click lands
-                  # on a child control, so the row's action lives on a transparent
-                  # full-template button declared LAST. Confirmed in Studio 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Set( gTkLead, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail } );
-                    Set( gTkPicker, "" )
-      - galTkSupporter:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
-          Properties:
-            Visible: |
-              =gTkPicker = "Supporter" && Len(txtTkSupporterSearch.Text) >= 2
-            Items: |
-              =Office365Users.SearchUserV2({ searchTerm: txtTkSupporterSearch.Text, top: 15 }).value
-            WrapCount: =1
-            TemplateSize: =40
-            TemplatePadding: =0
-            TemplateFill: =RGBA(0, 0, 0, 0)
-            BorderThickness: =0
-            ShowScrollbar: =true
-            X: =(Parent.Width - 620) / 2 + 8
-            Y: =Theme.Space.HeaderH + 108
-            Width: =604
-            Height: =288
-          Children:
-            - rowTkSuppRow:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
-                  Color: =Theme.Color.TextPrimary
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =12
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 24
-                  Height: =39
-            - galTkSupporterHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # A gallery's own OnSelect does not reliably fire when the click lands
-                  # on a child control, so the row's action lives on a transparent
-                  # full-template button declared LAST. Confirmed in Studio 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Set( gTkSupporter, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail } );
-                    Set( gTkPicker, "" )
-      # galTkApproval REMOVED 2026-08-09 — approval is now a free-text id (txtTkApprovalId),
-      # not a lookup, so there is no asset_approval results gallery to render.
       - galTkClient:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
@@ -1720,3 +1653,36 @@ Screens:
                     If( Len(gTkWarn) = 0,
                     Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
                     Back() ) )
+      # =====================================================================
+      # PEOPLE PICKER — declared LAST so the dialog paints above the fixed
+      # footer. One instance serves BOTH person fields: gTkPicker names which
+      # one is being filled, and OnConfirm writes to the matching global.
+      #
+      # Screen-sized and absolute. A component clips its children to its own
+      # bounds, so a field-sized instance could not paint a dialog over the
+      # form — which is why the person BOX stays on the screen (btnTkLeadPick /
+      # btnTkSuppPick and the two chips) and only the dialog lives in here.
+      # =====================================================================
+      - cmpTkPeople:
+          Control: CanvasComponent
+          ComponentName: cmpPeoplePicker
+          Properties:
+            Visible: =gTkPicker = "Lead" || gTkPicker = "Supporter"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: =If( gTkPicker = "Lead", "Select lead", "Select supporter" )
+            # Picked is read HERE and nowhere else. It is instance state cleared
+            # by OnReset on every open, so reading it outside this handler would
+            # be reading whatever the last dialog left behind.
+            OnConfirm: |
+              =If( gTkPicker = "Lead",
+                   Set( gTkLead,
+                        { DisplayName: cmpTkPeople.Picked.DisplayName,
+                          Mail:        cmpTkPeople.Picked.Mail } ),
+                   Set( gTkSupporter,
+                        { DisplayName: cmpTkPeople.Picked.DisplayName,
+                          Mail:        cmpTkPeople.Picked.Mail } ) );
+               Set( gTkPicker, "" )
+            OnCancel: =Set( gTkPicker, "" )
