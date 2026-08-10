@@ -145,7 +145,7 @@ lists:
       neither the parent nor the output format captures — mapping_activitytype stays
       in place, so that is a column, not a redesign.
     provisioned: live        # 2026-08-04
-    join_cost: 7          # 5 Lookup + 2 Person (9 incl. Created By/Modified By; cap is 12). Was 8 — task_category's Managed Metadata became zero-join Number/Text
+    join_cost: 7          # 5 Lookup + 2 Person (9 if a view also projects Created By/Modified By; SharePoint BLOCKS above 8 joins, so keep heavy views under 8). Was 8 — task_category's Managed Metadata became zero-join Number/Text
     columns:
       - { name: task_name,             type: Text,            required: true,  indexed: true,  desc: "Task title" }
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }

@@ -28,7 +28,8 @@ Screens:
       OnVisible: |
         =Set( gTxProject,
               If( gEditMode = "Edit",
-                  { Id: gEditTransaction.transaction_project_id.Id, Value: gEditTransaction.transaction_project_id.Value },
+                  { Id: gEditTransaction.transaction_project_id.Id,
+                    Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
                   { Id: 0, Value: "" } ) );
