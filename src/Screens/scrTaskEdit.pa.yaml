@@ -1612,6 +1612,17 @@ Screens:
                     Set( gTkSaved, Blank() );
                     Set( gTkErr, "" );
                     Set( gTkWarn, "" );
+                    // ONE WRITE. Every optional field is folded into this record as an
+                    // If(condition, value, Blank()) rather than a follow-up Patch. It used to be
+                    // nine sequential writes to the SAME ROW — the main one plus eight optionals,
+                    // and all eight fired on every edit, because the else-branch of each was
+                    // `gEditMode = "Edit"` -> clear. Nine round trips is what made saving slow.
+                    //
+                    // Blank() as the else is how a field is CLEARED, which is what the separate
+                    // clear-patches did; the toggles still decide it, so switching a section off
+                    // still wipes what it was hiding. Both halves are grounded in this screen's own
+                    // history: task_date_completion has always been an If(...) inside this record,
+                    // and every Blank() below was a live Patch value before the fold.
                     IfError(
                     Set( gTkSaved,
                     Patch( taskmaster_tasks,
@@ -1633,7 +1644,29 @@ Screens:
                     Coalesce(gEditTask.task_date_completion, Now()),
                     gTkStage = "Archived",
                     gEditTask.task_date_completion,
-                    Blank() ) } ) ),
+                    Blank() ),
+                    // --- folded optionals: were eight separate Patches ------------------
+                    task_supporter:
+                    If( Len(gTkSupporter.Mail) > 0,
+                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      ClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" },
+                    Blank() ),
+                    task_output_approval_id:
+                    If( tglTkOutput.Value && Len(Trim(txtTkApprovalId.Text)) > 0,
+                    Trim(txtTkApprovalId.Text), Blank() ),
+                    task_client_name:
+                    If( tglTkClient.Value && gTkClient.Id > 0,
+                    { Id: gTkClient.Id, Value: gTkClient.Value }, Blank() ),
+                    task_product_id:
+                    If( tglTkOutput.Value && gTkProduct.Id > 0,
+                    { Id: gTkProduct.Id, Value: gTkProduct.Value }, Blank() ),
+                    task_output_language:
+                    If( tglTkOutput.Value && gTkLanguage <> "(none)", { Value: gTkLanguage }, Blank() ),
+                    task_output_format:
+                    If( tglTkOutput.Value && gTkFormat <> "(none)", { Value: gTkFormat }, Blank() ),
+                    task_output_branding:
+                    If( tglTkOutput.Value && gTkBranding <> "(none)", { Value: gTkBranding }, Blank() ),
+                    task_client_stage:
+                    If( tglTkClient.Value && gTkClientStage <> "(none)", { Value: gTkClientStage }, Blank() ) } ) ),
                     Set( gTkErr, FirstError.Message ) );
                     // Trust the RECORD, never the message — a write can fail and still leave
                     // FirstError.Message empty, and reading that as success is what corrupted
@@ -1643,68 +1676,45 @@ Screens:
                     If( Len(gTkErr) > 0,
                     Notify("Couldn't save the task: " & gTkErr, NotificationType.Error) );
                     If( Len(gTkErr) = 0 && !IsBlank(gTkSaved.ID),
-                    If( Len(gTkSupporter.Mail) > 0,
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_supporter: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      ClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" } }) ), Set( gTkWarn, gTkWarn & "the supporter didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_supporter: Blank() }) ), Set( gTkWarn, gTkWarn & "the supporter didn't clear: " & FirstError.Message & "   " )) );
-                    // EVERY optional field is gated on its SECTION TOGGLE as well as its own
-                    // value. Switching a section off on an edit has to CLEAR what is stored, or
-                    // the form would hide values that are still on the record. Client and client
-                    // stage follow tglTkClient; the rest follow tglTkOutput.
-                    If( tglTkOutput.Value && Len(Trim(txtTkApprovalId.Text)) > 0,
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_approval_id: Trim(txtTkApprovalId.Text) }) ), Set( gTkWarn, gTkWarn & "the approval id didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_approval_id: Blank() }) ), Set( gTkWarn, gTkWarn & "the approval id didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkClient.Value && gTkClient.Id > 0,
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_name: { Id: gTkClient.Id, Value: gTkClient.Value } }) ), Set( gTkWarn, gTkWarn & "the client link didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_name: Blank() }) ), Set( gTkWarn, gTkWarn & "the client link didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkOutput.Value && gTkProduct.Id > 0,
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_product_id: { Id: gTkProduct.Id, Value: gTkProduct.Value } }) ), Set( gTkWarn, gTkWarn & "the product link didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_product_id: Blank() }) ), Set( gTkWarn, gTkWarn & "the product link didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkOutput.Value && gTkLanguage <> "(none)",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_language: { Value: gTkLanguage } }) ), Set( gTkWarn, gTkWarn & "the language didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_language: Blank() }) ), Set( gTkWarn, gTkWarn & "the language didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkOutput.Value && gTkFormat <> "(none)",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_format: { Value: gTkFormat } }) ), Set( gTkWarn, gTkWarn & "the format didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_format: Blank() }) ), Set( gTkWarn, gTkWarn & "the format didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkOutput.Value && gTkBranding <> "(none)",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_branding: { Value: gTkBranding } }) ), Set( gTkWarn, gTkWarn & "the branding didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_output_branding: Blank() }) ), Set( gTkWarn, gTkWarn & "the branding didn't clear: " & FirstError.Message & "   " )) );
-                    If( tglTkClient.Value && gTkClientStage <> "(none)",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_stage: { Value: gTkClientStage } }) ), Set( gTkWarn, gTkWarn & "the client stage didn't stick: " & FirstError.Message & "   " )),
-                    gEditMode = "Edit",
-                    IfError( Set( gTkOpt, Patch(taskmaster_tasks, gTkSaved, { task_client_stage: Blank() }) ), Set( gTkWarn, gTkWarn & "the client stage didn't clear: " & FirstError.Message & "   " )) );
                     // --- C3: rewrite the parent project's weighted completion ---------
-                    // LAST, because it must read the task's POST-save stage. Delegable Filter
-                    // on the indexed FK plus an Or-of-equals over the six live stages
-                    // (`<> "Archived"` is a Text <> and would NOT delegate).
-                    With( { pid: gTkProject.Id },
-                    With( { proj: LookUp(taskmaster_projects, ID = pid),
-                    scored:
+                    // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average
+                    // over task STAGES, so editing a description, a date, a priority or any
+                    // output field cannot change it — and computing it costs a LookUp, a fetch of
+                    // up to 500 task rows and a write. On New there is no previous stage, so the
+                    // test is false and it always runs.
+                    If( !(gEditMode = "Edit" && gTkStage = gEditTask.task_stage.Value),
+                    // The two reads are independent, so issue them together instead of in
+                    // series. They have to be Sets — Concurrent takes behaviour formulas, so a
+                    // With() scope cannot carry the results out.
+                    Concurrent(
+                    Set( gTkRollupProj, LookUp(taskmaster_projects, ID = gTkProject.Id) ),
+                    Set( gTkRollupScored,
                     AddColumns(
+                    // Delegable: FK = on an indexed Lookup, plus an Or-of-equals over the six
+                    // live stages (`<> "Archived"` is a Text <> and would NOT delegate).
                     Filter( taskmaster_tasks,
-                    task_project_id.Id = pid
+                    task_project_id.Id = gTkProject.Id
                     && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
                     || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
                     || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
-                    wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
-                    If( IsBlank(proj),
+                    wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) ) );
+                    If( IsBlank(gTkRollupProj),
                     Notify("Task saved. Parent project not found, so completion was left unchanged.",
                     NotificationType.Warning),
-                    CountRows(scored) >= 500,
+                    CountRows(gTkRollupScored) >= 500,
+                    // The average is computed LOCALLY over the returned page. Past the row limit
+                    // it would be a truncated number written back to SharePoint and read by
+                    // Power BI — refuse rather than persist it.
                     Notify("Task saved. This project has too many tasks to compute completion accurately, so it was left unchanged.",
                     NotificationType.Warning),
+                    With( { newPc: If( CountRows(gTkRollupScored) = 0, 0, RoundDown(Average(gTkRollupScored, wgt), 0) ) },
+                    // Don't spend a write on a number that has not moved. Most stage changes
+                    // inside a big project leave the rounded average where it was.
+                    If( newPc <> gTkRollupProj.project_perc_completion,
                     IfError(
                     Set( gSelProject,
-                    Patch( taskmaster_projects, proj,
-                    { project_perc_completion:
-                    If( CountRows(scored) = 0, 0,
-                    RoundDown(Average(scored, wgt), 0) ) } ) ), Set( gTkWarn, gTkWarn & "Task saved, but the project rollup didn't update: " & FirstError.Message & "   " )) ) ) );
+                    Patch( taskmaster_projects, gTkRollupProj, { project_perc_completion: newPc } ) ),
+                    Set( gTkWarn, gTkWarn & "Task saved, but the project rollup didn't update: " & FirstError.Message & "   " )) ) ) ) );
                     If( Len(gTkWarn) > 0,
                     Notify( "Task saved, but: " & gTkWarn, NotificationType.Warning ) );
                     If( Len(gTkWarn) = 0,

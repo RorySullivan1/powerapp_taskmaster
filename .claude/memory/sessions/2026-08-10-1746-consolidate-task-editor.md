@@ -180,3 +180,58 @@ symptom behind it.
 - **The `lbl*Missing` labels must stay a BARE LIST.** The guard now tests
   `Len(lbl*Missing.Text) > 0`; a static prefix would make it permanently non-empty and block
   every save on that screen. Recorded in each label's own comment.
+
+---
+
+## Follow-up 3 (20:15) — the task save was slow
+
+Earlier diagnosis note: the "nothing happened" click was NOT the DisplayMode gate. The user
+confirmed the task had a lead and the button was enabled and clickable. The repo source
+checked clean on every axis that can make an enabled button inert — z-order (actionBarRow is
+declared after actionBarBg, nothing covers it), dangling control references (none of 110),
+column tokens against schema.yaml (all 22 resolve), paren balance. **That pointed at Studio
+state, not source** — the screen was marked as needing a full re-paste with orphaned controls
+still to delete, so the button being clicked was likely a stale one with a broken formula.
+User fixed it in Studio. **Lesson: when the authored source is provably clean, stop
+diagnosing the file — the gap means the thing running may not be the thing being read.**
+
+**Then: "the save is decently slow."** Counted the round trips rather than guessing.
+
+An EDIT was **12 sequential calls**: 1 main Patch + **8 optional Patches to the same row** +
+LookUp(projects) + Filter fetching up to 500 task rows + Patch(projects).
+
+The eight were the surprise. Each read `If(cond, <set>, gEditMode = "Edit", <clear>)` — so on
+an edit, **every one of them fires**, either setting or clearing. There was no skip path.
+
+Four changes, all landed together as one paste:
+
+- **(A) Folded the eight optionals into the single Patch** as `If(cond, value, Blank())`.
+  9 writes -> 1. Grounded by the screen's own code: `task_date_completion` was always an
+  `If(...)` inside that record, and every `Blank()` used was already a live Patch value in
+  the clear-branches. Cost: per-field warning attribution, which SharePoint's own error
+  message replaces (it names the offending column).
+- **(B) The C3 rollup is skipped unless the stage moved.** Guard:
+  `If( !(gEditMode = "Edit" && gTkStage = gEditTask.task_stage.Value), <rollup> )`. Written
+  negated so New mode (where `gEditTask` may be stale) always runs it. Removes the LookUp,
+  the 500-row fetch and the project write from most saves.
+- **(C) The project is only written when the rounded number actually changed.**
+- **(D) `Concurrent()` around the two independent rollup reads.** They must be `Set`s —
+  Concurrent takes behaviour formulas, so a `With()` scope cannot carry results out.
+
+Net: typical edit **12 -> 1** round trip; a stage change **12 -> 4**.
+
+Verified mechanically, not by eye: paren depth 0, brace depth 0, all **18** columns still
+written, `gTkOpt` gone. The two new globals were first named `gTkProj`/`gTkScored` and
+renamed to `gTkRollupProj`/`gTkRollupScored` — `gTkProj` sits one letter from `gTkProject`,
+and in this repo a one-letter name error yields a silently empty result, never an error.
+
+## Gotchas (added)
+- **Never `Concurrent()` writes to the same row.** It is the obvious fix for a chain of
+  Patches to one record and it races version conflicts against itself. Concurrent is only
+  safe for independent reads.
+- **`ShowColumns` to shrink a rollup fetch was rejected, not forgotten.** Whether it reduces
+  the connector's `$select` or is applied client-side after the full fetch cannot be
+  confirmed across a one-way gap. (B) removes the fetch from most saves anyway, so there was
+  no reason to ship a guess.
+- **Count the round trips before tuning the query.** The slowness here was never the Filter —
+  it was nine writes to one row that nobody had counted.
