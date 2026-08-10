@@ -48,7 +48,7 @@ Key facts:
 | `scrReference.pa.yaml` | Code view | Clients/Products/Indices shell placeholder |
 | `scrAdmin.pa.yaml` | Code view | Admin shell placeholder — **landed, but from a stale copy carrying `Variant: CONFIRM_BlankVertical`. See paste-log.** |
 | `scrProject.pa.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
-| `scrTask.pa.yaml` | Code view | **Task detail + edit** — and the live home of the C3 rollup write-back |
+| `scrTaskEdit.pa.yaml` | Code view | **Task edit** — the SOLE writer of a task, and the live home of the C3 rollup write-back. (Superseded `scrTask`, deleted 2026-08-10.) |
 
 ## Paste order (dependencies are real)
 

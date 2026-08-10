@@ -484,7 +484,7 @@ Screens:
                             Control: CanvasComponent
                             ComponentName: cmpKpiRing
                             Properties:
-                              # The app-side weighted rollup (C3), maintained by scrTask.
+                              # The app-side weighted rollup (C3), maintained by scrTaskEdit.
                               Width: =120
                               Height: =120
                               Percent: =Coalesce(gSelProject.project_perc_completion, 0)
@@ -776,10 +776,41 @@ Screens:
                                           Y: =0
                                           Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight
+                                          # Goes STRAIGHT to the editor, exactly like the
+                                          # transaction and issue rows below. The old
+                                          # scrTask detail screen was deleted 2026-08-10:
+                                          # it was a second, weaker writer for the same
+                                          # row that seeded every control from `Default`
+                                          # and never called `Reset()`, so on the second
+                                          # task opened it still displayed the FIRST
+                                          # task's name, stage, health and priority — and
+                                          # saving wrote those stale values back. It also
+                                          # wrote `task_stage` WITHOUT the derived
+                                          # `task_date_completion` that scrTaskEdit
+                                          # maintains, so completing a task from there
+                                          # left the completion date blank.
+                                          #
+                                          # LookUp, not ThisItem: colProjectTasks is a
+                                          # snapshot taken in OnVisible, and the editor
+                                          # Patches against whatever record it is handed.
+                                          # Re-reading the live row on the way in costs
+                                          # one delegable ID lookup and removes a whole
+                                          # class of write-stale-data bug.
+                                          #
+                                          # A LookUp can MISS — the row may have been
+                                          # deleted by someone else since OnVisible took
+                                          # the snapshot. Opening the editor on a blank
+                                          # record would show an empty "Edit task" form
+                                          # and then Patch against nothing, so refuse and
+                                          # say so instead.
                                           OnSelect: |
                                             =Select(Parent);
-                                            Set( gSelTask, ThisItem );
-                                            Navigate( scrTask, ScreenTransition.Cover )
+                                            Set( gEditTask, LookUp(taskmaster_tasks, ID = ThisItem.ID) );
+                                            If( IsBlank(gEditTask.ID),
+                                                Notify( "That task no longer exists — it may have been deleted. Reopen the project to refresh the list.",
+                                                        NotificationType.Error ),
+                                                Set( gEditMode, "Edit" );
+                                                Navigate( scrTaskEdit, ScreenTransition.Cover ) )
                         - secTx:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout

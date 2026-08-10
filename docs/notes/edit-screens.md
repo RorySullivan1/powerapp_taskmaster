@@ -28,8 +28,12 @@ item to whatever the user last opened.
 | `scrProjects` → section header "New project" | new project |
 | `scrProject` → "Edit project" | edit this project |
 | `scrProject` → "New task / transaction / issue" (follows the active tab) | new child, pre-attached |
-| `scrProject` → transactions row, issues row | edit that child |
-| `scrTask` → "All fields…" | full edit of the current task |
+| `scrProject` → tasks row, transactions row, issues row | edit that child |
+
+All three child rows behave identically: set `gEditMode` to `"Edit"`, set the child's edit
+global, navigate to the editor. There is no intermediate detail screen for any of them.
+`scrTask` used to be one for tasks and was deleted 2026-08-10 — see
+`.claude/memory/INDEX.md` for why a second writer for one row is a defect, not a shortcut.
 
 ## 1. Seed globals in `OnVisible`, write from the globals
 

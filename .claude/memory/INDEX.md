@@ -1,10 +1,10 @@
 # MEMORY INDEX  ·  keep ≤ ~80 lines
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **Phase: BUILT — now editing and refining.** All 11 screens, 12 components and the App object
+- **Phase: BUILT — now editing and refining.** 10 screens, 12 components and the App object
   exist in Studio, the lists are added, `App.Formulas` is in. Work is fixing and refining, not creating.
 - **Repo restructured 2026-08-05 to plain source**: `src/App.pa.yaml`, `src/Screens/*.pa.yaml`,
-  `src/Components/*.pa.yaml`. 24/24 valid. Component definitions are WHOLE files again — the
+  `src/Components/*.pa.yaml`. 23/23 valid. Component definitions are WHOLE files again — the
   contract/body split, the skeleton variants, the `.msapp` packing and the `studio/` tree are all
   deleted, along with the paste runbooks. `docs/build-history.md` is the closed historical record.
 - **The shell is ONE component, `cmpAppBar`** (header bar + fly-out nav rail). The four `scr*Edit`
@@ -13,6 +13,8 @@
 - **`scrProject` REWORKED 2026-08-07 — no tabs.** Info card (name + 8 explicit facts, KPI ring,
   stacked edit/delete icons) over a work band: tasks and transactions stacked left, issues full
   height right with 5 columns. Containers throughout below the header; `gProjTab` is gone.
+- **`scrTaskEdit` is the SOLE task writer — `scrTask` was DELETED 2026-08-10.** A task row on
+  `scrProject` now goes straight to the editor, like transactions and issues already did.
 - **`scrTaskEdit` REWORKED 2026-08-07 — no tabs, containers.** Order: Task (name+description) ·
   Status (colour-coded combos) · People and dates (2 cols x 2 rows: Lead/Supporter | Start/Due) ·
   **Client** (toggle) · **Output requirements** (toggle). Project derived, never asked for;
@@ -183,7 +185,14 @@
 - [2026-08-07] **`scrTaskEdit` refinements: completion date off the form, People/Dates as a 2x2 band, and a SECOND optional section.** (a) The read-only completion field is gone entirely — the derivation still runs in the save, it is simply not shown. (b) People and dates share one section as two columns of two rows: Lead over Supporter, Start over Due. Built with a `stack()` helper that re-indents a generated field block so it can nest one level deeper — the fields inside are `FillPortions: =0` so the column pins them rather than splitting its height between them. (c) The output toggle's caption is now the static **"Task Produces Output?"** rather than text that changed with the toggle. (d) New **Client** section on the same pattern (`tglTkClient`, caption "Client Section?") holding the client lookup and client lifecycle stage, both MOVED out of Output. **A section's toggle ROW is never gated on its own toggle** — that would hide the only way to switch the section back on; only the field rows below it are. In the save, client and client stage now follow `tglTkClient` while the rest follow `tglTkOutput`, so switching either section off still CLEARS its own fields — src/Screens/scrTaskEdit.pa.yaml
 - [2026-08-07] **A generator is source too — sweep it when you sweep `src/`.** The version/classic conversion was applied to `src/**` but not to the Python generator that writes `scrTaskEdit`, so regenerating silently reintroduced `ModernTextInput@1.0.0` and `ModernButton@1.0.0`. **The token allow-list caught it on the next run** — which is exactly what it is for, but the generator should have been swept at the same time. Any file that EMITS pa-yaml is subject to the same token rules as the pa-yaml itself — tools/validate_pa_yaml.py
 
+- [2026-08-10] **`scrTask` DELETED — one row must have exactly ONE writer, and a stale DISPLAY is fixed with `Reset()`, not with a defensive write.** User reported both task screens "fail on changes", with NO red banner (which rules out the retired-MM `Required` columns — those fail loudly with a named column). Cause: `scrTask` contained **zero `Reset()` calls**; every control was seeded from `Default`/`DefaultId` off `gSelTask`, which are read once at control load, so the second task opened still showed the FIRST task's name/stage/health/priority — and `btnSave` wrote `txtTaskName.Text`, **renaming task B to task A**. The 2026-08-03 audit had hardened the WRITE (seed globals in `OnVisible`, Patch from them) but that leaves a hole: the globals only move on the strip's `OnChange`, so when the stale display already shows the value the user wants, clicking it fires nothing, `gTaskDirty` stays false, and the save button stays dead — the exact silent symptom. Deeper defect: **two writers, one invariant** — `scrTaskEdit` derives `task_date_completion` from stage, `scrTask` wrote `task_stage` without it, so completing from the quick screen left the date blank; `scrTask` also still guarded the rollup at `>= 2000` where the row limit is 500, so it could persist a truncated average that Power BI reads. `scrTask` was not in `NavMenu` and had ONE inbound reference; transactions and issues already went straight to their editors, so tasks were the odd hop out and `scrTaskEdit` is a strict superset. User was offered a one-tap stage flip to replace the lost `cmpSelection` strips and said it doesn't matter — none added — src/Screens/scrProject.pa.yaml
+- [2026-08-10] **`Reset()` cannot reach inside a component instance, so DON'T reuse `cmpSelection` for per-record seeded state.** Seeding a global and writing from it makes the write correct but leaves the display lying, and a lying display produces a no-op `OnChange` — which is its own failure mode. When a screen is reused for a different record, EVERY seeded input needs an explicit `Reset()` in `OnVisible`: text inputs, combo boxes (`DefaultSelectedItems`), date pickers (`DefaultDate`), toggles. `scrTaskEdit` resets all 16 of its inputs and documents why; `scrTask` never did — src/Screens/scrTaskEdit.pa.yaml
+- [2026-08-10] **Hand the editor a re-read row, not the gallery's collection record.** `galTasksHit.OnSelect` now does `Set(gEditTask, LookUp(taskmaster_tasks, ID = ThisItem.ID))` rather than `ThisItem`: `colProjectTasks` is a snapshot taken in `scrProject.OnVisible`, and the editor Patches against whatever record it is handed. One delegable ID lookup removes a whole class of write-stale-data bug. A LookUp can MISS (row deleted since the snapshot), so the `OnSelect` guards `IsBlank(gEditTask.ID)` and refuses with a Notify rather than opening an empty "Edit task" form that would Patch against nothing — src/Screens/scrProject.pa.yaml
+
 ## Threads          (open items; remove when closed)
+- **`scrTransactionEdit` / `scrIssueEdit` are still handed `ThisItem` straight off a collection
+  snapshot** — the same stale-base-record exposure tasks had fixed 2026-08-10. Give them the
+  same `LookUp` + `IsBlank` guard treatment.
 - Open questions Q3–Q10, Q13 + Q2b (PBI workspace/refresh/embed) + Q5 (index master?) + tmIndices taxonomy source → `.claude/context/open-questions.md`
 - Propose upstream to claudeBrain: `studio-transfer` + `pre-paste-review` + the new `power-apps-svg` / `power-apps-editable-table` skills (all general); flag PnP/CSOM gap.
 - Decide whether to build the column-token validator write-time hook.
@@ -288,3 +297,4 @@
 - 2026-08-07 0620 | real modern versions applied (TextInput 1.1.1, DatePicker 1.0.1); ModernButton+NumberInput converted to classic (version unknown); Mode->Type and DelayOutput->TriggerOutput fixed | sessions/2026-08-06-2059-classic-combobox-and-corruption.md
 - 2026-08-07 0710 | scrTaskEdit: completion date off the form, People/Dates 2x2, static output caption, new Client toggle section | sessions/2026-08-06-2059-classic-combobox-and-corruption.md
 - 2026-08-09 0110 | session log written; the 2026-08-06 "@1.0.0 correction" marked SUPERSEDED in place; INDEX State corrected (no `active` column on the mapping lists, no `@1.0.0` modern tokens) | sessions/2026-08-09-0108-modern-versions-and-screen-reworks.md
+- 2026-08-10 1746 | scrTask DELETED (no Reset() anywhere -> stale Default seeds silently saved the previous task's values); scrProject task row now goes straight to scrTaskEdit via LookUp + blank guard; scrTaskEdit is the sole task writer | sessions/2026-08-10-1746-consolidate-task-editor.md
