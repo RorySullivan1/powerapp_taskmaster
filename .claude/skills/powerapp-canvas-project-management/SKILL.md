@@ -53,9 +53,15 @@ a screen errors**. Four things drift, ordered by how loudly they fail:
 
 ```powershell
 pac canvas list
+# EITHER extract the source tree directly (-d already unpacks — do NOT also Expand-Archive):
 pac canvas download --name "MyApp" --extract-to-directory "C:\dest"
-Expand-Archive -Path app.msapp -DestinationPath C:\dest    # an .msapp IS a zip
+# OR download the raw .msapp and unzip it yourself (an .msapp IS a zip):
+pac canvas download --name "MyApp" --file-name "C:\dest\MyApp.msapp"
+Expand-Archive -Path "C:\dest\MyApp.msapp" -DestinationPath "C:\dest"
 ```
+Those are **two alternatives**, not a sequence: `--extract-to-directory` (`-d`) already writes the
+`\src` tree, so there is no `.msapp` left to `Expand-Archive`. Use the second pair only when you
+want the raw `.msapp` in hand.
 
 Inside: `\src\App.pa.yaml`, `\src\<Screen>.pa.yaml`, `\src\Component\<Name>.pa.yaml`. Only
 `\src` is meant for source control; the JSON files are not stable.
