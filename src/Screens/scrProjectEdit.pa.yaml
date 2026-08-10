@@ -193,6 +193,10 @@ Screens:
         // Staging areas. Cleared on every visit — a half-entered child list left
         // over from the previous project would be written to THIS one.
         Clear( colNewTasks ); Clear( colNewTransactions );
+        If( gEditMode = "Edit",
+            ClearCollect( colLinkedTasks, Filter(taskmaster_tasks, task_project_id.Id = gEditProject.ID) );
+            ClearCollect( colLinkedTx,    Filter(taskmaster_transactions, transaction_project_id.Id = gEditProject.ID) ),
+            Clear( colLinkedTasks ); Clear( colLinkedTx ) );
         Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
         // Modal state. Each `g*Open` gates one modal; all three start closed.
         Set( gNtOpen, false ); Set( gNxOpen, false );
@@ -215,7 +219,7 @@ Screens:
         // blank dates and then write Blank() over the stored ones.
         Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
         Reset( dtpPrStart ); Reset( dtpPrTarget );
-        Reset( txtPrManagerSearch ); Reset( txtPrRequestorSearch ); Reset( txtPrSupporterSearch );
+        Set( gPrPicker, "" ); Set( gPrPeopleQuery, "" ); Reset( cmpPrPeople );
         Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
         Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
         Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
@@ -619,20 +623,27 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =16
-                        # The search box and the chip occupy the SAME slot — a hidden
+                        # The person box and the chip occupy the SAME slot — a hidden
                         # child of an auto-layout container takes no space, so the
                         # column never shows both and never reserves room for both.
-                        - txtPrManagerSearch:
-                            Control: ModernTextInput@1.1.1
+                        - btnPrMgrPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =Len(gPrManager.Mail) = 0
-                              Type: =TextInputType.Search
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a manager"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set(gPrPicker, "Manager");
+                                 Reset(cmpPrPeople);
+                                 Set(gPrPeopleQuery, "")
                         - btnPrMgrChip:
                             Control: Classic/Button@2.2.0
                             Properties:
@@ -649,7 +660,8 @@ Screens:
                               Height: =36
                               OnSelect: |
                                 =Set(gPrManager, { DisplayName: "", Mail: "" });
-                                 Reset(txtPrManagerSearch)
+                                 Reset(cmpPrPeople);
+                                 Set(gPrPicker, "")
                   - colPrReq:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -669,20 +681,27 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =16
-                        # The search box and the chip occupy the SAME slot — a hidden
+                        # The person box and the chip occupy the SAME slot — a hidden
                         # child of an auto-layout container takes no space, so the
                         # column never shows both and never reserves room for both.
-                        - txtPrRequestorSearch:
-                            Control: ModernTextInput@1.1.1
+                        - btnPrReqPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =Len(gPrRequestor.Mail) = 0
-                              Type: =TextInputType.Search
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a requestor"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set(gPrPicker, "Requestor");
+                                 Reset(cmpPrPeople);
+                                 Set(gPrPeopleQuery, "")
                         - btnPrReqChip:
                             Control: Classic/Button@2.2.0
                             Properties:
@@ -699,7 +718,8 @@ Screens:
                               Height: =36
                               OnSelect: |
                                 =Set(gPrRequestor, { DisplayName: "", Mail: "" });
-                                 Reset(txtPrRequestorSearch)
+                                 Reset(cmpPrPeople);
+                                 Set(gPrPicker, "")
                   - colPrSup:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -719,20 +739,27 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =16
-                        # The search box and the chip occupy the SAME slot — a hidden
+                        # The person box and the chip occupy the SAME slot — a hidden
                         # child of an auto-layout container takes no space, so the
                         # column never shows both and never reserves room for both.
-                        - txtPrSupporterSearch:
-                            Control: ModernTextInput@1.1.1
+                        - btnPrSupPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =Len(gPrSupporter.Mail) = 0
-                              Type: =TextInputType.Search
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a supporter"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set(gPrPicker, "Supporter");
+                                 Reset(cmpPrPeople);
+                                 Set(gPrPeopleQuery, "")
                         - btnPrSupChip:
                             Control: Classic/Button@2.2.0
                             Properties:
@@ -749,133 +776,8 @@ Screens:
                               Height: =36
                               OnSelect: |
                                 =Set(gPrSupporter, { DisplayName: "", Mail: "" });
-                                 Reset(txtPrSupporterSearch)
-            - galPrManager:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtPrManagerSearch.Text) >= 2 && Len(gPrManager.Mail) = 0
-                  Items: |
-                    =If( Len(txtPrManagerSearch.Text) >= 2,
-                         Office365Users.SearchUserV2({ searchTerm: txtPrManagerSearch.Text, top: 8 }).value,
-                         Blank() )
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  TemplateFill: =Theme.Color.Surface
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - rowPrManagerLbl:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =6
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =20
-                  - rowPrManagerHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gPrManager, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
-                           Reset(txtPrManagerSearch)
-            - galPrRequestor:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtPrRequestorSearch.Text) >= 2 && Len(gPrRequestor.Mail) = 0
-                  Items: |
-                    =If( Len(txtPrRequestorSearch.Text) >= 2,
-                         Office365Users.SearchUserV2({ searchTerm: txtPrRequestorSearch.Text, top: 8 }).value,
-                         Blank() )
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  TemplateFill: =Theme.Color.Surface
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - rowPrRequestorLbl:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =6
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =20
-                  - rowPrRequestorHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gPrRequestor, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
-                           Reset(txtPrRequestorSearch)
-            - galPrSupporter:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtPrSupporterSearch.Text) >= 2 && Len(gPrSupporter.Mail) = 0
-                  Items: |
-                    =If( Len(txtPrSupporterSearch.Text) >= 2,
-                         Office365Users.SearchUserV2({ searchTerm: txtPrSupporterSearch.Text, top: 8 }).value,
-                         Blank() )
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  TemplateFill: =Theme.Color.Surface
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - rowPrSupporterLbl:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.DisplayName & "   ·   " & ThisItem.Mail
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =6
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =20
-                  - rowPrSupporterHit:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gPrSupporter, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
-                           Reset(txtPrSupporterSearch)
+                                 Reset(cmpPrPeople);
+                                 Set(gPrPicker, "")
             # -----------------------------------------------------------------
             # CLASSIFICATION  (managed metadata — one combobox bound to Choices() per column)
             # -----------------------------------------------------------------
@@ -1035,6 +937,7 @@ Screens:
                         - btnAddNt:
                             Control: Classic/Button@2.2.0
                             Properties:
+                              Visible: =gEditMode <> "Edit"
                               Fill: =Theme.Color.Surface
                               Color: =Theme.Color.Primary
                               BorderColor: =Theme.Color.Primary
@@ -1055,7 +958,7 @@ Screens:
                         - lblStgNtEmpty:
                             Control: Label@2.5.1
                             Properties:
-                              Visible: =IsEmpty(colNewTasks)
+                              Visible: =gEditMode <> "Edit" && IsEmpty(colNewTasks)
                               Text: ="No tasks added yet."
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
@@ -1069,7 +972,7 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              Visible: =!IsEmpty(colNewTasks)
+                              Visible: =gEditMode <> "Edit" && !IsEmpty(colNewTasks)
                               Items: =colNewTasks
                               # One per row. TemplatePadding is taken off BOTH edges,
                               # so usable height is 32 - 2*2 = 28, which clears the
@@ -1134,6 +1037,93 @@ Screens:
                                           Width: =16
                                           Height: =16
                                           OnSelect: =RemoveIf(colNewTasks, sid = ThisItem.sid)
+                        # Edit mode: the project's existing tasks, read-only, each row
+                        # clickable to open scrTaskEdit. One gallery per mode absorbs the
+                        # column slack, so New's galNewNt and Edit's galLinkedNt never
+                        # both claim FillPortions 1 at once.
+                        - lblLinkedNtEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =gEditMode = "Edit" && IsEmpty(colLinkedTasks)
+                              Text: ="No tasks linked yet."
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width
+                              Height: =24
+                              VerticalAlign: =VerticalAlign.Middle
+                        - galLinkedNt:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              Visible: =gEditMode = "Edit"
+                              Items: =colLinkedTasks
+                              WrapCount: =1
+                              TemplateSize: =32
+                              TemplatePadding: =2
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              FillPortions: =1
+                              LayoutMinHeight: =288
+                              Width: =Parent.Width
+                              Height: =288
+                            Children:
+                              - rowLinkedNt:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =6
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =28
+                                  Children:
+                                    - lblLinkedNtName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.task_name
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =60
+                                          Height: =24
+                                          OnSelect: |
+                                            =Select(Parent);
+                                            Set( gEditTask, LookUp(taskmaster_tasks, ID = ThisItem.ID) );
+                                            If( IsBlank(gEditTask.ID),
+                                                Notify( "That task no longer exists — reopen the project to refresh.",
+                                                        NotificationType.Error ),
+                                                Set( gEditMode, "Edit" );
+                                                Navigate( scrTaskEdit, ScreenTransition.Cover ) )
+                                    - lblLinkedNtStage:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.task_stage.Value
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextMuted
+                                          Align: =Align.Right
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinWidth: =96
+                                          Width: =96
+                                          Height: =24
+                                          OnSelect: |
+                                            =Select(Parent);
+                                            Set( gEditTask, LookUp(taskmaster_tasks, ID = ThisItem.ID) );
+                                            If( IsBlank(gEditTask.ID),
+                                                Notify( "That task no longer exists — reopen the project to refresh.",
+                                                        NotificationType.Error ),
+                                                Set( gEditMode, "Edit" );
+                                                Navigate( scrTaskEdit, ScreenTransition.Cover ) )
                   - colStgNx:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1148,6 +1138,7 @@ Screens:
                         - btnAddNx:
                             Control: Classic/Button@2.2.0
                             Properties:
+                              Visible: =gEditMode <> "Edit"
                               Fill: =Theme.Color.Surface
                               Color: =Theme.Color.Primary
                               BorderColor: =Theme.Color.Primary
@@ -1168,7 +1159,7 @@ Screens:
                         - lblStgNxEmpty:
                             Control: Label@2.5.1
                             Properties:
-                              Visible: =IsEmpty(colNewTransactions)
+                              Visible: =gEditMode <> "Edit" && IsEmpty(colNewTransactions)
                               Text: ="No transactions added yet."
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
@@ -1182,7 +1173,7 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              Visible: =!IsEmpty(colNewTransactions)
+                              Visible: =gEditMode <> "Edit" && !IsEmpty(colNewTransactions)
                               Items: =colNewTransactions
                               # One per row. TemplatePadding is taken off BOTH edges,
                               # so usable height is 32 - 2*2 = 28, which clears the
@@ -1250,6 +1241,70 @@ Screens:
                                           Width: =16
                                           Height: =16
                                           OnSelect: =RemoveIf(colNewTransactions, sid = ThisItem.sid)
+                        # Edit mode: the project's existing transactions, read-only, each
+                        # row clickable to open scrTransactionEdit.
+                        - lblLinkedNxEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =gEditMode = "Edit" && IsEmpty(colLinkedTx)
+                              Text: ="No transactions linked yet."
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width
+                              Height: =24
+                              VerticalAlign: =VerticalAlign.Middle
+                        - galLinkedNx:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              Visible: =gEditMode = "Edit"
+                              Items: =colLinkedTx
+                              WrapCount: =1
+                              TemplateSize: =32
+                              TemplatePadding: =2
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              FillPortions: =1
+                              LayoutMinHeight: =288
+                              Width: =Parent.Width
+                              Height: =288
+                            Children:
+                              - rowLinkedNx:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =6
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =28
+                                  Children:
+                                    - lblLinkedNxName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.transaction_name
+                                          Font: =Theme.Font
+                                          Size: =Theme.Size.Small
+                                          Color: =Theme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =60
+                                          Height: =24
+                                          OnSelect: |
+                                            =Select(Parent);
+                                            Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.ID) );
+                                            If( IsBlank(gEditTransaction.ID),
+                                                Notify( "That transaction no longer exists — reopen the project to refresh.",
+                                                        NotificationType.Error ),
+                                                Set( gEditMode, "Edit" );
+                                                Navigate( scrTransactionEdit, ScreenTransition.Cover ) )
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -2431,5 +2486,42 @@ Screens:
                Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
                Set( gNxOpen, false )
       # =======================================================================
-      # MODAL — ADD AN ISSUE       card 700 x 540, body scrolls, buttons pinned
+      # PEOPLE PICKER — declared LAST so the dialog paints above everything.
+      # One instance serves all three person fields; gPrPicker names which.
       # =======================================================================
+      - cmpPrPeople:
+          Control: CanvasComponent
+          ComponentName: cmpPeoplePicker
+          Properties:
+            Visible: =gPrPicker = "Manager" || gPrPicker = "Requestor" || gPrPicker = "Supporter"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: |
+              =Switch( gPrPicker,
+                       "Manager",   "Select project manager",
+                       "Requestor", "Select requestor",
+                       "Supporter", "Select supporter" )
+            Results: |
+              =If( Len(gPrPeopleQuery) >= 2,
+                   ShowColumns(
+                       Office365Users.SearchUserV2({ searchTerm: gPrPeopleQuery, top: 25 }).value,
+                       DisplayName, Mail ) )
+            OnSearch: =Set( gPrPeopleQuery, cmpPrPeople.Query )
+            OnConfirm: |
+              =Switch( gPrPicker,
+                       "Manager",
+                       Set( gPrManager,
+                            { DisplayName: cmpPrPeople.Picked.DisplayName,
+                              Mail:        cmpPrPeople.Picked.Mail } ),
+                       "Requestor",
+                       Set( gPrRequestor,
+                            { DisplayName: cmpPrPeople.Picked.DisplayName,
+                              Mail:        cmpPrPeople.Picked.Mail } ),
+                       "Supporter",
+                       Set( gPrSupporter,
+                            { DisplayName: cmpPrPeople.Picked.DisplayName,
+                              Mail:        cmpPrPeople.Picked.Mail } ) );
+               Set( gPrPicker, "" )
+            OnCancel: =Set( gPrPicker, "" )
