@@ -324,7 +324,13 @@ rollups:
 # and do not point the app at a new column until it exists.
 # =============================================================================
 migration:
-  status: PLANNED — nothing applied. See `blocking_now:` — the unapplied old columns are now actively breaking saves.
+  status: >-
+    PARTIALLY APPLIED 2026-08-10. Step 6 (delete the Managed Metadata columns) IS DONE —
+    the user retired all of them and put CHOICE columns in their place, which clears
+    `blocking_now:`. Steps 1-3 (the three mapping lists and the scrAdmin vocabulary
+    screen) and steps 4-5, 7 are NOT done, and the Choice replacement may well supersede
+    them rather than complete them — see `choice_replacement_UNRECORDED:` before acting
+    on any step below.
   precondition: >-
     Confirm how many rows actually carry a Managed Metadata value. The lists went
     live 2026-08-04 and the app has only ever been driven in Studio, so this is
@@ -343,18 +349,36 @@ migration:
     - 6. Delete the Managed Metadata columns.
     - 7. Point the app at the new columns and remove the term-store code paths.
   blocking_now: >-
-    **A REQUIRED OLD COLUMN IS REJECTING EVERY PROJECT INSERT (2026-08-06).** Saving a
-    project returns `"Project_Type" is required`. Nothing in the app writes a column by
-    that name — it writes `project_type_id` and `project_type_path` — so this is the
-    pre-C11 Managed Metadata column still sitting on `taskmaster_projects` with
-    Required = Yes. SharePoint refuses the insert before any of the new columns matter,
-    which is why the failure survived a fix aimed at the child writes. Steps 4-7 above
-    were never applied, so the same is likely true of `project_region` and of the old
-    `client_type` / `client_coverage` / `product_type` columns on the other lists.
-    FIX IN SHAREPOINT, NOT IN CODE — the app must not start writing a retired column:
-    set the old column to Required = No (fastest), or delete it once nothing reads it.
-    Then re-check every list for any other column left Required that the app never
-    writes. Until this is done, `taskmaster_projects` cannot accept a new row.
+    **RESOLVED 2026-08-10 — the user retired every Managed Metadata column and replaced
+    them with CHOICE columns.** The blocker was: saving a project returned
+    `"Project_Type" is required`, from the pre-C11 Managed Metadata column still sitting
+    on `taskmaster_projects` with Required = Yes, rejecting the insert before any new
+    column mattered. No Managed Metadata column remains on any list, so that class of
+    failure is gone. Kept as the record of a fault that took two fixes aimed at the wrong
+    layer before the cause was found: **a save rejected by a column the app never writes
+    is a SharePoint-side fault and cannot be fixed in Power Fx.**
+  choice_replacement_UNRECORDED: >-
+    **THE REPLACEMENT COLUMNS ARE NOT YET DEFINED HERE, AND NOTHING IN `src/` MAY
+    REFERENCE THEM UNTIL THEY ARE.** The user replaced Managed Metadata with Choice
+    columns on 2026-08-10, but their internal names and allowed values have not been
+    supplied, and this file is the golden source — inventing a token here would put a
+    name into the app that SharePoint does not have, which fails silently (an unknown
+    column in a Filter yields an EMPTY result, never an error). Two things must be
+    settled before any code moves:
+    (1) **Do the Choice columns REPLACE the C11 design or sit beside it?** The app today
+    writes the `*_id` / `*_path` pairs — `project_type_id`, `project_type_path`,
+    `project_region_id`, `project_region_path` — and drives them from `cmpNestedSelect`
+    against `mapping_regions` / `mapping_activitytype` / `mapping_producttype`. If Choice
+    columns are the replacement, that whole apparatus is superseded: the pairs, the three
+    mapping lists, the nested picker component and the planned scrAdmin vocabulary screen
+    all come out, and a Choice column is a one-level vocabulary where the mapping lists
+    were three.
+    (2) **If they replace it, is the hierarchy lost on purpose?** `mapping_*` held
+    level1/level2/level3; a Choice column is flat. That is a real modelling decision
+    (fine if the deeper levels were never used), not a detail — record the answer, do not
+    infer it.
+    Until both are answered the `*_id` / `*_path` writes stay exactly as they are: they
+    are what is authored, landed and working.
   path_separator: >-
     The `*_path` columns store levels joined by " | " (space pipe space), e.g.
     "EMEA | UK | London". It was " > " until 2026-08-06. THE SEPARATOR IS PART OF

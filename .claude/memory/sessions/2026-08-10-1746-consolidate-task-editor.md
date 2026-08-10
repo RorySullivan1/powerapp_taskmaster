@@ -86,9 +86,43 @@ Notify rather than opening an empty "Edit task" form that would Patch against no
 - **NOT YET IN STUDIO.** Hand-off is two steps and the ORDER matters: (1) edit
   `galTasksHit.OnSelect` in the formula bar, (2) *then* delete the `scrTask` screen.
   Reversing it leaves a `Navigate` pointing at a deleted screen.
-- `scrTransactionEdit` and `scrIssueEdit` are still reached with `Set(gEdit*, ThisItem)`
+- ~~`scrTransactionEdit` and `scrIssueEdit` are still reached with `Set(gEdit*, ThisItem)`
   straight off a collection snapshot — the same stale-base-record exposure that tasks
-  just had fixed. Not changed here; worth the same `LookUp` treatment.
-- The retired Managed Metadata `Required` columns remain unfixed in SharePoint
-  (`schema.yaml -> blocking_now:`). Separate issue, fails loudly, still blocks project
-  inserts.
+  just had fixed.~~ **DONE at 18:12, and the premise was wrong: those two galleries bind
+  to a live `Filter`, not a snapshot. See the follow-up below.**
+- ~~The retired Managed Metadata `Required` columns remain unfixed in SharePoint.~~
+  **RESOLVED — the user retired them all on 2026-08-10. See the follow-up below.**
+
+---
+
+## Follow-up, same session (18:12)
+
+**Managed Metadata is gone.** User: "I retired all managed metadata columns. Choice columns
+replace them." `schema.yaml -> blocking_now:` rewritten to RESOLVED (kept, not deleted — it
+records a fault whose shape is worth remembering: a save rejected by a column the app never
+writes is SharePoint-side and unfixable in Power Fx). `migration.status` is now PARTIALLY
+APPLIED: step 6 done, the rest not, and possibly superseded.
+
+**What was deliberately NOT done: nothing in `src/` now targets a Choice column.** The
+replacement columns' internal names and allowed values were not supplied, and `schema.yaml`
+is the golden source — inventing a token there would put a name into the app that SharePoint
+does not have, and an unknown column in a Filter yields an EMPTY result rather than an error,
+so it would fail silently. Recorded the gap as `choice_replacement_UNRECORDED:` with the two
+questions that block any code move: whether the Choice columns supersede the C11
+`*_id`/`*_path` + `mapping_*` + `cmpNestedSelect` apparatus or sit beside it, and whether the
+level1/level2/level3 hierarchy is being dropped on purpose (a Choice column is flat).
+
+**Transaction and issue rows fixed — and a correction.** I had claimed these carried "the same
+stale-base-record exposure" as tasks. Not so: `galTasks` bound to `colProjectTasks`, a
+ClearCollect SNAPSHOT, while these two bind to a live `Filter` of the data source. `ThisItem`
+there is a genuine data-source row, identity is correct, Patch always hit the right ID. The
+real gap is freshness — a gallery's query result is cached between refreshes, so the editor
+could seed from values another user had since changed and patch them back, or open on a
+deleted row. Same `LookUp` + `IsBlank` guard applied to both, for the smaller reason, with the
+comments saying which reason.
+
+## State at end (updated)
+- 23/23 valid. `scrProject` now re-reads the row for all three child editors.
+- Studio hand-off owed: `galTasksHit`, `galTxHit`-equivalent and the issue row `OnSelect` are
+  three formula-bar edits on `scrProject`; the `scrTask` screen deletion still stands, and the
+  OnSelect edit must come FIRST.

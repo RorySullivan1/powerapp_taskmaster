@@ -965,11 +965,26 @@ Screens:
                                           Y: =0
                                           Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight
+                                          # Re-read on the way in, like the task row. This
+                                          # gallery binds to a LIVE Filter rather than a
+                                          # ClearCollect snapshot, so the exposure is
+                                          # smaller than the task one was — ThisItem is a
+                                          # genuine data-source row and Patch hits the
+                                          # right ID either way. What it does NOT give is
+                                          # freshness: the query result is cached between
+                                          # refreshes, so the editor can seed its form
+                                          # from values someone else has since changed and
+                                          # patch them straight back. The LookUp costs one
+                                          # delegable read; the guard covers the row being
+                                          # gone entirely.
                                           OnSelect: |
                                             =Select(Parent);
-                                            Set( gEditMode, "Edit" );
-                                            Set( gEditTransaction, ThisItem );
-                                            Navigate( scrTransactionEdit, ScreenTransition.Cover )
+                                            Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.ID) );
+                                            If( IsBlank(gEditTransaction.ID),
+                                                Notify( "That transaction no longer exists — it may have been deleted. Reopen the project to refresh the list.",
+                                                        NotificationType.Error ),
+                                                Set( gEditMode, "Edit" );
+                                                Navigate( scrTransactionEdit, ScreenTransition.Cover ) )
                         # Preserved from the tabbed version, decision and all: there is no
                         # cross-currency total to show, because since Q14 the app stores only
                         # the native notional. Totalling ONE currency at a time is the honest
@@ -1253,8 +1268,14 @@ Screens:
                                     Y: =0
                                     Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight
+                                    # Re-read on the way in — see the transaction row for
+                                    # why the live-Filter binding makes this a freshness
+                                    # fix rather than an identity one.
                                     OnSelect: |
                                       =Select(Parent);
-                                       Set( gEditMode, "Edit" );
-                                       Set( gEditIssue, ThisItem );
-                                       Navigate( scrIssueEdit, ScreenTransition.Cover )
+                                       Set( gEditIssue, LookUp(taskmaster_issues, ID = ThisItem.ID) );
+                                       If( IsBlank(gEditIssue.ID),
+                                           Notify( "That issue no longer exists — it may have been deleted. Reopen the project to refresh the list.",
+                                                   NotificationType.Error ),
+                                           Set( gEditMode, "Edit" );
+                                           Navigate( scrIssueEdit, ScreenTransition.Cover ) )
