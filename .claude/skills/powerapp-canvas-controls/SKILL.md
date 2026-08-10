@@ -185,7 +185,7 @@ would take.
 | Control | Read it as | Note |
 |---|---|---|
 | `ModernTextInput` | `.Text` | **Unchanged from classic** — converting inputs is a property rename only |
-| `ModernNumberInput` | `.Value` | a real number; `TriggerOutput` was removed from this control |
+| `ModernNumberInput` | `.Value` | *reference only* — version UNKNOWN, so this repo authors `Classic/TextInput@2.3.2` and reads `Value(ctl.Text)` instead (a real number; the modern control's `TriggerOutput` was removed) |
 | `ModernCombobox` | `.Selected.Value` | with `SelectMultiple: =false`, `Selected` is a record; also `.SelectedItems`, `.SearchText` |
 | `ModernDatePicker` | `.SelectedDate` | `Blank()` when unset |
 | `ModernTabList` | `.Selected.Value` | the tab label — and `Default` must be an **item**, not a value; see below |

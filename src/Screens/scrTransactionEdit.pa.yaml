@@ -28,7 +28,8 @@ Screens:
       OnVisible: |
         =Set( gTxProject,
               If( gEditMode = "Edit",
-                  { Id: gEditTransaction.transaction_project_id.Id, Value: gEditTransaction.transaction_project_id.Value },
+                  { Id: gEditTransaction.transaction_project_id.Id,
+                    Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
                   { Id: 0, Value: "" } ) );
@@ -357,6 +358,7 @@ Screens:
       - numTxNotional:
           Control: Classic/TextInput@2.3.2
           Properties:
+            Default: =If(gEditMode = "Edit", gEditTransaction.transaction_notional, Blank())
             HintText: ="e.g. 25000000"
             AccessibleLabel: ="Notional in the selected currency"
             Align: =Align.Right

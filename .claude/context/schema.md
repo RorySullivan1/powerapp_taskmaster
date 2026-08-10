@@ -22,7 +22,7 @@ design. **Internal names freeze at creation** — the YAML's `name:` key *is* th
 | `taskmaster_issues` | Freeform issues | 5 |
 | `taskmaster_clients` | Client dimension | 4 |
 | `taskmaster_products` | Product reference | 1 |
-| `asset_approval` | Approval reference | 0 |
+| ~~`asset_approval`~~ | **RETIRED 2026-08-09** — approvals moved to an external portal; tasks now hold a free-text `task_output_approval_id`. Deprovision in SharePoint. | — |
 | `asset_library` | **Schema never supplied — bindings blocked** | ? |
 
 **Relationships** — all via SharePoint **Lookup** columns, which Power Fx sees as *records*
@@ -37,8 +37,8 @@ taskmaster_clients  ──< taskmaster_tasks         (task_client_name)
                     ──< taskmaster_transactions  (transaction_client_name, required)
 taskmaster_products ──< taskmaster_tasks         (task_product_id)
                     ──< taskmaster_transactions  (transaction_product_id, required)
-asset_approval      ──< taskmaster_tasks         (task_output_approval)
 asset_library       ──< taskmaster_tasks         (task_output_asset)   ← blocked
+(asset_approval retired 2026-08-09 — task_output_approval_id is now a free-text id, not a lookup)
 taskmaster_tasks    ──< taskmaster_issues        (issue_task_name)
 taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name)
 ```
@@ -188,16 +188,14 @@ Never FX-convert inside a query either: it neither delegates nor reproduces.
 measure converting at the trade date. Until that exists there is no blended notional anywhere —
 that is the accepted cost of the decision, not an oversight.
 
-**C6 ✅ By design 2026-08-03 — not a defect.** The three region columns serve **different
-purposes** and are **never used in the same setting**: `approval_region` is deliberately
-**broad-stroke**, while `project_region` and `client_region` carry the granularity their consumers
-need. So the divergence in type and value set is intentional, and no conformed dimension is
-required.
+**C6 ✅ By design 2026-08-03; narrowed 2026-08-09.** Region was modelled three ways; the broad-stroke
+`approval_region` was **retired with the `asset_approval` list on 2026-08-09**. The remaining two —
+`project_region` and `client_region` — serve **different purposes** and are **never used in the same
+setting**, so the divergence in type and value set is intentional and no conformed dimension is required.
 
 **Operational consequence** (not a problem, just a rule): don't build a single cross-model region
-slicer, and read each with its own idiom — `approval_region.Value` (Choice) versus the Managed
-Metadata subfield on projects/clients. In Power BI, model them as **separate dimensions**; don't
-try to relate them.
+slicer. `project_region` and `client_region` are Managed Metadata subfields; in Power BI model them
+as **separate dimensions** and don't try to relate them.
 
 **C10 ✅ Resolved 2026-08-03 — MM stays, and the app reads the term store directly.**
 `project_region` and `project_type` are **required** MM, so without an MM write path no project can
@@ -235,9 +233,9 @@ a `PathDelimiter` input on the component, which prints a raw path on screen. Fir
 **C8 ✅ Resolved 2026-08-03 (casing).** Renamed to **`issue_owner`** (a real Person column,
 distinct from `Created By`) and **`product_uid`**. The whole model is now consistently lowercase
 snake_case.
-**Still true:** no uniqueness is enforced anywhere — `approval_id`, `product_uid` and
-`project_name` are business keys **by convention only**. Join on the built-in `ID`, which is always
-indexed and the fastest possible lookup.
+**Still true:** no uniqueness is enforced anywhere — `product_uid` and `project_name` are business
+keys **by convention only**. Join on the built-in `ID`, which is always indexed and the fastest
+possible lookup.
 
 ---
 
@@ -250,5 +248,5 @@ Create indexes **early** — mandatory above 5,000 items, and they cannot be add
 - **projects** — `project_phase`, `project_manager`, `project_name`, `project_region`, `project_date_target`
 - **transactions** — `transaction_project_id`, `transaction_client_name`, `transaction_date`, `transaction_name`
 - **issues** — `issue_project_id`, `issue_status`, `issue_assignee`, `issue_date_target`, `issue_name`
-- **clients** — `client_name`, `client_region` · **products** — `product_uid` ·
-  **approval** — `approval_id`, `approval_status`
+- **clients** — `client_name`, `client_region` · **products** — `product_uid`
+  <!-- asset_approval retired 2026-08-09 — approval_id/approval_status indexes no longer apply -->

@@ -58,16 +58,18 @@ it's the single most common bug in this pattern.
 4. **Delete a row.** A per-row trash icon `Remove(colGrid, ThisItem)`. If the row already exists
    in the source, also record it for deletion (a `colDeletes` collection) to remove on save.
 5. **Harvest edits + save.** On Save, read the *current control values* per row. The robust
-   pattern is a bulk `Patch` of a shaped table:
+   pattern is a single `ForAll` pass with one `Patch` per row (update or create):
    ```power
-   // Update existing + create new in one call; split by whether the row has a real ID.
-   Patch( Source,
-       ForAll( Gallery.AllItems As row,
-           If( row.ThisItem.ID > 0,
-               Patch(Source, LookUp(Source, ID = row.ThisItem.ID), { Field: row.txtField.Text }),
-               // new row → merge onto Defaults(Source)
-               Patch(Source, Defaults(Source), { Field: row.txtField.Text })
-           )
+   // Update existing + create new in one pass; split by whether the row has a real ID.
+   // ForAll iterates and each row is written by its OWN Patch. Do NOT wrap this in an outer
+   // Patch(Source, ForAll(...)) — ForAll returns a table, which is not a valid base record.
+   // With `As row`, the alias IS the record: read columns/controls as row.ID / row.txtField.Text
+   // (there is no `.ThisItem` on an AllItems row).
+   ForAll( Gallery.AllItems As row,
+       If( row.ID > 0,
+           Patch(Source, LookUp(Source, ID = row.ID), { Field: row.txtField.Text }),
+           // new row → merge onto Defaults(Source)
+           Patch(Source, Defaults(Source), { Field: row.txtField.Text })
        )
    );
    ```
@@ -89,7 +91,7 @@ load, one write pass:
 IfError(
     ForAll(
         Filter(Gallery2.AllItems, Toggle1.Value = true) As r,
-        Patch(Training, r.ThisItem, { Status: {Value: "Complete"}, CompletedOn: Today() })
+        Patch(Training, r, { Status: {Value: "Complete"}, CompletedOn: Today() })
     ),
     Notify("Some rows failed to save: " & FirstError.Message, NotificationType.Error),
     Notify("Saved.", NotificationType.Success)
@@ -97,8 +99,9 @@ IfError(
 ClearCollect(colTraining, Filter(Training, AssignedTo.Email = gUserEmail))
 ```
 
-`Patch(Training, r.ThisItem, {...})` updates the **existing** record (merges onto the record, not
-`Defaults`), because these rows came from the source and carry their `ID`.
+`Patch(Training, r, {...})` uses `r` — the gallery row bound by `As r` — directly as the base
+record (there is no `.ThisItem` on an `AllItems` row; the alias *is* the record). It merges onto
+the **existing** item, not `Defaults`, because these rows came from the source and carry their `ID`.
 
 ## Watch Out
 

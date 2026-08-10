@@ -6,7 +6,7 @@ description: >
   authored in `src/Screens/` or `src/` and is about to be handed off for paste, or
   when the user asks "is this safe to paste", "audit this before I paste", "check this for
   delegation / schema problems", "will Studio accept this". Read-only: it inspects the
-  authored Power Fx against the schema snapshot and the delegation rules, determines *what*
+  authored Power Fx against the schema golden source (`schema/schema.yaml`) and the delegation rules, determines *what*
   is wrong, and returns findings plus a **paste / do-not-paste** verdict. It never edits the
   code and never pastes. Defer writing/fixing formulas to power-fx-development, the transfer
   mechanics to the studio-transfer skill, and list-schema design to sharepoint-list-architecture;
@@ -31,24 +31,27 @@ that. You **determine what is wrong; you never edit.**
   (that's `sharepoint-list-architecture`). You judge; you do not author, edit, or paste.
 
 ## What you audit against
-1. **The schema snapshot** — `.claude/context/schema.md` (and any `schema/` snapshot file). It
-   is the single source of truth for which lists and **internal column names** exist. Every
-   column token in the authored YAML must resolve to a real column in the snapshot. **"Never
-   invent a column name"** is the rule you enforce.
+1. **The schema golden source** — `schema/schema.yaml`. It is the single source of truth for which
+   lists and **internal column names** exist; every column token in the authored YAML must resolve
+   to a `name:` there. (`.claude/context/schema.md` is orientation only — it deliberately does NOT
+   restate columns, so never resolve tokens against it.) **"Never invent a column name"** is the
+   rule you enforce.
 2. **The delegation rules** — the matrix in `.claude/skills/power-fx-development/delegation.md`
    and the `power-fx-review` checklist. A non-delegable clause against a list that can exceed
    the row limit is a correctness defect, not a style note — it returns a *plausible wrong
    answer* against the first 500/2000 rows.
 
 ## Method
-1. **Confirm freshness first.** If you cannot tell that the authored change was written against
-   a current pull (check `CLAUDE.local.md` last-pull date and the paste log), say so and
-   **do-not-paste** — a paste built on stale state is unsafe regardless of its content.
+1. **Ground the paste — do NOT gate on "freshness".** The air gap is one-way: there is no pull and
+   no baseline to diff against, so a "was this written against a current pull?" check can never be
+   satisfied and must not be a do-not-paste gate. Instead confirm the change is grounded against the
+   golden source (`schema/schema.yaml` for columns, `tools/studio-enums.json` for control tokens);
+   resolve any unknown token from public sources or a documented fallback rather than blocking it.
 2. **Read the authored change, read-only.** Inspect the files in `src/Screens/` / `src/`
    (or the specific files named). Orient on what it does and which lists/columns it touches.
-3. **Resolve every column token against the schema snapshot.** Grep the authored YAML for
-   field references; for each, confirm the list and the **internal** name exist in the snapshot
-   (watch `_x0020_`-encoded names from manual provisioning). Any token with no match → a
+3. **Resolve every column token against `schema/schema.yaml`.** Grep the authored YAML for
+   field references; for each, confirm the list and the **internal** name exist in the golden
+   source (watch `_x0020_`-encoded names from manual provisioning). Any token with no match → a
    **schema violation** (invented or misspelled column).
 4. **Check delegation on every query.** For each `Filter`/`LookUp`/`Sort`/`Search`/aggregate:
    is the whole expression delegable against SharePoint for the column *types* in the snapshot?

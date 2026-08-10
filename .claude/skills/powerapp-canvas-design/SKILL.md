@@ -82,7 +82,11 @@ instant.** Consequences:
 ## 5. Auto-layout containers are the one layout that survives
 
 `GroupContainer@1.5.0` / `Variant: AutoLayout` children carry **no X/Y** — the container places
-them. Since X/Y are exactly what freezes, container-laid-out content is **immune** to §4.
+them. Since X/Y are exactly what freezes, the *children's placement* is **immune** to §4.
+Mind the scope: it's the children's absent X/Y that can't freeze. The **container's own**
+`Width`/`Height` are ordinary layout formulas and **do** freeze on paste (`=Parent.Height - 196`
+lands as a constant) — fine for this fixed-size tablet app, but don't expect the scroll region to
+re-flow if the screen later changes size.
 
 ```yaml
 - frmScroll:

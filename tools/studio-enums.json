@@ -228,7 +228,8 @@
    "props": "Placeholder, Type, TriggerOutput, MaxLength, Required, Default, Appearance, Align, AccessibleLabel, ValidationState, DisplayMode, Color/Size/Italic/Underline/Strikethrough",
    "two_traps_paid_for": "Type, NOT Mode. The modern text input takes Type: =TextInputType.Multiline; `Mode: =TextMode.MultiLine` is the CLASSIC text input's property and authoring it on the modern control is a property error. And TriggerOutput, NOT DelayOutput: =TriggerOutput.Delayed is right here — DelayOutput belongs to the COMBO BOX. Both authored wrongly on scrTaskEdit 2026-08-07 and both confirmed on MS Learn modern-control-text-input. Sibling modern controls do NOT share property names."
   },
-  "ModernNumberInput@1.0.0": {
+  "_modernNumberInput_TOKEN_UNKNOWN": {
+   "status": "VERSION NOT GROUNDED — do NOT author a ModernNumberInput token; the `@1.0.0` once keyed here was a GUESS and a wrong version rejects the whole paste. Per the powerapp-canvas-controls SKILL this control was CONVERTED to Classic/TextInput@2.3.2 (read as Value(ctl.Text)). Semantics below are reference only.",
    "output": "Value  — a real number, not text",
    "props": "Default, Min, Max, Step, Precision (DecimalPrecision.'0'|'1'|'2'), HintText, Align, Appearance, AccessibleLabel. NOTE: TriggerOutput was REMOVED from this control"
   },
@@ -236,13 +237,15 @@
    "output": "SelectedDate  — Blank() when unset",
    "props": "Placeholder, DefaultDate, StartDate, EndDate, StartOfWeek, Format (DatePickerFormat.LongAbbreviated|Short|Long or a custom string), IsEditable, DateTimeZone"
   },
-  "ModernTabList@1.0.0": {
+  "_modernTabList_TOKEN_UNKNOWN": {
+   "status": "VERSION NOT GROUNDED — do NOT author a ModernTabList token; the `@1.0.0` once keyed here was a GUESS and a wrong version rejects the whole paste. Author a classic control until the version is read off a live Studio control. Semantics below are reference only.",
    "output": "Selected  — .Selected.Value is the tab label",
    "props": "Items (array literal), Default, Appearance (TabListAppearance.Underline|Filled|Subtle), Alignment (TabListAlignment.Start|Center|End), Align (Align.Left|Center|Right), Size, FontWeight, AccessibleLabel, OnChange, OnSelect, DisplayMode",
    "default_is_an_ITEM": "Default must be an ITEM FROM Items, not a value equal to one. `Default: =\"Tasks\"` ERRORS. A string-array Items yields RECORDS with a Value column — which is why the output is read as .Selected.Value — so the default must be a record too: =First([\"Tasks\",\"Transactions\",\"Issues\"]) or =LookUp([...], Value = \"Tasks\"). MS Learn modern-control-tabs-or-tabs-list: \"Default — The tab that is selected by default... Must match an item from the Items source.\" NOTE this DIFFERS from ModernDropdown, whose Default takes a VALUE. Same property name, two contracts.",
    "height_warning": "MS Learn Limitations: \"Very small or very large width and height values might not be fully respected by the control.\" Never lay out the band below a tab list from a height you ASSUMED it would take — use the height the control actually carries and leave a real gap under it."
   },
-  "ModernButton@1.0.0": {
+  "_modernButton_TOKEN_UNKNOWN": {
+   "status": "VERSION NOT GROUNDED — do NOT author a ModernButton token; the `@1.0.0` once keyed here was a GUESS and a wrong version rejects the whole paste. Per the powerapp-canvas-controls SKILL this control was CONVERTED to Classic/Button@2.2.0 (carry the look on Fill/Color/BorderColor/BorderThickness). Semantics below are reference only.",
    "output": "none — OnSelect only",
    "props": "Text, OnSelect, Appearance (ButtonAppearance.Primary|Outline|Subtle), Icon (a STRING Fluent icon name, e.g. \"Checkmark\" — not the classic Icon enum), IconStyle, Layout (ButtonLayout.IconBefore), Tooltip, AccessibleLabel"
   },
@@ -252,7 +255,7 @@
    "seed": "DefaultSelectedItems  — CONFIRMED on this control (=Parent.Default inside a data card)",
    "props": "Items, SelectMultiple, DefaultSelectedItems, IsSearchable, SearchFields, DisplayFields, InputTextPlaceholder, OnChange, OnNavigate, SelectionColor, SelectionFill, Chevron{Fill,Background,HoverFill,HoverBackground,DisabledFill,DisabledBackground}, DisplayMode, Tooltip, AccessibleLabel, TabIndex, plus the usual colour/border set",
    "props_source": "MS Learn `controls/control-combo-box`, Key properties + Additional properties, read 2026-08-06. IsSearchable, SearchFields, DisplayFields and InputTextPlaceholder are all first-party documented on THIS control — they are not inferred.",
-   "note": "NOT used in src/ — this repo's 10 combo boxes are ModernCombobox@1.0.0. Modern controls ARE enabled in this app (confirmed 2026-08-06), so the earlier modern-controls-off hypothesis was WRONG; the real defect was the @1.1.1 version token. Kept here because Studio still generates this control inside classic data cards. IsSearchable + SelectMultiple both false gives plain dropdown behaviour.",
+   "note": "NOT used in src/ — this repo's 10 combo boxes are ModernCombobox@1.1.1 (see that entry; user-confirmed from live Studio 2026-08-05/06). Modern controls ARE enabled in this app (confirmed 2026-08-06). Kept here because Studio still generates this CLASSIC control inside classic data cards. IsSearchable + SelectMultiple both false gives plain dropdown behaviour.",
    "display_column": "DisplayFields: =[\"Value\"] and SearchFields: =[\"Value\"] — STRING ARRAYS, not ItemDisplayText. Confirmed from a Studio export 2026-08-05. This is the classic family's way; the modern combo box uses ItemDisplayText: =ThisItem.<col> and the two are not interchangeable.",
    "export_confirmed": "Full code-view export 2026-08-05 over a Distinct() Items formula. Also confirms LayoutMinWidth / LayoutMinHeight are emitted on a control inside an auto-layout container. FillPortions did NOT appear — Studio emits only non-defaults, so that is consistent with it being at default rather than with it being invalid."
   },
@@ -297,10 +300,11 @@
    "studio_defaults": "BorderColor RGBA(0,0,0,0) · BorderStyle.None · BorderThickness 2 · DisabledBorderColor RGBA(0,0,0,0) · FocusedBorderThickness 4 · HandleActiveFill RGBA(255,255,255,1) · HandleHoverFill RGBA(255,255,255,1) · HoverBorderColor RGBA(0,0,0,0) · PressedBorderColor RGBA(0,0,0,0) · RailFill RGBA(184,187,184,1) · RailHoverFill RGBA(222,236,249,1) · ValueFill RGBA(96,94,92,1) · ValueHoverFill RGBA(0,120,212,1)",
    "note": "PREFIXED. RailFill is the track to the RIGHT of the handle, ValueFill the filled part to the LEFT — swap them and the slider reads backwards. A slider cannot express Blank(): it always has a number, so it cannot represent an unset optional column. Min/Max are inclusive; set them explicitly, because the 0–100 default silently clamps any real-world scale."
   },
-  "ModernSlider@1.0.0": {
+  "_modernSlider_TOKEN_UNKNOWN": {
+   "status": "VERSION NOT GROUNDED — do NOT author a ModernSlider token; the `@1.0.0` once keyed here was a GUESS and a wrong version rejects the whole paste. Author Classic/Slider@2.1.0 until the version is read off a live Studio control. Semantics below are reference only.",
    "output": "Value — a number, READ-ONLY on this control",
    "props": "Default (the input — NOT Value), Min, Max, LayoutDirection (LayoutDirection.Horizontal|Vertical), Size (SliderSize.Small|Medium|Large), BasePaletteColor, AccessibleLabel, Tooltip, OnChange",
-   "note": "Grounded from MS Learn's own YAML sample, not a Studio export — same provenance as ModernDropdown@1.0.0. VERSION TRAP: this control was revised. The OLD shape set `Value:` as the INPUT and `Layout: =\"Horizontal\"` as a STRING; the current shape splits them — `Default` in, `Value` read-only out — and takes typed enums (`LayoutDirection.Horizontal`, `SliderSize.Medium`). Any sample found online that assigns `Value:` is pre-revision and will not behave as written."
+   "note": "Semantics grounded from MS Learn's own YAML sample, not a Studio export — same provenance as ModernDropdown. VERSION TRAP: this control was revised. The OLD shape set `Value:` as the INPUT and `Layout: =\"Horizontal\"` as a STRING; the current shape splits them — `Default` in, `Value` read-only out — and takes typed enums (`LayoutDirection.Horizontal`, `SliderSize.Medium`). Any sample found online that assigns `Value:` is pre-revision and will not behave as written."
   },
   "Classic/Radio@2.3.0": {
    "output": "Selected — a record; .Selected.Value is the option text. SelectedText is DEPRECATED",
@@ -318,7 +322,7 @@
    "output": "Selected  — a record; .Selected.Value for a string array",
    "props": "Items (array literal), ItemDisplayText, InputTextPlaceholder, SelectMultiple, IsSearchable, MultiValueDelimiter, Required, ValidationState",
    "seed": "DefaultSelectedItems — CONFIRMED on this control's own MS Learn page: 'the initial items selected… Must be a TABLE OF RECORDS from the Items data source.' With Items as an array literal, =[gVar] is the matching shape. No longer inferred.",
-   "version": "VERSION IS 1.1.1 \u2014 user-confirmed twice from the live Studio control (2026-08-05, 2026-08-06). MS Learn's YAML sample on modern-controls/modern-control-combobox still emits @1.0.0 on the same page whose prose documents the revision; doc samples lag a control revision, so the live app wins and @1.0.0 is kept allow-listed only as a fallback. An earlier @1.1.1 paste DID fail, but modern controls were DISABLED in the app at the time \u2014 a disabled template is unavailable whatever version you name it, so that failure is not evidence against the token. Versions are PER-CONTROL: every other modern token here is @1.0.0 and the combo box is not. Never pattern-match a version across the family.",
+   "version": "VERSION IS 1.1.1 \u2014 user-confirmed twice from the live Studio control (2026-08-05, 2026-08-06). MS Learn's YAML sample on modern-controls/modern-control-combobox still emits @1.0.0 on the same page whose prose documents the revision; doc samples lag a control revision, so the live app wins and @1.0.0 is kept allow-listed only as a fallback. An earlier @1.1.1 paste DID fail, but modern controls were DISABLED in the app at the time \u2014 a disabled template is unavailable whatever version you name it, so that failure is not evidence against the token. Versions are PER-CONTROL and NO TWO MATCH: the grounded modern tokens are ModernTextInput@1.1.1, ModernCombobox@1.1.1, ModernDropdown@1.0.2, ModernDatePicker@1.0.1, ModernRadio@1.0.1, ModernDataGrid@1.5.0 — not one is @1.0.0. Never pattern-match a version across the family.",
    "revision_shape": "The revision is real even though the token does not move: TriggerOutput -> DelayOutput, Fields -> ItemDisplayText, SelectMultiple now defaults TRUE, Appearance/ValidationState take typed enums, FontColor/FontSize/BorderRadius -> Color/Size/Radius{TopLeft,...}. There is NO Reset PROPERTY — classic ListBox has one, this does not, and authoring it fails the paste. The Reset() function works, and now clears SearchText as well as the selection.",
    "display_column": "ItemDisplayText: =ThisItem.Value. NOT the classic pair DisplayFields/SearchFields — crossing the two families renders BLANK ROWS rather than erroring. Items from Distinct(), a [\"a\",\"b\"] literal or Choices() all expose a single column named Value."
   }
