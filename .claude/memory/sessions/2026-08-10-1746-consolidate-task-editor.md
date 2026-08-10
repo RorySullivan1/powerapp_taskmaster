@@ -126,3 +126,57 @@ comments saying which reason.
 - Studio hand-off owed: `galTasksHit`, `galTxHit`-equivalent and the issue row `OnSelect` are
   three formula-bar edits on `scrProject`; the `scrTask` screen deletion still stands, and the
   OnSelect edit must come FIRST.
+
+---
+
+## Follow-up 2 (19:05) — "I clicked Save task and nothing happened"
+
+Reported after the consolidation: description added, stage changed, click on **Save task**,
+no toast, no navigation, nothing.
+
+**Cause: `btnTkSave.DisplayMode` was `If(Len(lblTkMissing.Text) = 0, Edit, Disabled)`.** A
+disabled button cannot fire `OnSelect`, and every path through that `OnSelect` ends in a
+`Notify` — so silence proves the handler never ran. The task was missing a required field.
+
+**The gate was not wrong; the silence was.** `task_name`, `task_lead` and `task_project_id`
+are all `required: true` in `schema.yaml`, so SharePoint would reject the write regardless.
+
+**It can only ever trip on an EDIT**, which is why it survived New-task testing:
+
+    Set( gTkLead, If( gEditMode = "Edit",
+        { ... Mail: Coalesce(gEditTask.task_lead.Email, "") },   <- blank if none stored
+        { ... Mail: Coalesce(User().Email, "") } ) );            <- New always fills it
+
+Same for `gTkProject` (Edit reads the record, New falls back to `gSelProject`). So a task
+stored without a lead makes the editor permanently, silently dead.
+
+**Fix, applied to three screens.** `DisplayMode` removed so the button is always enabled;
+the entire save body wrapped in a guard that names what is missing:
+
+    =If( Len(lblTkMissing.Text) > 0,
+         Notify( "Can't save yet — this task still needs: " & lblTkMissing.Text,
+                 NotificationType.Error ),
+         <the whole existing body> )
+
+Wrapping rather than re-indenting: Power Fx ignores whitespace, so only the first and last
+lines changed and the ~110-line body is untouched. Paren balance was checked mechanically on
+all three (depth 0) because a nesting level was added to a large expression by hand.
+
+- `scrTaskEdit` — 3 gated fields.
+- `scrIssueEdit` — 3 gated fields (summary, project, assignee).
+- `scrTransactionEdit` — **SIX** (label, project, client, product, sales owner, date). Worst
+  of the three: editing any older transaction missing one of them was a dead click.
+
+**`scrProjectEdit`'s three inline sub-form buttons were deliberately NOT changed.** They gate
+on fields inside the same modal the user is filling in right now, so the empty field sits on
+screen beside the dead button. That is a different situation from an editor seeded off a
+stored record, and touching three more large formulas would add paste risk with no reported
+symptom behind it.
+
+## Gotchas (added)
+- **Never gate a save with `DisplayMode.Disabled`.** The control that knows why the save is
+  blocked is the one control that has been prevented from saying so. Put the requirement in
+  `OnSelect` and `Notify`.
+- **The `lbl*Missing` labels must stay a BARE LIST.** The guard now tests
+  `Len(lbl*Missing.Text) > 0`; a static prefix would make it permanently non-empty and block
+  every save on that screen. Recorded in each label's own comment.

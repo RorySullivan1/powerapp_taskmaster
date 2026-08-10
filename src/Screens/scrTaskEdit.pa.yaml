@@ -1546,10 +1546,15 @@ Screens:
                   # Flat on purpose: one Trim over an &-chain, nothing nested. The
                   # nested version cost a round trip once — a single `&` mistyped as
                   # `,` turns it into Trim(a, b), which reads as a bug in the formula.
+                  #
+                  # KEEP THIS TEXT A BARE LIST — no static prefix, ever. btnTkSave.OnSelect
+                  # tests `Len(lblTkMissing.Text) > 0` to decide whether the save is
+                  # blocked, so a constant prefix would make it permanently non-empty and
+                  # block every save. The sentence around the list belongs in the Notify.
                   Text: |
                     =Trim(
-                    If( Len(Trim(txtTkName.Text)) = 0, "task name   ", "" ) &
-                    If( Len(gTkLead.Mail) = 0,         "lead   ", "" ) &
+                    If( Len(Trim(txtTkName.Text)) = 0, "a task name   ", "" ) &
+                    If( Len(gTkLead.Mail) = 0,         "a lead   ", "" ) &
                     If( gTkProject.Id = 0,             "a parent project   ", "" ) )
                   Font: =Theme.Font
                   Size: =Theme.Size.Small
@@ -1583,14 +1588,28 @@ Screens:
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
                   Text: =If(gEditMode = "Edit", "Save task", "Create task")
-                  DisplayMode: |
-                    =If( Len(lblTkMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled )
+                  # DELIBERATELY ALWAYS ENABLED — do not put the DisplayMode gate back.
+                  # It used to read `If(Len(lblTkMissing.Text) = 0, Edit, Disabled)`, and a
+                  # DISABLED BUTTON CANNOT FIRE OnSelect, so a task missing a required
+                  # field produced a click that did NOTHING: no Notify, no Back(), no
+                  # error. Reported 2026-08-10 as "I clicked Save task and nothing
+                  # happened". The gate could only ever trip on an EDIT — in New mode
+                  # gTkLead defaults to User() and gTkProject to gSelProject, so both are
+                  # always populated. The requirement is still enforced, one line down in
+                  # OnSelect, where it can actually SPEAK.
                   FillPortions: =0
                   LayoutMinWidth: =200
                   Width: =200
                   Height: =48
                   OnSelect: |
-                    =Set( gTkSaved, Blank() );
+                    =If( Len(lblTkMissing.Text) > 0,
+                    // The requirement that used to disable the button. Enforced HERE so a
+                    // blocked save says which field is blocking it. All three are
+                    // `required: true` in schema.yaml, so SharePoint would reject the
+                    // write anyway — this only decides whether the user is TOLD.
+                    Notify( "Can't save yet — this task still needs: " & lblTkMissing.Text,
+                    NotificationType.Error ),
+                    Set( gTkSaved, Blank() );
                     Set( gTkErr, "" );
                     Set( gTkWarn, "" );
                     IfError(
@@ -1690,4 +1709,4 @@ Screens:
                     Notify( "Task saved, but: " & gTkWarn, NotificationType.Warning ) );
                     If( Len(gTkWarn) = 0,
                     Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
-                    Back() )
+                    Back() ) )

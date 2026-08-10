@@ -582,7 +582,9 @@ Screens:
             Font: =Theme.Font
             Size: =Theme.Size.Body
             Text: =If(gEditMode = "Edit", "Save issue", "Create issue")
-            DisplayMode: =If(Len(lblIssMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
+            # ALWAYS ENABLED — see scrTaskEdit btnTkSave. A disabled button cannot fire
+            # OnSelect, so a record missing a required field gave a click that did
+            # nothing at all. The requirement moved into OnSelect, where it can speak.
             Height: =44
             Width: =200
             X: =24
@@ -608,7 +610,13 @@ Screens:
             # and reported in ONE banner after the guarded block, which also beats
             # up to five separate toasts.
             OnSelect: |
-              =Set( gIssSaved, Blank() );
+              =If( Len(lblIssMissing.Text) > 0,
+              // The requirement that used to disable the button, moved here so a blocked
+              // save names the field. These are required in schema.yaml — SharePoint would
+              // reject the write regardless; this only decides whether the user is told.
+              Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
+              NotificationType.Error ),
+              Set( gIssSaved, Blank() );
               Set( gIssErr, "" );
               Set( gIssWarn, "" );
               IfError(
@@ -671,7 +679,7 @@ Screens:
                   If( Len(gIssWarn) = 0,
                       Notify( If(gEditMode = "Edit", "Issue saved", "Issue created"), NotificationType.Success ) );
                   Back()
-              )
+              ) )
       - btnIssCancel:
           Control: Classic/Button@2.2.0
           Properties:

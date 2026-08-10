@@ -455,8 +455,9 @@ Screens:
             Size: =Theme.Size.Body
             Text: |
               =If(gEditMode = "Edit", "Save transaction", "Create transaction")
-            DisplayMode: |
-              =If(Len(lblTxMissing.Text) = 0, DisplayMode.Edit, DisplayMode.Disabled)
+            # ALWAYS ENABLED — see scrTaskEdit btnTkSave. This gate gated on SIX
+            # fields, so editing any older transaction missing one of them produced a
+            # click that did nothing and said nothing. Moved into OnSelect.
             Height: =44
             Width: =220
             X: =24
@@ -465,7 +466,13 @@ Screens:
             # — no guarded second pass is needed. transaction_notional_usd is NOT
             # written: it has no app-side writer by decision (Q14).
             OnSelect: |
-              =Set( gTxErr, "" );
+              =If( Len(lblTxMissing.Text) > 0,
+              // The requirement that used to disable the button, moved here so a blocked
+              // save names the field. All six are required in schema.yaml — SharePoint would
+              // reject the write regardless; this only decides whether the user is told.
+              Notify( "Can't save yet — this still needs: " & lblTxMissing.Text,
+              NotificationType.Error ),
+              Set( gTxErr, "" );
               IfError(
                   // The Set wrapper is not decoration: IfError requires all its
                   // arguments to be type-compatible today, and a bare Patch (record)
@@ -494,7 +501,7 @@ Screens:
               If( Len(gTxErr) = 0,
                   Notify( If(gEditMode = "Edit", "Transaction saved", "Transaction created"),
                           NotificationType.Success );
-                  Back() )
+                  Back() ) )
       - btnTxCancel:
           Control: Classic/Button@2.2.0
           Properties:
