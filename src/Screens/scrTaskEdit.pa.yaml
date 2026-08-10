@@ -75,7 +75,9 @@ Screens:
         // its highlight and its search box. The lead and supporter pickers are the
         // SAME instance, reused across every record this screen opens, so this is
         // what stops task B's dialog opening on task A's highlighted person.
+        // The query global is the screen's half of that same state, so it clears here too.
         Reset( cmpTkPeople );
+        Set( gTkPeopleQuery, "" );
         Reset( txtTkApprovalId ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without these
         // the previous task's stage/health/priority survive into the next one.
@@ -540,7 +542,8 @@ Screens:
                                           Height: =36
                                           OnSelect: |
                                             =Set( gTkPicker, "Lead" );
-                                             Reset( cmpTkPeople )
+                                             Reset( cmpTkPeople );
+                                             Set( gTkPeopleQuery, "" )
                                     # The chip REPLACES the search box once somebody is chosen —
                                     # same shape as scrProjectEdit. One row either way.
                                     - chipTkLead:
@@ -628,7 +631,8 @@ Screens:
                                           Height: =36
                                           OnSelect: |
                                             =Set( gTkPicker, "Supporter" );
-                                             Reset( cmpTkPeople )
+                                             Reset( cmpTkPeople );
+                                             Set( gTkPeopleQuery, "" )
                                     # The chip REPLACES the search box once somebody is chosen —
                                     # same shape as scrProjectEdit. One row either way.
                                     - chipTkSupp:
@@ -1673,6 +1677,25 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: =If( gTkPicker = "Lead", "Select lead", "Select supporter" )
+            # THE DIRECTORY CALL LIVES HERE, NOT IN THE COMPONENT. With
+            # AccessAppScope false the component cannot reach a data source any
+            # more than it can reach Theme, so it takes rows in — the same
+            # contract as cmpNestedSelect's Terms.
+            #
+            # Bound to gTkPeopleQuery, which OnSearch sets — NOT to
+            # cmpTkPeople.Query directly. Feeding an instance's own output into
+            # its own input is a same-instance cycle Studio may reject; the
+            # global sidesteps it. It also keeps the call on SUBMIT: this only
+            # re-evaluates when OnSearch hands over a new query.
+            #
+            # ShowColumns narrows SearchUserV2's wide rows to the two columns the
+            # component declares. Column names are IDENTIFIERS, not strings.
+            Results: |
+              =If( Len(gTkPeopleQuery) >= 2,
+                   ShowColumns(
+                       Office365Users.SearchUserV2({ searchTerm: gTkPeopleQuery, top: 25 }).value,
+                       DisplayName, Mail ) )
+            OnSearch: =Set( gTkPeopleQuery, cmpTkPeople.Query )
             # Picked is read HERE and nowhere else. It is instance state cleared
             # by OnReset on every open, so reading it outside this handler would
             # be reading whatever the last dialog left behind.

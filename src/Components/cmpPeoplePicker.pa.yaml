@@ -18,12 +18,28 @@
 # they are cheap, they already exist, and keeping them out here means clearing a
 # field never has to open a dialog.
 #
-# Contract:
+# THIS COMPONENT TOUCHES NOTHING OUTSIDE ITSELF. AccessAppScope is false, so it
+# cannot read app globals, App named formulas (Theme included) or data sources.
+# Every colour below is therefore a LITERAL lifted from Theme — keep them in step
+# by hand, exactly as cmpAppBar and cmpUiKit do — and the directory search runs
+# on the SCREEN, which passes rows in through Results. The first draft of this
+# file reached for Theme.* and Office365Users directly and was wrong on both.
+#
+# Contract — SEVEN properties to hand-type in Studio:
 #   Title     (Input, Text)    — dialog heading, e.g. "Select lead"
+#   Results   (Input, Table)   — {DisplayName, Mail} rows to list; screen supplies
+#   Query     (Output, Text)   — what the user submitted; read inside OnSearch
 #   Picked    (Output, Record) — {DisplayName, Mail} highlighted at confirm time
+#   OnSearch  (Event)          — a search was submitted; screen refreshes Results
 #   OnConfirm (Event)          — check pressed with somebody highlighted
 #   OnCancel  (Event)          — dismissed via the X or the scrim
 #   OnReset   (built-in)       — see below; not a custom property, nothing to type
+#
+# WHY Query GOES OUT AND Results COMES BACK, RATHER THAN THE SCREEN READING
+# Query DIRECTLY INTO Results: the screen stashes Query in a global inside
+# OnSearch, and binds Results off THAT. Feeding an instance's own output straight
+# into its own input is the kind of same-instance cycle Studio may reject, and a
+# rejection costs a paste to discover. One global sidesteps the question.
 #
 # ONRESET IS LOAD-BEARING, NOT HOUSEKEEPING.
 # One instance serves every person field on the screen AND every record the
@@ -38,12 +54,12 @@
 # MS Learn states Set() results are scoped to the component instance. Same basis
 # as cmpNestedSelect's nsLevels.
 #
-# SEARCH RUNS ON SUBMIT, NOT PER KEYSTROKE. The gallery binds to `ppQuery`, not
-# to the search box's live text. `TriggerOutput.FocusOut` means a single-line
-# input commits on ENTER (or on leaving the field), which fires OnChange, which
-# is what fills ppQuery. That is the whole "type, press enter, list appears"
-# mechanic, and it also means one Office365Users call per search instead of one
-# per character.
+# SEARCH RUNS ON SUBMIT, NOT PER KEYSTROKE. Nothing here watches the search
+# box's live text. `TriggerOutput.FocusOut` means a single-line input commits on
+# ENTER (or on leaving the field), which fires OnChange, which fills `ppQuery`
+# and raises OnSearch — and only then does the screen re-run the directory call.
+# That is the whole "type, press enter, list appears" mechanic, and it also means
+# one Office365Users call per search instead of one per character.
 # =============================================================================
 ComponentDefinitions:
   cmpPeoplePicker:
@@ -56,6 +72,20 @@ ComponentDefinitions:
         Description: Heading shown at the top of the dialog, e.g. "Select lead".
         DataType: Text
         Default: ="Select a person"
+      Results:
+        PropertyKind: Input
+        Description: People to list. Schema {DisplayName:Text, Mail:Text}. The SCREEN runs the directory call and passes rows in; column names are identifiers, not strings.
+        DataType: Table
+        Default: |
+          =Table( { DisplayName: "Example Person", Mail: "example@contoso.com" } )
+      Query:
+        PropertyKind: Output
+        Description: What the user submitted. Read it inside OnSearch and stash it in a screen global; the screen runs the directory call.
+        DataType: Text
+      OnSearch:
+        PropertyKind: Event
+        Description: Raised when a search is submitted (Enter or the Search button). The app reads Query and refreshes what it passes to Results.
+        ReturnType: Boolean
       Picked:
         PropertyKind: Output
         Description: The highlighted person as {DisplayName, Mail}. Read it inside OnConfirm; it is cleared by OnReset.
@@ -78,6 +108,8 @@ ComponentDefinitions:
       # If(), not Coalesce(): Coalesce is grounded for scalars here, not records.
       Picked: |
         =If( IsBlank(ppPicked), { DisplayName: "", Mail: "" }, ppPicked )
+      Query: |
+        =Coalesce( ppQuery, "" )
       OnReset: |
         =Set( ppQuery, "" );
          Set( ppPicked, Blank() );
@@ -104,7 +136,7 @@ ComponentDefinitions:
       - ppCard:
           Control: Rectangle@2.3.0
           Properties:
-            Fill: =Theme.Color.Surface
+            Fill: =RGBA(255, 255, 255, 1)
             X: =(Parent.Width - 620) / 2
             Y: =(Parent.Height - 460) / 2
             Width: =620
@@ -112,7 +144,7 @@ ComponentDefinitions:
       - ppHeadBar:
           Control: Rectangle@2.3.0
           Properties:
-            Fill: =Theme.Color.Primary
+            Fill: =RGBA(0, 90, 158, 1)
             X: =(Parent.Width - 620) / 2
             Y: =(Parent.Height - 460) / 2
             Width: =620
@@ -121,9 +153,9 @@ ComponentDefinitions:
           Control: Label@2.5.1
           Properties:
             Text: =cmpPeoplePicker.Title
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.H3
+            Color: =RGBA(255, 255, 255, 1)
+            Font: =Font.'Segoe UI'
+            Size: =16
             FontWeight: =FontWeight.Semibold
             VerticalAlign: =VerticalAlign.Middle
             X: =(Parent.Width - 620) / 2 + 16
@@ -134,7 +166,7 @@ ComponentDefinitions:
           Control: Classic/Icon@2.5.0
           Properties:
             Icon: =Icon.Cancel
-            Color: =Theme.Color.OnPrimary
+            Color: =RGBA(255, 255, 255, 1)
             Tooltip: ="Close without choosing"
             X: =(Parent.Width - 620) / 2 + 620 - 16 - 20
             Y: =(Parent.Height - 460) / 2 + 16
@@ -150,8 +182,8 @@ ComponentDefinitions:
             # OnChange. That is what makes the search run on submit rather than
             # on every keystroke — see the header note.
             TriggerOutput: =TriggerOutput.FocusOut
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
+            Font: =Font.'Segoe UI'
+            Size: =14
             X: =(Parent.Width - 620) / 2 + 16
             Y: =(Parent.Height - 460) / 2 + 68
             Width: =520
@@ -159,7 +191,8 @@ ComponentDefinitions:
             OnChange: |
               =Set( ppQuery, Trim(txtPpSearch.Text) );
                Set( ppPicked, Blank() );
-               Set( ppTried, false )
+               Set( ppTried, false );
+               cmpPeoplePicker.OnSearch()
       - ppSearchGo:
           Control: Classic/Button@2.2.0
           Properties:
@@ -167,12 +200,12 @@ ComponentDefinitions:
             # search" is a convention some users never reach for, and a visible
             # affordance costs one control.
             Text: ="Search"
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderColor: =RGBA(0, 90, 158, 1)
             BorderThickness: =0
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
+            Font: =Font.'Segoe UI'
+            Size: =14
             X: =(Parent.Width - 620) / 2 + 16 + 528
             Y: =(Parent.Height - 460) / 2 + 68
             Width: =60
@@ -180,19 +213,22 @@ ComponentDefinitions:
             OnSelect: |
               =Set( ppQuery, Trim(txtPpSearch.Text) );
                Set( ppPicked, Blank() );
-               Set( ppTried, false )
+               Set( ppTried, false );
+               cmpPeoplePicker.OnSearch()
       # ---- Results -----------------------------------------------------------
       - galPpResults:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
-            # Bound to ppQuery, NOT to txtPpSearch.Text — that is the difference
-            # between searching on submit and searching per keystroke. Two
-            # characters is the floor because a one-letter directory search
-            # returns noise and costs a round trip to produce it.
-            Items: |
-              =If( Len(Coalesce(ppQuery, "")) >= 2,
-                   Office365Users.SearchUserV2({ searchTerm: ppQuery, top: 25 }).value )
+            # The SCREEN runs the directory call and passes the rows in. This
+            # component never touches a data source: with AccessAppScope false it
+            # cannot reach one, exactly as it cannot reach Theme or a global.
+            # Same contract as cmpNestedSelect's Terms — "pass a collection, not
+            # the list itself".
+            #
+            # Searching on submit rather than per keystroke is preserved by the
+            # screen: it only re-runs the call when OnSearch hands it a new Query.
+            Items: =cmpPeoplePicker.Results
             WrapCount: =1
             TemplateSize: =44
             TemplatePadding: =0
@@ -210,7 +246,7 @@ ComponentDefinitions:
                   # Highlight for the row currently held in ppPicked. Compared on
                   # Mail, not on the record — a record comparison against a value
                   # rebuilt by Set() is not an identity match.
-                  Fill: =Theme.Color.Accent
+                  Fill: =RGBA(102, 182, 227, 1)
                   Visible: |
                     =Len(Coalesce(ppPicked.Mail, "")) > 0 && ppPicked.Mail = ThisItem.Mail
                   X: =0
@@ -221,9 +257,9 @@ ComponentDefinitions:
                 Control: Label@2.5.1
                 Properties:
                   Text: =ThisItem.DisplayName
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
-                  Color: =Theme.Color.TextPrimary
+                  Font: =Font.'Segoe UI'
+                  Size: =14
+                  Color: =RGBA(32, 38, 45, 1)
                   VerticalAlign: =VerticalAlign.Middle
                   X: =12
                   Y: =0
@@ -233,9 +269,9 @@ ComponentDefinitions:
                 Control: Label@2.5.1
                 Properties:
                   Text: =ThisItem.Mail
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =Font.'Segoe UI'
+                  Size: =12
+                  Color: =RGBA(110, 120, 130, 1)
                   VerticalAlign: =VerticalAlign.Middle
                   X: =12
                   Y: =23
@@ -244,7 +280,7 @@ ComponentDefinitions:
             - ppRowLine:
                 Control: Rectangle@2.3.0
                 Properties:
-                  Fill: =Theme.Color.Border
+                  Fill: =RGBA(225, 229, 235, 1)
                   X: =0
                   Y: =43
                   Width: =Parent.TemplateWidth
@@ -282,9 +318,9 @@ ComponentDefinitions:
               =If( Len(Coalesce(ppQuery, "")) = 0,
                    "Type a name and press Enter to search.",
                    "Type at least two characters." )
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            Color: =Theme.Color.TextMuted
+            Font: =Font.'Segoe UI'
+            Size: =14
+            Color: =RGBA(110, 120, 130, 1)
             Align: =Align.Center
             VerticalAlign: =VerticalAlign.Middle
             X: =(Parent.Width - 620) / 2 + 16
@@ -302,9 +338,9 @@ ComponentDefinitions:
             # on a Boolean is not grounded in this repo.
             Visible: =ppTried = true
             Text: ="Pick somebody from the list first."
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.Danger
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(197, 58, 58, 1)
             VerticalAlign: =VerticalAlign.Middle
             X: =(Parent.Width - 620) / 2 + 16
             Y: =(Parent.Height - 460) / 2 + 400
@@ -314,12 +350,12 @@ ComponentDefinitions:
           Control: Classic/Button@2.2.0
           Properties:
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.Primary
-            BorderColor: =Theme.Color.Primary
+            Fill: =RGBA(255, 255, 255, 1)
+            Color: =RGBA(0, 90, 158, 1)
+            BorderColor: =RGBA(0, 90, 158, 1)
             BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
+            Font: =Font.'Segoe UI'
+            Size: =14
             X: =(Parent.Width - 620) / 2 + 620 - 16 - 120 - 8 - 120
             Y: =(Parent.Height - 460) / 2 + 400
             Width: =120
@@ -329,12 +365,12 @@ ComponentDefinitions:
           Control: Classic/Button@2.2.0
           Properties:
             Text: ="✓  Use this person"
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderColor: =RGBA(0, 90, 158, 1)
             BorderThickness: =0
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
+            Font: =Font.'Segoe UI'
+            Size: =14
             X: =(Parent.Width - 620) / 2 + 620 - 16 - 120
             Y: =(Parent.Height - 460) / 2 + 400
             Width: =120
