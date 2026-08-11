@@ -50,7 +50,8 @@ Screens:
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
         Reset( txtTxName );
         Reset( txtTxProjectSearch ); Reset( txtTxClientSearch );
-        Reset( txtTxProductSearch ); Reset( txtTxSalesSearch );
+        Reset( txtTxProductSearch );
+        Set( gTxPicker, "" ); Set( gTxPeopleQuery, "" ); Reset( cmpTxPeople );
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
         // date — it blocked the save outright on every edit.
         Reset( dtpTxDate )
@@ -510,18 +511,24 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtTxSalesSearch:
-                            Control: ModernTextInput@1.1.1
+                        - btnTxSalesPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =Len(gTxSales.Mail) = 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gTxPicker, "Sales")
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a sales owner"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set(gTxPicker, "Sales");
+                                 Reset(cmpTxPeople);
+                                 Set(gTxPeopleQuery, "")
                         - chipTxSales:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -556,7 +563,9 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gTxSales, { DisplayName: "", Mail: "" }); Reset(txtTxSalesSearch)
+                                      =Set(gTxSales, { DisplayName: "", Mail: "" });
+                                       Reset(cmpTxPeople);
+                                       Set(gTxPicker, "")
             - colTxMissing:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -852,49 +861,25 @@ Screens:
                   OnSelect: |
                     =Select(Parent);
                      Set(gTxProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid })
-      - galTxSales:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+      - cmpTxPeople:
+          Control: CanvasComponent
+          ComponentName: cmpPeoplePicker
           Properties:
-            Visible: =gTxPicker = "Sales" && ( Len(txtTxSalesSearch.Text) >= 2 && Len(gTxSales.Mail) = 0 )
-            Items: |
-              =Office365Users.SearchUserV2({ searchTerm: txtTxSalesSearch.Text, top: 8 }).value
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =304
-            Y: =258
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowTxSales:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.DisplayName
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galTxSalesHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gTxSales, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+            Visible: =gTxPicker = "Sales"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: ="Select sales owner"
+            Results: |
+              =If( Len(gTxPeopleQuery) >= 2,
+                   ShowColumns(
+                       Office365Users.SearchUserV2({ searchTerm: gTxPeopleQuery, top: 25 }).value,
+                       DisplayName, Mail ) )
+            OnSearch: =Set( gTxPeopleQuery, cmpTxPeople.Query )
+            OnConfirm: |
+              =Set( gTxSales,
+                    { DisplayName: cmpTxPeople.Picked.DisplayName,
+                      Mail:        cmpTxPeople.Picked.Mail } );
+               Set( gTxPicker, "" )
+            OnCancel: =Set( gTxPicker, "" )
