@@ -47,7 +47,7 @@ prefixed tokens:
 |---|---|
 | `Button` | `Classic/Button@2.2.0` — modern button version UNKNOWN, so classic |
 | `TextInput` | `ModernTextInput@1.1.1` or `Classic/TextInput@2.3.2` |
-| `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` |
+| `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` (or `GridLayout` — see below, container shape not yet grounded) |
 | `Dropdown` / `Combobox` | `ModernCombobox@1.1.1` (or `Classic/ComboBox@2.4.0`) |
 | `DatePicker` | `ModernDatePicker@1.0.1` |
 | `Timer` | `Timer` — no prefix, no version |
@@ -80,7 +80,8 @@ still fails the whole paste. **Casing stays per-token**: `DropDown` has a capita
 
 **Modern family IN USE** — `ModernTextInput@1.1.1`, `ModernCombobox@1.1.1`,
 `ModernDatePicker@1.0.1`, `GroupContainer@1.5.0` (`Variant: AutoLayout`). Version-confirmed
-but unused: `ModernDropdown@1.0.2`, `ModernRadio@1.0.1`, `ModernDataGrid@1.5.0`.
+but unused: `ModernDropdown@1.0.2`, `ModernRadio@1.0.1`, `ModernDataGrid@1.5.0`,
+`ModernCard@1.3.0` (2026-08-10, same photo as `GridLayout`).
 
 **Version UNKNOWN, so NOT used** — `ModernButton`, `ModernNumberInput`, `ModernTabList`,
 `ModernSlider`. Author the classic control for these; see the standing rule below.
@@ -246,30 +247,75 @@ classic enum.
 Children carry `LayoutMinWidth` / `LayoutMinHeight` and **no X/Y** — see
 powerapp-canvas-design for why that is the most important property in the whole dialect.
 
-Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`,
-and the non-AutoLayout variant name.
+Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`.
 
-## Grid container — cuts control count, but TOKENS NOT YET GROUNDED
+## Grid container — WHY to adopt it, and how far it is grounded
 
-A second container layout worth adopting: **CSS-grid** placement. You set the grid's `Columns`,
-`Rows` and `Gap` once, and each child names its cell (`Column Start/End`, `Row Start/End`,
-`Align in Cell`) instead of living in a nested row-of-columns. **A 2×2 that today costs a row
-container + two col containers collapses to ONE grid container** — which is the whole point:
-fewer controls, lower load. Responsive like the auto-layout container (children keep their cells,
-no X/Y to freeze). Insert ▸ **Layout ▸ Grid container**.
+A second container layout worth adopting: **CSS-grid** placement. You set the grid's columns,
+rows and gap once, and each child names its cell instead of living in a nested row-of-columns.
+**A 2×2 that today costs a row container + two col containers collapses to ONE grid
+container** — which is the whole point: fewer controls, lower load. Responsive like the
+auto-layout container (children keep their cells, no X/Y to freeze).
+Insert ▸ **Layout ▸ Grid container**.
 
-**Semantics grounded on MS Learn `controls/control-grid-container`** (read 2026-08-10) — container:
-`Gap`, `Columns`, `Rows`, `Padding`, `X/Y/Width/Height`, `Color`, `Border{Style,Thickness,Color}`,
-`BorderRadius`, `DropShadow`, `Visible`; per-child: `Column Start/End`, `Row Start/End`, `Align in Cell`.
+### Grounded 2026-08-10 — the Control token, the Variant, and the four child tokens
 
-**⚠ Do NOT author it until a Studio code-view grounds the tokens.** Those are DISPLAY names, and
-this dialect renames on paste (the auto-layout container's "Gap" is `LayoutGap`, its "Direction" is
-`LayoutDirection`), so `Columns`/`Rows`/`Gap`/`Column Start` almost certainly map to different
-`Layout*`-style tokens. Unconfirmed and therefore NOT on the validator allow-list: the `Control:`
-token **and version** (auto-layout is `GroupContainer@1.5.0`; the grid MAY share it or differ), the
-exact `Variant:` (user reports **`GridLayout`**; only `AutoLayout` is grounded so far), and every
-property token above. A guessed token fails the whole paste — ground it from one pasted code-view of
-a Grid container with two placed children first. See `tools/studio-enums.json ▸ _gridContainerNotes`.
+A Studio code-view photo settled what this section previously carried as inferred, including
+"the non-AutoLayout variant name". **The grid SHARES the auto-layout container's token and
+version**; only the `Variant:` differs.
+
+```yaml
+- Container1:
+    Control: GroupContainer@1.5.0          # <- SAME token and version as AutoLayout
+    Variant: GridLayout                    # <- the second variant, confirmed
+    Properties:
+      X: =40
+      Y: =40
+    Children:
+      - Card1:
+          Control: ModernCard@1.3.0        # <- new modern token, version 1.3.0
+          Properties:
+            X: =40
+            Y: =40
+      - Combobox1:
+          Control: ModernCombobox@1.1.1
+          Properties:
+            LayoutGridColumnStart: =3      # <- how a child names its cell
+            LayoutGridColumnEnd:   =5
+            LayoutGridRowStart:    =1
+            LayoutGridRowEnd:      =3
+            X: =40
+            Y: =40
+```
+
+The predicted `Layout*` renaming is exactly what happened: display-name *Column Start* is
+`LayoutGridColumnStart`, and so on for the other three.
+
+**Studio wrote `X`/`Y` on the grid child anyway**, alongside the four `LayoutGrid*` properties —
+the same thing it does for auto-layout children whose X/Y are ignored. Never read the presence
+of X/Y as evidence that absolute positioning is in play.
+
+### Still ungrounded — and it is the half that blocks authoring
+
+**Semantics** are grounded on MS Learn `controls/control-grid-container` (read 2026-08-10) —
+container: `Gap`, `Columns`, `Rows`, `Padding`, `X/Y/Width/Height`, `Color`,
+`Border{Style,Thickness,Color}`, `BorderRadius`, `DropShadow`, `Visible`; per-child:
+`Column Start/End`, `Row Start/End`, `Align in Cell`. Those are **DISPLAY names**.
+
+The four child placement tokens are now mapped. **No container property token is** — the sample's
+grid container carried only `X`/`Y`, so whatever `Columns`, `Rows` and `Gap` become is still
+unknown, as is `Align in Cell`.
+
+Also **inferred, not observed**: that `Start`/`End` are CSS-grid style *line* indices rather than
+cell indices. `ColumnStart 3 / ColumnEnd 5` spans two columns under the line reading and three
+under the cell reading, and the sample does not distinguish them. Likewise 1-based indexing, and
+whether a child with none of the four gets auto-placed.
+
+> **So: FILL a grid Studio already made — the four child tokens are safe. Do NOT author a
+> `GridLayout` container from scratch**, because placing children into a grid whose shape you
+> cannot express is a guess, and a guess fails the whole paste. To close it, ask the human for a
+> code-view of a grid container whose columns/rows/gap have been configured in the Studio pane.
+> See `tools/studio-enums.json ▸ _gridContainerNotes`.
 
 ## Selecting one thing: five controls, five contracts
 

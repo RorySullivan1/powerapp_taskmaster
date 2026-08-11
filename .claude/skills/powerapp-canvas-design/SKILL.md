@@ -105,6 +105,19 @@ re-flow if the screen later changes size.
       Height: =Parent.Height - 64 - 132        # stop above the action bar
 ```
 
+### The other variant: `GridLayout` — usable, but not yet authorable
+
+`GroupContainer@1.5.0` also takes **`Variant: GridLayout`**, confirmed from Studio code view
+2026-08-10. Its children place themselves with four numeric properties instead of X/Y:
+`LayoutGridColumnStart` / `LayoutGridColumnEnd` / `LayoutGridRowStart` / `LayoutGridRowEnd`.
+Studio writes `X`/`Y` on those children anyway, exactly as it does for auto-layout children
+whose X/Y are ignored — so §4's freezing note applies unchanged: their placement is immune.
+
+**What is NOT known is how the grid's own shape is declared** — no column count, row count or
+track sizes appear anywhere in the sample. So a grid is placeable but not creatable from here:
+fill one Studio has already made, and don't author the container blind. Token detail and the
+verbatim sample live in powerapp-canvas-controls.
+
 **A child's explicit Width/Height is ADVISORY until you turn flexible sizing off.** Every child
 of an auto-layout container starts with *Flexible width* (or height, along the parent's
 `Direction`) **on**, and the container then divides space by `FillPortions` — so setting a fixed
