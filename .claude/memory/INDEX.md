@@ -10,9 +10,14 @@
 - **The shell is ONE component, `cmpAppBar`** (header bar + fly-out nav rail). The four `scr*Edit`
   screens deliberately KEEP a local close-only header — the fly-out rail would let a user navigate
   away from an editor holding unsaved staged children.
-- **`scrProject` REWORKED 2026-08-07 — no tabs.** Info card (name + 8 explicit facts, KPI ring,
-  stacked edit/delete icons) over a work band: tasks and transactions stacked left, issues full
-  height right with 5 columns. Containers throughout below the header; `gProjTab` is gone.
+- **`scrProject` REWORKED 2026-08-07 — no tabs.** Info card (name + 8 explicit facts at 12pt, KPI
+  ring, stacked edit/delete icons) over a work band: tasks and transactions stacked left, issues
+  full height right with 5 columns. Containers throughout below the header; `gProjTab` is gone.
+  **Padding-overflow fixed 2026-08-11 (13 properties, NOT yet in Studio).**
+- **STANDING LAYOUT RULE: a child's `Width` must subtract its parent's horizontal padding.**
+  `Parent.Width` in a container is the OUTER width, not the content box — `Width: =Parent.Width`
+  under 16px padding hangs 32px off the right. Write `=Parent.Width - 48` / `- 32`, as
+  `scrProjectEdit` always has. **`scrTaskEdit` and `scrIssueEdit` are UNSWEPT for this.**
 - **`scrTaskEdit` is the SOLE task writer — `scrTask` was DELETED 2026-08-10.** A task row on
   `scrProject` now goes straight to the editor, like transactions and issues already did.
 - **`scrTaskEdit` REWORKED 2026-08-07 — no tabs, containers.** Order: Task (name+description) ·
@@ -226,6 +231,15 @@
 
 
 ## Threads          (open items; remove when closed)
+- **Await the Studio binary on scrProject's padding fix** (13 formula-bar edits, handed off
+  2026-08-11). If labels STILL overlap, padding overflow is ruled out — ask which two labels
+  touch and whether the columns sit too far left or too far right.
+- **Sweep `scrTaskEdit` and `scrIssueEdit` for `Width: =Parent.Width` inside a padded container.**
+  Mechanical: for every auto-layout container declaring `PaddingLeft`/`PaddingRight`, each child's
+  `Width` must subtract their sum. `scrProjectEdit` is known-clean (it is where the idiom came from).
+- **Second hook candidate, now with evidence:** a write-time check on `src/` flagging any child
+  whose `Width` is `=Parent.Width` while the parent declares horizontal padding. Pure arithmetic
+  over the YAML tree, no Studio needed — it would have caught this at author time.
 - **Ask the human for a `GridLayout` container's OWN code view** — one that has had its columns
   and rows configured in the Studio pane. That is the only missing piece before a grid can be
   authored here rather than merely filled.
@@ -352,3 +366,4 @@
 - 2026-08-10 1812 | transaction+issue rows given the same LookUp + blank guard (freshness, not identity - those galleries bind to a live Filter, not a snapshot); MM blocker recorded RESOLVED in schema.yaml, Choice replacement columns flagged UNRECORDED | sessions/2026-08-10-1746-consolidate-task-editor.md
 - 2026-08-10 1905 | save buttons no longer gate on DisplayMode.Disabled (a disabled button can't fire OnSelect, so a missing required field = silent dead click); requirement moved into OnSelect with a Notify naming the field, on scrTaskEdit + scrIssueEdit + scrTransactionEdit | sessions/2026-08-10-1746-consolidate-task-editor.md
 - 2026-08-10 2015 | task save optimised 12 round trips -> 1 on a typical edit: 8 optional Patches folded into the main one, C3 rollup skipped unless the stage moved, project write skipped when unchanged, Concurrent on the two rollup reads | sessions/2026-08-10-1746-consolidate-task-editor.md
+- 2026-08-11 1325 | scrProject task-list overlap root-caused: `Parent.Width` is the OUTER width, so every child of a padded container overflowed by its padding; 12 widths + 1 height fixed, cardInfo fact values -> 12pt | sessions/2026-08-11-1325-scrproject-padding-overflow.md
