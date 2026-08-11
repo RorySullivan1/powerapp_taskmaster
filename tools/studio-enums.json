@@ -214,6 +214,58 @@
     "flexible_sizing_default": "A child of an auto-layout container has \"Flexible width\" (or height, along the parent's Direction) turned ON BY DEFAULT — MS Learn walks you through switching it off in \"Building responsive canvas apps\". While it is on, an explicit Width/Height on that child is ADVISORY: the container distributes space by FillPortions instead. This is why setting a child to a fixed width appears to do nothing. Set FillPortions: =0 to pin it, and LayoutMinWidth as a floor. Cost this repo four iterations of cmpNestedSelect, 2026-08-05.",
     "fillportions_provenance": "Documented on the Horizontal container control page as \"Fill portions\": \"Defines how the individual component grows when there is more screen real-estate assigned to its parent... if child A has Fill portions 1 and child B has 2, A gets 1/3 of the extra space.\" Doc-grounded 2026-08-05, not yet seen in a Studio export."
   },
+  "_gridContainerNotes": {
+    "status": "TOKENS PARTIALLY GROUNDED 2026-08-10. The Control token, the Variant and the four CHILD placement tokens are CONFIRMED from a Studio code-view photo. The CONTAINER's own shape tokens (the Columns / Rows / Gap equivalents) are STILL UNGROUNDED. So: a grid Studio already made can be FILLED from here; a grid CANNOT be authored from scratch.",
+    "what": "CSS-grid container. Set the grid's Columns/Rows/Gap once and place each child by cell (Column Start/End, Row Start/End, Align in Cell) instead of nesting a row of col AutoLayout containers. FEWER CONTROLS, lower load — a 2x2 goes from 3 containers (1 row + 2 col) to 1. Responsive like AutoLayout; children keep their cells and carry no frozen X/Y. Insert > Layout > Grid container.",
+    "semantics_source": "MS Learn controls/control-grid-container, read 2026-08-10 — DISPLAY names, not pa-yaml tokens.",
+    "container_display_props": "Gap, Columns, Rows, Padding, X/Y/Width/Height, Color, Border{Style,Thickness,Color}, BorderRadius, DropShadow, Visible",
+    "child_display_props": "Column Start / Column End, Row Start / Row End, Align in Cell",
+    "UNGROUNDED_tokens": "NARROWED, NOT CLOSED. Items (1) Control token+version and (2) Variant are now CONFIRMED — see CONFIRMED_2026_08_10. Item (3) is HALF done: the four CHILD tokens are confirmed, but NO container property appears in the sample — the grid container carried only X/Y, so the tokens behind the display names Columns / Rows / Gap are still unknown. 'Align in Cell' is also unmapped. STILL NEEDS: a code-view of a grid container whose columns/rows/gap have been CONFIGURED in the Studio pane, so the container tokens appear.",
+    "user_report": "User (sees live Studio) described it as GroupContainer with Variant: GridLayout, 2026-08-10 — since CONFIRMED by their code-view photo the same day.",
+    "why_adopt": "Direct control-count reduction across the app (user's stated goal). scrProjectEdit alone is ~57 AutoLayout containers, many of them row/col scaffolding a grid would erase.",
+    "CONFIRMED_2026_08_10": {
+      "source": "Studio code-view photo, user-supplied — this is the code-view the UNGROUNDED_tokens note below was asking for.",
+      "control": "GroupContainer@1.5.0  — the grid SHARES the AutoLayout container's token and version",
+      "variant": "GridLayout  — the user's report is now confirmed",
+      "child_property_tokens": [
+        "LayoutGridColumnStart = <number>",
+        "LayoutGridColumnEnd = <number>",
+        "LayoutGridRowStart = <number>",
+        "LayoutGridRowEnd = <number>"
+      ],
+      "display_to_token_map": "'Column Start' -> LayoutGridColumnStart, 'Column End' -> LayoutGridColumnEnd, 'Row Start' -> LayoutGridRowStart, 'Row End' -> LayoutGridRowEnd. The Layout*-style renaming this file predicted is exactly what happened.",
+      "also_grounded_by_the_same_photo": "ModernCard@1.3.0 (new token); ModernCombobox@1.1.1 re-confirmed independently.",
+      "observed_verbatim": [
+        "- Container1:",
+        "    Control: GroupContainer@1.5.0",
+        "    Variant: GridLayout",
+        "    Properties:",
+        "      X: =40",
+        "      Y: =40",
+        "    Children:",
+        "      - Card1:",
+        "          Control: ModernCard@1.3.0",
+        "          Properties:",
+        "            X: =40",
+        "            Y: =40",
+        "      - Combobox1:",
+        "          Control: ModernCombobox@1.1.1",
+        "          Properties:",
+        "            LayoutGridColumnEnd: =5",
+        "            LayoutGridColumnStart: =3",
+        "            LayoutGridRowEnd: =3",
+        "            LayoutGridRowStart: =1",
+        "            X: =40",
+        "            Y: =40"
+      ],
+      "x_y_are_written_anyway": "Studio emitted X: =40 / Y: =40 on the grid child ALONGSIDE the four LayoutGrid* properties, exactly as it does for auto-layout children whose X/Y are ignored. Do not read the presence of X/Y as evidence that absolute positioning applies.",
+      "INFERRED_not_observed": [
+        "That Start/End are CSS-grid style LINE indices rather than cell indices. The sample reads ColumnStart 3 / ColumnEnd 5 and RowStart 1 / RowEnd 3, which under the line reading spans 2 columns and 2 rows. Plausible, NOT confirmed — a cell-index reading would make it 3 columns and 3 rows.",
+        "Whether the indices are 1-based. The sample's lowest value is 1 (RowStart), which is consistent with 1-based but does not prove it.",
+        "Whether omitting the four properties auto-places a child in the next free cell."
+      ]
+    }
+  },
   "_modernControls": {
     "confirmed_from": "user-supplied Studio YAML + MS Learn output properties, 2026-08-04",
     "_modernVersions": {
@@ -388,47 +440,5 @@
     "Choices column argument": "Studio writes it as a SINGLE-QUOTED identifier — Choices([@asset_library].'asset_owner'). Quotes are only required when the identifier needs escaping, so this repo's unquoted snake_case form is equally valid; the quoted form is Studio being defensive.",
     "Self": "PaddingLeft: =If(Self.DisplayMode = DisplayMode.Edit, 5, 0) — Self is available in a control's own property formulas.",
     "Dotted property names": "A property key can be qualified with a dot: `Items.Value: =Value` on a classic DropDown or ListBox names the column of Items to display. Valid pa-yaml, and easy to mistake for a typo."
-  },
-  "_gridLayoutNotes": {
-    "control": "GroupContainer@1.5.0",
-    "variant": "GridLayout",
-    "confirmed_from": "photo of Studio code view, 2026-08-10 (user-supplied). Answers the 'non-AutoLayout variant name' that this file and powerapp-canvas-controls both carried as INFERRED.",
-    "observed_verbatim": [
-      "- Container1:",
-      "    Control: GroupContainer@1.5.0",
-      "    Variant: GridLayout",
-      "    Properties:",
-      "      X: =40",
-      "      Y: =40",
-      "    Children:",
-      "      - Card1:",
-      "          Control: ModernCard@1.3.0",
-      "          Properties:",
-      "            X: =40",
-      "            Y: =40",
-      "      - Combobox1:",
-      "          Control: ModernCombobox@1.1.1",
-      "          Properties:",
-      "            LayoutGridColumnEnd: =5",
-      "            LayoutGridColumnStart: =3",
-      "            LayoutGridRowEnd: =3",
-      "            LayoutGridRowStart: =1",
-      "            X: =40",
-      "            Y: =40"
-    ],
-    "child_properties": [
-      "LayoutGridColumnStart = <number>",
-      "LayoutGridColumnEnd   = <number>",
-      "LayoutGridRowStart    = <number>",
-      "LayoutGridRowEnd      = <number>"
-    ],
-    "x_y_are_written_anyway": "Studio emitted X: =40 / Y: =40 on the grid child ALONGSIDE the four LayoutGrid* properties, exactly as it does for auto-layout children whose X/Y are ignored. Do not read the presence of X/Y as evidence that absolute positioning applies.",
-    "INFERRED_not_observed": [
-      "That Start/End are CSS-grid style LINE indices rather than cell indices. The sample reads ColumnStart 3 / ColumnEnd 5 and RowStart 1 / RowEnd 3, which under the line reading spans 2 columns and 2 rows. Plausible, NOT confirmed — a cell-index reading would make it 3 columns and 3 rows.",
-      "Whether the indices are 1-based. The sample's lowest value is 1 (RowStart), which is consistent with 1-based but does not prove it.",
-      "Whether omitting the four properties auto-places a child in the next free cell."
-    ],
-    "STILL_UNKNOWN_the_big_one": "HOW THE GRID ITSELF IS DEFINED. Nothing in the sample declares the column count, row count or their sizes — the container carries only X/Y. There must be a property (or a Studio-pane-only setting) that does this, and it is NOT grounded. Do not author a GridLayout container until it is: a child placed into a grid whose shape you cannot express is a guess.",
-    "verdict": "SAFE to author the four CHILD properties on a grid that Studio already created. NOT safe to author a GridLayout container from scratch."
   }
 }
