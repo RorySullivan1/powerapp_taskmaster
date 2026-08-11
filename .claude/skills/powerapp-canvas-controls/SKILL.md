@@ -42,7 +42,7 @@ prefixed tokens:
 |---|---|
 | `Button` | `Classic/Button@2.2.0` — modern button version UNKNOWN, so classic |
 | `TextInput` | `ModernTextInput@1.1.1` or `Classic/TextInput@2.3.2` |
-| `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` |
+| `Container` | `GroupContainer@1.5.0` + `Variant: AutoLayout` (or `GridLayout` — see below, container shape not yet grounded) |
 | `Dropdown` / `Combobox` | `ModernCombobox@1.1.1` (or `Classic/ComboBox@2.4.0`) |
 | `DatePicker` | `ModernDatePicker@1.0.1` |
 | `Timer` | `Timer` — no prefix, no version |
@@ -75,7 +75,8 @@ still fails the whole paste. **Casing stays per-token**: `DropDown` has a capita
 
 **Modern family IN USE** — `ModernTextInput@1.1.1`, `ModernCombobox@1.1.1`,
 `ModernDatePicker@1.0.1`, `GroupContainer@1.5.0` (`Variant: AutoLayout`). Version-confirmed
-but unused: `ModernDropdown@1.0.2`, `ModernRadio@1.0.1`, `ModernDataGrid@1.5.0`.
+but unused: `ModernDropdown@1.0.2`, `ModernRadio@1.0.1`, `ModernDataGrid@1.5.0`,
+`ModernCard@1.3.0` (2026-08-10, same photo as `GridLayout`).
 
 **Version UNKNOWN, so NOT used** — `ModernButton`, `ModernNumberInput`, `ModernTabList`,
 `ModernSlider`. Author the classic control for these; see the standing rule below.
@@ -241,8 +242,54 @@ classic enum.
 Children carry `LayoutMinWidth` / `LayoutMinHeight` and **no X/Y** — see
 powerapp-canvas-design for why that is the most important property in the whole dialect.
 
-Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`,
-and the non-AutoLayout variant name.
+Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`.
+
+## Grid-layout container — CONFIRMED 2026-08-10, but only half of it
+
+The second `GroupContainer` variant is **`GridLayout`**. This section previously listed "the
+non-AutoLayout variant name" as inferred; a Studio code-view photo settled it.
+
+```yaml
+- Container1:
+    Control: GroupContainer@1.5.0
+    Variant: GridLayout                    # <- the second variant, confirmed
+    Properties:
+      X: =40
+      Y: =40
+    Children:
+      - Card1:
+          Control: ModernCard@1.3.0        # <- new modern token, version 1.3.0
+          Properties:
+            X: =40
+            Y: =40
+      - Combobox1:
+          Control: ModernCombobox@1.1.1
+          Properties:
+            LayoutGridColumnStart: =3      # <- how a child places itself
+            LayoutGridColumnEnd:   =5
+            LayoutGridRowStart:    =1
+            LayoutGridRowEnd:      =3
+            X: =40
+            Y: =40
+```
+
+**Studio wrote `X`/`Y` on the grid child anyway**, alongside the four `LayoutGrid*` properties —
+the same thing it does for auto-layout children whose X/Y are ignored. Never read the presence
+of X/Y as evidence that absolute positioning is in play.
+
+**Inferred, NOT observed:** that `Start`/`End` are CSS-grid style *line* indices rather than
+cell indices. Under the line reading, `ColumnStart 3 / ColumnEnd 5` spans two columns; under a
+cell reading it spans three. Plausible, unconfirmed. Likewise 1-based indexing, and whether a
+child with none of the four gets auto-placed.
+
+**STILL UNKNOWN, and it is the blocking half: how the grid itself is defined.** Nothing in the
+sample declares a column count, a row count or their sizes — the container carries only `X`/`Y`.
+Some property or Studio-pane-only setting must do it, and it is not grounded.
+
+> **So: safe to author the four CHILD properties into a grid Studio already made. NOT safe to
+> author a `GridLayout` container from scratch** — placing children into a grid whose shape you
+> cannot express is a guess, and a guess costs the whole paste. If a grid is wanted, have the
+> human create the container in Studio and send back its code view.
 
 ## Selecting one thing: five controls, five contracts
 
