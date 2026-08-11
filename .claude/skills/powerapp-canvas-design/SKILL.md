@@ -17,6 +17,12 @@ description: >
 
 # Canvas Design — geometry you cannot see, so you must compute
 
+> **Docs source (meaning, not tokens):** the authoritative layout/control reference is
+> `github.com/MicrosoftDocs/powerapps-docs` (esp. `create-responsive-layout.md`,
+> `build-responsive-apps.md`, `working-with-large-apps.md`). See
+> `.claude/context/powerapps-docs-source.md` for paths + fetch methods. It grounds layout
+> BEHAVIOUR; the exact pa-yaml token still comes from a Studio code-view (`tools/studio-enums.json`).
+
 You author blind. The render is on someone else's machine and comes back as a sentence. So
 **layout is arithmetic done at author time**, not something to eyeball later. Every layout bug
 this project has shipped was a number that was never worked out.

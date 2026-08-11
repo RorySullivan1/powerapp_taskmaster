@@ -22,6 +22,7 @@ Two tiers:
 | `schema.md` | Model shape, delegation/join costs, and open consequences. **Columns live in `schema/schema.yaml` (golden source)** — this brief points there, never repeats it. | `sharepoint-list-architecture` |
 | `app-structure.md` | Screens, components, and the Power BI reporting surface (licence-gated). | `power-apps-components` |
 | `open-questions.md` | Unresolved decisions still shaping schema/app/provisioning. Answered ones live in `.claude/memory/`. | — |
+| `powerapps-docs-source.md` | The authoritative control & layout **docs source** (`MicrosoftDocs/powerapps-docs`) — paths + fetch methods. Grounds SEMANTICS/property meaning, not pa-yaml tokens. | `powerapp-canvas-controls` / `-design` |
 
 **Decisions with reasoning** are **not** a brief here — they live in the `session-memory`
 Decisions ledger (`.claude/memory/INDEX.md`), append-only and decay-proof, so a later session

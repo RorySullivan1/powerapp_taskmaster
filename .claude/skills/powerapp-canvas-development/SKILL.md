@@ -17,6 +17,11 @@ description: >
 
 # Canvas Development — pa-yaml v3.0 and the Power Fx inside it
 
+> **Docs source (meaning, not tokens):** the authoritative control/property/layout reference is
+> `github.com/MicrosoftDocs/powerapps-docs` (e.g. `controls/reference-properties.md`). See
+> `.claude/context/powerapps-docs-source.md` for paths + fetch methods. It grounds SEMANTICS; the
+> pa-yaml token/version still comes from a Studio code-view (`tools/studio-enums.json`).
+
 Schema: `tools/pa.schema.v3.0.yaml`, vendored from `microsoft/PowerApps-Tooling`.
 Validate with `python tools/validate_pa_yaml.py` before every hand-off. **The schema alone is
 not enough** — it declares `Control:` as `true` (anything) and `Variant:` as any string, so a

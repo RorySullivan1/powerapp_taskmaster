@@ -22,6 +22,11 @@ description: >
 
 # Canvas Controls — the grounded catalogue
 
+> **Docs source (meaning, not tokens):** the authoritative control/layout reference is
+> `github.com/MicrosoftDocs/powerapps-docs`. See `.claude/context/powerapps-docs-source.md` for the
+> paths and how to fetch it (raw GitHub, `gh`, or the connected MS Learn MCP). Ground a control's
+> SEMANTICS there; ground the pa-yaml TOKEN in `tools/studio-enums.json` (Studio code-view).
+
 **The single rule: never author a control token you cannot point at evidence for.**
 
 An unknown `Control:` or `Variant:` fails the *entire* paste. Across a one-way gap that returns
@@ -243,6 +248,28 @@ powerapp-canvas-design for why that is the most important property in the whole 
 
 Still inferred, never seen non-default: `LayoutJustifyContent`, `LayoutWrap`, `FillPortions`,
 and the non-AutoLayout variant name.
+
+## Grid container — cuts control count, but TOKENS NOT YET GROUNDED
+
+A second container layout worth adopting: **CSS-grid** placement. You set the grid's `Columns`,
+`Rows` and `Gap` once, and each child names its cell (`Column Start/End`, `Row Start/End`,
+`Align in Cell`) instead of living in a nested row-of-columns. **A 2×2 that today costs a row
+container + two col containers collapses to ONE grid container** — which is the whole point:
+fewer controls, lower load. Responsive like the auto-layout container (children keep their cells,
+no X/Y to freeze). Insert ▸ **Layout ▸ Grid container**.
+
+**Semantics grounded on MS Learn `controls/control-grid-container`** (read 2026-08-10) — container:
+`Gap`, `Columns`, `Rows`, `Padding`, `X/Y/Width/Height`, `Color`, `Border{Style,Thickness,Color}`,
+`BorderRadius`, `DropShadow`, `Visible`; per-child: `Column Start/End`, `Row Start/End`, `Align in Cell`.
+
+**⚠ Do NOT author it until a Studio code-view grounds the tokens.** Those are DISPLAY names, and
+this dialect renames on paste (the auto-layout container's "Gap" is `LayoutGap`, its "Direction" is
+`LayoutDirection`), so `Columns`/`Rows`/`Gap`/`Column Start` almost certainly map to different
+`Layout*`-style tokens. Unconfirmed and therefore NOT on the validator allow-list: the `Control:`
+token **and version** (auto-layout is `GroupContainer@1.5.0`; the grid MAY share it or differ), the
+exact `Variant:` (user reports **`GridLayout`**; only `AutoLayout` is grounded so far), and every
+property token above. A guessed token fails the whole paste — ground it from one pasted code-view of
+a Grid container with two placed children first. See `tools/studio-enums.json ▸ _gridContainerNotes`.
 
 ## Selecting one thing: five controls, five contracts
 
