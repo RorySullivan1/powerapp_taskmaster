@@ -1402,57 +1402,81 @@ Screens:
                     // record fails forever and no amount of re-typing helps — so
                     // treat a missing ID as New and insert instead. This is the
                     // self-heal for the state described at step 4 below.
-                    If( gEditMode = "New" || IsBlank(gEditProject.ID),
-                        IfError(
-                            Set( gPrSaved,
-                                Patch( taskmaster_projects, Defaults(taskmaster_projects),
-                                    { project_name:        Trim(txtPrName.Text),
-                                      project_description: txtPrDesc.Text,
-                                      project_pathway:     txtPrPathway.Text,
-                                      project_phase:       { Value: gPrPhase },
-                                      project_priority:    { Value: gPrPriority },
-                                      project_manager:
+                    // ONE WRITE, ONE RECORD. This used to be two near-identical Patches
+                    // (insert vs update) followed by FIVE guarded follow-up Patches against
+                    // the row just written — up to nine serial round trips to fix a typo.
+                    // The base record is now chosen by If() and every column, required and
+                    // optional, is in the single record. Same fold scrTaskEdit took on
+                    // 2026-08-10, and the same rationale: the follow-ups' per-field error
+                    // attribution is replaced by SharePoint's own error, which names the
+                    // offending column.
+                    //
+                    // `insert` means gEditMode = "New" OR a missing ID — the self-heal
+                    // below. It is tested twice here rather than hoisted because a Patch
+                    // record is a value, not a behaviour chain, so there is nowhere to put
+                    // a local.
+                    IfError(
+                        Set( gPrSaved,
+                            Patch( taskmaster_projects,
+                                If( gEditMode = "New" || IsBlank(gEditProject.ID),
+                                    Defaults(taskmaster_projects), gEditProject ),
+                                { project_name:        Trim(txtPrName.Text),
+                                  project_description: txtPrDesc.Text,
+                                  project_pathway:     txtPrPathway.Text,
+                                  project_phase:       { Value: gPrPhase },
+                                  project_priority:    { Value: gPrPriority },
+                                  project_manager:
+                                      { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                        Claims:      ClaimPrefix & Lower(gPrManager.Mail),
+                                        DisplayName: gPrManager.DisplayName,
+                                        Email:       gPrManager.Mail,
+                                        Department: "", JobTitle: "", Picture: "" },
+                                  // Classification is two plain columns per vocabulary now —
+                                  // a Number and a Text. No taxonomy record, no connector
+                                  // shape to get right (C11). Previously EDIT-only, via a
+                                  // follow-up Patch; now written on both paths.
+                                  project_region_id:   gPrRegionId,
+                                  project_region_path: gPrRegionPath,
+                                  project_type_id:     gPrTypeId,
+                                  project_type_path:   gPrTypePath,
+                                  // GUARDED. This was a bare { Value: gPrCov } on the insert
+                                  // path while the Edit path guarded the identical write, and
+                                  // gPrCov seeds to "" on New with no required-field gate —
+                                  // so an unpicked Coverage sent an empty Choice member, which
+                                  // is not a member, and the connector rejected the insert.
+                                  project_coverage:
+                                      If( Len(gPrCov) > 0, { Value: gPrCov }, Blank() ),
+                                  project_date_start:    dtpPrStart.SelectedDate,
+                                  project_date_target:   dtpPrTarget.SelectedDate,
+                                  // gEditProject IS NOT CLEARED ON NEW, so reading it here
+                                  // unguarded made a new project inherit the last-edited
+                                  // project's completion date — and, if the new one was
+                                  // Complete, Coalesce kept that stale date instead of
+                                  // stamping Now(). Insert and update are now separated.
+                                  project_date_complete:
+                                      If( gEditMode = "New" || IsBlank(gEditProject.ID),
+                                          If( gPrPhase = "Complete", Now(), Blank() ),
+                                          If( gPrPhase = "Complete",
+                                              Coalesce(gEditProject.project_date_complete, Now()),
+                                              gEditProject.project_date_complete ) ),
+                                  // --- FOLDED OPTIONALS: were two follow-up Patches --------
+                                  project_requestor:
+                                      If( Len(gPrRequestor.Mail) > 0,
                                           { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                            Claims:      ClaimPrefix & Lower(gPrManager.Mail),
-                                            DisplayName: gPrManager.DisplayName,
-                                            Email:       gPrManager.Mail,
+                                            Claims:      ClaimPrefix & Lower(gPrRequestor.Mail),
+                                            DisplayName: gPrRequestor.DisplayName,
+                                            Email:       gPrRequestor.Mail,
                                             Department: "", JobTitle: "", Picture: "" },
-                                      // Classification is two plain columns per vocabulary
-                                      // now — a Number and a Text. No taxonomy record, no
-                                      // connector shape to get right (C11).
-                                      project_region_id:   gPrRegionId,
-                                      project_region_path: gPrRegionPath,
-                                      project_type_id:     gPrTypeId,
-                                      project_type_path:   gPrTypePath,
-                                      project_coverage:    { Value: gPrCov },
-                                      project_date_start:    dtpPrStart.SelectedDate,
-                                      project_date_target:   dtpPrTarget.SelectedDate,
-                                      project_date_complete:
-                                                        If( gPrPhase = "Complete",
-                                                            Coalesce(gEditProject.project_date_complete, Now()),
-                                                            gEditProject.project_date_complete ) } ) ),
-                            Set( gPrErr, FirstError.Message ) ),
-                        IfError(
-                            Set( gPrSaved,
-                                Patch( taskmaster_projects, gEditProject,
-                                    { project_name:        Trim(txtPrName.Text),
-                                      project_description: txtPrDesc.Text,
-                                      project_pathway:     txtPrPathway.Text,
-                                      project_phase:       { Value: gPrPhase },
-                                      project_priority:    { Value: gPrPriority },
-                                      project_manager:
+                                          Blank() ),
+                                  project_supporter:
+                                      If( Len(gPrSupporter.Mail) > 0,
                                           { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                            Claims:      ClaimPrefix & Lower(gPrManager.Mail),
-                                            DisplayName: gPrManager.DisplayName,
-                                            Email:       gPrManager.Mail,
+                                            Claims:      ClaimPrefix & Lower(gPrSupporter.Mail),
+                                            DisplayName: gPrSupporter.DisplayName,
+                                            Email:       gPrSupporter.Mail,
                                             Department: "", JobTitle: "", Picture: "" },
-                                      project_date_start:    dtpPrStart.SelectedDate,
-                                      project_date_target:   dtpPrTarget.SelectedDate,
-                                      project_date_complete:
-                                                        If( gPrPhase = "Complete",
-                                                            Coalesce(gEditProject.project_date_complete, Now()),
-                                                            gEditProject.project_date_complete ) } ) ),
-                            Set( gPrErr, FirstError.Message ) ) );
+                                          Blank() ) } ) ),
+                        Set( gPrErr, FirstError.Message ) );
                     // TRUST THE RECORD, NEVER THE MESSAGE. A write can fail and
                     // still leave FirstError.Message empty, and the old code read
                     // that empty message as success: it then set gEditProject to a
@@ -1468,43 +1492,6 @@ Screens:
                                   & gPrErr,
                                 NotificationType.Error ) );
                     If( Len(gPrErr) = 0 && !IsBlank(gPrSaved.ID),
-                        // --- 2. optional / re-picked parent fields ----------------
-                        If( Len(gPrRequestor.Mail) > 0,
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_requestor:
-                                               { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                 Claims:      ClaimPrefix & Lower(gPrRequestor.Mail),
-                                                 DisplayName: gPrRequestor.DisplayName,
-                                                 Email:       gPrRequestor.Mail,
-                                                 Department: "", JobTitle: "", Picture: "" } }) ), Set( gPrWarn, gPrWarn & "the requestor didn't stick: " & FirstError.Message & "   " )),
-                            gEditMode = "Edit",
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved, { project_requestor: Blank() }) ), Set( gPrWarn, gPrWarn & "the requestor didn't clear: " & FirstError.Message & "   " )) );
-                        If( Len(gPrSupporter.Mail) > 0,
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_supporter:
-                                               { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                 Claims:      ClaimPrefix & Lower(gPrSupporter.Mail),
-                                                 DisplayName: gPrSupporter.DisplayName,
-                                                 Email:       gPrSupporter.Mail,
-                                                 Department: "", JobTitle: "", Picture: "" } }) ), Set( gPrWarn, gPrWarn & "the supporter didn't stick: " & FirstError.Message & "   " )),
-                            gEditMode = "Edit",
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved, { project_supporter: Blank() }) ), Set( gPrWarn, gPrWarn & "the supporter didn't clear: " & FirstError.Message & "   " )) );
-                        // Classification on EDIT only — on New these went in with the
-                        // insert. One Patch each, so a failure can't take the record down.
-                        If( gEditMode = "Edit" && Len(gPrRegionPath) > 0,
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_region_id: gPrRegionId,
-                                             project_region_path: gPrRegionPath }) ), Set( gPrWarn, gPrWarn & "the region didn't stick: " & FirstError.Message & "   " )) );
-                        If( gEditMode = "Edit" && Len(gPrTypePath) > 0,
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_type_id: gPrTypeId,
-                                             project_type_path: gPrTypePath }) ), Set( gPrWarn, gPrWarn & "the type didn't stick: " & FirstError.Message & "   " )) );
-                        If( gEditMode = "Edit" && Len(gPrCov) > 0,
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_coverage: { Value: gPrCov } }) ), Set( gPrWarn, gPrWarn & "the coverage didn't stick: " & FirstError.Message & "   " )) );
-                        If( gEditMode = "Edit" && Len(gPrCov) = 0 && !IsBlank(gEditProject.project_coverage),
-                            IfError( Set( gPrOpt, Patch(taskmaster_projects, gPrSaved,
-                                           { project_coverage: Blank() }) ), Set( gPrWarn, gPrWarn & "the coverage didn't clear: " & FirstError.Message & "   " )) );
                         // --- 3. children ------------------------------------------
                         // IfError's third argument is the value returned when NOTHING
                         // errored, which is how each row records success or failure

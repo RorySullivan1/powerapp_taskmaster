@@ -798,7 +798,13 @@ Screens:
                   LayoutMinWidth: =200
                   Width: =200
                   Height: =48
-                  # Required fields in one Patch; optional ones after, each guarded.
+                  # ONE WRITE. Every column, required and optional, is in a single Patch;
+                  # the optionals are If(condition, value, Blank()) inside the record.
+                  # It used to be one Patch plus FIVE guarded follow-ups against the row
+                  # just written — six serial round trips to save one issue. Folding also
+                  # killed the unlink bug at the root: three of those follow-ups had no
+                  # clearing arm, so a cleared task/transaction/owner never saved.
+                  #
                   # The gate is gIssErr, captured in IfError's fallback: FirstError is
                   # only in scope THERE, so the message is stashed and acted on
                   # afterwards. Two reasons it is not `IsBlank(gIssSaved)`: Errors()
@@ -845,61 +851,32 @@ Screens:
                                      issue_date_open:
                                          If( gEditMode = "Edit", gEditIssue.issue_date_open, Now() ),
                                      issue_date_target: dtpIssTarget.SelectedDate,
-                                     issue_date_close:  dtpIssClose.SelectedDate } ) ),
+                                     issue_date_close:  dtpIssClose.SelectedDate,
+                                     // --- FOLDED OPTIONALS: were five separate Patches --------
+                                     // Blank() as the else is how a field is CLEARED, which is
+                                     // what the follow-up clear-arms did. Folding also removes
+                                     // the unlink bug at its root rather than patching around it.
+                                     issue_type:
+                                         If( gIssType <> "(none)", { Value: gIssType }, Blank() ),
+                                     issue_impact:
+                                         If( gIssImpact <> "(none)", { Value: gIssImpact }, Blank() ),
+                                     issue_task_name:
+                                         If( gIssTask.Id > 0, { Id: gIssTask.Id, Value: gIssTask.Value }, Blank() ),
+                                     issue_transaction_name:
+                                         If( gIssTx.Id > 0, { Id: gIssTx.Id, Value: gIssTx.Value }, Blank() ),
+                                     issue_owner:
+                                         If( Len(gIssOwner.Mail) > 0,
+                                             { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                               Claims:      ClaimPrefix & Lower(gIssOwner.Mail),
+                                               DisplayName: gIssOwner.DisplayName,
+                                               Email:       gIssOwner.Mail,
+                                               Department: "", JobTitle: "", Picture: "" },
+                                             Blank() ) } ) ),
                         Set( gIssErr, FirstError.Message )
                     );
                     If( Len(gIssErr) > 0,
                         Notify("Couldn't save the issue: " & gIssErr, NotificationType.Error) );
                     If( Len(gIssErr) = 0,
-                        // --- optional fields, one guarded Patch each ---------------
-                        // gIssOpt exists only so both IfError arguments are a Set and
-                        // therefore type-compatible; its value is never read.
-                        If( gIssType <> "(none)",
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: { Value: gIssType } }) ),
-                                     Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ),
-                            gEditMode = "Edit",
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: Blank() }) ),
-                                     Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ) );
-                        If( gIssImpact <> "(none)",
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: { Value: gIssImpact } }) ),
-                                     Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ),
-                            gEditMode = "Edit",
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: Blank() }) ),
-                                     Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ) );
-                        If( gIssTask.Id > 0,
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                           { issue_task_name: { Id: gIssTask.Id, Value: gIssTask.Value } }) ),
-                                     Set( gIssWarn, gIssWarn & "task link (" & FirstError.Message & ")   " ) ),
-                            // CLEARING ARM. Without it the user can never UNLINK an issue:
-                            // pressing the chip's ✕ empties the global, the save skips this
-                            // block entirely, SharePoint keeps the old link, and the toast
-                            // still says "Issue saved". issue_type and issue_impact above
-                            // have always had this arm; these three did not.
-                            gEditMode = "Edit",
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                           { issue_task_name: Blank() }) ),
-                                     Set( gIssWarn, gIssWarn & "task link didn't clear (" & FirstError.Message & ")   " ) ) );
-                        If( gIssTx.Id > 0,
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                           { issue_transaction_name: { Id: gIssTx.Id, Value: gIssTx.Value } }) ),
-                                     Set( gIssWarn, gIssWarn & "transaction link (" & FirstError.Message & ")   " ) ),
-                            gEditMode = "Edit",
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                           { issue_transaction_name: Blank() }) ),
-                                     Set( gIssWarn, gIssWarn & "transaction link didn't clear (" & FirstError.Message & ")   " ) ) );
-                        If( Len(gIssOwner.Mail) > 0,
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                           { issue_owner:
-                                               { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                 Claims:      ClaimPrefix & Lower(gIssOwner.Mail),
-                                                 DisplayName: gIssOwner.DisplayName,
-                                                 Email:       gIssOwner.Mail,
-                                                 Department: "", JobTitle: "", Picture: "" } }) ),
-                                     Set( gIssWarn, gIssWarn & "owner (" & FirstError.Message & ")   " ) ),
-                            gEditMode = "Edit",
-                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                           { issue_owner: Blank() }) ),
-                                     Set( gIssWarn, gIssWarn & "owner didn't clear (" & FirstError.Message & ")   " ) ) );
                         If( Len(gIssWarn) > 0,
                             Notify( "Issue saved, but these fields didn't: " & gIssWarn, NotificationType.Warning ) );
                         If( Len(gIssWarn) = 0,
