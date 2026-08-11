@@ -148,6 +148,13 @@ lists:
     join_cost: 7          # 5 Lookup + 2 Person (9 if a view also projects Created By/Modified By; SharePoint BLOCKS above 8 joins, so keep heavy views under 8). Was 8 — task_category's Managed Metadata became zero-join Number/Text
     columns:
       - { name: task_name,             type: Text,            required: true,  indexed: true,  desc: "Task title" }
+      # LIVE DIVERGENCE, confirmed in Studio 2026-08-09: the column's display field in
+      # SharePoint is the target's ID, NOT project_name, so `.Value` returns a NUMBER.
+      # `show:` below records the INTENT. The three edit screens therefore resolve the
+      # name app-side with LookUp(taskmaster_projects, ID = <fk>.Id, project_name) —
+      # that is deliberate, not a redundant query, and two code reviewers flagged it as
+      # waste on 2026-08-11 by trusting this line. Changing the display column in place
+      # UNASSOCIATES existing items, which is why it was fixed in the app instead.
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
       - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
@@ -174,6 +181,13 @@ lists:
     join_cost: 4
     columns:
       - { name: transaction_name,       type: Text,     required: true,  indexed: true,  desc: "Transaction label" }
+      # LIVE DIVERGENCE, confirmed in Studio 2026-08-09: the column's display field in
+      # SharePoint is the target's ID, NOT project_name, so `.Value` returns a NUMBER.
+      # `show:` below records the INTENT. The three edit screens therefore resolve the
+      # name app-side with LookUp(taskmaster_projects, ID = <fk>.Id, project_name) —
+      # that is deliberate, not a redundant query, and two code reviewers flagged it as
+      # waste on 2026-08-11 by trusting this line. Changing the display column in place
+      # UNASSOCIATES existing items, which is why it was fixed in the app instead.
       - { name: transaction_project_id, type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: transaction_client_name, type: Lookup,  required: true,  indexed: true,  desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
       - { name: transaction_product_id, type: Lookup,   required: true,                  desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
@@ -197,6 +211,13 @@ lists:
     columns:
       - { name: issue_name,             type: Text,     required: true,  indexed: true,  desc: "Issue summary / title" }
       - { name: issue_description,      type: Note,     required: false,                 desc: "Detailed description (display only)" }
+      # LIVE DIVERGENCE, confirmed in Studio 2026-08-09: the column's display field in
+      # SharePoint is the target's ID, NOT project_name, so `.Value` returns a NUMBER.
+      # `show:` below records the INTENT. The three edit screens therefore resolve the
+      # name app-side with LookUp(taskmaster_projects, ID = <fk>.Id, project_name) —
+      # that is deliberate, not a redundant query, and two code reviewers flagged it as
+      # waste on 2026-08-11 by trusting this line. Changing the display column in place
+      # UNASSOCIATES existing items, which is why it was fixed in the app instead.
       - { name: issue_project_id,       type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: issue_task_name,        type: Lookup,   required: false,                 desc: "Related task", lookup: { list: taskmaster_tasks, show: task_name } }
       - { name: issue_transaction_name, type: Lookup,   required: false,                 desc: "Related transaction", lookup: { list: taskmaster_transactions, show: transaction_name } }

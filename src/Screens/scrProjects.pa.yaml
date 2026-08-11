@@ -65,6 +65,11 @@ Screens:
             Type: =TextInputType.Search
             # Phase 2: drives StartsWith(project_name, txtProjSearch.Text) on the projects gallery.
             Placeholder: ="Search projects…"
+            # galProjects.Items reads .Text directly, so without this every keystroke
+            # fires a delegated query against taskmaster_projects — ~16 round trips to
+            # type "Portfolio Review", on the app's busiest list screen. This was the
+            # only text input in the repo missing it.
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Body
             Height: =40

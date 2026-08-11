@@ -726,8 +726,15 @@ Screens:
                                   Control: Gallery@2.15.0
                                   Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                                   Properties:
+                                    # LIFECYCLE ORDER, not alphabetical. task_stage is a Choice and
+                                    # Sort on .Value is a TEXT sort, which ordered the list
+                                    # Complete, Drafting, Finalizing, Not Started, Planning, Under
+                                    # Review — finished work at the top, unstarted work fourth.
+                                    # StageWeights already holds the real ordering, and this is an
+                                    # in-memory collection so the LookUp costs nothing.
                                     Items: |
-                                      =Sort(colProjectTasks, task_stage.Value)
+                                      =Sort( colProjectTasks,
+                                             Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) )
                                     WrapCount: =1
                                     TemplateSize: =52
                                     TemplatePadding: =0
