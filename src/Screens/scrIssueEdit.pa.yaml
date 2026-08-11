@@ -10,7 +10,10 @@
 #
 #  1. SEED GLOBALS IN OnVisible, WRITE FROM GLOBALS. Never write from a control's
 #     or component's live state. A cmpSelection strip keeps the previous record's
-#     pick (Reset cannot reach inside a component), and whether it clears on
+#     pick. (An earlier note here claimed Reset cannot reach inside a component.
+#     THAT IS WRONG — Reset(<instance>) fires the component's OnReset; cmpSelection
+#     simply had none until 2026-08-11. The claim misled two code reviewers.)
+#     Whether it clears on
 #     navigation is precisely what a one-way gap cannot verify — so re-seeding
 #     here makes the WRITE correct regardless of what the screen is displaying.
 #  2. NORMALISED PICKER RECORDS. Every picker global has ONE fixed schema —
@@ -79,7 +82,13 @@ Screens:
         Reset( txtIssName ); Reset( txtIssDesc );
         Set( gIssPicker, "" ); Set( gIssPeopleQuery, "" ); Reset( cmpIssPeople );
         // Re-read DefaultDate; see the note on the pickers themselves.
-        Reset( dtpIssTarget ); Reset( dtpIssClose )
+        Reset( dtpIssTarget ); Reset( dtpIssClose );
+        // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the
+        // strip shows the previous record's pick while the save writes this one.
+        // The component gained OnReset on 2026-08-11; these are its consumers.
+        Reset( selIssStatus );
+        Reset( selIssType );
+        Reset( selIssImpact )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -857,11 +866,24 @@ Screens:
                         If( gIssTask.Id > 0,
                             IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
                                            { issue_task_name: { Id: gIssTask.Id, Value: gIssTask.Value } }) ),
-                                     Set( gIssWarn, gIssWarn & "task link (" & FirstError.Message & ")   " ) ) );
+                                     Set( gIssWarn, gIssWarn & "task link (" & FirstError.Message & ")   " ) ),
+                            // CLEARING ARM. Without it the user can never UNLINK an issue:
+                            // pressing the chip's ✕ empties the global, the save skips this
+                            // block entirely, SharePoint keeps the old link, and the toast
+                            // still says "Issue saved". issue_type and issue_impact above
+                            // have always had this arm; these three did not.
+                            gEditMode = "Edit",
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                           { issue_task_name: Blank() }) ),
+                                     Set( gIssWarn, gIssWarn & "task link didn't clear (" & FirstError.Message & ")   " ) ) );
                         If( gIssTx.Id > 0,
                             IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
                                            { issue_transaction_name: { Id: gIssTx.Id, Value: gIssTx.Value } }) ),
-                                     Set( gIssWarn, gIssWarn & "transaction link (" & FirstError.Message & ")   " ) ) );
+                                     Set( gIssWarn, gIssWarn & "transaction link (" & FirstError.Message & ")   " ) ),
+                            gEditMode = "Edit",
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                           { issue_transaction_name: Blank() }) ),
+                                     Set( gIssWarn, gIssWarn & "transaction link didn't clear (" & FirstError.Message & ")   " ) ) );
                         If( Len(gIssOwner.Mail) > 0,
                             IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
                                            { issue_owner:
@@ -870,7 +892,11 @@ Screens:
                                                  DisplayName: gIssOwner.DisplayName,
                                                  Email:       gIssOwner.Mail,
                                                  Department: "", JobTitle: "", Picture: "" } }) ),
-                                     Set( gIssWarn, gIssWarn & "owner (" & FirstError.Message & ")   " ) ) );
+                                     Set( gIssWarn, gIssWarn & "owner (" & FirstError.Message & ")   " ) ),
+                            gEditMode = "Edit",
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                           { issue_owner: Blank() }) ),
+                                     Set( gIssWarn, gIssWarn & "owner didn't clear (" & FirstError.Message & ")   " ) ) );
                         If( Len(gIssWarn) > 0,
                             Notify( "Issue saved, but these fields didn't: " & gIssWarn, NotificationType.Warning ) );
                         If( Len(gIssWarn) = 0,

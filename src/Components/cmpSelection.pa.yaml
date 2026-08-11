@@ -58,6 +58,20 @@ ComponentDefinitions:
       Width: =360
       Fill: =RGBA(0, 0, 0, 0)
       Selected: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
+      # WITHOUT THIS THE STRIP LIES. A gallery re-reads its `Default` only on
+      # Reset, and `galSel.Default` is the seed from `DefaultId` — so an instance
+      # bound to per-record state kept showing the PREVIOUS record's pick while
+      # the screen's global (and therefore the save) held the new one. Open issue
+      # A as Blocked, back, open issue B as Open: the strip said Blocked and the
+      # save wrote Open.
+      #
+      # This is the same defect that made scrTask unusable and got that screen
+      # deleted on 2026-08-10 — a display that disagrees with the write. The
+      # mechanism was recorded then ("cmpSelection is un-resettable because it
+      # HAS NO OnReset, not because components can't be reset") but the three
+      # live per-record instances were never checked. Fixed at the source, so
+      # every consumer gets it: the screen just calls Reset(<instance>).
+      OnReset: =Reset( galSel )
     Children:
       # A HORIZONTAL STRIP BUILT FROM A VERTICAL GALLERY.
       #

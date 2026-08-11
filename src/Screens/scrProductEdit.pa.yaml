@@ -242,6 +242,12 @@ Screens:
               =If( Len(lblPdMissing.Text) > 0,
               Notify( "Can't save yet — this product still needs: " & lblPdMissing.Text,
               NotificationType.Error ),
+              // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last
+              // successful save, gPdSaved makes the IsBlank(.ID) guard below pass on a
+              // PREVIOUS record — so a write that fails with an empty error message
+              // reported success and handed the caller's form the WRONG record.
+              // scrTaskEdit has always blanked its equivalent; these two did not.
+              Set( gPdSaved, Blank() );
               Set( gPdErr, "" );
               // product_uid is a business key and SharePoint does not enforce
               // uniqueness, so check first. Delegable: `=` on an indexed Text

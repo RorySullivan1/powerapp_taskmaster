@@ -64,8 +64,15 @@ Screens:
         Set( gTxPicker, "" ); Set( gTxPeopleQuery, "" ); Reset( cmpTxPeople );
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
         // date — it blocked the save outright on every edit.
-        Reset( dtpTxDate )
-        )
+        Reset( dtpTxDate );
+        // cmpSelection re-reads its DefaultId ONLY on Reset, so without this the
+        // strip shows the PREVIOUS record's currency while the save writes this
+        // one. The component gained OnReset on 2026-08-11; this is its consumer.
+        //
+        // INSIDE the resume guard on purpose: returning from ＋ New must not
+        // re-seed the strip from the stored record, which would discard a
+        // currency the user picked before stepping out to create a client.
+        Reset( selTxCurrency ) )
     Children:
       # ---- Header ----------------------------------------------------------
       - HeaderBar:
