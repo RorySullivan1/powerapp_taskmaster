@@ -27,7 +27,7 @@ Key facts:
 - **Data is now bound (2026-08-03).** `scrHome`, `scrProjects` and `scrReports` carry live,
   delegable queries against `schema/schema.yaml`'s columns. The shape everywhere is
   **filter server-side → aggregate locally**, because `CountRows`/`Average` never delegate
-  to SharePoint. `scrReference` / `scrAdmin` remain shells.
+  to SharePoint. `scrReference` is now the reference-data screen (clients + products); `scrAdmin` was deleted 2026-08-11 and its galleries moved there.
 - **Prerequisite:** these three screens **cannot paste until the lists are provisioned** and
   added as data sources — Studio can't bind to a list that doesn't exist. The two shells and
   the components still paste at any time.
@@ -45,15 +45,15 @@ Key facts:
 | `scrHome.pa.yaml` | Code view | Landing shell — the reference header+nav template |
 | `scrReports.pa.yaml` | Code view | Reports shell + the Q2 unlicensed empty-state card |
 | `scrProjects.pa.yaml` | Code view | Projects shell + search box + empty placeholder |
-| `scrReference.pa.yaml` | Code view | Clients/Products/Indices shell placeholder |
-| `scrAdmin.pa.yaml` | Code view | Admin shell placeholder — **landed, but from a stale copy carrying `Variant: CONFIRM_BlankVertical`. See paste-log.** |
+| `scrReference.pa.yaml` | Code view | **Reference data** — clients + products browse/filter/open/create. Absorbed `scrAdmin` 2026-08-11. |
 | `scrProject.pa.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
 | `scrTaskEdit.pa.yaml` | Code view | **Task edit** — the SOLE writer of a task, and the live home of the C3 rollup write-back. (Superseded `scrTask`, deleted 2026-08-10.) |
 
 ## Paste order (dependencies are real)
 
-1. **Create five blank screens** in Studio, rename them exactly:
-   `scrHome`, `scrReports`, `scrProjects`, `scrReference`, `scrAdmin`.
+1. **Create four blank screens** in Studio, rename them exactly:
+   `scrHome`, `scrReports`, `scrProjects`, `scrReference`.
+   (`scrAdmin` was deleted 2026-08-11 — NavMenu is four entries.)
    (`NavMenu` holds live Screen references — they must exist by those names first.)
 2. **Recreate the components** in the component editor (`components/_COMPONENTS-NOTES.md`).
 3. **Paste `App.Formulas`** into the formula bar — **now step 3, not last.** The data-bound

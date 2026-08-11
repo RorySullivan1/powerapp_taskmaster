@@ -1,9 +1,14 @@
 # =============================================================================
-# scrReference  —  Clients + Product/Index stubs (screen-map §8). CORE-SHELL:
-# header + nav + titled placeholder. Phase 2 wires Filter(tmClients, IsActive =
-# true) CRUD and the read-mostly ISIN / IndexTicker browse lists.
-# DIALECT: modern structured schema; positional z-order. Header + nav are one
-# component (cmpAppBar), declared LAST so the fly-out floats over the content.
+# scrReference  —  REFERENCE DATA. Clients and products: browse, filter, open,
+# and create. Absorbed scrAdmin 2026-08-11, which was deleted — its two
+# maintenance galleries and two create buttons are the whole of this screen now,
+# so there is one place to maintain reference data rather than two.
+#
+# NavMenu dropped from five entries to four. Key 4 is this screen and is now the
+# Switch DEFAULT in every OnNavigate, since there is no fifth destination.
+#
+# Planned: this becomes the Reference Data TAB of a tabbed Settings screen, once
+# the user and admin settings are settled. Nothing here needs to move for that.
 # =============================================================================
 Screens:
   scrReference:
@@ -19,19 +24,267 @@ Screens:
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
             X: =Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter
-      - RefEmptyLabel:
+      # ---- Reference data ---------------------------------------------------
+      # scrClientEdit and scrProductEdit are reachable from EXACTLY two places:
+      # the Reference screen, and cmpRecordPicker's "＋ New". They are deliberately NOT in
+      # NavMenu — reference data is something you maintain, not somewhere you
+      # browse to. Both are opened in New mode with an EMPTY return contract, so
+      # the save just comes back here rather than filling a caller's field.
+      - lblAdminRefHead:
           Control: Label@2.5.1
           Properties:
-            Text: ="Clients, Products (ISIN) and Indices (IndexTicker) will live here (Phase 2)."
+            Text: ="Reference data"
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            FontWeight: =FontWeight.Semibold
+            Color: =Theme.Color.TextPrimary
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter * 2
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter * 2
+            Width: =400
+            Height: =28
+      - btnAdminNewClient:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="＋  New client"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
             Font: =Theme.Font
             Size: =Theme.Size.Body
+            X: =Theme.Space.Gutter * 2
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter * 2 + 40
+            Width: =180
+            Height: =44
+            OnSelect: |
+              =Set( gClMode, "New" );
+               Set( gClReturn, "" );
+               Navigate( scrClientEdit, ScreenTransition.Cover )
+      - btnAdminNewProduct:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="＋  New product"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Theme.Space.Gutter * 2 + 180 + 12
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter * 2 + 40
+            Width: =180
+            Height: =44
+            OnSelect: |
+              =Set( gPdMode, "New" );
+               Set( gPdReturn, "" );
+               Navigate( scrProductEdit, ScreenTransition.Cover )
+      # ---- Maintenance lists -----------------------------------------------
+      # THESE ARE WHAT DEFINE `gEditClient` / `gEditProduct`. Until they existed
+      # the two create screens READ those globals but nothing in the app ever
+      # Set them, so Studio reported both as unknown — an undefined global has no
+      # type, and `gEditClient.client_name` cannot resolve against nothing.
+      # The Edit path had no entry point, which was the actual gap: scrReference
+      # could only CREATE reference data, never open any.
+      #
+      # Bands, computed (1366x768):
+      #   112..140  heading      152..196  new buttons
+      #   210..230  caption      234..270  search      278..744  gallery
+      #   left col X 24..675     right col X 691..1342
+      - lblAdminClients:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Clients"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
             Color: =Theme.Color.TextMuted
-            Align: =Align.Center
             VerticalAlign: =VerticalAlign.Middle
-            X: =RefEmpty.X
-            Y: =RefEmpty.Y
-            Width: =RefEmpty.Width
-            Height: =RefEmpty.Height
+            X: =Theme.Space.Gutter
+            Y: =210
+            Width: =651
+            Height: =20
+      - txtAdminClientSearch:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="Filter by name…"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Theme.Space.Gutter
+            Y: =234
+            Width: =651
+            Height: =36
+      - galAdminClients:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            # Delegable: StartsWith on an indexed Text column, and an empty search
+            # box matches everything rather than nothing.
+            Items: |
+              =Sort( Filter( taskmaster_clients,
+                             StartsWith(client_name, txtAdminClientSearch.Text) ),
+                     client_name )
+            WrapCount: =1
+            TemplateSize: =44
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            ShowScrollbar: =true
+            X: =Theme.Space.Gutter
+            Y: =278
+            Width: =651
+            Height: =466
+          Children:
+            - cellAdminClName:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.client_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =24
+            - cellAdminClMeta:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =Coalesce(ThisItem.client_type.Value, "—") & "   ·   " &
+                     Coalesce(ThisItem.client_region_path, "—")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =23
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
+            - lineAdminCl:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =Theme.Color.Border
+                  X: =0
+                  Y: =43
+                  Width: =Parent.TemplateWidth
+                  Height: =1
+            - hitAdminCl:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # Transparent full-template button declared LAST — a gallery's
+                  # own OnSelect does not reliably fire when the click lands on a
+                  # child control.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gEditClient, LookUp(taskmaster_clients, ID = ThisItem.ID) );
+                     If( IsBlank(gEditClient.ID),
+                         Notify( "That client no longer exists — it may have been deleted.",
+                                 NotificationType.Error ),
+                         Set( gClMode, "Edit" );
+                         Set( gClReturn, "" );
+                         Navigate( scrClientEdit, ScreenTransition.Cover ) )
+      - lblAdminProducts:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Products"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =691
+            Y: =210
+            Width: =651
+            Height: =20
+      - txtAdminProductSearch:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="Filter by product ID…"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =691
+            Y: =234
+            Width: =651
+            Height: =36
+      - galAdminProducts:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            Items: |
+              =Sort( Filter( taskmaster_products,
+                             StartsWith(product_uid, txtAdminProductSearch.Text) ),
+                     product_uid )
+            WrapCount: =1
+            TemplateSize: =44
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            ShowScrollbar: =true
+            X: =691
+            Y: =278
+            Width: =651
+            Height: =466
+          Children:
+            - cellAdminPdUid:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.product_uid
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =24
+            - cellAdminPdMeta:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =Coalesce(ThisItem.product_type_path, "—")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =23
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
+            - lineAdminPd:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =Theme.Color.Border
+                  X: =0
+                  Y: =43
+                  Width: =Parent.TemplateWidth
+                  Height: =1
+            - hitAdminPd:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gEditProduct, LookUp(taskmaster_products, ID = ThisItem.ID) );
+                     If( IsBlank(gEditProduct.ID),
+                         Notify( "That product no longer exists — it may have been deleted.",
+                                 NotificationType.Error ),
+                         Set( gPdMode, "Edit" );
+                         Set( gPdReturn, "" );
+                         Navigate( scrProductEdit, ScreenTransition.Cover ) )
+
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #
@@ -53,7 +306,7 @@ Screens:
             ActiveKey: =4
             HasLicence: =gHasPowerBiLicence
             AppTitle: ="EQD Taskmaster"
-            ScreenTitle: ="Reference"
+            ScreenTitle: ="Reference data"
             IsOpen: =gNavOpen
             OnToggle: =Set(gNavOpen, !gNavOpen)
             OnNavigate: |
@@ -61,6 +314,5 @@ Screens:
                        1, Navigate(scrHome, ScreenTransition.Fade),
                        2, Navigate(scrReports, ScreenTransition.Fade),
                        3, Navigate(scrProjects, ScreenTransition.Fade),
-                       4, Navigate(scrReference, ScreenTransition.Fade),
-                          Navigate(scrAdmin, ScreenTransition.Fade) );
+                          Navigate(scrReference, ScreenTransition.Fade) );
               Set(gNavOpen, false)
