@@ -79,7 +79,7 @@ Screens:
         Reset( txtIssName ); Reset( txtIssDesc );
 
         Reset( txtIssProjectSearch ); Reset( txtIssTaskSearch ); Reset( txtIssTxSearch );
-        Reset( txtIssAssigneeSearch ); Reset( txtIssOwnerSearch );
+        Set( gIssPicker, "" ); Set( gIssPeopleQuery, "" ); Reset( cmpIssPeople );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose )
     Children:
@@ -625,18 +625,24 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtIssAssigneeSearch:
-                            Control: ModernTextInput@1.1.1
+                        - btnIssAssigneePick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =Len(gIssAssignee.Mail) = 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gIssPicker, "Assignee")
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose an assignee"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set(gIssPicker, "Assignee");
+                                 Reset(cmpIssPeople);
+                                 Set(gIssPeopleQuery, "")
                         - chipIssAssignee:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -669,7 +675,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gIssAssignee, { DisplayName: "", Mail: "" }); Reset(txtIssAssigneeSearch)
+                                      =Set(gIssAssignee, { DisplayName: "", Mail: "" }); Reset(cmpIssPeople); Set(gIssPicker, "")
                   - colIssOwner:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -689,18 +695,24 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtIssOwnerSearch:
-                            Control: ModernTextInput@1.1.1
+                        - btnIssOwnerPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =Len(gIssOwner.Mail) = 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gIssPicker, "Owner")
-                              Placeholder: ="Search people…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a business owner"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set(gIssPicker, "Owner");
+                                 Reset(cmpIssPeople);
+                                 Set(gIssPeopleQuery, "")
                         - chipIssOwner:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -733,7 +745,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gIssOwner, { DisplayName: "", Mail: "" }); Reset(txtIssOwnerSearch)
+                                      =Set(gIssOwner, { DisplayName: "", Mail: "" }); Reset(cmpIssPeople); Set(gIssPicker, "")
             - colIssMissing:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1077,98 +1089,34 @@ Screens:
                   OnSelect: |
                     =Select(Parent);
                      Set(gIssTx, { Id: ThisItem.ID, Value: ThisItem.transaction_name })
-      # People pickers — Office365Users.SearchUser is first-party and returns
-      # DisplayName / Mail, which is exactly what the Person write needs. Only
-      # those two fields are stored, so the global has ONE schema (pattern 2).
-      - galIssAssignee:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+      - cmpIssPeople:
+          Control: CanvasComponent
+          ComponentName: cmpPeoplePicker
           Properties:
-            Visible: =gIssPicker = "Assignee" && ( Len(txtIssAssigneeSearch.Text) >= 2 && Len(gIssAssignee.Mail) = 0 )
-            Items: |
-              =Office365Users.SearchUserV2({ searchTerm: txtIssAssigneeSearch.Text, top: 8 }).value
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =24
-            Y: =654
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowIssAssignee:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galIssAssigneeHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gIssAssignee, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
-      - galIssOwner:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gIssPicker = "Owner" && ( Len(txtIssOwnerSearch.Text) >= 2 && Len(gIssOwner.Mail) = 0 )
-            Items: |
-              =Office365Users.SearchUserV2({ searchTerm: txtIssOwnerSearch.Text, top: 8 }).value
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =304
-            Y: =654
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowIssOwner:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galIssOwnerHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gIssOwner, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+            Visible: =gIssPicker = "Assignee" || gIssPicker = "Owner"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: |
+              =Switch( gIssPicker,
+                       "Assignee", "Select assignee",
+                       "Owner",    "Select business owner" )
+            Results: |
+              =If( Len(gIssPeopleQuery) >= 2,
+                   ShowColumns(
+                       Office365Users.SearchUserV2({ searchTerm: gIssPeopleQuery, top: 25 }).value,
+                       DisplayName, Mail ) )
+            OnSearch: =Set( gIssPeopleQuery, cmpIssPeople.Query )
+            OnConfirm: |
+              =Switch( gIssPicker,
+                       "Assignee",
+                       Set( gIssAssignee,
+                            { DisplayName: cmpIssPeople.Picked.DisplayName,
+                              Mail:        cmpIssPeople.Picked.Mail } ),
+                       "Owner",
+                       Set( gIssOwner,
+                            { DisplayName: cmpIssPeople.Picked.DisplayName,
+                              Mail:        cmpIssPeople.Picked.Mail } ) );
+               Set( gIssPicker, "" )
+            OnCancel: =Set( gIssPicker, "" )
