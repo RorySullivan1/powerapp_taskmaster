@@ -97,6 +97,7 @@ KNOWN_CONTROLS = {
 # published .pa.yaml in the wild.
 KNOWN_VARIANTS = {
     "AutoLayout",        # GroupContainer@1.5.0
+    "GridLayout",        # GroupContainer@1.5.0 — CONFIRMED from Studio code view 2026-08-10
     "Classic",           # Form@2.4.4 — CONFIRMED from Studio code view 2026-08-04
     "ClassicTextualEdit",# TypedDataCard@1.0.7 — the text-field card
    # GroupContainer@1.5.0 — CONFIRMED from Studio code view 2026-08-04
