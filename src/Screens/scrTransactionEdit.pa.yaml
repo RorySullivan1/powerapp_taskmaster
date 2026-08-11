@@ -25,8 +25,16 @@ Screens:
   scrTransactionEdit:
     Properties:
       Fill: =Theme.Color.Bg
+      # RE-ENTRY GUARD. Back() from the ＋ New create screen makes this screen
+      # visible again, which fires OnVisible — and OnVisible exists to seed a
+      # record from scratch, so it wiped everything the user had typed and
+      # overwrote the client/product the create screen had just handed back.
+      # On a RETURN there is nothing to seed: the globals already hold the
+      # in-progress values. So skip the whole body and clear the flag.
       OnVisible: |
-        =Set( gTxProject,
+        =If( gTxResume,
+         Set( gTxResume, false ),
+         Set( gTxProject,
               If( gEditMode = "Edit",
                   { Id: gEditTransaction.transaction_project_id.Id,
                     Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
@@ -45,7 +53,11 @@ Screens:
               If( gEditMode = "Edit",
                   { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
                     Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
-                  { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
+                  // NOT User(). The sales owner of a transaction is usually somebody
+                  // else — defaulting to whoever is entering it writes a wrong name
+                  // silently, and transaction_sales is required so the empty state is
+                  // caught by lblTxMissing rather than slipping through.
+                  { DisplayName: "", Mail: "" } ) );
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
         Reset( txtTxName );
@@ -53,6 +65,7 @@ Screens:
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
         // date — it blocked the save outright on every edit.
         Reset( dtpTxDate )
+        )
     Children:
       # ---- Header ----------------------------------------------------------
       - HeaderBar:
@@ -822,11 +835,16 @@ Screens:
             # ＋ New hands the caller's field name to the create screen via
             # gClReturn / gPdReturn; that screen writes the new record back
             # into the right global and returns here with it selected.
+            # DOES NOT TOUCH gEditMode. The create screens carry their OWN mode
+            # (gClMode / gPdMode) — clobbering the caller's mode meant returning
+            # from ＋ New re-seeded this screen as a blank NEW record, losing the
+            # record being edited rather than merely the typed values.
+            # gTxResume tells this screen's OnVisible that the next show is a RETURN.
             OnCreateNew: |
-              =Set( gEditMode, "New" );
-              If( gTxPicker = "Client",
-              Set( gClReturn, "TxClient" ); Set( gTxPicker, "" );
-              Navigate( scrClientEdit, ScreenTransition.Cover ),
-              Set( gPdReturn, "TxProduct" ); Set( gTxPicker, "" );
-              Navigate( scrProductEdit, ScreenTransition.Cover ) )
+              =Set( gTxResume, true );
+               If( gTxPicker = "Client",
+                   Set( gClMode, "New" ); Set( gClReturn, "TxClient" ); Set( gTxPicker, "" );
+                   Navigate( scrClientEdit, ScreenTransition.Cover ),
+                   Set( gPdMode, "New" ); Set( gPdReturn, "TxProduct" ); Set( gTxPicker, "" );
+                   Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gTxPicker, "" )

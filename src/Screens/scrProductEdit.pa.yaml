@@ -26,10 +26,10 @@ Screens:
     Properties:
       Fill: =Theme.Color.Bg
       OnVisible: |
-        =Set( gPdUid,      If( gEditMode = "Edit", Coalesce(gEditProduct.product_uid, ""), "" ) );
-        Set( gPdTypeId,   If( gEditMode = "Edit", Coalesce(gEditProduct.product_type_id, 0), 0 ) );
-        Set( gPdTypePath, If( gEditMode = "Edit", Coalesce(gEditProduct.product_type_path, ""), "" ) );
-        Set( gPdDesc,     If( gEditMode = "Edit", Coalesce(gEditProduct.product_description, ""), "" ) );
+        =Set( gPdUid,      If( gPdMode = "Edit", Coalesce(gEditProduct.product_uid, ""), "" ) );
+        Set( gPdTypeId,   If( gPdMode = "Edit", Coalesce(gEditProduct.product_type_id, 0), 0 ) );
+        Set( gPdTypePath, If( gPdMode = "Edit", Coalesce(gEditProduct.product_type_path, ""), "" ) );
+        Set( gPdDesc,     If( gPdMode = "Edit", Coalesce(gEditProduct.product_description, ""), "" ) );
         ClearCollect( colMapProdType, mapping_producttype );
         Set( gPdDup, false );
         // Seeded inputs keep the PREVIOUS record's value without an explicit Reset.
@@ -46,7 +46,7 @@ Screens:
       - AppTitle:
           Control: Label@2.5.1
           Properties:
-            Text: =If(gEditMode = "Edit", "Edit product", "New product")
+            Text: =If(gPdMode = "Edit", "Edit product", "New product")
             Color: =Theme.Color.OnPrimary
             Font: =Theme.Font
             Size: =Theme.Size.H2
@@ -100,7 +100,7 @@ Screens:
             - txtPdUid:
                 Control: ModernTextInput@1.1.1
                 Properties:
-                  Default: =If(gEditMode = "Edit", gEditProduct.product_uid, "")
+                  Default: =If(gPdMode = "Edit", gEditProduct.product_uid, "")
                   Placeholder: ="e.g. XS1234567890"
                   TriggerOutput: =TriggerOutput.Delayed
                   Font: =Theme.Font
@@ -168,7 +168,7 @@ Screens:
             - txtPdDesc:
                 Control: ModernTextInput@1.1.1
                 Properties:
-                  Default: =If(gEditMode = "Edit", gEditProduct.product_description, "")
+                  Default: =If(gPdMode = "Edit", gEditProduct.product_description, "")
                   Placeholder: ="What this product is"
                   Type: =TextInputType.Multiline
                   TriggerOutput: =TriggerOutput.Delayed
@@ -226,7 +226,7 @@ Screens:
       - btnPdSave:
           Control: Classic/Button@2.2.0
           Properties:
-            Text: =If(gEditMode = "Edit", "Save product", "Create product")
+            Text: =If(gPdMode = "Edit", "Save product", "Create product")
             Fill: =Theme.Color.Primary
             Color: =Theme.Color.OnPrimary
             BorderColor: =Theme.Color.Primary
@@ -248,7 +248,7 @@ Screens:
               // column. On an EDIT the row itself is excluded by ID.
               Set( gPdClash,
               LookUp( taskmaster_products,
-              product_uid = Trim(txtPdUid.Text) && ID <> If(gEditMode = "Edit", gEditProduct.ID, 0) ) );
+              product_uid = Trim(txtPdUid.Text) && ID <> If(gPdMode = "Edit", gEditProduct.ID, 0) ) );
               If( !IsBlank(gPdClash.ID),
               Set( gPdDup, true );
               Notify( "A product with ID " & Trim(txtPdUid.Text) & " already exists.",
@@ -257,7 +257,7 @@ Screens:
               IfError(
               Set( gPdSaved,
               Patch( taskmaster_products,
-              If( gEditMode = "Edit", gEditProduct, Defaults(taskmaster_products) ),
+              If( gPdMode = "Edit", gEditProduct, Defaults(taskmaster_products) ),
               { product_uid:         Trim(txtPdUid.Text),
               product_type_id:     gPdTypeId,
               product_type_path:   gPdTypePath,
@@ -276,5 +276,5 @@ Screens:
               gPdReturn = "TxProduct",
               Set( gTxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
               Set( gPdReturn, "" );
-              Notify( If(gEditMode = "Edit", "Product saved", "Product created"), NotificationType.Success );
+              Notify( If(gPdMode = "Edit", "Product saved", "Product created"), NotificationType.Success );
               Back() ) ) )

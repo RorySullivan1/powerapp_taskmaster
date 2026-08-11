@@ -34,8 +34,16 @@ Screens:
   scrTaskEdit:
     Properties:
       Fill: =Theme.Color.Bg
+      # RE-ENTRY GUARD. Back() from the ＋ New create screen makes this screen
+      # visible again, which fires OnVisible — and OnVisible exists to seed a
+      # record from scratch, so it wiped everything the user had typed and
+      # overwrote the client/product the create screen had just handed back.
+      # On a RETURN there is nothing to seed: the globals already hold the
+      # in-progress values. So skip the whole body and clear the flag.
       OnVisible: |
-        =Set( gTkProject,
+        =If( gTkResume,
+         Set( gTkResume, false ),
+         Set( gTkProject,
               If( gEditMode = "Edit",
                   { Id: gEditTask.task_project_id.Id,
                     Value: LookUp(taskmaster_projects, ID = gEditTask.task_project_id.Id, project_name) },
@@ -88,6 +96,7 @@ Screens:
         // never take on a second visit and the Patch writes Blank() over the stored
         // dates. The completion date is derived on save and has no picker at all.
         Reset( dtpTkStart ); Reset( dtpTkTarget )
+        )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -1618,11 +1627,16 @@ Screens:
             # ＋ New hands the caller's field name to the create screen via
             # gClReturn / gPdReturn; that screen writes the new record back
             # into the right global and returns here with it selected.
+            # DOES NOT TOUCH gEditMode. The create screens carry their OWN mode
+            # (gClMode / gPdMode) — clobbering the caller's mode meant returning
+            # from ＋ New re-seeded this screen as a blank NEW record, losing the
+            # record being edited rather than merely the typed values.
+            # gTkResume tells this screen's OnVisible that the next show is a RETURN.
             OnCreateNew: |
-              =Set( gEditMode, "New" );
-              If( gTkPicker = "Client",
-              Set( gClReturn, "TaskClient" ); Set( gTkPicker, "" );
-              Navigate( scrClientEdit, ScreenTransition.Cover ),
-              Set( gPdReturn, "TaskProduct" ); Set( gTkPicker, "" );
-              Navigate( scrProductEdit, ScreenTransition.Cover ) )
+              =Set( gTkResume, true );
+               If( gTkPicker = "Client",
+                   Set( gClMode, "New" ); Set( gClReturn, "TaskClient" ); Set( gTkPicker, "" );
+                   Navigate( scrClientEdit, ScreenTransition.Cover ),
+                   Set( gPdMode, "New" ); Set( gPdReturn, "TaskProduct" ); Set( gTkPicker, "" );
+                   Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gTkPicker, "" )

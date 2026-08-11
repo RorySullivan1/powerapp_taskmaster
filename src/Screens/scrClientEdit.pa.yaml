@@ -38,20 +38,20 @@ Screens:
     Properties:
       Fill: =Theme.Color.Bg
       OnVisible: |
-        =Set( gClName,   If( gEditMode = "Edit", Coalesce(gEditClient.client_name, ""), "" ) );
+        =Set( gClName,   If( gClMode = "Edit", Coalesce(gEditClient.client_name, ""), "" ) );
         // Choice values come from the column itself — never a literal here.
         ClearCollect( colClTypeChoices, Choices([@taskmaster_clients].client_type) );
         ClearCollect( colClCovChoices,  Choices([@taskmaster_clients].client_coverage) );
-        Set( gClType, If( gEditMode = "Edit", Coalesce(gEditClient.client_type.Value, ""), "" ) );
-        Set( gClCov,  If( gEditMode = "Edit", Coalesce(gEditClient.client_coverage.Value, ""), "" ) );
+        Set( gClType, If( gClMode = "Edit", Coalesce(gEditClient.client_type.Value, ""), "" ) );
+        Set( gClCov,  If( gClMode = "Edit", Coalesce(gEditClient.client_coverage.Value, ""), "" ) );
         Set( gClSales,
-              If( gEditMode = "Edit",
+              If( gClMode = "Edit",
                   { DisplayName: Coalesce(gEditClient.client_sales.DisplayName, ""),
                     Mail:        Coalesce(gEditClient.client_sales.Email, "") },
                   { DisplayName: "", Mail: "" } ) );
-        Set( gClRegionId,   If( gEditMode = "Edit", Coalesce(gEditClient.client_region_id, 0), 0 ) );
-        Set( gClRegionPath, If( gEditMode = "Edit", Coalesce(gEditClient.client_region_path, ""), "" ) );
-        Set( gClNotes, If( gEditMode = "Edit", Coalesce(gEditClient.client_notes, ""), "" ) );
+        Set( gClRegionId,   If( gClMode = "Edit", Coalesce(gEditClient.client_region_id, 0), 0 ) );
+        Set( gClRegionPath, If( gClMode = "Edit", Coalesce(gEditClient.client_region_path, ""), "" ) );
+        Set( gClNotes, If( gClMode = "Edit", Coalesce(gEditClient.client_notes, ""), "" ) );
         ClearCollect( colMapRegionCl, mapping_regions );
         Set( gClPicker, "" );
         // Every seeded input needs an explicit Reset or it keeps the PREVIOUS
@@ -72,7 +72,7 @@ Screens:
       - AppTitle:
           Control: Label@2.5.1
           Properties:
-            Text: =If(gEditMode = "Edit", "Edit client", "New client")
+            Text: =If(gClMode = "Edit", "Edit client", "New client")
             Color: =Theme.Color.OnPrimary
             Font: =Theme.Font
             Size: =Theme.Size.H2
@@ -126,7 +126,7 @@ Screens:
             - txtClName:
                 Control: ModernTextInput@1.1.1
                 Properties:
-                  Default: =If(gEditMode = "Edit", gEditClient.client_name, "")
+                  Default: =If(gClMode = "Edit", gEditClient.client_name, "")
                   Placeholder: ="Legal or trading name"
                   TriggerOutput: =TriggerOutput.Delayed
                   Font: =Theme.Font
@@ -311,7 +311,7 @@ Screens:
             - txtClNotes:
                 Control: ModernTextInput@1.1.1
                 Properties:
-                  Default: =If(gEditMode = "Edit", gEditClient.client_notes, "")
+                  Default: =If(gClMode = "Edit", gEditClient.client_notes, "")
                   Placeholder: ="Optional"
                   Type: =TextInputType.Multiline
                   TriggerOutput: =TriggerOutput.Delayed
@@ -372,7 +372,7 @@ Screens:
       - btnClSave:
           Control: Classic/Button@2.2.0
           Properties:
-            Text: =If(gEditMode = "Edit", "Save client", "Create client")
+            Text: =If(gClMode = "Edit", "Save client", "Create client")
             Fill: =Theme.Color.Primary
             Color: =Theme.Color.OnPrimary
             BorderColor: =Theme.Color.Primary
@@ -394,7 +394,7 @@ Screens:
               IfError(
               Set( gClSaved,
               Patch( taskmaster_clients,
-              If( gEditMode = "Edit", gEditClient, Defaults(taskmaster_clients) ),
+              If( gClMode = "Edit", gEditClient, Defaults(taskmaster_clients) ),
               { client_name:        Trim(txtClName.Text),
               client_type:        { Value: gClType },
               client_coverage:    { Value: gClCov },
@@ -418,7 +418,7 @@ Screens:
               gClReturn = "TxClient",
               Set( gTxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ) );
               Set( gClReturn, "" );
-              Notify( If(gEditMode = "Edit", "Client saved", "Client created"), NotificationType.Success );
+              Notify( If(gClMode = "Edit", "Client saved", "Client created"), NotificationType.Success );
               Back() ) )
       # ---- People picker — declared LAST so it paints above the action bar ---
       - cmpClPeople:
