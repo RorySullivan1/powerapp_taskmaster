@@ -92,7 +92,8 @@ Screens:
       - AppTitle:
           Control: Label@2.5.1
           Properties:
-            Text: =If(gEditMode = "Edit", "Edit issue", "New issue")
+            Text: =If(gEditMode = "Edit", "Edit issue", "New issue") &
+               If( gIssProject.Id > 0, "   ·   " & gIssProject.Value, "" )
             Color: =Theme.Color.OnPrimary
             Font: =Theme.Font
             FontWeight: =FontWeight.Semibold
@@ -288,7 +289,7 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =120
                 Children:
-                  - colIssProject:
+                  - colIssImpact:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
@@ -297,83 +298,6 @@ Screens:
                         LayoutGap: =8
                         LayoutGridColumnStart: =1
                         LayoutGridColumnEnd: =1
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =10
-                        Height: =62
-                      Children:
-                        - lblIssProjCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Project  *"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        # Opens the shared record picker. Was a search box that filtered a
-                        # floating gallery as you typed; the search now lives in the dialog.
-                        # Reset() clears the previous field's query and highlight — one
-                        # instance serves every lookup on this screen.
-                        - btnIssProjectPick:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =gIssProject.Id <= 0
-                              Text: ="＋  Choose a project"
-                              Align: =Align.Left
-                              Fill: =Theme.Color.Bg
-                              Color: =Theme.Color.TextMuted
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Body
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set( gIssPicker, "Project" );
-                                 Reset( cmpIssRecord );
-                                 Set( gIssRecQuery, "" )
-                        - chipIssProject:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              Visible: =gIssProject.Id > 0
-                              LayoutDirection: =LayoutDirection.Horizontal
-                              LayoutAlignItems: =LayoutAlignItems.Center
-                              LayoutGap: =6
-                              Width: =Parent.Width
-                              Height: =36
-                            Children:
-                              - lblIssProjChip:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: =If(gIssProject.Id > 0, gIssProject.Value, "— none selected —")
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =If(gIssProject.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =1
-                                    LayoutMinWidth: =60
-                                    Height: =36
-                              - icoIssProjClear:
-                                  Control: Classic/Icon@2.5.0
-                                  Properties:
-                                    Icon: =Icon.Cancel
-                                    Color: =Theme.Color.TextMuted
-                                    FillPortions: =0
-                                    LayoutMinWidth: =16
-                                    Height: =16
-                                    Width: =16
-                                    OnSelect: |
-                                      =Set(gIssProject, { Id: 0, Value: "" }); Reset( cmpIssRecord )
-                  - colIssImpact:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
                         LayoutGridRowStart: =1
                         LayoutGridRowEnd: =10
                         Height: =62
@@ -800,7 +724,11 @@ Screens:
                         Text: |
                           =Trim(
                              If( Len(Trim(txtIssName.Text)) = 0, "summary   ", "" ) &
-                             If( gIssProject.Id <= 0,            "project   ", "" ) &
+                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on
+                             // this form, but a blank one would still be rejected by SharePoint —
+                             // and silently, since there is nothing on screen to point at. Same
+                             // guard scrTaskEdit keeps for the same reason.
+                             If( gIssProject.Id <= 0,            "a parent project (not set — reopen from the project screen)   ", "" ) &
                              If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) )
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
@@ -1008,12 +936,12 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpRecordPicker
           Properties:
-            Visible: =gIssPicker = "Project" || gIssPicker = "Task" || gIssPicker = "Tx"
+            Visible: =gIssPicker = "Task" || gIssPicker = "Tx"
             X: =0
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            Title: =Switch( gIssPicker, "Project", "Select project", "Task", "Select task", "Select transaction" )
+            Title: =Switch( gIssPicker, "Task", "Select task", "Select transaction" )
             # ForAll(... As alias, {record}) — NOT AddColumns(ShowColumns(...)).
             # ShowColumns kept `ID` and AddColumns then tried to add `Id`, a name
             # differing only by case, which Studio rejects — and the result carried
@@ -1024,13 +952,7 @@ Screens:
             # the people picker, which is confirmed working in Studio.
             # FirstN caps the page at 50: Filter delegates, ForAll does not.
             Results: |
-              =If( gIssPicker = "Project" && Len(gIssRecQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_projects,
-              StartsWith(project_name, gIssRecQuery) ), 50 ) As pr,
-              { Id:        pr.ID,
-              Primary:   pr.project_name,
-              Secondary: Coalesce(pr.project_phase.Value, "") } ),
-              gIssPicker = "Task" && Len(gIssRecQuery) >= 2,
+              =If( gIssPicker = "Task" && Len(gIssRecQuery) >= 2,
               ForAll( FirstN( Filter( taskmaster_tasks,
               StartsWith(task_name, gIssRecQuery) ), 50 ) As t,
               { Id:        t.ID,
@@ -1046,7 +968,6 @@ Screens:
             AllowCreate: =false
             OnConfirm: |
               =Switch( gIssPicker,
-              "Project", Set( gIssProject, { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ),
               "Task",    Set( gIssTask,    { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ),
               Set( gIssTx,      { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ) );
               Set( gIssPicker, "" )
