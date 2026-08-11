@@ -74,22 +74,211 @@ Screens:
               =Set( gEditMode, "New" );
                Set( gPdReturn, "" );
                Navigate( scrProductEdit, ScreenTransition.Cover )
-      - AdminEmptyLabel:
+      # ---- Maintenance lists -----------------------------------------------
+      # THESE ARE WHAT DEFINE `gEditClient` / `gEditProduct`. Until they existed
+      # the two create screens READ those globals but nothing in the app ever
+      # Set them, so Studio reported both as unknown — an undefined global has no
+      # type, and `gEditClient.client_name` cannot resolve against nothing.
+      # The Edit path had no entry point, which was the actual gap: scrAdmin
+      # could only CREATE reference data, never open any.
+      #
+      # Bands, computed (1366x768):
+      #   112..140  heading      152..196  new buttons
+      #   210..230  caption      234..270  search      278..744  gallery
+      #   left col X 24..675     right col X 691..1342
+      - lblAdminClients:
           Control: Label@2.5.1
           Properties:
-            Text: ="Bulk archive and orphan detection will live here (Phase 2/3)."
+            Text: ="Clients"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =210
+            Width: =651
+            Height: =20
+      - txtAdminClientSearch:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="Filter by name…"
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Theme.Font
             Size: =Theme.Size.Body
-            Color: =Theme.Color.TextMuted
-            Align: =Align.Center
-            VerticalAlign: =VerticalAlign.Middle
-            # Plain arithmetic, not `AdminEmpty.X`. Positioning off a sibling is
-            # evaluated mid-paste, when that sibling may not be where it ends up,
-            # and freezes wrong — see the NOTE in validate_pa_yaml.py.
             X: =Theme.Space.Gutter
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 160
-            Width: =Parent.Width - (Theme.Space.Gutter * 2)
-            Height: =Parent.Height - Theme.Space.HeaderH - (Theme.Space.Gutter * 2) - 160
+            Y: =234
+            Width: =651
+            Height: =36
+      - galAdminClients:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            # Delegable: StartsWith on an indexed Text column, and an empty search
+            # box matches everything rather than nothing.
+            Items: |
+              =Sort( Filter( taskmaster_clients,
+                             StartsWith(client_name, txtAdminClientSearch.Text) ),
+                     client_name )
+            WrapCount: =1
+            TemplateSize: =44
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            ShowScrollbar: =true
+            X: =Theme.Space.Gutter
+            Y: =278
+            Width: =651
+            Height: =466
+          Children:
+            - cellAdminClName:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.client_name
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =24
+            - cellAdminClMeta:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =Coalesce(ThisItem.client_type.Value, "—") & "   ·   " &
+                     Coalesce(ThisItem.client_region_path, "—")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =23
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
+            - lineAdminCl:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =Theme.Color.Border
+                  X: =0
+                  Y: =43
+                  Width: =Parent.TemplateWidth
+                  Height: =1
+            - hitAdminCl:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # Transparent full-template button declared LAST — a gallery's
+                  # own OnSelect does not reliably fire when the click lands on a
+                  # child control.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gEditClient, LookUp(taskmaster_clients, ID = ThisItem.ID) );
+                     If( IsBlank(gEditClient.ID),
+                         Notify( "That client no longer exists — it may have been deleted.",
+                                 NotificationType.Error ),
+                         Set( gEditMode, "Edit" );
+                         Set( gClReturn, "" );
+                         Navigate( scrClientEdit, ScreenTransition.Cover ) )
+      - lblAdminProducts:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Products"
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =691
+            Y: =210
+            Width: =651
+            Height: =20
+      - txtAdminProductSearch:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="Filter by product ID…"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =691
+            Y: =234
+            Width: =651
+            Height: =36
+      - galAdminProducts:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            Items: |
+              =Sort( Filter( taskmaster_products,
+                             StartsWith(product_uid, txtAdminProductSearch.Text) ),
+                     product_uid )
+            WrapCount: =1
+            TemplateSize: =44
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            ShowScrollbar: =true
+            X: =691
+            Y: =278
+            Width: =651
+            Height: =466
+          Children:
+            - cellAdminPdUid:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.product_uid
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Color: =Theme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =24
+            - cellAdminPdMeta:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =Coalesce(ThisItem.product_type_path, "—")
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =23
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
+            - lineAdminPd:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =Theme.Color.Border
+                  X: =0
+                  Y: =43
+                  Width: =Parent.TemplateWidth
+                  Height: =1
+            - hitAdminPd:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gEditProduct, LookUp(taskmaster_products, ID = ThisItem.ID) );
+                     If( IsBlank(gEditProduct.ID),
+                         Notify( "That product no longer exists — it may have been deleted.",
+                                 NotificationType.Error ),
+                         Set( gEditMode, "Edit" );
+                         Set( gPdReturn, "" );
+                         Navigate( scrProductEdit, ScreenTransition.Cover ) )
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #
