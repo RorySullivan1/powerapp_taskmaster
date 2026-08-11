@@ -1,0 +1,370 @@
+# =============================================================================
+# cmpRecordPicker  —  modal single-record search dialog (component)
+# =============================================================================
+# The sibling of cmpPeoplePicker, and deliberately its twin: click a box on the
+# form -> this opens over the whole screen -> type -> ENTER runs the search ->
+# tap a result to highlight it -> press the check to commit. Same two-step, so a
+# mistap in the results never writes a link to the record.
+#
+# ONE COMPONENT FOR EVERY LOOKUP, NOT ONE PER ENTITY.
+# There are TEN Lookup columns in schema.yaml — task -> project / asset / client /
+# product, transaction -> project / client / product, issue -> project / task /
+# transaction. Picking is byte-identical for all ten; only the ROWS differ, and
+# rows already arrive through `Results` because a component cannot touch a data
+# source (AccessAppScope false). A per-entity split would duplicate seven
+# hand-typed properties per copy and buy nothing.
+#
+# THE ROW SHAPE IS GENERIC: {Id, Primary, Secondary}. The SCREEN projects each
+# list into it, which is what lets one component serve all ten:
+#   clients       {Id: ID, Primary: client_name,      Secondary: client_type.Value}
+#   products      {Id: ID, Primary: product_uid,      Secondary: product_description}
+#   tasks         {Id: ID, Primary: task_name,        Secondary: task_stage.Value}
+#   transactions  {Id: ID, Primary: transaction_name, Secondary: transaction_currency.Value}
+# `Id` is what a Lookup write needs — {Id: <n>, Value: <text>} — so it is carried
+# through Picked rather than being re-derived by the screen afterwards.
+#
+# THIS COMPONENT TOUCHES NOTHING OUTSIDE ITSELF. AccessAppScope is false, so it
+# cannot read app globals, App named formulas (Theme included) or data sources.
+# Every colour below is a LITERAL lifted from Theme — keep them in step by hand,
+# as cmpAppBar, cmpUiKit and cmpPeoplePicker do — and the search runs on the
+# SCREEN, which passes rows in through Results.
+#
+# Contract — SEVEN properties to hand-type in Studio, the same seven as
+# cmpPeoplePicker so there is one shape to learn:
+#   Title     (Input, Text)    — dialog heading, e.g. "Select client"
+#   Results   (Input, Table)   — {Id, Primary, Secondary} rows; screen supplies
+#   Query     (Output, Text)   — what the user submitted; read inside OnSearch
+#   Picked    (Output, Record) — {Id, Primary, Secondary} highlighted at confirm
+#   OnSearch  (Event)          — a search was submitted; screen refreshes Results
+#   OnConfirm (Event)          — check pressed with something highlighted
+#   OnCancel  (Event)          — dismissed via the X or the scrim
+#   OnReset   (built-in)       — see below; not a custom property, nothing to type
+#
+# WHY Query GOES OUT AND Results COMES BACK rather than the screen reading Query
+# straight into Results: the screen stashes Query in a global inside OnSearch and
+# binds Results off THAT. Feeding an instance's own output into its own input is
+# the kind of same-instance cycle Studio may reject, and a rejection costs a
+# paste to discover. One global sidesteps the question.
+#
+# ONRESET IS LOAD-BEARING. One instance serves every lookup field on the screen
+# AND every record the screen is reused for. Without it, opening for Product
+# would still show Client's highlighted row and the check would commit it — the
+# defect that makes cmpSelection unusable for per-record state, which it has
+# because it has no OnReset. The screen MUST call `Reset(<instance>)` when it
+# opens the dialog.
+#
+# NO "ADD NEW" HERE, AND THAT IS A DECISION. Creating a client needs FIVE
+# required columns (name, type, coverage, sales Person, region path) and a
+# product THREE. That is a form, not a "+" — and a Person field would mean a
+# picker inside a picker, which a component cannot host because it clips its
+# children to its own bounds. See docs and the memory ledger.
+# =============================================================================
+ComponentDefinitions:
+  cmpRecordPicker:
+    DefinitionType: CanvasComponent
+    Description: Modal single-record search over {Id, Primary, Secondary} rows. Enter searches, tap highlights, the check commits. Call Reset(<instance>) when opening.
+    AccessAppScope: false
+    CustomProperties:
+      Title:
+        PropertyKind: Input
+        Description: Heading shown at the top of the dialog, e.g. "Select client".
+        DataType: Text
+        Default: ="Select a record"
+      Results:
+        PropertyKind: Input
+        Description: Rows to list. Schema {Id:Number, Primary:Text, Secondary:Text}. The SCREEN runs the query and projects the list into this shape.
+        DataType: Table
+        Default: |
+          =Table( { Id: 1, Primary: "Example record", Secondary: "example detail" } )
+      Query:
+        PropertyKind: Output
+        Description: What the user submitted. Read it inside OnSearch and stash it in a screen global; the screen runs the query.
+        DataType: Text
+      Picked:
+        PropertyKind: Output
+        Description: The highlighted row as {Id, Primary, Secondary}. Read it inside OnConfirm; it is cleared by OnReset. Id is what a Lookup write needs.
+        DataType: Record
+      OnSearch:
+        PropertyKind: Event
+        Description: Raised when a search is submitted (Enter or the Search button). The app reads Query and refreshes what it passes to Results.
+        ReturnType: Boolean
+      OnConfirm:
+        PropertyKind: Event
+        Description: Raised when the check is pressed with a row highlighted. The app writes Picked into its own lookup global.
+        ReturnType: Boolean
+      OnCancel:
+        PropertyKind: Event
+        Description: Raised when the dialog is dismissed without choosing. The app clears whatever global drives Visible.
+        ReturnType: Boolean
+    Properties:
+      # Screen-sized by default — the instance is meant to cover the form.
+      Width: =1366
+      Height: =768
+      Fill: =RGBA(0, 0, 0, 0)
+      # Falls back to a zero-Id record rather than Blank(), so the consuming
+      # screen can test `inst.Picked.Id > 0` without a type surprise.
+      # If(), not Coalesce(): Coalesce is grounded for scalars here, not records.
+      Picked: |
+        =If( IsBlank(rpPicked), { Id: 0, Primary: "", Secondary: "" }, rpPicked )
+      Query: |
+        =Coalesce( rpQuery, "" )
+      OnReset: |
+        =Set( rpQuery, "" );
+         Set( rpPicked, Blank() );
+         Set( rpTried, false );
+         Reset( txtRpSearch )
+    Children:
+      # ---- Scrim: dims the form and swallows clicks aimed past the dialog ----
+      - rpScrim:
+          Control: Classic/Button@2.2.0
+          Properties:
+            # A button, not a rectangle: it has to be CLICKABLE to dismiss, and a
+            # rectangle's OnSelect is not a reliable hit target behind a dialog.
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0.35)
+            HoverFill: =RGBA(0, 0, 0, 0.35)
+            PressedFill: =RGBA(0, 0, 0, 0.35)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =cmpRecordPicker.OnCancel()
+      # ---- Dialog card -------------------------------------------------------
+      - rpCard:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(255, 255, 255, 1)
+            X: =(Parent.Width - 620) / 2
+            Y: =(Parent.Height - 460) / 2
+            Width: =620
+            Height: =460
+      - rpHeadBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(0, 90, 158, 1)
+            X: =(Parent.Width - 620) / 2
+            Y: =(Parent.Height - 460) / 2
+            Width: =620
+            Height: =52
+      - rpTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =cmpRecordPicker.Title
+            Color: =RGBA(255, 255, 255, 1)
+            Font: =Font.'Segoe UI'
+            Size: =16
+            FontWeight: =FontWeight.Semibold
+            VerticalAlign: =VerticalAlign.Middle
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2
+            Width: =520
+            Height: =52
+      - rpClose:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Color: =RGBA(255, 255, 255, 1)
+            Tooltip: ="Close without choosing"
+            X: =(Parent.Width - 620) / 2 + 620 - 16 - 20
+            Y: =(Parent.Height - 460) / 2 + 16
+            Width: =20
+            Height: =20
+            OnSelect: =cmpRecordPicker.OnCancel()
+      # ---- Search row --------------------------------------------------------
+      - txtRpSearch:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="Type a name, then press Enter"
+            # FocusOut commits on ENTER (and on leaving the field), which fires
+            # OnChange. That is what makes the search run on submit rather than
+            # on every keystroke.
+            TriggerOutput: =TriggerOutput.FocusOut
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 68
+            Width: =520
+            Height: =40
+            OnChange: |
+              =Set( rpQuery, Trim(txtRpSearch.Text) );
+               Set( rpPicked, Blank() );
+               Set( rpTried, false );
+               cmpRecordPicker.OnSearch()
+      - rpSearchGo:
+          Control: Classic/Button@2.2.0
+          Properties:
+            # Does exactly what Enter does. Present because "press Enter to
+            # search" is a convention some users never reach for.
+            Text: ="Search"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderColor: =RGBA(0, 90, 158, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =(Parent.Width - 620) / 2 + 16 + 528
+            Y: =(Parent.Height - 460) / 2 + 68
+            Width: =60
+            Height: =40
+            OnSelect: |
+              =Set( rpQuery, Trim(txtRpSearch.Text) );
+               Set( rpPicked, Blank() );
+               Set( rpTried, false );
+               cmpRecordPicker.OnSearch()
+      # ---- Results -----------------------------------------------------------
+      - galRpResults:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            # The SCREEN runs the query and passes the rows in. This component
+            # never touches a data source: with AccessAppScope false it cannot
+            # reach one, any more than it can reach Theme or a global.
+            Items: =cmpRecordPicker.Results
+            WrapCount: =1
+            TemplateSize: =44
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            ShowScrollbar: =true
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 120
+            Width: =588
+            Height: =264
+          Children:
+            - rpRowSel:
+                Control: Rectangle@2.3.0
+                Properties:
+                  # Highlight for the row currently held in rpPicked. Compared on
+                  # Id, not on the record — a record comparison against a value
+                  # rebuilt by Set() is not an identity match.
+                  Fill: =RGBA(102, 182, 227, 1)
+                  Visible: |
+                    =rpPicked.Id > 0 && rpPicked.Id = ThisItem.Id
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =43
+            - rpRowPrimary:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Primary
+                  Font: =Font.'Segoe UI'
+                  Size: =14
+                  Color: =RGBA(32, 38, 45, 1)
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =24
+            - rpRowSecondary:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Secondary
+                  Font: =Font.'Segoe UI'
+                  Size: =12
+                  Color: =RGBA(110, 120, 130, 1)
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =23
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
+            - rpRowLine:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =RGBA(225, 229, 235, 1)
+                  X: =0
+                  Y: =43
+                  Width: =Parent.TemplateWidth
+                  Height: =1
+            - rpRowHit:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # The row's action lives HERE, on a transparent full-template
+                  # button declared LAST. A gallery's own OnSelect does not
+                  # reliably fire when the click lands on a child control.
+                  #
+                  # HIGHLIGHTS ONLY. Committing is the check button's job.
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( rpPicked,
+                          { Id: ThisItem.Id, Primary: ThisItem.Primary, Secondary: ThisItem.Secondary } );
+                     Set( rpTried, false )
+      # ---- Empty / prompt state ---------------------------------------------
+      - rpHint:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =Len(Coalesce(rpQuery, "")) < 2
+            Text: |
+              =If( Len(Coalesce(rpQuery, "")) = 0,
+                   "Type a name and press Enter to search.",
+                   "Type at least two characters." )
+            Font: =Font.'Segoe UI'
+            Size: =14
+            Color: =RGBA(110, 120, 130, 1)
+            Align: =Align.Center
+            VerticalAlign: =VerticalAlign.Middle
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 120
+            Width: =588
+            Height: =264
+      # ---- Footer ------------------------------------------------------------
+      - rpNudge:
+          Control: Label@2.5.1
+          Properties:
+            # Shown only after the check has been pressed with nothing chosen.
+            # The check is NOT disabled: a disabled button cannot say why it is
+            # disabled, which on 2026-08-10 cost a round trip on btnTkSave.
+            # `= true` rather than Coalesce(): blank compares false, and Coalesce
+            # on a Boolean is not grounded in this repo.
+            Visible: =rpTried = true
+            Text: ="Pick something from the list first."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(197, 58, 58, 1)
+            VerticalAlign: =VerticalAlign.Middle
+            X: =(Parent.Width - 620) / 2 + 16
+            Y: =(Parent.Height - 460) / 2 + 400
+            Width: =300
+            Height: =40
+      - rpCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =RGBA(255, 255, 255, 1)
+            Color: =RGBA(0, 90, 158, 1)
+            BorderColor: =RGBA(0, 90, 158, 1)
+            BorderThickness: =1
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =(Parent.Width - 620) / 2 + 620 - 16 - 120 - 8 - 120
+            Y: =(Parent.Height - 460) / 2 + 400
+            Width: =120
+            Height: =40
+            OnSelect: =cmpRecordPicker.OnCancel()
+      - rpConfirm:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="✓  Use this one"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderColor: =RGBA(0, 90, 158, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =(Parent.Width - 620) / 2 + 620 - 16 - 120
+            Y: =(Parent.Height - 460) / 2 + 400
+            Width: =120
+            Height: =40
+            # ALWAYS ENABLED. With nothing picked it explains itself via rpNudge.
+            OnSelect: |
+              =If( rpPicked.Id = 0,
+                   Set( rpTried, true ),
+                   cmpRecordPicker.OnConfirm() )
