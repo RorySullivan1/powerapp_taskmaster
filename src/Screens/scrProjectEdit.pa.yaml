@@ -220,9 +220,9 @@ Screens:
         Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
         Reset( dtpPrStart ); Reset( dtpPrTarget );
         Set( gPrPicker, "" ); Set( gPrPeopleQuery, "" ); Reset( cmpPrPeople );
-        Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
+        Reset( txtNtName ); Reset( cmpPrPeople ); Reset( dtpNtTarget );
         Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
-        Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
+        Reset( cmpPrRecord ); Reset( cmpPrRecord ); Reset( cmpPrPeople );
         // The SAME rule applies to every combo box: DefaultSelectedItems is
         // re-read only on Reset. Without these six, opening project B after project A
         // leaves A's phase/priority showing while gPrPhase already holds B's — and
@@ -939,7 +939,7 @@ Screens:
                               Height: =36
                               OnSelect: |
                                 =Set( gNtEditSid, 0 ); Set( gNtName, "" ); Set( gNtTarget, Blank() );
-                                Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
+                                Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset( cmpPrPeople );
                                 Set( gNtOpen, true )
                         - lblStgNtEmpty:
                             Control: Label@2.5.1
@@ -1010,7 +1010,7 @@ Screens:
                                             Set( gNtPriority, ThisItem.t_priority );
                                             Set( gNtLead, { DisplayName: ThisItem.t_leadName, Mail: ThisItem.t_leadMail } );
                                             Set( gNtEditSid, ThisItem.sid );
-                                            Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset(txtNtLeadSearch);
+                                            Reset(txtNtName); Reset(dtpNtTarget); Reset(cboNtPriority); Reset( cmpPrPeople );
                                             Set( gNtOpen, true )
                                     - icoStgNtDel:
                                         Control: Classic/Icon@2.5.0
@@ -1138,7 +1138,7 @@ Screens:
                               Height: =36
                               OnSelect: |
                                 =Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
-                                Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy); Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
+                                Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy); Reset( cmpPrRecord ); Reset( cmpPrRecord ); Reset( cmpPrPeople );
                                 Set( gNxOpen, true )
                         - lblStgNxEmpty:
                             Control: Label@2.5.1
@@ -1212,7 +1212,7 @@ Screens:
                                             Set( gNxSales, { DisplayName: ThisItem.x_salesName, Mail: ThisItem.x_salesMail } );
                                             Set( gNxEditSid, ThisItem.sid );
                                             Reset(txtNxName); Reset(dtpNxDate); Reset(numNxNotional); Reset(cboNxCcy);
-                                            Reset(txtNxClientSearch); Reset(txtNxProductSearch); Reset(txtNxSalesSearch);
+                                            Reset( cmpPrRecord ); Reset( cmpPrRecord ); Reset( cmpPrPeople );
                                             Set( gNxOpen, true )
                                     - icoStgNxDel:
                                         Control: Classic/Icon@2.5.0
@@ -1640,7 +1640,7 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             OnSelect: |
-              =Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
+              =Reset( txtNtName ); Reset( cmpPrPeople ); Reset( dtpNtTarget );
                Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
@@ -1798,18 +1798,24 @@ Screens:
                         Color: =Theme.Color.TextMuted
                         Width: =Parent.Width
                         Height: =18
-                  - txtNtLeadSearch:
-                      Control: ModernTextInput@1.1.1
+                  - btnNtLeadPick:
+                      Control: Classic/Button@2.2.0
                       Properties:
                         Visible: =!(Len(gNtLead.Mail) > 0)
-                        Type: =TextInputType.Search
-                        Default: =""
-                        Placeholder: ="Type a name…"
-                        TriggerOutput: =TriggerOutput.Delayed
+                        Text: ="＋  Choose a task lead"
+                        Align: =Align.Left
+                        Fill: =Theme.Color.Bg
+                        Color: =Theme.Color.TextMuted
+                        BorderColor: =Theme.Color.Border
+                        BorderThickness: =1
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Width: =Parent.Width
                         Height: =36
+                        OnSelect: |
+                          =Set( gPrPicker, "NtLead" );
+                           Reset( cmpPrPeople );
+                           Set( gPrPeopleQuery, "" )
                   - btnNtLeadChip:
                       Control: Classic/Button@2.2.0
                       Properties:
@@ -1826,48 +1832,7 @@ Screens:
                         Height: =36
                         OnSelect: |
                           =Set(gNtLead, { DisplayName: "", Mail: "" });
-                           Reset(txtNtLeadSearch)
-            - galNtLead:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtNtLeadSearch.Text) >= 2 && Len(gNtLead.Mail) = 0
-                  Items: |
-                    =Office365Users.SearchUserV2({ searchTerm: txtNtLeadSearch.Text, top: 6 }).value
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - lblNtLeadRow:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.DisplayName & "     " & ThisItem.Mail
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =0
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - hitNtLead:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gNtLead, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
-                           Reset(txtNtLeadSearch)
+                           Reset( cmpPrPeople )
       # Buttons sit OUTSIDE mdNtBody, on the card's own anchor, so they stay
       # pinned to the card's bottom edge however tall the body grows.
       - mdNtAdd:
@@ -1904,7 +1869,7 @@ Screens:
                         t_leadName: gNtLead.DisplayName,
                         t_leadMail: gNtLead.Mail,
                         t_target:   dtpNtTarget.SelectedDate } ) );
-               Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
+               Reset( txtNtName ); Reset( cmpPrPeople ); Reset( dtpNtTarget );
                Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
@@ -1926,7 +1891,7 @@ Screens:
             Width: =120
             Height: =40
             OnSelect: |
-              =Reset( txtNtName ); Reset( txtNtLeadSearch ); Reset( dtpNtTarget );
+              =Reset( txtNtName ); Reset( cmpPrPeople ); Reset( dtpNtTarget );
                Reset( cboNtPriority );
                Set( gNtLead, { DisplayName: "", Mail: "" } );
                Set( gNtPriority, "Moderate" );
@@ -1946,7 +1911,7 @@ Screens:
             Height: =Parent.Height
             OnSelect: |
               =Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
-               Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
+               Reset( cmpPrRecord ); Reset( cmpPrRecord ); Reset( cmpPrPeople );
                Reset( cboNxCcy );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
@@ -2138,18 +2103,24 @@ Screens:
                         Color: =Theme.Color.TextMuted
                         Width: =Parent.Width
                         Height: =18
-                  - txtNxClientSearch:
-                      Control: ModernTextInput@1.1.1
+                  - btnNxClientPick:
+                      Control: Classic/Button@2.2.0
                       Properties:
                         Visible: =!(gNxClient.Id > 0)
-                        Type: =TextInputType.Search
-                        Default: =""
-                        Placeholder: ="Type to find a client…"
-                        TriggerOutput: =TriggerOutput.Delayed
+                        Text: ="＋  Choose a client"
+                        Align: =Align.Left
+                        Fill: =Theme.Color.Bg
+                        Color: =Theme.Color.TextMuted
+                        BorderColor: =Theme.Color.Border
+                        BorderThickness: =1
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Width: =Parent.Width
                         Height: =36
+                        OnSelect: |
+                          =Set( gPrPicker, "NxClient" );
+                           Reset( cmpPrRecord );
+                           Set( gPrRecQuery, "" )
                   - btnNxClientChip:
                       Control: Classic/Button@2.2.0
                       Properties:
@@ -2166,48 +2137,7 @@ Screens:
                         Height: =36
                         OnSelect: |
                           =Set(gNxClient, { Id: 0, Value: "" });
-                           Reset(txtNxClientSearch)
-            - galNxClient:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtNxClientSearch.Text) >= 2 && gNxClient.Id <= 0
-                  Items: =Sort( Filter(taskmaster_clients, StartsWith(client_name, txtNxClientSearch.Text)), client_name )
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - lblNxClientRow:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.client_name
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =0
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - hitNxClient:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gNxClient, { Id: ThisItem.ID, Value: ThisItem.client_name });
-                           Reset(txtNxClientSearch)
-            # --- Product (Lookup) ---
+                           Reset( cmpPrRecord )
             - rowNxProduct:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -2227,18 +2157,24 @@ Screens:
                         Color: =Theme.Color.TextMuted
                         Width: =Parent.Width
                         Height: =18
-                  - txtNxProductSearch:
-                      Control: ModernTextInput@1.1.1
+                  - btnNxProductPick:
+                      Control: Classic/Button@2.2.0
                       Properties:
                         Visible: =!(gNxProduct.Id > 0)
-                        Type: =TextInputType.Search
-                        Default: =""
-                        Placeholder: ="Type to find a product…"
-                        TriggerOutput: =TriggerOutput.Delayed
+                        Text: ="＋  Choose a product"
+                        Align: =Align.Left
+                        Fill: =Theme.Color.Bg
+                        Color: =Theme.Color.TextMuted
+                        BorderColor: =Theme.Color.Border
+                        BorderThickness: =1
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Width: =Parent.Width
                         Height: =36
+                        OnSelect: |
+                          =Set( gPrPicker, "NxProduct" );
+                           Reset( cmpPrRecord );
+                           Set( gPrRecQuery, "" )
                   - btnNxProductChip:
                       Control: Classic/Button@2.2.0
                       Properties:
@@ -2255,48 +2191,7 @@ Screens:
                         Height: =36
                         OnSelect: |
                           =Set(gNxProduct, { Id: 0, Value: "" });
-                           Reset(txtNxProductSearch)
-            - galNxProduct:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtNxProductSearch.Text) >= 2 && gNxProduct.Id <= 0
-                  Items: =Sort( Filter(taskmaster_products, StartsWith(product_uid, txtNxProductSearch.Text)), product_uid )
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - lblNxProductRow:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.product_uid
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =0
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - hitNxProduct:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gNxProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid });
-                           Reset(txtNxProductSearch)
-            # --- Sales owner (Person) ---
+                           Reset( cmpPrRecord )
             - rowNxSales:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -2316,18 +2211,24 @@ Screens:
                         Color: =Theme.Color.TextMuted
                         Width: =Parent.Width
                         Height: =18
-                  - txtNxSalesSearch:
-                      Control: ModernTextInput@1.1.1
+                  - btnNxSalesPick:
+                      Control: Classic/Button@2.2.0
                       Properties:
                         Visible: =!(Len(gNxSales.Mail) > 0)
-                        Type: =TextInputType.Search
-                        Default: =""
-                        Placeholder: ="Type a name…"
-                        TriggerOutput: =TriggerOutput.Delayed
+                        Text: ="＋  Choose a sales owner"
+                        Align: =Align.Left
+                        Fill: =Theme.Color.Bg
+                        Color: =Theme.Color.TextMuted
+                        BorderColor: =Theme.Color.Border
+                        BorderThickness: =1
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Width: =Parent.Width
                         Height: =36
+                        OnSelect: |
+                          =Set( gPrPicker, "NxSales" );
+                           Reset( cmpPrPeople );
+                           Set( gPrPeopleQuery, "" )
                   - btnNxSalesChip:
                       Control: Classic/Button@2.2.0
                       Properties:
@@ -2344,48 +2245,7 @@ Screens:
                         Height: =36
                         OnSelect: |
                           =Set(gNxSales, { DisplayName: "", Mail: "" });
-                           Reset(txtNxSalesSearch)
-            - galNxSales:
-                Control: Gallery@2.15.0
-                Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-                Properties:
-                  Visible: =Len(txtNxSalesSearch.Text) >= 2 && Len(gNxSales.Mail) = 0
-                  Items: |
-                    =Office365Users.SearchUserV2({ searchTerm: txtNxSalesSearch.Text, top: 6 }).value
-                  TemplateSize: =32
-                  TemplatePadding: =0
-                  TemplateFill: =Theme.Color.Surface
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Width: =Parent.Width - 48
-                  Height: =132
-                Children:
-                  - lblNxSalesRow:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.DisplayName & "     " & ThisItem.Mail
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextPrimary
-                        X: =12
-                        Y: =0
-                        Width: =Parent.TemplateWidth - 24
-                        Height: =32
-                        VerticalAlign: =VerticalAlign.Middle
-                  - hitNxSales:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: =""
-                        Fill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        X: =0
-                        Y: =0
-                        Width: =Parent.TemplateWidth
-                        Height: =Parent.TemplateHeight
-                        OnSelect: |
-                          =Select(Parent);
-                           Set(gNxSales, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail });
-                           Reset(txtNxSalesSearch)
+                           Reset( cmpPrPeople )
       - mdNxAdd:
           Control: Classic/Button@2.2.0
           Properties:
@@ -2431,7 +2291,7 @@ Screens:
                         x_salesName:    gNxSales.DisplayName,
                         x_salesMail:    gNxSales.Mail } ) );
                Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
-               Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
+               Reset( cmpPrRecord ); Reset( cmpPrRecord ); Reset( cmpPrPeople );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Reset( cboNxCcy );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
@@ -2455,7 +2315,7 @@ Screens:
             Height: =40
             OnSelect: |
               =Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
-               Reset( txtNxClientSearch ); Reset( txtNxProductSearch ); Reset( txtNxSalesSearch );
+               Reset( cmpPrRecord ); Reset( cmpPrRecord ); Reset( cmpPrPeople );
                Set( gNxClient, { Id: 0, Value: "" } ); Set( gNxProduct, { Id: 0, Value: "" } );
                Reset( cboNxCcy );
                Set( gNxSales, { DisplayName: "", Mail: "" } );
@@ -2466,7 +2326,12 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpPeoplePicker
           Properties:
-            Visible: =gPrPicker = "Manager" || gPrPicker = "Requestor" || gPrPicker = "Supporter"
+            # Also serves the two person fields inside the STAGED CHILD modals —
+            # the task lead and the transaction sales owner. One instance, five
+            # states. Declared after both modals, so the dialog paints above them.
+            Visible: |
+              =gPrPicker = "Manager"   || gPrPicker = "Requestor" || gPrPicker = "Supporter"
+               || gPrPicker = "NtLead" || gPrPicker = "NxSales"
             X: =0
             Y: =0
             Width: =Parent.Width
@@ -2475,7 +2340,9 @@ Screens:
               =Switch( gPrPicker,
                        "Manager",   "Select project manager",
                        "Requestor", "Select requestor",
-                       "Supporter", "Select supporter" )
+                       "Supporter", "Select supporter",
+                       "NtLead",    "Select task lead",
+                       "NxSales",   "Select sales owner" )
             Results: |
               =If( Len(gPrPeopleQuery) >= 2,
                    ShowColumns(
@@ -2495,6 +2362,54 @@ Screens:
                        "Supporter",
                        Set( gPrSupporter,
                             { DisplayName: cmpPrPeople.Picked.DisplayName,
+                              Mail:        cmpPrPeople.Picked.Mail } ),
+                       "NtLead",
+                       Set( gNtLead,
+                            { DisplayName: cmpPrPeople.Picked.DisplayName,
+                              Mail:        cmpPrPeople.Picked.Mail } ),
+                       "NxSales",
+                       Set( gNxSales,
+                            { DisplayName: cmpPrPeople.Picked.DisplayName,
                               Mail:        cmpPrPeople.Picked.Mail } ) );
                Set( gPrPicker, "" )
+            OnCancel: =Set( gPrPicker, "" )
+      # =====================================================================
+      # RECORD PICKER — the staged transaction's client and product.
+      # Declared LAST so it paints above BOTH child modals and the people
+      # picker. AllowCreate is FALSE here on purpose: ＋ New would navigate
+      # away, and this screen's OnVisible clears colNewTasks / colNewTransactions,
+      # so a return would destroy staged children — a much worse loss than the
+      # cleared inputs fixed on scrTaskEdit. Creating a client mid-project is
+      # available from the transaction editor, or from scrAdmin.
+      # =====================================================================
+      - cmpPrRecord:
+          Control: CanvasComponent
+          ComponentName: cmpRecordPicker
+          Properties:
+            Visible: =gPrPicker = "NxClient" || gPrPicker = "NxProduct"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: =If( gPrPicker = "NxClient", "Select client", "Select product" )
+            Results: |
+              =If( gPrPicker = "NxClient" && Len(gPrRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_clients,
+              StartsWith(client_name, gPrRecQuery) ), 50 ) As c,
+              { Id:        c.ID,
+              Primary:   c.client_name,
+              Secondary: Coalesce(c.client_type.Value, "") } ),
+              gPrPicker = "NxProduct" && Len(gPrRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_products,
+              StartsWith(product_uid, gPrRecQuery) ), 50 ) As p,
+              { Id:        p.ID,
+              Primary:   p.product_uid,
+              Secondary: Coalesce(p.product_type_path, "") } ) )
+            OnSearch: =Set( gPrRecQuery, cmpPrRecord.Query )
+            AllowCreate: =false
+            OnConfirm: |
+              =If( gPrPicker = "NxClient",
+              Set( gNxClient,  { Id: cmpPrRecord.Picked.Id, Value: cmpPrRecord.Picked.Primary } ),
+              Set( gNxProduct, { Id: cmpPrRecord.Picked.Id, Value: cmpPrRecord.Picked.Primary } ) );
+              Set( gPrPicker, "" )
             OnCancel: =Set( gPrPicker, "" )
