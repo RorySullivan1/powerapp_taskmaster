@@ -78,7 +78,7 @@ Screens:
         // The query global is the screen's half of that same state, so it clears here too.
         Reset( cmpTkPeople );
         Set( gTkPeopleQuery, "" );
-        Reset( txtTkApprovalId ); Reset( txtTkClientSearch ); Reset( txtTkProductSearch );
+        Reset( txtTkApprovalId );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without these
         // the previous task's stage/health/priority survive into the next one.
         Reset( cboTkStage ); Reset( cboTkStatus ); Reset( cboTkPriority );
@@ -856,19 +856,30 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              - txtTkClientSearch:
-                                  Control: ModernTextInput@1.1.1
+                              # Opens the shared record picker. Was a search box that filtered a
+                              # floating gallery as you typed; the search now lives in the dialog.
+                              # Reset() clears the previous field's query and highlight — one
+                              # instance serves every lookup on this screen.
+                              - btnTkClientPick:
+                                  Control: Classic/Button@2.2.0
                                   Properties:
                                     Visible: =gTkClient.Id = 0
-                                    Placeholder: ="Search…"
-                                    TriggerOutput: =TriggerOutput.Delayed
+                                    Text: ="＋  Choose a client"
+                                    Align: =Align.Left
+                                    Fill: =Theme.Color.Bg
+                                    Color: =Theme.Color.TextMuted
+                                    BorderColor: =Theme.Color.Border
+                                    BorderThickness: =1
                                     Font: =Theme.Font
                                     Size: =Theme.Size.Body
                                     FillPortions: =0
                                     LayoutMinHeight: =36
                                     Width: =Parent.Width
                                     Height: =36
-                                    OnChange: =Set( gTkPicker, "Client" )
+                                    OnSelect: |
+                                      =Set( gTkPicker, "Client" );
+                                       Reset( cmpTkRecord );
+                                       Set( gTkRecQuery, "" )
                               - chipTkClient:
                                   Control: GroupContainer@1.5.0
                                   Variant: AutoLayout
@@ -910,7 +921,6 @@ Screens:
                                           Height: =16
                                           OnSelect: |
                                             =Set( gTkClient, { Id: 0, Value: "" } );
-                                             Reset( txtTkClientSearch );
                                              Set( gTkPicker, "" )
                         - colTkCliStage:
                             Control: GroupContainer@1.5.0
@@ -1090,19 +1100,30 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              - txtTkProductSearch:
-                                  Control: ModernTextInput@1.1.1
+                              # Opens the shared record picker. Was a search box that filtered a
+                              # floating gallery as you typed; the search now lives in the dialog.
+                              # Reset() clears the previous field's query and highlight — one
+                              # instance serves every lookup on this screen.
+                              - btnTkProductPick:
+                                  Control: Classic/Button@2.2.0
                                   Properties:
                                     Visible: =gTkProduct.Id = 0
-                                    Placeholder: ="Search…"
-                                    TriggerOutput: =TriggerOutput.Delayed
+                                    Text: ="＋  Choose a product"
+                                    Align: =Align.Left
+                                    Fill: =Theme.Color.Bg
+                                    Color: =Theme.Color.TextMuted
+                                    BorderColor: =Theme.Color.Border
+                                    BorderThickness: =1
                                     Font: =Theme.Font
                                     Size: =Theme.Size.Body
                                     FillPortions: =0
                                     LayoutMinHeight: =36
                                     Width: =Parent.Width
                                     Height: =36
-                                    OnChange: =Set( gTkPicker, "Product" )
+                                    OnSelect: |
+                                      =Set( gTkPicker, "Product" );
+                                       Reset( cmpTkRecord );
+                                       Set( gTkRecQuery, "" )
                               - chipTkProduct:
                                   Control: GroupContainer@1.5.0
                                   Variant: AutoLayout
@@ -1144,7 +1165,6 @@ Screens:
                                           Height: =16
                                           OnSelect: |
                                             =Set( gTkProduct, { Id: 0, Value: "" } );
-                                             Reset( txtTkProductSearch );
                                              Set( gTkPicker, "" )
                   - rowTkOut2:
                       Control: GroupContainer@1.5.0
@@ -1288,158 +1308,6 @@ Screens:
                         LayoutMinHeight: =20
                         Width: =Parent.Width - 40
                         Height: =20
-      # ==================================================================
-      # PICKER PANEL — ONE floating panel, absolute, ABOVE the form.
-      #
-      # Absolute on purpose: results must float OVER the fields rather than push
-      # them down, and a container child cannot overlap its siblings. All five
-      # galleries share one rectangle because only one picker is ever open, so
-      # they cannot collide with each other.
-      #
-      # Each is gated on its OWN search text as well as gTkPicker: querying
-      # SearchUserV2 with an empty term returns the whole directory, which is the
-      # always-open-gallery defect this repo already paid for once.
-      # ==================================================================
-      - pnlTkPickerBg:
-          Control: Rectangle@2.3.0
-          Properties:
-            # Client and product only — the person pickers moved to cmpTkPeople,
-            # which brings its own card, heading and close.
-            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
-            Fill: =Theme.Color.Surface
-            BorderColor: =Theme.Color.Primary
-            BorderThickness: =1
-            X: =(Parent.Width - 620) / 2
-            Y: =Theme.Space.HeaderH + 72
-            Width: =620
-            Height: =332
-      - lblTkPickerHead:
-          Control: Label@2.5.1
-          Properties:
-            # Client and product only — the person pickers moved to cmpTkPeople,
-            # which brings its own card, heading and close.
-            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
-            Text: ="Pick a " & Lower(gTkPicker)
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            VerticalAlign: =VerticalAlign.Middle
-            X: =(Parent.Width - 620) / 2 + 16
-            Y: =Theme.Space.HeaderH + 72
-            Width: =540
-            Height: =32
-      - icoTkPickerClose:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            # Client and product only — the person pickers moved to cmpTkPeople,
-            # which brings its own card, heading and close.
-            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
-            Icon: =Icon.Cancel
-            Color: =Theme.Color.TextMuted
-            Tooltip: ="Close"
-            X: =(Parent.Width - 620) / 2 + 620 - 32
-            Y: =Theme.Space.HeaderH + 80
-            Width: =16
-            Height: =16
-            OnSelect: =Set( gTkPicker, "" )
-      - galTkClient:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
-          Properties:
-            Visible: |
-              =gTkPicker = "Client" && Len(txtTkClientSearch.Text) >= 1
-            Items: |
-              =Sort( Filter( taskmaster_clients, StartsWith(client_name, txtTkClientSearch.Text) ), client_name )
-            WrapCount: =1
-            TemplateSize: =40
-            TemplatePadding: =0
-            TemplateFill: =RGBA(0, 0, 0, 0)
-            BorderThickness: =0
-            ShowScrollbar: =true
-            X: =(Parent.Width - 620) / 2 + 8
-            Y: =Theme.Space.HeaderH + 108
-            Width: =604
-            Height: =288
-          Children:
-            - rowTkClientRow:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.client_name
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
-                  Color: =Theme.Color.TextPrimary
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =12
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 24
-                  Height: =39
-            - galTkClientHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # A gallery's own OnSelect does not reliably fire when the click lands
-                  # on a child control, so the row's action lives on a transparent
-                  # full-template button declared LAST. Confirmed in Studio 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Set( gTkClient, { Id: ThisItem.ID, Value: ThisItem.client_name } );
-                    Set( gTkPicker, "" )
-      - galTkProduct:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
-          Properties:
-            Visible: |
-              =gTkPicker = "Product" && Len(txtTkProductSearch.Text) >= 1
-            Items: |
-              =Sort( Filter( taskmaster_products, StartsWith(product_uid, txtTkProductSearch.Text) ), product_uid )
-            WrapCount: =1
-            TemplateSize: =40
-            TemplatePadding: =0
-            TemplateFill: =RGBA(0, 0, 0, 0)
-            BorderThickness: =0
-            ShowScrollbar: =true
-            X: =(Parent.Width - 620) / 2 + 8
-            Y: =Theme.Space.HeaderH + 108
-            Width: =604
-            Height: =288
-          Children:
-            - rowTkProductRow:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.product_uid
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
-                  Color: =Theme.Color.TextPrimary
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =12
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 24
-                  Height: =39
-            - galTkProductHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # A gallery's own OnSelect does not reliably fire when the click lands
-                  # on a child control, so the row's action lives on a transparent
-                  # full-template button declared LAST. Confirmed in Studio 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Set( gTkProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid } );
-                    Set( gTkPicker, "" )
-      # ==================================================================
-      # ACTION BAR — fixed footer: one opaque backing rectangle and one
-      # auto-layout row on the IDENTICAL anchor, so they cannot drift apart.
-      # ==================================================================
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -1698,4 +1566,52 @@ Screens:
                         { DisplayName: cmpTkPeople.Picked.DisplayName,
                           Mail:        cmpTkPeople.Picked.Mail } ) );
                Set( gTkPicker, "" )
+            OnCancel: =Set( gTkPicker, "" )
+
+      # =====================================================================
+      # RECORD PICKER — declared LAST so the dialog paints above the footer.
+      # ONE instance serves every lookup on this screen; gTkPicker names which.
+      # The query runs HERE, not in the component: with AccessAppScope false
+      # it cannot reach a data source. Each branch is a delegable StartsWith
+      # on an indexed Text column, projected to the {Id, Primary, Secondary}
+      # shape the component declares. ShowColumns takes IDENTIFIERS.
+      # =====================================================================
+      - cmpTkRecord:
+          Control: CanvasComponent
+          ComponentName: cmpRecordPicker
+          Properties:
+            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: =If( gTkPicker = "Client", "Select client", "Select product" )
+            Results: |
+              =If( Len(gTkRecQuery) < 2, Blank(),
+              gTkPicker = "Client",
+              AddColumns( ShowColumns( Filter( taskmaster_clients,
+              StartsWith(client_name, gTkRecQuery) ),
+              ID, client_name, client_type ),
+              Id, ID, Primary, client_name, Secondary, Coalesce(client_type.Value, "") ),
+              AddColumns( ShowColumns( Filter( taskmaster_products,
+              StartsWith(product_uid, gTkRecQuery) ),
+              ID, product_uid, product_type_path ),
+              Id, ID, Primary, product_uid, Secondary, Coalesce(product_type_path, "") ) )
+            OnSearch: =Set( gTkRecQuery, cmpTkRecord.Query )
+            AllowCreate: =gTkPicker = "Client" || gTkPicker = "Product"
+            OnConfirm: |
+              =If( gTkPicker = "Client",
+              Set( gTkClient,  { Id: cmpTkRecord.Picked.Id, Value: cmpTkRecord.Picked.Primary } ),
+              Set( gTkProduct, { Id: cmpTkRecord.Picked.Id, Value: cmpTkRecord.Picked.Primary } ) );
+              Set( gTkPicker, "" )
+            # ＋ New hands the caller's field name to the create screen via
+            # gClReturn / gPdReturn; that screen writes the new record back
+            # into the right global and returns here with it selected.
+            OnCreateNew: |
+              =Set( gEditMode, "New" );
+              If( gTkPicker = "Client",
+              Set( gClReturn, "TaskClient" ); Set( gTkPicker, "" );
+              Navigate( scrClientEdit, ScreenTransition.Cover ),
+              Set( gPdReturn, "TaskProduct" ); Set( gTkPicker, "" );
+              Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gTkPicker, "" )

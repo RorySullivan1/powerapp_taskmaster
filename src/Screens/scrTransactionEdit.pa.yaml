@@ -49,8 +49,6 @@ Screens:
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
         Reset( txtTxName );
-        Reset( txtTxProjectSearch ); Reset( txtTxClientSearch );
-        Reset( txtTxProductSearch );
         Set( gTxPicker, "" ); Set( gTxPeopleQuery, "" ); Reset( cmpTxPeople );
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
         // date — it blocked the save outright on every edit.
@@ -295,18 +293,28 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtTxProjectSearch:
-                            Control: ModernTextInput@1.1.1
+                        # Opens the shared record picker. Was a search box that filtered a
+                        # floating gallery as you typed; the search now lives in the dialog.
+                        # Reset() clears the previous field's query and highlight — one
+                        # instance serves every lookup on this screen.
+                        - btnTxProjectPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =gTxProject.Id <= 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gTxPicker, "Project")
-                              Placeholder: ="Type to find a project…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a project"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
-                              Size: =Theme.Size.Small
+                              Size: =Theme.Size.Body
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set( gTxPicker, "Project" );
+                                 Reset( cmpTxRecord );
+                                 Set( gTxRecQuery, "" )
                         - chipTxProject:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -341,7 +349,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gTxProject, { Id: 0, Value: "" }); Reset(txtTxProjectSearch)
+                                      =Set(gTxProject, { Id: 0, Value: "" }); Reset( cmpTxRecord )
                   - colTxClient:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -364,18 +372,28 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtTxClientSearch:
-                            Control: ModernTextInput@1.1.1
+                        # Opens the shared record picker. Was a search box that filtered a
+                        # floating gallery as you typed; the search now lives in the dialog.
+                        # Reset() clears the previous field's query and highlight — one
+                        # instance serves every lookup on this screen.
+                        - btnTxClientPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =gTxClient.Id <= 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gTxPicker, "Client")
-                              Placeholder: ="Type to find a client…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a client"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
-                              Size: =Theme.Size.Small
+                              Size: =Theme.Size.Body
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set( gTxPicker, "Client" );
+                                 Reset( cmpTxRecord );
+                                 Set( gTxRecQuery, "" )
                         - chipTxClient:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -410,7 +428,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gTxClient, { Id: 0, Value: "" }); Reset(txtTxClientSearch)
+                                      =Set(gTxClient, { Id: 0, Value: "" }); Reset( cmpTxRecord )
             - gridTx4:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
@@ -442,18 +460,28 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtTxProductSearch:
-                            Control: ModernTextInput@1.1.1
+                        # Opens the shared record picker. Was a search box that filtered a
+                        # floating gallery as you typed; the search now lives in the dialog.
+                        # Reset() clears the previous field's query and highlight — one
+                        # instance serves every lookup on this screen.
+                        - btnTxProductPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =gTxProduct.Id <= 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gTxPicker, "Product")
-                              Placeholder: ="Type an ISIN / ticker / internal id…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a product"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
-                              Size: =Theme.Size.Small
+                              Size: =Theme.Size.Body
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set( gTxPicker, "Product" );
+                                 Reset( cmpTxRecord );
+                                 Set( gTxRecQuery, "" )
                         - chipTxProduct:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -488,7 +516,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gTxProduct, { Id: 0, Value: "" }); Reset(txtTxProductSearch)
+                                      =Set(gTxProduct, { Id: 0, Value: "" }); Reset( cmpTxRecord )
                   - colTxSales:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -714,153 +742,6 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
-      # =====================================================================
-      # OVERLAY PICKERS — declared last so they float above the fields below.
-      # =====================================================================
-      - galTxProject:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gTxPicker = "Project" && ( Len(txtTxProjectSearch.Text) >= 2 && gTxProject.Id <= 0 )
-            Items: |
-              =Sort( Filter( taskmaster_projects,
-                         StartsWith(project_name, txtTxProjectSearch.Text) ),
-                     project_name )
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =24
-            Y: =172
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowTxProject:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.project_name
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galTxProjectHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gTxProject, { Id: ThisItem.ID, Value: ThisItem.project_name })
-      - galTxClient:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gTxPicker = "Client" && ( Len(txtTxClientSearch.Text) >= 2 && gTxClient.Id <= 0 )
-            Items: |
-              =Sort( Filter( taskmaster_clients,
-                         StartsWith(client_name, txtTxClientSearch.Text) ),
-                     client_name )
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =304
-            Y: =172
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowTxClient:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.client_name
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galTxClientHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gTxClient, { Id: ThisItem.ID, Value: ThisItem.client_name })
-      - galTxProduct:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gTxPicker = "Product" && ( Len(txtTxProductSearch.Text) >= 2 && gTxProduct.Id <= 0 )
-            Items: |
-              =Sort( Filter( taskmaster_products,
-                         StartsWith(product_uid, txtTxProductSearch.Text) ),
-                     product_uid )
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =24
-            Y: =258
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowTxProduct:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.product_uid
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galTxProductHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gTxProduct, { Id: ThisItem.ID, Value: ThisItem.product_uid })
       - cmpTxPeople:
           Control: CanvasComponent
           ComponentName: cmpPeoplePicker
@@ -882,4 +763,58 @@ Screens:
                     { DisplayName: cmpTxPeople.Picked.DisplayName,
                       Mail:        cmpTxPeople.Picked.Mail } );
                Set( gTxPicker, "" )
+            OnCancel: =Set( gTxPicker, "" )
+
+      # =====================================================================
+      # RECORD PICKER — declared LAST so the dialog paints above the footer.
+      # ONE instance serves every lookup on this screen; gTxPicker names which.
+      # The query runs HERE, not in the component: with AccessAppScope false
+      # it cannot reach a data source. Each branch is a delegable StartsWith
+      # on an indexed Text column, projected to the {Id, Primary, Secondary}
+      # shape the component declares. ShowColumns takes IDENTIFIERS.
+      # =====================================================================
+      - cmpTxRecord:
+          Control: CanvasComponent
+          ComponentName: cmpRecordPicker
+          Properties:
+            Visible: =gTxPicker = "Project" || gTxPicker = "Client" || gTxPicker = "Product"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: =Switch( gTxPicker, "Project", "Select project", "Client", "Select client", "Select product" )
+            Results: |
+              =If( Len(gTxRecQuery) < 2, Blank(),
+              gTxPicker = "Project",
+              AddColumns( ShowColumns( Filter( taskmaster_projects,
+              StartsWith(project_name, gTxRecQuery) ),
+              ID, project_name, project_phase ),
+              Id, ID, Primary, project_name, Secondary, Coalesce(project_phase.Value, "") ),
+              gTxPicker = "Client",
+              AddColumns( ShowColumns( Filter( taskmaster_clients,
+              StartsWith(client_name, gTxRecQuery) ),
+              ID, client_name, client_type ),
+              Id, ID, Primary, client_name, Secondary, Coalesce(client_type.Value, "") ),
+              AddColumns( ShowColumns( Filter( taskmaster_products,
+              StartsWith(product_uid, gTxRecQuery) ),
+              ID, product_uid, product_type_path ),
+              Id, ID, Primary, product_uid, Secondary, Coalesce(product_type_path, "") ) )
+            OnSearch: =Set( gTxRecQuery, cmpTxRecord.Query )
+            AllowCreate: =gTxPicker = "Client" || gTxPicker = "Product"
+            OnConfirm: |
+              =Switch( gTxPicker,
+              "Project", Set( gTxProject, { Id: cmpTxRecord.Picked.Id, Value: cmpTxRecord.Picked.Primary } ),
+              "Client",  Set( gTxClient,  { Id: cmpTxRecord.Picked.Id, Value: cmpTxRecord.Picked.Primary } ),
+              Set( gTxProduct, { Id: cmpTxRecord.Picked.Id, Value: cmpTxRecord.Picked.Primary } ) );
+              Set( gTxPicker, "" )
+            # ＋ New hands the caller's field name to the create screen via
+            # gClReturn / gPdReturn; that screen writes the new record back
+            # into the right global and returns here with it selected.
+            OnCreateNew: |
+              =Set( gEditMode, "New" );
+              If( gTxPicker = "Client",
+              Set( gClReturn, "TxClient" ); Set( gTxPicker, "" );
+              Navigate( scrClientEdit, ScreenTransition.Cover ),
+              Set( gPdReturn, "TxProduct" ); Set( gTxPicker, "" );
+              Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gTxPicker, "" )

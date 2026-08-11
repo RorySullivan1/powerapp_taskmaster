@@ -77,8 +77,6 @@ Screens:
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
         Reset( txtIssName ); Reset( txtIssDesc );
-
-        Reset( txtIssProjectSearch ); Reset( txtIssTaskSearch ); Reset( txtIssTxSearch );
         Set( gIssPicker, "" ); Set( gIssPeopleQuery, "" ); Reset( cmpIssPeople );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose )
@@ -312,18 +310,28 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtIssProjectSearch:
-                            Control: ModernTextInput@1.1.1
+                        # Opens the shared record picker. Was a search box that filtered a
+                        # floating gallery as you typed; the search now lives in the dialog.
+                        # Reset() clears the previous field's query and highlight — one
+                        # instance serves every lookup on this screen.
+                        - btnIssProjectPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =gIssProject.Id <= 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gIssPicker, "Project")
-                              Placeholder: ="Type to find a project…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a project"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
-                              Size: =Theme.Size.Small
+                              Size: =Theme.Size.Body
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set( gIssPicker, "Project" );
+                                 Reset( cmpIssRecord );
+                                 Set( gIssRecQuery, "" )
                         - chipIssProject:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -356,7 +364,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gIssProject, { Id: 0, Value: "" }); Reset(txtIssProjectSearch)
+                                      =Set(gIssProject, { Id: 0, Value: "" }); Reset( cmpIssRecord )
                   - colIssImpact:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -425,18 +433,28 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtIssTaskSearch:
-                            Control: ModernTextInput@1.1.1
+                        # Opens the shared record picker. Was a search box that filtered a
+                        # floating gallery as you typed; the search now lives in the dialog.
+                        # Reset() clears the previous field's query and highlight — one
+                        # instance serves every lookup on this screen.
+                        - btnIssTaskPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =gIssTask.Id <= 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gIssPicker, "Task")
-                              Placeholder: ="Type to find a task…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a task"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
-                              Size: =Theme.Size.Small
+                              Size: =Theme.Size.Body
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set( gIssPicker, "Task" );
+                                 Reset( cmpIssRecord );
+                                 Set( gIssRecQuery, "" )
                         - chipIssTask:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -469,7 +487,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gIssTask, { Id: 0, Value: "" }); Reset(txtIssTaskSearch)
+                                      =Set(gIssTask, { Id: 0, Value: "" }); Reset( cmpIssRecord )
                   - lblIssTargetCap:
                       Control: Label@2.5.1
                       Properties:
@@ -526,18 +544,28 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - txtIssTxSearch:
-                            Control: ModernTextInput@1.1.1
+                        # Opens the shared record picker. Was a search box that filtered a
+                        # floating gallery as you typed; the search now lives in the dialog.
+                        # Reset() clears the previous field's query and highlight — one
+                        # instance serves every lookup on this screen.
+                        - btnIssTxPick:
+                            Control: Classic/Button@2.2.0
                             Properties:
                               Visible: =gIssTx.Id <= 0
-                              Type: =TextInputType.Search
-                              OnChange: =Set(gIssPicker, "Tx")
-                              Placeholder: ="Type to find a transaction…"
-                              TriggerOutput: =TriggerOutput.Delayed
+                              Text: ="＋  Choose a transaction"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
                               Font: =Theme.Font
-                              Size: =Theme.Size.Small
+                              Size: =Theme.Size.Body
                               Width: =Parent.Width
                               Height: =36
+                              OnSelect: |
+                                =Set( gIssPicker, "Tx" );
+                                 Reset( cmpIssRecord );
+                                 Set( gIssRecQuery, "" )
                         - chipIssTx:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -570,7 +598,7 @@ Screens:
                                     Height: =16
                                     Width: =16
                                     OnSelect: |
-                                      =Set(gIssTx, { Id: 0, Value: "" }); Reset(txtIssTxSearch)
+                                      =Set(gIssTx, { Id: 0, Value: "" }); Reset( cmpIssRecord )
                   - lblIssCloseCap:
                       Control: Label@2.5.1
                       Properties:
@@ -936,159 +964,6 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
-      # =====================================================================
-      # OVERLAY PICKERS — declared LAST so positional z-order floats them above
-      # characters and nothing is chosen yet.
-      # =====================================================================
-      - galIssProject:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gIssPicker = "Project" && ( Len(txtIssProjectSearch.Text) >= 2 && gIssProject.Id <= 0 )
-            # Delegable: StartsWith on the indexed project_name.
-            Items: |
-              =Sort( Filter( taskmaster_projects,
-                         StartsWith(project_name, txtIssProjectSearch.Text) ),
-                     project_name )
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =24
-            Y: =150
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowIssProject:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.project_name
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galIssProjectHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gIssProject, { Id: ThisItem.ID, Value: ThisItem.project_name })
-      - galIssTask:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gIssPicker = "Task" && ( Len(txtIssTaskSearch.Text) >= 2 && gIssTask.Id <= 0 )
-            # Narrowed to the chosen project when there is one — a delegable
-            # `=` on the indexed Lookup FK plus a delegable StartsWith.
-            Items: |
-              =Sort( Filter( taskmaster_tasks,
-                         task_project_id.Id = gIssProject.Id
-                      && StartsWith(task_name, txtIssTaskSearch.Text) ),
-                     task_name )
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =24
-            Y: =402
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowIssTask:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.task_name
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galIssTaskHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gIssTask, { Id: ThisItem.ID, Value: ThisItem.task_name })
-      - galIssTx:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gIssPicker = "Tx" && ( Len(txtIssTxSearch.Text) >= 2 && gIssTx.Id <= 0 )
-            Items: |
-              =Sort( Filter( taskmaster_transactions,
-                         transaction_project_id.Id = gIssProject.Id
-                      && StartsWith(transaction_name, txtIssTxSearch.Text) ),
-                     transaction_name )
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =24
-            Y: =526
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowIssTx:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.transaction_name
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galIssTxHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gIssTx, { Id: ThisItem.ID, Value: ThisItem.transaction_name })
       - cmpIssPeople:
           Control: CanvasComponent
           ComponentName: cmpPeoplePicker
@@ -1119,4 +994,48 @@ Screens:
                             { DisplayName: cmpIssPeople.Picked.DisplayName,
                               Mail:        cmpIssPeople.Picked.Mail } ) );
                Set( gIssPicker, "" )
+            OnCancel: =Set( gIssPicker, "" )
+
+      # =====================================================================
+      # RECORD PICKER — declared LAST so the dialog paints above the footer.
+      # ONE instance serves every lookup on this screen; gIssPicker names which.
+      # The query runs HERE, not in the component: with AccessAppScope false
+      # it cannot reach a data source. Each branch is a delegable StartsWith
+      # on an indexed Text column, projected to the {Id, Primary, Secondary}
+      # shape the component declares. ShowColumns takes IDENTIFIERS.
+      # =====================================================================
+      - cmpIssRecord:
+          Control: CanvasComponent
+          ComponentName: cmpRecordPicker
+          Properties:
+            Visible: =gIssPicker = "Project" || gIssPicker = "Task" || gIssPicker = "Tx"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: =Switch( gIssPicker, "Project", "Select project", "Task", "Select task", "Select transaction" )
+            Results: |
+              =If( Len(gIssRecQuery) < 2, Blank(),
+              gIssPicker = "Project",
+              AddColumns( ShowColumns( Filter( taskmaster_projects,
+              StartsWith(project_name, gIssRecQuery) ),
+              ID, project_name, project_phase ),
+              Id, ID, Primary, project_name, Secondary, Coalesce(project_phase.Value, "") ),
+              gIssPicker = "Task",
+              AddColumns( ShowColumns( Filter( taskmaster_tasks,
+              StartsWith(task_name, gIssRecQuery) ),
+              ID, task_name, task_stage ),
+              Id, ID, Primary, task_name, Secondary, Coalesce(task_stage.Value, "") ),
+              AddColumns( ShowColumns( Filter( taskmaster_transactions,
+              StartsWith(transaction_name, gIssRecQuery) ),
+              ID, transaction_name, transaction_currency ),
+              Id, ID, Primary, transaction_name, Secondary, Coalesce(transaction_currency.Value, "") ) )
+            OnSearch: =Set( gIssRecQuery, cmpIssRecord.Query )
+            AllowCreate: =false
+            OnConfirm: |
+              =Switch( gIssPicker,
+              "Project", Set( gIssProject, { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ),
+              "Task",    Set( gIssTask,    { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ),
+              Set( gIssTx,      { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ) );
+              Set( gIssPicker, "" )
             OnCancel: =Set( gIssPicker, "" )
