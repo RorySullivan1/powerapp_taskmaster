@@ -1,6 +1,11 @@
 # Reusable components — contracts, constraints, and transfer
 
-Ten reusable UI building blocks for the EQD Taskmaster app, authored in the **v3.0
+**Four of the original ten were deleted 2026-08-11** — see "Removed" below. The table
+below is also PARTIAL: `cmpAppBar`, `cmpNestedSelect`, `cmpPeoplePicker` and
+`cmpRecordPicker` were built after it was written and were never added. `.claude/CATALOG.md`
+is the generated, always-current inventory; this file is the contract notes.
+
+Authored in the **v3.0
 `.pa.yaml` `ComponentDefinitions`** schema (grounded on the official schema:
 `microsoft/PowerApps-Tooling` `schemas/pa-yaml/v3.0/pa.schema.yaml`). Data-independent —
 no `tm*` tokens. Colours **inline** the `App.Formulas` `Theme` palette because a component
@@ -10,38 +15,43 @@ is isolated and can't read app globals; keep the hex/RGBA in step with `Theme`.
 
 | File | What it is | Kind | Key contract |
 |---|---|---|---|
-| `cmpUiKit.pa.yaml` | Pill/chip/person **HTML builders** | Function library | `StatusPillHtml(label,tone)`, `ChoicePillHtml(label,selected)`, `PersonChipHtml(name)`, `Initials(name)` → all `OutputFunction` returning HtmlText |
-| `cmpStatusPill.pa.yaml` | Status badge (screen-level) | Component | in: `Label`, `Tone` |
-| `cmpChoicePill.pa.yaml` | Clickable filter chip | Component | in: `Label`, `Selected`; event: `OnSelect` |
 | `cmpStatusCard.pa.yaml` | Tappable KPI/summary card | Component | in: `Title,Value,Caption,Trend,Accent`; event: `OnSelect` |
 | `cmpSelection.pa.yaml` | Single-select strip over `Items` | Component | in: `Items,DefaultId`; out: `Selected`; event: `OnChange` |
-| `cmpEditableGrid.pa.yaml` | Editable grid, bulk-save | Component | in: `Items`; out: `EditedItems,RowCount`; action: `AddRow`; event: `OnCommit` |
 | `cmpSectionHeader.pa.yaml` | Section title + subtitle + action | Component | in: `Title,Subtitle,ActionLabel,ShowAction`; event: `OnAction` |
 | `cmpConfirmDialog.pa.yaml` | Modal confirm (scrim + card) | Component | in: `Visible,Title,Message,ConfirmLabel,CancelLabel,Destructive`; events: `OnConfirm,OnCancel` |
 | `cmpToast.pa.yaml` | Self-dismissing toast | Component | in: `IsOpen,Message,Tone,Duration`; event: `OnDismiss` |
 | `cmpKpiRing.pa.yaml` | SVG percent ring (licence-free) | Component | in: `Percent,Label,AccentHex,TrackHex` |
 
-## The one rule that shaped the design: **no component inside a gallery/form**
+## Removed 2026-08-11 — four components, 462 lines, zero instances
 
-Power Apps forbids placing a canvas component inside a gallery or form. Status/choice
-pills and person chips are almost always **cell renderers inside gallery rows**, so they
-**can't** be components there. Hence:
+`cmpUiKit` (129), `cmpEditableGrid` (192), `cmpStatusPill` (75) and `cmpChoicePill` (66)
+were **never instantiated by any screen** — confirmed by an exhaustive `ComponentName:`
+and function-call scan. An unused component definition still ships inside the `.msapp`
+and loads at app start, so they were pure payload and maintenance surface.
 
-- **In a gallery row** → drop a plain **HtmlText** control and call a `cmpUiKit` function:
-  ```
-  HtmlText = cmpUiKit.StatusPillHtml(ThisItem.Status, "auto")
-  HtmlText = cmpUiKit.PersonChipHtml(ThisItem.OwnerName)
-  ```
-- **On a screen** (detail header, filter bar — not in a gallery) → use the components
-  `cmpStatusPill` / `cmpChoicePill`.
-- `cmpChoicePill` **must** be a component (not a function): it's clickable and raises an
-  event; HtmlText can't take a click. `cmpUiKit.ChoicePillHtml` is its display-only twin.
-- The tone→colour logic is intentionally duplicated between `cmpStatusPill` and
-  `cmpUiKit.StatusPillHtml` (a component can't call another component). Keep them in step.
+`cmpUiKit` in particular could not work as built: its `OutputFunction`s are uncallable
+without a screen-level instance, and no screen has one. Its tone-to-colour logic was also
+deliberately duplicated into `cmpStatusPill`, so there were three implementations of one
+pill and none of them in use.
 
-> Alternative worth knowing: the `cmpUiKit` functions could instead be **user-defined
-> functions** in `App.Formulas` (no component, no transfer pain). Kept as a component here
-> because you asked for components and it packages them as one importable unit.
+**What was lost, honestly:** galleries render status as flat muted text
+(`scrProjects` row meta, `scrReference` client meta) where a coloured pill would read
+better. Adopting the pills was the alternative to deleting them, and it was considered —
+it needs an `HtmlText` control per gallery row plus a screen-level `cmpUiKit` instance.
+The deletion is recoverable from git if that is ever wanted; the definitions are at
+`e16688c^`.
+
+**The size win is only real once they are deleted in STUDIO too** — removing them from the
+repo does not shrink the running app.
+
+## The rule that shaped the original design: **no component inside a gallery/form**
+
+Power Apps forbids placing a canvas component inside a gallery or form, which is why the
+pill renderers were built as `OutputFunction`s returning HtmlText rather than as
+components. That constraint is still true and still worth knowing before anyone builds a
+per-row renderer: **in a gallery row it has to be an HtmlText control**, never a component
+instance.
+
 
 ## Gallery `Variant` tokens — the real ones
 
