@@ -41,6 +41,7 @@
 # and ModernButton. The two date fields no longer parse text, so their
 # "⚠ not a date" echo labels are gone — a picker cannot produce a bad date.
 # Every column token resolves to schema/schema.yaml (golden source).
+#
 # =============================================================================
 Screens:
   scrIssueEdit:
@@ -76,13 +77,12 @@ Screens:
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
         Reset( txtIssName ); Reset( txtIssDesc );
-         
+
         Reset( txtIssProjectSearch ); Reset( txtIssTaskSearch ); Reset( txtIssTxSearch );
-        Reset( txtIssAssigneeSearch ); Reset( txtIssOwnerSearch );
+        Set( gIssPicker, "" ); Set( gIssPeopleQuery, "" ); Reset( cmpIssPeople );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose )
     Children:
-      # ---- Header ----------------------------------------------------------
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -114,590 +114,830 @@ Screens:
             X: =Parent.Width - 24 - Theme.Space.Gutter
             Y: =(Theme.Space.HeaderH - 24) / 2
             OnSelect: =Back()
-      # ================= LEFT COLUMN =======================================
-      - lblIssNameCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Summary  *"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =24
-            Y: =88
-            Width: =560
-            Height: =18
-      - txtIssName:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Default: =If(gEditMode = "Edit", gEditIssue.issue_name, "")
-            Placeholder: ="What is the issue?"
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            X: =24
-            Y: =108
-            Width: =560
-            Height: =40
-      - lblIssDescCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Description"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =24
-            Y: =158
-            Width: =560
-            Height: =18
-      - txtIssDesc:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Default: =If(gEditMode = "Edit", gEditIssue.issue_description, "")
-            Type: =TextInputType.Multiline
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            X: =24
-            Y: =178
-            Width: =560
-            Height: =92
-      # ---- Project (Lookup, required) --------------------------------------
-      - lblIssProjCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Project  *"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =24
-            Y: =280
-            Width: =560
-            Height: =18
-      - txtIssProjectSearch:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Type: =TextInputType.Search
-            OnChange: =Set(gIssPicker, "Project")
-            Placeholder: ="Type to find a project…"
-            TriggerOutput: =TriggerOutput.Delayed
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            X: =24
-            Y: =300
-            Width: =300
-            Height: =36
-      - lblIssProjChip:
-          Control: Label@2.5.1
-          Properties:
-            Text: =If(gIssProject.Id > 0, gIssProject.Value, "— none selected —")
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =If(gIssProject.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-            X: =332
-            Y: =300
-            Width: =228
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
-      - icoIssProjClear:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            Icon: =Icon.Cancel
-            Visible: =gIssProject.Id > 0
-            Color: =Theme.Color.TextMuted
-            Height: =16
-            Width: =16
-            X: =564
-            Y: =310
-            OnSelect: |
-              =Set(gIssProject, { Id: 0, Value: "" })
-      # ---- Related task (Lookup, optional) ---------------------------------
-      - lblIssTaskCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Related task"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =24
-            Y: =346
-            Width: =560
-            Height: =18
-      - txtIssTaskSearch:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Type: =TextInputType.Search
-            OnChange: =Set(gIssPicker, "Task")
-            Placeholder: ="Type to find a task…"
-            TriggerOutput: =TriggerOutput.Delayed
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            X: =24
-            Y: =366
-            Width: =300
-            Height: =36
-      - lblIssTaskChip:
-          Control: Label@2.5.1
-          Properties:
-            Text: =If(gIssTask.Id > 0, gIssTask.Value, "— none —")
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =If(gIssTask.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-            X: =332
-            Y: =366
-            Width: =228
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
-      - icoIssTaskClear:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            Icon: =Icon.Cancel
-            Visible: =gIssTask.Id > 0
-            Color: =Theme.Color.TextMuted
-            Height: =16
-            Width: =16
-            X: =564
-            Y: =376
-            OnSelect: |
-              =Set(gIssTask, { Id: 0, Value: "" })
-      # ---- Related transaction (Lookup, optional) ---------------------------
-      - lblIssTxCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Related transaction"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =24
-            Y: =412
-            Width: =560
-            Height: =18
-      - txtIssTxSearch:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Type: =TextInputType.Search
-            OnChange: =Set(gIssPicker, "Tx")
-            Placeholder: ="Type to find a transaction…"
-            TriggerOutput: =TriggerOutput.Delayed
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            X: =24
-            Y: =432
-            Width: =300
-            Height: =36
-      - lblIssTxChip:
-          Control: Label@2.5.1
-          Properties:
-            Text: =If(gIssTx.Id > 0, gIssTx.Value, "— none —")
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =If(gIssTx.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-            X: =332
-            Y: =432
-            Width: =228
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
-      - icoIssTxClear:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            Icon: =Icon.Cancel
-            Visible: =gIssTx.Id > 0
-            Color: =Theme.Color.TextMuted
-            Height: =16
-            Width: =16
-            X: =564
-            Y: =442
-            OnSelect: |
-              =Set(gIssTx, { Id: 0, Value: "" })
-      # ---- Assignee (Person, required) --------------------------------------
-      - lblIssAssigneeCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Assignee  *"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =24
-            Y: =478
-            Width: =560
-            Height: =18
-      - txtIssAssigneeSearch:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Type: =TextInputType.Search
-            OnChange: =Set(gIssPicker, "Assignee")
-            Placeholder: ="Search people…"
-            TriggerOutput: =TriggerOutput.Delayed
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            X: =24
-            Y: =498
-            Width: =300
-            Height: =36
-      - lblIssAssigneeChip:
-          Control: Label@2.5.1
-          Properties:
-            Text: =If(Len(gIssAssignee.Mail) > 0, gIssAssignee.DisplayName, "— none selected —")
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =If(Len(gIssAssignee.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-            X: =332
-            Y: =498
-            Width: =228
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
-      - icoIssAssigneeClear:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            Icon: =Icon.Cancel
-            Visible: =Len(gIssAssignee.Mail) > 0
-            Color: =Theme.Color.TextMuted
-            Height: =16
-            Width: =16
-            X: =564
-            Y: =508
-            OnSelect: |
-              =Set(gIssAssignee, { DisplayName: "", Mail: "" })
-      # ---- Owner (Person, optional) -----------------------------------------
-      - lblIssOwnerCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Business owner"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =24
-            Y: =544
-            Width: =560
-            Height: =18
-      - txtIssOwnerSearch:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Type: =TextInputType.Search
-            OnChange: =Set(gIssPicker, "Owner")
-            Placeholder: ="Search people…"
-            TriggerOutput: =TriggerOutput.Delayed
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            X: =24
-            Y: =564
-            Width: =300
-            Height: =36
-      - lblIssOwnerChip:
-          Control: Label@2.5.1
-          Properties:
-            Text: =If(Len(gIssOwner.Mail) > 0, gIssOwner.DisplayName, "— none —")
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =If(Len(gIssOwner.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-            X: =332
-            Y: =564
-            Width: =228
-            Height: =36
-            VerticalAlign: =VerticalAlign.Middle
-      - icoIssOwnerClear:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            Icon: =Icon.Cancel
-            Visible: =Len(gIssOwner.Mail) > 0
-            Color: =Theme.Color.TextMuted
-            Height: =16
-            Width: =16
-            X: =564
-            Y: =574
-            OnSelect: |
-              =Set(gIssOwner, { DisplayName: "", Mail: "" })
-      # ================= RIGHT COLUMN ======================================
-      - lblIssStatusCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Status  *"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =620
-            Y: =88
-            Width: =560
-            Height: =18
-      - selIssStatus:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
-          Properties:
-            FontSize: =11
-            X: =620
-            Y: =108
-            Width: =560
-            Height: =40
-            Items: |
-              =Table( { Id: 1, Label: "Open" },    { Id: 2, Label: "Review" },
-                      { Id: 3, Label: "Waiting" }, { Id: 4, Label: "Blocked" },
-                      { Id: 5, Label: "Closed" } )
-            DefaultId: |
-              =Switch( If(gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open"),
-                       "Open", 1, "Review", 2, "Waiting", 3, "Blocked", 4, 5 )
-            OnChange: =Set(gIssStatus, selIssStatus.Selected.Label)
-      - lblIssTypeCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Type"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =620
-            Y: =158
-            Width: =560
-            Height: =18
-      - selIssType:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
-          Properties:
-            FontSize: =10
-            X: =620
-            Y: =178
-            Width: =660
-            Height: =40
-            # "(none)" is a real option, not a placeholder: an optional Choice must
-            # be clearable, and {Value: ""} is not a legal write.
-            Items: |
-              =Table( { Id: 1, Label: "(none)" },     { Id: 2, Label: "Approval" },
-                      { Id: 3, Label: "Process" },    { Id: 4, Label: "Compliance" },
-                      { Id: 5, Label: "Branding" },   { Id: 6, Label: "Technical" } )
-            DefaultId: |
-              =Switch( If(gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value, "(none)"), "(none)"),
-                       "Approval", 2, "Process", 3, "Compliance", 4, "Branding", 5, "Technical", 6, 1 )
-            OnChange: =Set(gIssType, selIssType.Selected.Label)
-      - lblIssImpactCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Impact"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =620
-            Y: =228
-            Width: =560
-            Height: =18
-      - selIssImpact:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
-          Properties:
-            FontSize: =11
-            X: =620
-            Y: =248
-            Width: =560
-            Height: =40
-            Items: |
-              =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "Low" },
-                      { Id: 3, Label: "Moderate" }, { Id: 4, Label: "High" },
-                      { Id: 5, Label: "Critical" } )
-            DefaultId: |
-              =Switch( If(gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)"),
-                       "Low", 2, "Moderate", 3, "High", 4, "Critical", 5, 1 )
-            OnChange: =Set(gIssImpact, selIssImpact.Selected.Label)
-      # ---- Dates: typed, parsed, and echoed back ---------------------------
-      # No DatePicker: its version token is unverified, and an unverified token is
-      # a failed paste we would learn about only as "it didn't work". A text box
-      # plus DateValue() is grounded; the echo label makes the parse visible so a
-      # mis-typed date cannot be saved as Blank() without the user seeing it.
-      - lblIssTargetCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Target resolution date"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =620
-            Y: =298
-            Width: =560
-            Height: =18
-      - dtpIssTarget:
-          Control: ModernDatePicker@1.0.1
-          Properties:
-            DefaultDate: =If(gEditMode = "Edit", gEditIssue.issue_date_target, Blank())
-            Placeholder: ="Target date"
-            Format: =DatePickerFormat.LongAbbreviated
-            StartOfWeek: =StartOfWeek.Monday
-            IsEditable: =true
-            Height: =32
-            X: =620
-            Y: =318
-            Width: =180
-      - lblIssCloseCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Resolution date"
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =620
-            Y: =364
-            Width: =560
-            Height: =18
-      - dtpIssClose:
-          Control: ModernDatePicker@1.0.1
-          Properties:
-            DefaultDate: =If(gEditMode = "Edit", gEditIssue.issue_date_close, Blank())
-            Placeholder: ="Close date"
-            Format: =DatePickerFormat.LongAbbreviated
-            StartOfWeek: =StartOfWeek.Monday
-            IsEditable: =true
-            Height: =32
-            X: =620
-            Y: =384
-            Width: =180
-      # ---- What is still missing -------------------------------------------
-      - lblIssMissing:
-          Control: Label@2.5.1
-          Properties:
-            Text: |
-              =Trim(
-                 If( Len(Trim(txtIssName.Text)) = 0, "summary   ", "" ) &
-                 If( gIssProject.Id <= 0,            "project   ", "" ) &
-                 If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.Danger
-            X: =620
-            Y: =440
-            Width: =560
-            Height: =40
-            Visible: =Len(Self.Text) > 0
-      - lblIssMissingCap:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Still required:"
-            Visible: =Len(lblIssMissing.Text) > 0
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.TextMuted
-            X: =620
-            Y: =422
-            Width: =560
-            Height: =18
-      # ---- Save / Cancel ----------------------------------------------------
-      - btnIssSave:
-          Control: Classic/Button@2.2.0
-          Properties:
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
-            BorderThickness: =0
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            Text: =If(gEditMode = "Edit", "Save issue", "Create issue")
-            # ALWAYS ENABLED — see scrTaskEdit btnTkSave. A disabled button cannot fire
-            # OnSelect, so a record missing a required field gave a click that did
-            # nothing at all. The requirement moved into OnSelect, where it can speak.
-            Height: =44
-            Width: =200
-            X: =24
-            Y: =660
-            # Required fields in one Patch; optional ones after, each guarded.
-            # The gate is gIssErr, captured in IfError's fallback: FirstError is
-            # only in scope THERE, so the message is stashed and acted on
-            # afterwards. Two reasons it is not `IsBlank(gIssSaved)`: Errors()
-            # returns a TABLE (so IsError(Errors(...)) never fires), and what a
-            # failed Patch leaves in the Set target is not something a one-way gap
-            # can verify. Each IfError argument is a SINGLE statement — no ";"
-            # chains inside a function argument.
-            #
-            # EVERY IfError ARGUMENT IS A `Set(...)`, AND THAT IS LOAD-BEARING.
-            # "IfError returns the value of one of its arguments. The types of all
-            # values that might be returned by IfError must be compatible" — and
-            # MS Learn adds that *currently* ALL arguments must be compatible, not
-            # just the ones that could be returned. `Patch` returns a record and
-            # `Notify` returns a boolean, so the obvious `IfError(Patch(…),
-            # Notify(…))` — which the docs themselves show — is rejected today with
-            # "expecting a record". Wrapping the Patch in a Set makes both sides a
-            # Set and it types. Failures are therefore accumulated into gIssWarn
-            # and reported in ONE banner after the guarded block, which also beats
-            # up to five separate toasts.
-            OnSelect: |
-              =If( Len(lblIssMissing.Text) > 0,
-              // The requirement that used to disable the button, moved here so a blocked
-              // save names the field. These are required in schema.yaml — SharePoint would
-              // reject the write regardless; this only decides whether the user is told.
-              Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
-              NotificationType.Error ),
-              Set( gIssSaved, Blank() );
-              Set( gIssErr, "" );
-              Set( gIssWarn, "" );
-              IfError(
-                  Set( gIssSaved,
-                      Patch( taskmaster_issues,
-                             If( gEditMode = "Edit", gEditIssue, Defaults(taskmaster_issues) ),
-                             { issue_name:        Trim(txtIssName.Text),
-                               issue_description: txtIssDesc.Text,
-                               issue_project_id:  { Id: gIssProject.Id, Value: gIssProject.Value },
-                               issue_assignee:
-                                   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                     Claims:      ClaimPrefix & Lower(gIssAssignee.Mail),
-                                     DisplayName: gIssAssignee.DisplayName,
-                                     Email:       gIssAssignee.Mail,
-                                     Department: "", JobTitle: "", Picture: "" },
-                               issue_status:      { Value: gIssStatus },
-                               issue_date_open:
-                                   If( gEditMode = "Edit", gEditIssue.issue_date_open, Now() ),
-                               issue_date_target: dtpIssTarget.SelectedDate,
-                               issue_date_close:  dtpIssClose.SelectedDate } ) ),
-                  Set( gIssErr, FirstError.Message )
-              );
-              If( Len(gIssErr) > 0,
-                  Notify("Couldn't save the issue: " & gIssErr, NotificationType.Error) );
-              If( Len(gIssErr) = 0,
-                  // --- optional fields, one guarded Patch each ---------------
-                  // gIssOpt exists only so both IfError arguments are a Set and
-                  // therefore type-compatible; its value is never read.
-                  If( gIssType <> "(none)",
-                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: { Value: gIssType } }) ),
-                               Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ),
-                      gEditMode = "Edit",
-                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: Blank() }) ),
-                               Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ) );
-                  If( gIssImpact <> "(none)",
-                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: { Value: gIssImpact } }) ),
-                               Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ),
-                      gEditMode = "Edit",
-                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: Blank() }) ),
-                               Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ) );
-                  If( gIssTask.Id > 0,
-                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                     { issue_task_name: { Id: gIssTask.Id, Value: gIssTask.Value } }) ),
-                               Set( gIssWarn, gIssWarn & "task link (" & FirstError.Message & ")   " ) ) );
-                  If( gIssTx.Id > 0,
-                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                     { issue_transaction_name: { Id: gIssTx.Id, Value: gIssTx.Value } }) ),
-                               Set( gIssWarn, gIssWarn & "transaction link (" & FirstError.Message & ")   " ) ) );
-                  If( Len(gIssOwner.Mail) > 0,
-                      IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
-                                     { issue_owner:
-                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                           Claims:      ClaimPrefix & Lower(gIssOwner.Mail),
-                                           DisplayName: gIssOwner.DisplayName,
-                                           Email:       gIssOwner.Mail,
-                                           Department: "", JobTitle: "", Picture: "" } }) ),
-                               Set( gIssWarn, gIssWarn & "owner (" & FirstError.Message & ")   " ) ) );
-                  If( Len(gIssWarn) > 0,
-                      Notify( "Issue saved, but these fields didn't: " & gIssWarn, NotificationType.Warning ) );
-                  If( Len(gIssWarn) = 0,
-                      Notify( If(gEditMode = "Edit", "Issue saved", "Issue created"), NotificationType.Success ) );
-                  Back()
-              ) )
-      - btnIssCancel:
-          Control: Classic/Button@2.2.0
+      - formSheet:
+          Control: Rectangle@2.3.0
           Properties:
             Fill: =Theme.Color.Surface
-            Color: =Theme.Color.Primary
-            BorderColor: =Theme.Color.Primary
+            X: =0
+            Y: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            Height: =Parent.Height - Theme.Space.HeaderH - 88
+      - frmIssScroll:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =20
+            PaddingBottom: =28
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =0
+            Y: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            Height: =Parent.Height - Theme.Space.HeaderH - 88
+          Children:
+            - gridIss1:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =120
+                Children:
+                  - lblIssNameCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Summary  *"
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: =Theme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Height: =18
+                  - txtIssName:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =If(gEditMode = "Edit", gEditIssue.issue_name, "")
+                        Placeholder: ="What is the issue?"
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Body
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Height: =36
+                  - colIssStatus:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblIssStatusCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Status  *"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - selIssStatus:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
+                            Properties:
+                              FontSize: =11
+                              Width: =Parent.Width
+                              Height: =40
+                              Items: |
+                                =Table( { Id: 1, Label: "Open" },    { Id: 2, Label: "Review" },
+                                        { Id: 3, Label: "Waiting" }, { Id: 4, Label: "Blocked" },
+                                        { Id: 5, Label: "Closed" } )
+                              DefaultId: |
+                                =Switch( If(gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open"),
+                                         "Open", 1, "Review", 2, "Waiting", 3, "Blocked", 4, 5 )
+                              OnChange: =Set(gIssStatus, selIssStatus.Selected.Label)
+            - gridIss2:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =150
+                Children:
+                  - lblIssDescCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Description"
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: =Theme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =2
+                        Height: =18
+                  - txtIssDesc:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =If(gEditMode = "Edit", gEditIssue.issue_description, "")
+                        Type: =TextInputType.Multiline
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =3
+                        LayoutGridRowEnd: =10
+                        Height: =96
+                  - colIssType:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblIssTypeCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Type"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - selIssType:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
+                            Properties:
+                              FontSize: =10
+                              Width: =Parent.Width
+                              Height: =40
+                              # "(none)" is a real option, not a placeholder: an optional Choice must
+                              # be clearable, and {Value: ""} is not a legal write.
+                              Items: |
+                                =Table( { Id: 1, Label: "(none)" },     { Id: 2, Label: "Approval" },
+                                        { Id: 3, Label: "Process" },    { Id: 4, Label: "Compliance" },
+                                        { Id: 5, Label: "Branding" },   { Id: 6, Label: "Technical" } )
+                              DefaultId: |
+                                =Switch( If(gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value, "(none)"), "(none)"),
+                                         "Approval", 2, "Process", 3, "Compliance", 4, "Branding", 5, "Technical", 6, 1 )
+                              OnChange: =Set(gIssType, selIssType.Selected.Label)
+            - gridIss3:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =120
+                Children:
+                  - colIssProject:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblIssProjCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Project  *"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - txtIssProjectSearch:
+                            Control: ModernTextInput@1.1.1
+                            Properties:
+                              Visible: =gIssProject.Id <= 0
+                              Type: =TextInputType.Search
+                              OnChange: =Set(gIssPicker, "Project")
+                              Placeholder: ="Type to find a project…"
+                              TriggerOutput: =TriggerOutput.Delayed
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Width: =Parent.Width
+                              Height: =36
+                        - chipIssProject:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              Visible: =gIssProject.Id > 0
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =6
+                              Width: =Parent.Width
+                              Height: =36
+                            Children:
+                              - lblIssProjChip:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =If(gIssProject.Id > 0, gIssProject.Value, "— none selected —")
+                                    Font: =Theme.Font
+                                    Size: =Theme.Size.Small
+                                    Color: =If(gIssProject.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =60
+                                    Height: =36
+                              - icoIssProjClear:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =Theme.Color.TextMuted
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Height: =16
+                                    Width: =16
+                                    OnSelect: |
+                                      =Set(gIssProject, { Id: 0, Value: "" }); Reset(txtIssProjectSearch)
+                  - colIssImpact:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblIssImpactCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Impact"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - selIssImpact:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
+                            Properties:
+                              FontSize: =11
+                              Width: =Parent.Width
+                              Height: =40
+                              Items: |
+                                =Table( { Id: 1, Label: "(none)" }, { Id: 2, Label: "Low" },
+                                        { Id: 3, Label: "Moderate" }, { Id: 4, Label: "High" },
+                                        { Id: 5, Label: "Critical" } )
+                              DefaultId: |
+                                =Switch( If(gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)"),
+                                         "Low", 2, "Moderate", 3, "High", 4, "Critical", 5, 1 )
+                              OnChange: =Set(gIssImpact, selIssImpact.Selected.Label)
+            - gridIss4:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =120
+                Children:
+                  - colIssTask:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblIssTaskCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Related task"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - txtIssTaskSearch:
+                            Control: ModernTextInput@1.1.1
+                            Properties:
+                              Visible: =gIssTask.Id <= 0
+                              Type: =TextInputType.Search
+                              OnChange: =Set(gIssPicker, "Task")
+                              Placeholder: ="Type to find a task…"
+                              TriggerOutput: =TriggerOutput.Delayed
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Width: =Parent.Width
+                              Height: =36
+                        - chipIssTask:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              Visible: =gIssTask.Id > 0
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =6
+                              Width: =Parent.Width
+                              Height: =36
+                            Children:
+                              - lblIssTaskChip:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =If(gIssTask.Id > 0, gIssTask.Value, "— none —")
+                                    Font: =Theme.Font
+                                    Size: =Theme.Size.Small
+                                    Color: =If(gIssTask.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =60
+                                    Height: =36
+                              - icoIssTaskClear:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =Theme.Color.TextMuted
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Height: =16
+                                    Width: =16
+                                    OnSelect: |
+                                      =Set(gIssTask, { Id: 0, Value: "" }); Reset(txtIssTaskSearch)
+                  - lblIssTargetCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Target resolution date"
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: =Theme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Height: =18
+                  - dtpIssTarget:
+                      Control: ModernDatePicker@1.0.1
+                      Properties:
+                        DefaultDate: =If(gEditMode = "Edit", gEditIssue.issue_date_target, Blank())
+                        Placeholder: ="Target date"
+                        Format: =DatePickerFormat.LongAbbreviated
+                        StartOfWeek: =StartOfWeek.Monday
+                        IsEditable: =true
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Height: =36
+            - gridIss5:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =120
+                Children:
+                  - colIssTx:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblIssTxCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Related transaction"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - txtIssTxSearch:
+                            Control: ModernTextInput@1.1.1
+                            Properties:
+                              Visible: =gIssTx.Id <= 0
+                              Type: =TextInputType.Search
+                              OnChange: =Set(gIssPicker, "Tx")
+                              Placeholder: ="Type to find a transaction…"
+                              TriggerOutput: =TriggerOutput.Delayed
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Width: =Parent.Width
+                              Height: =36
+                        - chipIssTx:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              Visible: =gIssTx.Id > 0
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =6
+                              Width: =Parent.Width
+                              Height: =36
+                            Children:
+                              - lblIssTxChip:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =If(gIssTx.Id > 0, gIssTx.Value, "— none —")
+                                    Font: =Theme.Font
+                                    Size: =Theme.Size.Small
+                                    Color: =If(gIssTx.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =60
+                                    Height: =36
+                              - icoIssTxClear:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =Theme.Color.TextMuted
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Height: =16
+                                    Width: =16
+                                    OnSelect: |
+                                      =Set(gIssTx, { Id: 0, Value: "" }); Reset(txtIssTxSearch)
+                  - lblIssCloseCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Resolution date"
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: =Theme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Height: =18
+                  - dtpIssClose:
+                      Control: ModernDatePicker@1.0.1
+                      Properties:
+                        DefaultDate: =If(gEditMode = "Edit", gEditIssue.issue_date_close, Blank())
+                        Placeholder: ="Close date"
+                        Format: =DatePickerFormat.LongAbbreviated
+                        StartOfWeek: =StartOfWeek.Monday
+                        IsEditable: =true
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Height: =36
+            - rowIss6:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =24
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - colIssAssignee:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        Width: =(Parent.Width - 24) / 2
+                        Height: =62
+                      Children:
+                        - lblIssAssigneeCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Assignee  *"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - btnIssAssigneePick:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Visible: =Len(gIssAssignee.Mail) = 0
+                              Text: ="＋  Choose an assignee"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set(gIssPicker, "Assignee");
+                                 Reset(cmpIssPeople);
+                                 Set(gIssPeopleQuery, "")
+                        - chipIssAssignee:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              Visible: =Len(gIssAssignee.Mail) > 0
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =6
+                              Width: =Parent.Width
+                              Height: =36
+                            Children:
+                              - lblIssAssigneeChip:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =If(Len(gIssAssignee.Mail) > 0, gIssAssignee.DisplayName, "— none selected —")
+                                    Font: =Theme.Font
+                                    Size: =Theme.Size.Small
+                                    Color: =If(Len(gIssAssignee.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =60
+                                    Height: =36
+                              - icoIssAssigneeClear:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =Theme.Color.TextMuted
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Height: =16
+                                    Width: =16
+                                    OnSelect: |
+                                      =Set(gIssAssignee, { DisplayName: "", Mail: "" }); Reset(cmpIssPeople); Set(gIssPicker, "")
+                  - colIssOwner:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        Width: =(Parent.Width - 24) / 2
+                        Height: =62
+                      Children:
+                        - lblIssOwnerCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Business owner"
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Color: =Theme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        - btnIssOwnerPick:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Visible: =Len(gIssOwner.Mail) = 0
+                              Text: ="＋  Choose a business owner"
+                              Align: =Align.Left
+                              Fill: =Theme.Color.Bg
+                              Color: =Theme.Color.TextMuted
+                              BorderColor: =Theme.Color.Border
+                              BorderThickness: =1
+                              Font: =Theme.Font
+                              Size: =Theme.Size.Small
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set(gIssPicker, "Owner");
+                                 Reset(cmpIssPeople);
+                                 Set(gIssPeopleQuery, "")
+                        - chipIssOwner:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              Visible: =Len(gIssOwner.Mail) > 0
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =6
+                              Width: =Parent.Width
+                              Height: =36
+                            Children:
+                              - lblIssOwnerChip:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =If(Len(gIssOwner.Mail) > 0, gIssOwner.DisplayName, "— none —")
+                                    Font: =Theme.Font
+                                    Size: =Theme.Size.Small
+                                    Color: =If(Len(gIssOwner.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =60
+                                    Height: =36
+                              - icoIssOwnerClear:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =Theme.Color.TextMuted
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Height: =16
+                                    Width: =16
+                                    OnSelect: |
+                                      =Set(gIssOwner, { DisplayName: "", Mail: "" }); Reset(cmpIssPeople); Set(gIssPicker, "")
+            - colIssMissing:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =4
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblIssMissingCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Still required:"
+                        Visible: =Len(lblIssMissing.Text) > 0
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: =Theme.Color.TextMuted
+                        Width: =Parent.Width
+                        Height: =18
+                  - lblIssMissing:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          =Trim(
+                             If( Len(Trim(txtIssName.Text)) = 0, "summary   ", "" ) &
+                             If( gIssProject.Id <= 0,            "project   ", "" ) &
+                             If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) )
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Small
+                        Color: =Theme.Color.Danger
+                        Width: =Parent.Width
+                        Height: =40
+                        Visible: =Len(Self.Text) > 0
+      - actionBarBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            Text: ="Cancel"
-            Height: =44
-            Width: =140
-            X: =240
-            Y: =660
-            OnSelect: =Back()
+            X: =0
+            Y: =Parent.Height - 88
+            Width: =Parent.Width
+            Height: =88
+      - actionBarRow:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            LayoutDirection: =LayoutDirection.Horizontal
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            PaddingTop: =20
+            PaddingBottom: =20
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =0
+            Y: =Parent.Height - 88
+            Width: =Parent.Width
+            Height: =88
+          Children:
+            - lblIssFooterSpacer:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =""
+                  FillPortions: =1
+                  LayoutMinWidth: =60
+                  Height: =48
+            - btnIssSave:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Fill: =Theme.Color.Primary
+                  Color: =Theme.Color.OnPrimary
+                  BorderColor: =Theme.Color.Primary
+                  BorderThickness: =0
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Text: =If(gEditMode = "Edit", "Save issue", "Create issue")
+                  # ALWAYS ENABLED — see scrTaskEdit btnTkSave. A disabled button cannot fire
+                  # OnSelect, so a record missing a required field gave a click that did
+                  # nothing at all. The requirement moved into OnSelect, where it can speak.
+                  FillPortions: =0
+                  LayoutMinWidth: =200
+                  Width: =200
+                  Height: =48
+                  # Required fields in one Patch; optional ones after, each guarded.
+                  # The gate is gIssErr, captured in IfError's fallback: FirstError is
+                  # only in scope THERE, so the message is stashed and acted on
+                  # afterwards. Two reasons it is not `IsBlank(gIssSaved)`: Errors()
+                  # returns a TABLE (so IsError(Errors(...)) never fires), and what a
+                  # failed Patch leaves in the Set target is not something a one-way gap
+                  # can verify. Each IfError argument is a SINGLE statement — no ";"
+                  # chains inside a function argument.
+                  #
+                  # EVERY IfError ARGUMENT IS A `Set(...)`, AND THAT IS LOAD-BEARING.
+                  # "IfError returns the value of one of its arguments. The types of all
+                  # values that might be returned by IfError must be compatible" — and
+                  # MS Learn adds that *currently* ALL arguments must be compatible, not
+                  # just the ones that could be returned. `Patch` returns a record and
+                  # `Notify` returns a boolean, so the obvious `IfError(Patch(…),
+                  # Notify(…))` — which the docs themselves show — is rejected today with
+                  # "expecting a record". Wrapping the Patch in a Set makes both sides a
+                  # Set and it types. Failures are therefore accumulated into gIssWarn
+                  # and reported in ONE banner after the guarded block, which also beats
+                  # up to five separate toasts.
+                  OnSelect: |
+                    =If( Len(lblIssMissing.Text) > 0,
+                    // The requirement that used to disable the button, moved here so a blocked
+                    // save names the field. These are required in schema.yaml — SharePoint would
+                    // reject the write regardless; this only decides whether the user is told.
+                    Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
+                    NotificationType.Error ),
+                    Set( gIssSaved, Blank() );
+                    Set( gIssErr, "" );
+                    Set( gIssWarn, "" );
+                    IfError(
+                        Set( gIssSaved,
+                            Patch( taskmaster_issues,
+                                   If( gEditMode = "Edit", gEditIssue, Defaults(taskmaster_issues) ),
+                                   { issue_name:        Trim(txtIssName.Text),
+                                     issue_description: txtIssDesc.Text,
+                                     issue_project_id:  { Id: gIssProject.Id, Value: gIssProject.Value },
+                                     issue_assignee:
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                           Claims:      ClaimPrefix & Lower(gIssAssignee.Mail),
+                                           DisplayName: gIssAssignee.DisplayName,
+                                           Email:       gIssAssignee.Mail,
+                                           Department: "", JobTitle: "", Picture: "" },
+                                     issue_status:      { Value: gIssStatus },
+                                     issue_date_open:
+                                         If( gEditMode = "Edit", gEditIssue.issue_date_open, Now() ),
+                                     issue_date_target: dtpIssTarget.SelectedDate,
+                                     issue_date_close:  dtpIssClose.SelectedDate } ) ),
+                        Set( gIssErr, FirstError.Message )
+                    );
+                    If( Len(gIssErr) > 0,
+                        Notify("Couldn't save the issue: " & gIssErr, NotificationType.Error) );
+                    If( Len(gIssErr) = 0,
+                        // --- optional fields, one guarded Patch each ---------------
+                        // gIssOpt exists only so both IfError arguments are a Set and
+                        // therefore type-compatible; its value is never read.
+                        If( gIssType <> "(none)",
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: { Value: gIssType } }) ),
+                                     Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ),
+                            gEditMode = "Edit",
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_type: Blank() }) ),
+                                     Set( gIssWarn, gIssWarn & "type (" & FirstError.Message & ")   " ) ) );
+                        If( gIssImpact <> "(none)",
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: { Value: gIssImpact } }) ),
+                                     Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ),
+                            gEditMode = "Edit",
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved, { issue_impact: Blank() }) ),
+                                     Set( gIssWarn, gIssWarn & "impact (" & FirstError.Message & ")   " ) ) );
+                        If( gIssTask.Id > 0,
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                           { issue_task_name: { Id: gIssTask.Id, Value: gIssTask.Value } }) ),
+                                     Set( gIssWarn, gIssWarn & "task link (" & FirstError.Message & ")   " ) ) );
+                        If( gIssTx.Id > 0,
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                           { issue_transaction_name: { Id: gIssTx.Id, Value: gIssTx.Value } }) ),
+                                     Set( gIssWarn, gIssWarn & "transaction link (" & FirstError.Message & ")   " ) ) );
+                        If( Len(gIssOwner.Mail) > 0,
+                            IfError( Set( gIssOpt, Patch(taskmaster_issues, gIssSaved,
+                                           { issue_owner:
+                                               { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                                 Claims:      ClaimPrefix & Lower(gIssOwner.Mail),
+                                                 DisplayName: gIssOwner.DisplayName,
+                                                 Email:       gIssOwner.Mail,
+                                                 Department: "", JobTitle: "", Picture: "" } }) ),
+                                     Set( gIssWarn, gIssWarn & "owner (" & FirstError.Message & ")   " ) ) );
+                        If( Len(gIssWarn) > 0,
+                            Notify( "Issue saved, but these fields didn't: " & gIssWarn, NotificationType.Warning ) );
+                        If( Len(gIssWarn) = 0,
+                            Notify( If(gEditMode = "Edit", "Issue saved", "Issue created"), NotificationType.Success ) );
+                        Back()
+                    ) )
+            - btnIssCancel:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Fill: =Theme.Color.Surface
+                  Color: =Theme.Color.Primary
+                  BorderColor: =Theme.Color.Primary
+                  BorderThickness: =1
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  Text: ="Cancel"
+                  FillPortions: =0
+                  LayoutMinWidth: =140
+                  Width: =140
+                  Height: =48
+                  OnSelect: =Back()
       # =====================================================================
       # OVERLAY PICKERS — declared LAST so positional z-order floats them above
-      # the fields they cover. Each is hidden unless its search box has 2+
       # characters and nothing is chosen yet.
       # =====================================================================
       - galIssProject:
@@ -714,8 +954,8 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =332
-            Y: =300
+            X: =24
+            Y: =150
             Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
@@ -765,8 +1005,8 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =332
-            Y: =366
+            X: =24
+            Y: =402
             Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
@@ -814,8 +1054,8 @@ Screens:
             TemplatePadding: =0
             BorderColor: =Theme.Color.Border
             BorderThickness: =1
-            X: =332
-            Y: =432
+            X: =24
+            Y: =526
             Width: =280
             Height: =132
             TemplateFill: =Theme.Color.Surface
@@ -849,98 +1089,34 @@ Screens:
                   OnSelect: |
                     =Select(Parent);
                      Set(gIssTx, { Id: ThisItem.ID, Value: ThisItem.transaction_name })
-      # People pickers — Office365Users.SearchUser is first-party and returns
-      # DisplayName / Mail, which is exactly what the Person write needs. Only
-      # those two fields are stored, so the global has ONE schema (pattern 2).
-      - galIssAssignee:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
+      - cmpIssPeople:
+          Control: CanvasComponent
+          ComponentName: cmpPeoplePicker
           Properties:
-            Visible: =gIssPicker = "Assignee" && ( Len(txtIssAssigneeSearch.Text) >= 2 && Len(gIssAssignee.Mail) = 0 )
-            Items: |
-              =Office365Users.SearchUserV2({ searchTerm: txtIssAssigneeSearch.Text, top: 8 }).value
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =332
-            Y: =498
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowIssAssignee:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galIssAssigneeHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gIssAssignee, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
-      - galIssOwner:
-          Control: Gallery@2.15.0
-          Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
-          Properties:
-            Visible: =gIssPicker = "Owner" && ( Len(txtIssOwnerSearch.Text) >= 2 && Len(gIssOwner.Mail) = 0 )
-            Items: |
-              =Office365Users.SearchUserV2({ searchTerm: txtIssOwnerSearch.Text, top: 8 }).value
-            TemplateSize: =32
-            TemplatePadding: =0
-            BorderColor: =Theme.Color.Border
-            BorderThickness: =1
-            X: =332
-            Y: =564
-            Width: =280
-            Height: =132
-            TemplateFill: =Theme.Color.Surface
-          Children:
-            - rowIssOwner:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.DisplayName & "  ·  " & ThisItem.Mail
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextPrimary
-                  X: =8
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 16
-                  Height: =32
-                  VerticalAlign: =VerticalAlign.Middle
-            - galIssOwnerHit:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
-                  Text: =""
-                  Fill: =RGBA(0, 0, 0, 0)
-                  BorderThickness: =0
-                  X: =0
-                  Y: =0
-                  Width: =Parent.TemplateWidth
-                  Height: =Parent.TemplateHeight
-                  OnSelect: |
-                    =Select(Parent);
-                     Set(gIssOwner, { DisplayName: ThisItem.DisplayName, Mail: ThisItem.Mail })
+            Visible: =gIssPicker = "Assignee" || gIssPicker = "Owner"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: |
+              =Switch( gIssPicker,
+                       "Assignee", "Select assignee",
+                       "Owner",    "Select business owner" )
+            Results: |
+              =If( Len(gIssPeopleQuery) >= 2,
+                   ShowColumns(
+                       Office365Users.SearchUserV2({ searchTerm: gIssPeopleQuery, top: 25 }).value,
+                       DisplayName, Mail ) )
+            OnSearch: =Set( gIssPeopleQuery, cmpIssPeople.Query )
+            OnConfirm: |
+              =Switch( gIssPicker,
+                       "Assignee",
+                       Set( gIssAssignee,
+                            { DisplayName: cmpIssPeople.Picked.DisplayName,
+                              Mail:        cmpIssPeople.Picked.Mail } ),
+                       "Owner",
+                       Set( gIssOwner,
+                            { DisplayName: cmpIssPeople.Picked.DisplayName,
+                              Mail:        cmpIssPeople.Picked.Mail } ) );
+               Set( gIssPicker, "" )
+            OnCancel: =Set( gIssPicker, "" )
