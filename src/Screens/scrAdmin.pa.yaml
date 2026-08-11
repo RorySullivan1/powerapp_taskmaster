@@ -19,19 +19,77 @@ Screens:
             Width: =Parent.Width - (Theme.Space.Gutter * 2)
             X: =Theme.Space.Gutter
             Y: =Theme.Space.HeaderH + Theme.Space.Gutter
+      # ---- Reference data ---------------------------------------------------
+      # scrClientEdit and scrProductEdit are reachable from EXACTLY two places:
+      # here, and cmpRecordPicker's "＋ New". They are deliberately NOT in
+      # NavMenu — reference data is something you maintain, not somewhere you
+      # browse to. Both are opened in New mode with an EMPTY return contract, so
+      # the save just comes back here rather than filling a caller's field.
+      - lblAdminRefHead:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Reference data"
+            Font: =Theme.Font
+            Size: =Theme.Size.H3
+            FontWeight: =FontWeight.Semibold
+            Color: =Theme.Color.TextPrimary
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter * 2
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter * 2
+            Width: =400
+            Height: =28
+      - btnAdminNewClient:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="＋  New client"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Theme.Space.Gutter * 2
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter * 2 + 40
+            Width: =180
+            Height: =44
+            OnSelect: |
+              =Set( gEditMode, "New" );
+               Set( gClReturn, "" );
+               Navigate( scrClientEdit, ScreenTransition.Cover )
+      - btnAdminNewProduct:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="＋  New product"
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Theme.Space.Gutter * 2 + 180 + 12
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter * 2 + 40
+            Width: =180
+            Height: =44
+            OnSelect: |
+              =Set( gEditMode, "New" );
+               Set( gPdReturn, "" );
+               Navigate( scrProductEdit, ScreenTransition.Cover )
       - AdminEmptyLabel:
           Control: Label@2.5.1
           Properties:
-            Text: ="Lookups, bulk archive and orphan detection will live here (Phase 2/3)."
+            Text: ="Bulk archive and orphan detection will live here (Phase 2/3)."
             Font: =Theme.Font
             Size: =Theme.Size.Body
             Color: =Theme.Color.TextMuted
             Align: =Align.Center
             VerticalAlign: =VerticalAlign.Middle
-            X: =AdminEmpty.X
-            Y: =AdminEmpty.Y
-            Width: =AdminEmpty.Width
-            Height: =AdminEmpty.Height
+            # Plain arithmetic, not `AdminEmpty.X`. Positioning off a sibling is
+            # evaluated mid-paste, when that sibling may not be where it ends up,
+            # and freezes wrong — see the NOTE in validate_pa_yaml.py.
+            X: =Theme.Space.Gutter
+            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 160
+            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Height: =Parent.Height - Theme.Space.HeaderH - (Theme.Space.Gutter * 2) - 160
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #

@@ -362,28 +362,19 @@ migration:
     failure is gone. Kept as the record of a fault that took two fixes aimed at the wrong
     layer before the cause was found: **a save rejected by a column the app never writes
     is a SharePoint-side fault and cannot be fixed in Power Fx.**
-  choice_replacement_UNRECORDED: >-
-    **THE REPLACEMENT COLUMNS ARE NOT YET DEFINED HERE, AND NOTHING IN `src/` MAY
-    REFERENCE THEM UNTIL THEY ARE.** The user replaced Managed Metadata with Choice
-    columns on 2026-08-10, but their internal names and allowed values have not been
-    supplied, and this file is the golden source — inventing a token here would put a
-    name into the app that SharePoint does not have, which fails silently (an unknown
-    column in a Filter yields an EMPTY result, never an error). Two things must be
-    settled before any code moves:
-    (1) **Do the Choice columns REPLACE the C11 design or sit beside it?** The app today
-    writes the `*_id` / `*_path` pairs — `project_type_id`, `project_type_path`,
-    `project_region_id`, `project_region_path` — and drives them from `cmpNestedSelect`
-    against `mapping_regions` / `mapping_activitytype` / `mapping_producttype`. If Choice
-    columns are the replacement, that whole apparatus is superseded: the pairs, the three
-    mapping lists, the nested picker component and the planned scrAdmin vocabulary screen
-    all come out, and a Choice column is a one-level vocabulary where the mapping lists
-    were three.
-    (2) **If they replace it, is the hierarchy lost on purpose?** `mapping_*` held
-    level1/level2/level3; a Choice column is flat. That is a real modelling decision
-    (fine if the deeper levels were never used), not a detail — record the answer, do not
-    infer it.
-    Until both are answered the `*_id` / `*_path` writes stay exactly as they are: they
-    are what is authored, landed and working.
+  choice_replacement_RESOLVED: >-
+    **RESOLVED 2026-08-11 — the app never needs the Choice VALUES, only the column NAMES,
+    and those were in this file all along.** The user's answer: read them with `Choices()`
+    at runtime. So `client_type` and `client_coverage` are filled by
+    `ClearCollect(colX, Choices([@taskmaster_clients].client_type))` bound to a combo box —
+    the pattern `scrProjectEdit` already lands for `project_coverage` — and the Managed
+    Metadata retirement needs no app change and no invented token. This closes the block
+    that stood since 2026-08-10.
+    THE `*_path` COLUMNS ARE A DIFFERENT ANIMAL AND ARE UNCHANGED: `client_region_path`,
+    `product_type_path`, `project_region_path` and `project_type_path` are Text holding a
+    composed mapping-list path, still driven by `cmpNestedSelect` over the three live
+    `mapping_*` lists. They are NOT Choice columns and `Choices()` does not apply to them.
+    Both new create screens use exactly these two mechanisms and invent nothing.
   path_separator: >-
     The `*_path` columns store levels joined by " | " (space pipe space), e.g.
     "EMEA | UK | London". It was " > " until 2026-08-06. THE SEPARATOR IS PART OF

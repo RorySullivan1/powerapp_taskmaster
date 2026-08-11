@@ -96,6 +96,15 @@ ComponentDefinitions:
         PropertyKind: Event
         Description: Raised when the dialog is dismissed without choosing. The app clears whatever global drives Visible.
         ReturnType: Boolean
+      AllowCreate:
+        PropertyKind: Input
+        Description: Show the "＋ New" row. True for clients and products only — tasks, transactions, projects and assets are pick-only.
+        DataType: Boolean
+        Default: =false
+      OnCreateNew:
+        PropertyKind: Event
+        Description: Raised by "＋ New". The app navigates to scrClientEdit / scrProductEdit in New mode and returns with the new record selected.
+        ReturnType: Boolean
     Properties:
       # Screen-sized by default — the instance is meant to cover the form.
       Width: =1366
@@ -330,10 +339,36 @@ ComponentDefinitions:
             Size: =12
             Color: =RGBA(197, 58, 58, 1)
             VerticalAlign: =VerticalAlign.Middle
+            # Footer row, all at +400 h40: rpCreateNew 16..136 | rpNudge 144..348
+            # | rpCancel 356..476 | rpConfirm 484..604. Computed, not eyeballed —
+            # this label was at 16..316 and sat on top of the ＋ New button.
+            X: =(Parent.Width - 620) / 2 + 144
+            Y: =(Parent.Height - 460) / 2 + 400
+            Width: =204
+            Height: =40
+      - rpCreateNew:
+          Control: Classic/Button@2.2.0
+          Properties:
+            # Only clients and products can be created on the fly; every other
+            # lookup target is pick-only, so this is off by default.
+            #
+            # It RAISES, it does not create. The screen navigates to the create
+            # screen — creating a client needs five required columns including a
+            # Person, which is a form, and a component cannot host one (it clips
+            # its children, so a nested people picker could not paint).
+            Visible: =cmpRecordPicker.AllowCreate
+            Text: ="＋  New"
+            Fill: =RGBA(255, 255, 255, 1)
+            Color: =RGBA(0, 90, 158, 1)
+            BorderColor: =RGBA(0, 90, 158, 1)
+            BorderThickness: =1
+            Font: =Font.'Segoe UI'
+            Size: =14
             X: =(Parent.Width - 620) / 2 + 16
             Y: =(Parent.Height - 460) / 2 + 400
-            Width: =300
+            Width: =120
             Height: =40
+            OnSelect: =cmpRecordPicker.OnCreateNew()
       - rpCancel:
           Control: Classic/Button@2.2.0
           Properties:

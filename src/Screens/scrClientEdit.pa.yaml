@@ -1,0 +1,449 @@
+# =============================================================================
+# scrClientEdit  —  create / edit ONE client. Compact by instruction.
+#
+# REACHABLE FROM EXACTLY TWO PLACES, and that is deliberate:
+#   1. scrAdmin  ▸ Clients            — maintenance
+#   2. cmpRecordPicker ▸ "＋ New"     — quick creation mid-flow
+# It is NOT in NavMenu. A client is reference data, not a place you browse to.
+#
+# THE RETURN CONTRACT (`gClReturn`) is what makes the picker route work.
+# When the picker sends you here it sets gClReturn to the name of the global the
+# caller wants filled. On a successful save this screen writes the new client
+# into THAT global as {Id, Value} — the shape a Lookup write needs — and Back()s,
+# so the user lands where they left off with the new client already selected.
+# From scrAdmin, gClReturn is "" and the save just returns.
+#
+# WHY A SCREEN AND NOT A "+" INSIDE THE PICKER DIALOG:
+# taskmaster_clients has FIVE required columns, one of them a Person. That is a
+# form. And a canvas component clips its children to its own bounds, so a picker
+# dialog cannot host the people picker this form needs — the nested dialog would
+# be cut off. Confirmed constraint, not a preference.
+#
+# PEOPLE ARE NEVER CREATED. client_sales is a Person column filled from Microsoft
+# 365 through cmpPeoplePicker, exactly like every other person field in the app.
+# Only the CLIENT record is created here.
+#
+# CHOICE VALUES ARE READ, NOT HARDCODED. client_type and client_coverage are
+# Choice columns whose allowed values live in SharePoint; Choices() returns them
+# at runtime, so the Managed Metadata retirement needs no app change and no value
+# is ever invented here. Same pattern as scrProjectEdit's coverage picker.
+#
+# BAND ARITHMETIC (1366x768):
+#      0 ..  64   header (absolute)
+#     64 .. 700   bodyRoot, vertical auto-layout, 24 padding
+#    700 .. 768   actionBar (opaque, absolute)
+# =============================================================================
+Screens:
+  scrClientEdit:
+    Properties:
+      Fill: =Theme.Color.Bg
+      OnVisible: |
+        =Set( gClName,   If( gEditMode = "Edit", Coalesce(gEditClient.client_name, ""), "" ) );
+        // Choice values come from the column itself — never a literal here.
+        ClearCollect( colClTypeChoices, Choices([@taskmaster_clients].client_type) );
+        ClearCollect( colClCovChoices,  Choices([@taskmaster_clients].client_coverage) );
+        Set( gClType, If( gEditMode = "Edit", Coalesce(gEditClient.client_type.Value, ""), "" ) );
+        Set( gClCov,  If( gEditMode = "Edit", Coalesce(gEditClient.client_coverage.Value, ""), "" ) );
+        Set( gClSales,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditClient.client_sales.DisplayName, ""),
+                    Mail:        Coalesce(gEditClient.client_sales.Email, "") },
+                  { DisplayName: "", Mail: "" } ) );
+        Set( gClRegionId,   If( gEditMode = "Edit", Coalesce(gEditClient.client_region_id, 0), 0 ) );
+        Set( gClRegionPath, If( gEditMode = "Edit", Coalesce(gEditClient.client_region_path, ""), "" ) );
+        Set( gClNotes, If( gEditMode = "Edit", Coalesce(gEditClient.client_notes, ""), "" ) );
+        ClearCollect( colMapRegionCl, mapping_regions );
+        Set( gClPicker, "" );
+        // Every seeded input needs an explicit Reset or it keeps the PREVIOUS
+        // record's value — Default and DefaultSelectedItems are read once.
+        Reset( txtClName ); Reset( txtClNotes );
+        Reset( cboClType ); Reset( cboClCov );
+        Reset( pickClRegion );
+        Reset( cmpClPeople )
+    Children:
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Theme.Space.HeaderH
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(gEditMode = "Edit", "Edit client", "New client")
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.H2
+            FontWeight: =FontWeight.Semibold
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =Parent.Width - 120
+            Height: =Theme.Space.HeaderH
+      - BackIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.OnPrimary
+            Tooltip: ="Close without saving"
+            X: =Parent.Width - 24 - Theme.Space.Gutter
+            Y: =(Theme.Space.HeaderH - 24) / 2
+            Width: =24
+            Height: =24
+            OnSelect: =Back()
+      - bodyRoot:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Start
+            LayoutGap: =12
+            PaddingTop: =Theme.Space.Gutter
+            PaddingBottom: =Theme.Space.Gutter
+            PaddingLeft: =Theme.Space.Gutter
+            PaddingRight: =Theme.Space.Gutter
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            Fill: =Theme.Color.Surface
+            X: =0
+            Y: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            Height: =Parent.Height - Theme.Space.HeaderH - 68
+          Children:
+            - lblClNameCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Client name  *"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - txtClName:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: =If(gEditMode = "Edit", gEditClient.client_name, "")
+                  Placeholder: ="Legal or trading name"
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =Parent.Width - 48
+                  Height: =36
+                  OnChange: =Set( gClName, Trim(txtClName.Text) )
+            - lblClTypeCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Type  *"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - cboClType:
+                Control: ModernCombobox@1.1.1
+                Properties:
+                  Items: =colClTypeChoices
+                  ItemDisplayText: =ThisItem.Value
+                  DefaultSelectedItems: =Filter( colClTypeChoices, Value = gClType )
+                  SelectMultiple: =false
+                  IsSearchable: =true
+                  InputTextPlaceholder: ="Select a client type"
+                  FillPortions: =0
+                  LayoutMinHeight: =32
+                  Width: =Parent.Width - 48
+                  Height: =32
+                  OnChange: =Set( gClType, cboClType.Selected.Value )
+            - lblClCovCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Coverage  *"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - cboClCov:
+                Control: ModernCombobox@1.1.1
+                Properties:
+                  Items: =colClCovChoices
+                  ItemDisplayText: =ThisItem.Value
+                  DefaultSelectedItems: =Filter( colClCovChoices, Value = gClCov )
+                  SelectMultiple: =false
+                  IsSearchable: =true
+                  InputTextPlaceholder: ="Select a coverage group"
+                  FillPortions: =0
+                  LayoutMinHeight: =32
+                  Width: =Parent.Width - 48
+                  Height: =32
+                  OnChange: =Set( gClCov, cboClCov.Selected.Value )
+            - lblClSalesCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Sales owner  *"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            # Empty person box -> opens cmpClPeople. People are NEVER created;
+            # they come from Microsoft 365 through the shared picker.
+            - btnClSalesPick:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Visible: =Len(gClSales.Mail) = 0
+                  Text: ="＋  Choose a sales owner"
+                  Align: =Align.Left
+                  Fill: =Theme.Color.Bg
+                  Color: =Theme.Color.TextMuted
+                  BorderColor: =Theme.Color.Border
+                  BorderThickness: =1
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =Parent.Width - 48
+                  Height: =36
+                  OnSelect: |
+                    =Set( gClPicker, "Sales" );
+                     Reset( cmpClPeople );
+                     Set( gClPeopleQuery, "" )
+            - chipClSales:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  Visible: =Len(gClSales.Mail) > 0
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =6
+                  PaddingLeft: =10
+                  PaddingRight: =10
+                  Fill: =Theme.Color.Bg
+                  BorderColor: =Theme.Color.Border
+                  BorderThickness: =1
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =Parent.Width - 48
+                  Height: =36
+                Children:
+                  - lblClSalesName:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =gClSales.DisplayName
+                        Font: =Theme.Font
+                        Size: =Theme.Size.Body
+                        Color: =Theme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =80
+                        Height: =24
+                  - icoClSalesClear:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        Icon: =Icon.Cancel
+                        Color: =Theme.Color.TextMuted
+                        Tooltip: ="Clear"
+                        FillPortions: =0
+                        LayoutMinWidth: =16
+                        Width: =16
+                        Height: =16
+                        OnSelect: |
+                          =Set( gClSales, { DisplayName: "", Mail: "" } );
+                           Set( gClPicker, "" )
+            # Region is the composed mapping_regions path — same cascading picker
+            # scrProjectEdit uses, and the same " | " separator, which is part of
+            # the stored data rather than a display choice.
+            # WRAPPED IN A COL. A component instance accepts only its own custom
+            # properties plus the built-ins, so it cannot carry FillPortions or
+            # LayoutMinHeight — the validator rejects that as a paste failure.
+            # The wrapper holds the auto-layout contract; the instance just sizes.
+            - colClRegion:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =0
+                  FillPortions: =0
+                  LayoutMinHeight: =64
+                  Width: =Parent.Width - 48
+                  Height: =64
+                Children:
+                  - pickClRegion:
+                      Control: CanvasComponent
+                      ComponentName: cmpNestedSelect
+                      Properties:
+                        Terms: =colMapRegionCl
+                        Caption: ="Region  *"
+                        DefaultPath: =gClRegionPath
+                        Separator: =" | "
+                        Width: =Parent.Width
+                        Height: =64
+                        OnChange: |
+                          =Set( gClRegionId,   pickClRegion.SelectedId );
+                           Set( gClRegionPath, pickClRegion.SelectedPath )
+            - lblClNotesCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Notes"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - txtClNotes:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: =If(gEditMode = "Edit", gEditClient.client_notes, "")
+                  Placeholder: ="Optional"
+                  Type: =TextInputType.Multiline
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =60
+                  Width: =Parent.Width - 48
+                  Height: =60
+                  OnChange: =Set( gClNotes, txtClNotes.Text )
+      # ---- Action bar (opaque, absolute) ------------------------------------
+      - actionBarBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =0
+            Y: =Parent.Height - 68
+            Width: =Parent.Width
+            Height: =68
+      - lblClMissing:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =Len(Self.Text) > 0
+            # KEEP THIS A BARE LIST — btnClSave tests Len(...) > 0, so a static
+            # prefix would make it permanently non-empty and block every save.
+            Text: |
+              =Trim(
+              If( Len(Trim(txtClName.Text)) = 0, "a name   ", "" ) &
+              If( Len(gClType) = 0,              "a type   ", "" ) &
+              If( Len(gClCov) = 0,               "a coverage group   ", "" ) &
+              If( Len(gClSales.Mail) = 0,        "a sales owner   ", "" ) &
+              If( Len(gClRegionPath) = 0,        "a region   ", "" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.Danger
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =Parent.Height - 68
+            Width: =Parent.Width - Theme.Space.Gutter - 320
+            Height: =68
+      - btnClCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.Primary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Parent.Width - Theme.Space.Gutter - 140 - 8 - 140
+            Y: =Parent.Height - 68 + 12
+            Width: =140
+            Height: =44
+            OnSelect: =Back()
+      - btnClSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =If(gEditMode = "Edit", "Save client", "Create client")
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Parent.Width - Theme.Space.Gutter - 140
+            Y: =Parent.Height - 68 + 12
+            Width: =140
+            Height: =44
+            # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
+            OnSelect: |
+              =If( Len(lblClMissing.Text) > 0,
+              Notify( "Can't save yet — this client still needs: " & lblClMissing.Text,
+              NotificationType.Error ),
+              Set( gClErr, "" );
+              // ONE WRITE. All six columns in a single Patch; nothing here is
+              // optional enough to need a guarded second pass.
+              IfError(
+              Set( gClSaved,
+              Patch( taskmaster_clients,
+              If( gEditMode = "Edit", gEditClient, Defaults(taskmaster_clients) ),
+              { client_name:        Trim(txtClName.Text),
+              client_type:        { Value: gClType },
+              client_coverage:    { Value: gClCov },
+              client_sales: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      ClaimPrefix & Lower(gClSales.Mail),   DisplayName: gClSales.DisplayName,   Email:       gClSales.Mail,   Department: "", JobTitle: "", Picture: "" },
+              client_region_id:   gClRegionId,
+              client_region_path: gClRegionPath,
+              client_notes:       txtClNotes.Text } ) ),
+              Set( gClErr, FirstError.Message ) );
+              // Trust the RECORD, never the message — a write can fail and still
+              // leave FirstError.Message empty.
+              If( IsBlank(gClSaved.ID) && Len(gClErr) = 0,
+              Set( gClErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
+              If( Len(gClErr) > 0,
+              Notify( "Couldn't save the client: " & gClErr, NotificationType.Error ) );
+              If( Len(gClErr) = 0 && !IsBlank(gClSaved.ID),
+              // THE RETURN CONTRACT. If a picker sent us here, hand the new
+              // client straight back in the shape a Lookup write needs, so the
+              // user returns to their form with it already selected.
+              If( gClReturn = "TaskClient",
+              Set( gTkClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ),
+              gClReturn = "TxClient",
+              Set( gTxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ) );
+              Set( gClReturn, "" );
+              Notify( If(gEditMode = "Edit", "Client saved", "Client created"), NotificationType.Success );
+              Back() ) )
+      # ---- People picker — declared LAST so it paints above the action bar ---
+      - cmpClPeople:
+          Control: CanvasComponent
+          ComponentName: cmpPeoplePicker
+          Properties:
+            Visible: =gClPicker = "Sales"
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: ="Select sales owner"
+            # The directory call runs HERE — the component cannot reach a data
+            # source with AccessAppScope false. Bound to the global that OnSearch
+            # fills, not to the instance's own Query output, which would be a
+            # same-instance cycle.
+            Results: |
+              =If( Len(gClPeopleQuery) >= 2,
+                   ShowColumns(
+                       Office365Users.SearchUserV2({ searchTerm: gClPeopleQuery, top: 25 }).value,
+                       DisplayName, Mail ) )
+            OnSearch: =Set( gClPeopleQuery, cmpClPeople.Query )
+            OnConfirm: |
+              =Set( gClSales,
+                    { DisplayName: cmpClPeople.Picked.DisplayName,
+                      Mail:        cmpClPeople.Picked.Mail } );
+               Set( gClPicker, "" )
+            OnCancel: =Set( gClPicker, "" )

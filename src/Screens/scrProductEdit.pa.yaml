@@ -1,0 +1,280 @@
+# =============================================================================
+# scrProductEdit  —  create / edit ONE product. Compact by instruction.
+#
+# REACHABLE FROM EXACTLY TWO PLACES, like scrClientEdit:
+#   1. scrAdmin ▸ Products           — maintenance
+#   2. cmpRecordPicker ▸ "＋ New"    — quick creation mid-flow
+# Not in NavMenu. A product is reference data, not a destination.
+#
+# THREE required columns and no Person, so this is genuinely small: a business
+# key, a type path, a description. See scrClientEdit for the return contract and
+# for why quick-create is a screen rather than a "+" inside the picker dialog.
+#
+# product_uid IS A BUSINESS KEY (ISIN / Ticker / internal ID) and schema.yaml
+# calls it unique. SharePoint does not enforce that, so the save checks for a
+# duplicate BEFORE writing — a delegable `=` on an indexed Text column. Without
+# it the app would happily create a second row for the same instrument and every
+# lookup pointing at it would then be ambiguous.
+#
+# BAND ARITHMETIC (1366x768):
+#      0 ..  64   header (absolute)
+#     64 .. 700   bodyRoot, vertical auto-layout, 24 padding
+#    700 .. 768   actionBar (opaque, absolute)
+# =============================================================================
+Screens:
+  scrProductEdit:
+    Properties:
+      Fill: =Theme.Color.Bg
+      OnVisible: |
+        =Set( gPdUid,      If( gEditMode = "Edit", Coalesce(gEditProduct.product_uid, ""), "" ) );
+        Set( gPdTypeId,   If( gEditMode = "Edit", Coalesce(gEditProduct.product_type_id, 0), 0 ) );
+        Set( gPdTypePath, If( gEditMode = "Edit", Coalesce(gEditProduct.product_type_path, ""), "" ) );
+        Set( gPdDesc,     If( gEditMode = "Edit", Coalesce(gEditProduct.product_description, ""), "" ) );
+        ClearCollect( colMapProdType, mapping_producttype );
+        Set( gPdDup, false );
+        // Seeded inputs keep the PREVIOUS record's value without an explicit Reset.
+        Reset( txtPdUid ); Reset( txtPdDesc ); Reset( pickPdType )
+    Children:
+      - HeaderBar:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Primary
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Theme.Space.HeaderH
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: =If(gEditMode = "Edit", "Edit product", "New product")
+            Color: =Theme.Color.OnPrimary
+            Font: =Theme.Font
+            Size: =Theme.Size.H2
+            FontWeight: =FontWeight.Semibold
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =0
+            Width: =Parent.Width - 120
+            Height: =Theme.Space.HeaderH
+      - BackIcon:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Icon: =Icon.Cancel
+            Color: =Theme.Color.OnPrimary
+            Tooltip: ="Close without saving"
+            X: =Parent.Width - 24 - Theme.Space.Gutter
+            Y: =(Theme.Space.HeaderH - 24) / 2
+            Width: =24
+            Height: =24
+            OnSelect: =Back()
+      - bodyRoot:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Start
+            LayoutGap: =12
+            PaddingTop: =Theme.Space.Gutter
+            PaddingBottom: =Theme.Space.Gutter
+            PaddingLeft: =Theme.Space.Gutter
+            PaddingRight: =Theme.Space.Gutter
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            Fill: =Theme.Color.Surface
+            X: =0
+            Y: =Theme.Space.HeaderH
+            Width: =Parent.Width
+            Height: =Parent.Height - Theme.Space.HeaderH - 68
+          Children:
+            - lblPdUidCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Product ID  *   (ISIN, ticker or internal ID)"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - txtPdUid:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: =If(gEditMode = "Edit", gEditProduct.product_uid, "")
+                  Placeholder: ="e.g. XS1234567890"
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =Parent.Width - 48
+                  Height: =36
+                  # Clear a stale duplicate warning as soon as the key changes.
+                  OnChange: |
+                    =Set( gPdUid, Trim(txtPdUid.Text) );
+                     Set( gPdDup, false )
+            - lblPdDup:
+                Control: Label@2.5.1
+                Properties:
+                  Visible: =gPdDup = true
+                  Text: ="A product with this ID already exists. Use it instead of creating a second one."
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.Danger
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            # WRAPPED IN A COL — a component instance cannot carry FillPortions
+            # or LayoutMinHeight; the wrapper holds the auto-layout contract.
+            - colPdType:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =0
+                  FillPortions: =0
+                  LayoutMinHeight: =64
+                  Width: =Parent.Width - 48
+                  Height: =64
+                Children:
+                  - pickPdType:
+                      Control: CanvasComponent
+                      ComponentName: cmpNestedSelect
+                      Properties:
+                        Terms: =colMapProdType
+                        Caption: ="Product type  *"
+                        DefaultPath: =gPdTypePath
+                        Separator: =" | "
+                        Width: =Parent.Width
+                        Height: =64
+                        OnChange: |
+                          =Set( gPdTypeId,   pickPdType.SelectedId );
+                           Set( gPdTypePath, pickPdType.SelectedPath )
+            - lblPdDescCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Description  *"
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Small
+                  Color: =Theme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - txtPdDesc:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: =If(gEditMode = "Edit", gEditProduct.product_description, "")
+                  Placeholder: ="What this product is"
+                  Type: =TextInputType.Multiline
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =Theme.Font
+                  Size: =Theme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =84
+                  Width: =Parent.Width - 48
+                  Height: =84
+                  OnChange: =Set( gPdDesc, txtPdDesc.Text )
+      # ---- Action bar (opaque, absolute) ------------------------------------
+      - actionBarBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =Theme.Color.Surface
+            BorderColor: =Theme.Color.Border
+            BorderThickness: =1
+            X: =0
+            Y: =Parent.Height - 68
+            Width: =Parent.Width
+            Height: =68
+      - lblPdMissing:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =Len(Self.Text) > 0
+            # KEEP THIS A BARE LIST — btnPdSave tests Len(...) > 0.
+            Text: |
+              =Trim(
+              If( Len(Trim(txtPdUid.Text)) = 0, "a product ID   ", "" ) &
+              If( Len(gPdTypePath) = 0,         "a product type   ", "" ) &
+              If( Len(Trim(txtPdDesc.Text)) = 0, "a description   ", "" ) )
+            Font: =Theme.Font
+            Size: =Theme.Size.Small
+            Color: =Theme.Color.Danger
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Theme.Space.Gutter
+            Y: =Parent.Height - 68
+            Width: =Parent.Width - Theme.Space.Gutter - 320
+            Height: =68
+      - btnPdCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="Cancel"
+            Fill: =Theme.Color.Surface
+            Color: =Theme.Color.Primary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =1
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Parent.Width - Theme.Space.Gutter - 140 - 8 - 140
+            Y: =Parent.Height - 68 + 12
+            Width: =140
+            Height: =44
+            OnSelect: =Back()
+      - btnPdSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =If(gEditMode = "Edit", "Save product", "Create product")
+            Fill: =Theme.Color.Primary
+            Color: =Theme.Color.OnPrimary
+            BorderColor: =Theme.Color.Primary
+            BorderThickness: =0
+            Font: =Theme.Font
+            Size: =Theme.Size.Body
+            X: =Parent.Width - Theme.Space.Gutter - 140
+            Y: =Parent.Height - 68 + 12
+            Width: =140
+            Height: =44
+            # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
+            OnSelect: |
+              =If( Len(lblPdMissing.Text) > 0,
+              Notify( "Can't save yet — this product still needs: " & lblPdMissing.Text,
+              NotificationType.Error ),
+              Set( gPdErr, "" );
+              // product_uid is a business key and SharePoint does not enforce
+              // uniqueness, so check first. Delegable: `=` on an indexed Text
+              // column. On an EDIT the row itself is excluded by ID.
+              Set( gPdClash,
+              LookUp( taskmaster_products,
+              product_uid = Trim(txtPdUid.Text) && ID <> If(gEditMode = "Edit", gEditProduct.ID, 0) ) );
+              If( !IsBlank(gPdClash.ID),
+              Set( gPdDup, true );
+              Notify( "A product with ID " & Trim(txtPdUid.Text) & " already exists.",
+              NotificationType.Error ),
+              Set( gPdDup, false );
+              IfError(
+              Set( gPdSaved,
+              Patch( taskmaster_products,
+              If( gEditMode = "Edit", gEditProduct, Defaults(taskmaster_products) ),
+              { product_uid:         Trim(txtPdUid.Text),
+              product_type_id:     gPdTypeId,
+              product_type_path:   gPdTypePath,
+              product_description: txtPdDesc.Text } ) ),
+              Set( gPdErr, FirstError.Message ) );
+              // Trust the RECORD, never the message.
+              If( IsBlank(gPdSaved.ID) && Len(gPdErr) = 0,
+              Set( gPdErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
+              If( Len(gPdErr) > 0,
+              Notify( "Couldn't save the product: " & gPdErr, NotificationType.Error ) );
+              If( Len(gPdErr) = 0 && !IsBlank(gPdSaved.ID),
+              // THE RETURN CONTRACT — hand the new product back in the shape a
+              // Lookup write needs, so the caller's form has it selected.
+              If( gPdReturn = "TaskProduct",
+              Set( gTkProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ),
+              gPdReturn = "TxProduct",
+              Set( gTxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
+              Set( gPdReturn, "" );
+              Notify( If(gEditMode = "Edit", "Product saved", "Product created"), NotificationType.Success );
+              Back() ) ) )
