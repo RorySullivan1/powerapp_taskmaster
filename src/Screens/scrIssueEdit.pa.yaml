@@ -1014,22 +1014,34 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: =Switch( gIssPicker, "Project", "Select project", "Task", "Select task", "Select transaction" )
+            # ForAll(... As alias, {record}) — NOT AddColumns(ShowColumns(...)).
+            # ShowColumns kept `ID` and AddColumns then tried to add `Id`, a name
+            # differing only by case, which Studio rejects — and the result carried
+            # SIX columns where the component declares three. A record literal emits
+            # exactly {Id, Primary, Secondary} and cannot collide. `As` scoping is the
+            # idiom scrProjectEdit already lands.
+            # No else branch, so an unmatched state yields blank — the same shape as
+            # the people picker, which is confirmed working in Studio.
+            # FirstN caps the page at 50: Filter delegates, ForAll does not.
             Results: |
-              =If( Len(gIssRecQuery) < 2, Blank(),
-              gIssPicker = "Project",
-              AddColumns( ShowColumns( Filter( taskmaster_projects,
-              StartsWith(project_name, gIssRecQuery) ),
-              ID, project_name, project_phase ),
-              Id, ID, Primary, project_name, Secondary, Coalesce(project_phase.Value, "") ),
-              gIssPicker = "Task",
-              AddColumns( ShowColumns( Filter( taskmaster_tasks,
-              StartsWith(task_name, gIssRecQuery) ),
-              ID, task_name, task_stage ),
-              Id, ID, Primary, task_name, Secondary, Coalesce(task_stage.Value, "") ),
-              AddColumns( ShowColumns( Filter( taskmaster_transactions,
-              StartsWith(transaction_name, gIssRecQuery) ),
-              ID, transaction_name, transaction_currency ),
-              Id, ID, Primary, transaction_name, Secondary, Coalesce(transaction_currency.Value, "") ) )
+              =If( gIssPicker = "Project" && Len(gIssRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_projects,
+              StartsWith(project_name, gIssRecQuery) ), 50 ) As pr,
+              { Id:        pr.ID,
+              Primary:   pr.project_name,
+              Secondary: Coalesce(pr.project_phase.Value, "") } ),
+              gIssPicker = "Task" && Len(gIssRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_tasks,
+              StartsWith(task_name, gIssRecQuery) ), 50 ) As t,
+              { Id:        t.ID,
+              Primary:   t.task_name,
+              Secondary: Coalesce(t.task_stage.Value, "") } ),
+              gIssPicker = "Tx" && Len(gIssRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_transactions,
+              StartsWith(transaction_name, gIssRecQuery) ), 50 ) As x,
+              { Id:        x.ID,
+              Primary:   x.transaction_name,
+              Secondary: Coalesce(x.transaction_currency.Value, "") } ) )
             OnSearch: =Set( gIssRecQuery, cmpIssRecord.Query )
             AllowCreate: =false
             OnConfirm: |

@@ -783,22 +783,34 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: =Switch( gTxPicker, "Project", "Select project", "Client", "Select client", "Select product" )
+            # ForAll(... As alias, {record}) — NOT AddColumns(ShowColumns(...)).
+            # ShowColumns kept `ID` and AddColumns then tried to add `Id`, a name
+            # differing only by case, which Studio rejects — and the result carried
+            # SIX columns where the component declares three. A record literal emits
+            # exactly {Id, Primary, Secondary} and cannot collide. `As` scoping is the
+            # idiom scrProjectEdit already lands.
+            # No else branch, so an unmatched state yields blank — the same shape as
+            # the people picker, which is confirmed working in Studio.
+            # FirstN caps the page at 50: Filter delegates, ForAll does not.
             Results: |
-              =If( Len(gTxRecQuery) < 2, Blank(),
-              gTxPicker = "Project",
-              AddColumns( ShowColumns( Filter( taskmaster_projects,
-              StartsWith(project_name, gTxRecQuery) ),
-              ID, project_name, project_phase ),
-              Id, ID, Primary, project_name, Secondary, Coalesce(project_phase.Value, "") ),
-              gTxPicker = "Client",
-              AddColumns( ShowColumns( Filter( taskmaster_clients,
-              StartsWith(client_name, gTxRecQuery) ),
-              ID, client_name, client_type ),
-              Id, ID, Primary, client_name, Secondary, Coalesce(client_type.Value, "") ),
-              AddColumns( ShowColumns( Filter( taskmaster_products,
-              StartsWith(product_uid, gTxRecQuery) ),
-              ID, product_uid, product_type_path ),
-              Id, ID, Primary, product_uid, Secondary, Coalesce(product_type_path, "") ) )
+              =If( gTxPicker = "Project" && Len(gTxRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_projects,
+              StartsWith(project_name, gTxRecQuery) ), 50 ) As pr,
+              { Id:        pr.ID,
+              Primary:   pr.project_name,
+              Secondary: Coalesce(pr.project_phase.Value, "") } ),
+              gTxPicker = "Client" && Len(gTxRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_clients,
+              StartsWith(client_name, gTxRecQuery) ), 50 ) As c,
+              { Id:        c.ID,
+              Primary:   c.client_name,
+              Secondary: Coalesce(c.client_type.Value, "") } ),
+              gTxPicker = "Product" && Len(gTxRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_products,
+              StartsWith(product_uid, gTxRecQuery) ), 50 ) As p,
+              { Id:        p.ID,
+              Primary:   p.product_uid,
+              Secondary: Coalesce(p.product_type_path, "") } ) )
             OnSearch: =Set( gTxRecQuery, cmpTxRecord.Query )
             AllowCreate: =gTxPicker = "Client" || gTxPicker = "Product"
             OnConfirm: |

@@ -1586,17 +1586,28 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: =If( gTkPicker = "Client", "Select client", "Select product" )
+            # ForAll(... As alias, {record}) — NOT AddColumns(ShowColumns(...)).
+            # ShowColumns kept `ID` and AddColumns then tried to add `Id`, a name
+            # differing only by case, which Studio rejects — and the result carried
+            # SIX columns where the component declares three. A record literal emits
+            # exactly {Id, Primary, Secondary} and cannot collide. `As` scoping is the
+            # idiom scrProjectEdit already lands.
+            # No else branch, so an unmatched state yields blank — the same shape as
+            # the people picker, which is confirmed working in Studio.
+            # FirstN caps the page at 50: Filter delegates, ForAll does not.
             Results: |
-              =If( Len(gTkRecQuery) < 2, Blank(),
-              gTkPicker = "Client",
-              AddColumns( ShowColumns( Filter( taskmaster_clients,
-              StartsWith(client_name, gTkRecQuery) ),
-              ID, client_name, client_type ),
-              Id, ID, Primary, client_name, Secondary, Coalesce(client_type.Value, "") ),
-              AddColumns( ShowColumns( Filter( taskmaster_products,
-              StartsWith(product_uid, gTkRecQuery) ),
-              ID, product_uid, product_type_path ),
-              Id, ID, Primary, product_uid, Secondary, Coalesce(product_type_path, "") ) )
+              =If( gTkPicker = "Client" && Len(gTkRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_clients,
+              StartsWith(client_name, gTkRecQuery) ), 50 ) As c,
+              { Id:        c.ID,
+              Primary:   c.client_name,
+              Secondary: Coalesce(c.client_type.Value, "") } ),
+              gTkPicker = "Product" && Len(gTkRecQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_products,
+              StartsWith(product_uid, gTkRecQuery) ), 50 ) As p,
+              { Id:        p.ID,
+              Primary:   p.product_uid,
+              Secondary: Coalesce(p.product_type_path, "") } ) )
             OnSearch: =Set( gTkRecQuery, cmpTkRecord.Query )
             AllowCreate: =gTkPicker = "Client" || gTkPicker = "Product"
             OnConfirm: |
