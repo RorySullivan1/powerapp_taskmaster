@@ -142,6 +142,16 @@ Two property errors on one screen, both from assuming a neighbour's spelling:
 `TriggerOutput` takes `Keypress` (default) / `FocusOut` / `Delayed`. The combo box is the
 control that renamed `TriggerOutput` to `DelayOutput`; the text input did **not**.
 
+> **`FocusOut` does NOT fire on Enter — confirmed in Studio 2026-08-11.** It means only what
+> it says: the output commits when the control *loses focus*. Both pickers were authored with
+> `FocusOut` on the assumption that a single-line input commits on Enter, and the result was a
+> search box where Enter did nothing and results appeared only when you clicked away.
+>
+> **There is no keypress or Enter event on a canvas text input at all**, so no formula can bind
+> Enter to an action. The two real options are `Delayed` (debounce — fires once typing stops,
+> which is what this repo uses in all eight places) or an explicit button beside the box. If a
+> spec asks for "press Enter to search", say up front that it cannot be built.
+
 ### Modern controls still get REVISED — the revision renames properties
 
 The revision is real even though the token doesn't move. The combo box's current shape:

@@ -2,7 +2,7 @@
 # cmpPeoplePicker  —  modal single-person search dialog (component)
 # =============================================================================
 # Click a person box on the form -> this opens over the whole screen -> type a
-# name -> ENTER runs the search -> tap a result to highlight it -> press the
+# name -> results appear as you pause -> tap one to highlight it -> press the
 # check to commit. Selecting and committing are two separate acts, so a mistap
 # in the results list never writes a person to the record.
 #
@@ -54,17 +54,22 @@
 # MS Learn states Set() results are scoped to the component instance. Same basis
 # as cmpNestedSelect's nsLevels.
 #
-# SEARCH RUNS ON SUBMIT, NOT PER KEYSTROKE. Nothing here watches the search
-# box's live text. `TriggerOutput.FocusOut` means a single-line input commits on
-# ENTER (or on leaving the field), which fires OnChange, which fills `ppQuery`
-# and raises OnSearch — and only then does the screen re-run the directory call.
-# That is the whole "type, press enter, list appears" mechanic, and it also means
-# one Office365Users call per search instead of one per character.
+# SEARCH IS DEBOUNCED, NOT PER KEYSTROKE AND NOT ON ENTER.
+# `TriggerOutput.Delayed` fires OnChange once the user stops typing, which fills
+# `ppQuery` and raises OnSearch; only then does the screen run the directory
+# call. So it is still one call per search term rather than one per character.
+#
+# This was `FocusOut` first, on the assumption that a single-line input commits
+# on ENTER. IT DOES NOT — FocusOut means only what it says, so Enter did nothing
+# and results appeared only when the box lost focus. **Canvas Power Apps has no
+# keypress or Enter event on a text input at all**, so there is no formula that
+# binds Enter to a search: debounce is the mechanism, and the Search button is
+# the explicit alternative.
 # =============================================================================
 ComponentDefinitions:
   cmpPeoplePicker:
     DefinitionType: CanvasComponent
-    Description: Modal single-person search. Enter runs the search, tap highlights, the check commits. Call Reset(<instance>) when opening.
+    Description: Modal single-person search. Typing searches (debounced), tap highlights, the check commits. Call Reset(<instance>) when opening.
     AccessAppScope: false
     CustomProperties:
       Title:
@@ -80,11 +85,11 @@ ComponentDefinitions:
           =Table( { DisplayName: "Example Person", Mail: "example@contoso.com" } )
       Query:
         PropertyKind: Output
-        Description: What the user submitted. Read it inside OnSearch and stash it in a screen global; the screen runs the directory call.
+        Description: The current search text. Read it inside OnSearch and stash it in a screen global; the screen runs the directory call.
         DataType: Text
       OnSearch:
         PropertyKind: Event
-        Description: Raised when a search is submitted (Enter or the Search button). The app reads Query and refreshes what it passes to Results.
+        Description: Raised when the debounced search box settles, or the Search button is pressed. The app reads Query and refreshes what it passes to Results.
         ReturnType: Boolean
       Picked:
         PropertyKind: Output
@@ -177,11 +182,15 @@ ComponentDefinitions:
       - txtPpSearch:
           Control: ModernTextInput@1.1.1
           Properties:
-            Placeholder: ="Type a name, then press Enter"
-            # FocusOut commits on ENTER (and on leaving the field), which fires
-            # OnChange. That is what makes the search run on submit rather than
-            # on every keystroke — see the header note.
-            TriggerOutput: =TriggerOutput.FocusOut
+            Placeholder: ="Type at least 2 characters…"
+            # Delayed: OnChange fires once the user STOPS TYPING, not per
+            # keystroke. This was FocusOut on the assumption that a single-line
+            # input commits on Enter — it does not; FocusOut means exactly what
+            # it says, so Enter did nothing and the list only appeared when the
+            # box lost focus. Canvas has no keypress/Enter event on a text
+            # input, so debounce is the mechanism and the Search button is the
+            # explicit alternative.
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Font.'Segoe UI'
             Size: =14
             X: =(Parent.Width - 620) / 2 + 16
@@ -196,9 +205,9 @@ ComponentDefinitions:
       - ppSearchGo:
           Control: Classic/Button@2.2.0
           Properties:
-            # Does exactly what Enter does. Present because "press Enter to
-            # search" is a convention some users never reach for, and a visible
-            # affordance costs one control.
+            # Explicit re-run. Debounce covers the normal case; this is for
+            # re-issuing the same query after a data change, and for anyone who
+            # expects a search box to have a button.
             Text: ="Search"
             Fill: =RGBA(0, 90, 158, 1)
             Color: =RGBA(255, 255, 255, 1)
@@ -316,7 +325,7 @@ ComponentDefinitions:
             Visible: =Len(Coalesce(ppQuery, "")) < 2
             Text: |
               =If( Len(Coalesce(ppQuery, "")) = 0,
-                   "Type a name and press Enter to search.",
+                   "Start typing to search — results appear as you pause.",
                    "Type at least two characters." )
             Font: =Font.'Segoe UI'
             Size: =14

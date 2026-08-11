@@ -2,7 +2,7 @@
 # cmpRecordPicker  —  modal single-record search dialog (component)
 # =============================================================================
 # The sibling of cmpPeoplePicker, and deliberately its twin: click a box on the
-# form -> this opens over the whole screen -> type -> ENTER runs the search ->
+# form -> this opens over the whole screen -> type -> results appear ->
 # tap a result to highlight it -> press the check to commit. Same two-step, so a
 # mistap in the results never writes a link to the record.
 #
@@ -62,7 +62,7 @@
 ComponentDefinitions:
   cmpRecordPicker:
     DefinitionType: CanvasComponent
-    Description: Modal single-record search over {Id, Primary, Secondary} rows. Enter searches, tap highlights, the check commits. Call Reset(<instance>) when opening.
+    Description: Modal single-record search over {Id, Primary, Secondary} rows. Typing searches (debounced), tap highlights, the check commits. Call Reset(<instance>) when opening.
     AccessAppScope: false
     CustomProperties:
       Title:
@@ -78,7 +78,7 @@ ComponentDefinitions:
           =Table( { Id: 1, Primary: "Example record", Secondary: "example detail" } )
       Query:
         PropertyKind: Output
-        Description: What the user submitted. Read it inside OnSearch and stash it in a screen global; the screen runs the query.
+        Description: The current search text. Read it inside OnSearch and stash it in a screen global; the screen runs the query.
         DataType: Text
       Picked:
         PropertyKind: Output
@@ -86,7 +86,7 @@ ComponentDefinitions:
         DataType: Record
       OnSearch:
         PropertyKind: Event
-        Description: Raised when a search is submitted (Enter or the Search button). The app reads Query and refreshes what it passes to Results.
+        Description: Raised when the debounced search box settles, or the Search button is pressed. The app reads Query and refreshes what it passes to Results.
         ReturnType: Boolean
       OnConfirm:
         PropertyKind: Event
@@ -184,11 +184,15 @@ ComponentDefinitions:
       - txtRpSearch:
           Control: ModernTextInput@1.1.1
           Properties:
-            Placeholder: ="Type a name, then press Enter"
-            # FocusOut commits on ENTER (and on leaving the field), which fires
-            # OnChange. That is what makes the search run on submit rather than
-            # on every keystroke.
-            TriggerOutput: =TriggerOutput.FocusOut
+            Placeholder: ="Type at least 2 characters…"
+            # Delayed: OnChange fires once the user STOPS TYPING, not per
+            # keystroke. This was FocusOut on the assumption that a single-line
+            # input commits on Enter — it does not; FocusOut means exactly what
+            # it says, so Enter did nothing and the list only appeared when the
+            # box lost focus. Canvas has no keypress/Enter event on a text
+            # input, so debounce is the mechanism and the Search button is the
+            # explicit alternative.
+            TriggerOutput: =TriggerOutput.Delayed
             Font: =Font.'Segoe UI'
             Size: =14
             X: =(Parent.Width - 620) / 2 + 16
@@ -203,8 +207,9 @@ ComponentDefinitions:
       - rpSearchGo:
           Control: Classic/Button@2.2.0
           Properties:
-            # Does exactly what Enter does. Present because "press Enter to
-            # search" is a convention some users never reach for.
+            # Explicit re-run. Debounce covers the normal case; this is for
+            # re-issuing the same query after a data change, and for anyone who
+            # expects a search box to have a button.
             Text: ="Search"
             Fill: =RGBA(0, 90, 158, 1)
             Color: =RGBA(255, 255, 255, 1)
@@ -313,7 +318,7 @@ ComponentDefinitions:
             Visible: =Len(Coalesce(rpQuery, "")) < 2
             Text: |
               =If( Len(Coalesce(rpQuery, "")) = 0,
-                   "Type a name and press Enter to search.",
+                   "Start typing to search — results appear as you pause.",
                    "Type at least two characters." )
             Font: =Font.'Segoe UI'
             Size: =14
