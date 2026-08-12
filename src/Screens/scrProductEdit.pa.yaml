@@ -4,7 +4,7 @@
 # REACHABLE FROM EXACTLY TWO PLACES, like scrClientEdit:
 #   1. scrReference ▸ Products        — maintenance
 #   2. cmpPicker ▸ "＋ New"          — quick creation mid-flow
-# Not in NavMenu. A product is reference data, not a destination.
+# Not in gNavMenu. A product is reference data, not a destination.
 #
 # THREE required columns and no Person, so this is genuinely small: a business
 # key, a type path, a description. See scrClientEdit for the return contract and
@@ -24,7 +24,7 @@
 Screens:
   scrProductEdit:
     Properties:
-      Fill: =Theme.Color.Bg
+      Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnPdSave
         Set( gPdUid,      If( gPdMode = "Edit", Coalesce(gEditProduct.product_uid, ""), "" ) );
@@ -39,32 +39,32 @@ Screens:
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
-            Fill: =Theme.Color.Primary
+            Fill: =gTheme.Color.Primary
             X: =0
             Y: =0
             Width: =Parent.Width
-            Height: =Theme.Space.HeaderH
+            Height: =gTheme.Space.HeaderH
       - AppTitle:
           Control: Label@2.5.1
           Properties:
             Text: =If(gPdMode = "Edit", "Edit product", "New product")
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.H2
+            Color: =gTheme.Color.OnPrimary
+            Font: =gTheme.Font
+            Size: =gTheme.Size.H2
             FontWeight: =FontWeight.Semibold
             VerticalAlign: =VerticalAlign.Middle
-            X: =Theme.Space.Gutter
+            X: =gTheme.Space.Gutter
             Y: =0
             Width: =Parent.Width - 120
-            Height: =Theme.Space.HeaderH
+            Height: =gTheme.Space.HeaderH
       - BackIcon:
           Control: Classic/Icon@2.5.0
           Properties:
             Icon: =Icon.Cancel
-            Color: =Theme.Color.OnPrimary
+            Color: =gTheme.Color.OnPrimary
             Tooltip: ="Close without saving"
-            X: =Parent.Width - 24 - Theme.Space.Gutter
-            Y: =(Theme.Space.HeaderH - 24) / 2
+            X: =Parent.Width - 24 - gTheme.Space.Gutter
+            Y: =(gTheme.Space.HeaderH - 24) / 2
             Width: =24
             Height: =24
             OnSelect: =Back()
@@ -75,24 +75,24 @@ Screens:
             LayoutDirection: =LayoutDirection.Vertical
             LayoutAlignItems: =LayoutAlignItems.Start
             LayoutGap: =12
-            PaddingTop: =Theme.Space.Gutter
-            PaddingBottom: =Theme.Space.Gutter
-            PaddingLeft: =Theme.Space.Gutter
-            PaddingRight: =Theme.Space.Gutter
+            PaddingTop: =gTheme.Space.Gutter
+            PaddingBottom: =gTheme.Space.Gutter
+            PaddingLeft: =gTheme.Space.Gutter
+            PaddingRight: =gTheme.Space.Gutter
             LayoutOverflowY: =LayoutOverflow.Scroll
-            Fill: =Theme.Color.Surface
+            Fill: =gTheme.Color.Surface
             X: =0
-            Y: =Theme.Space.HeaderH
+            Y: =gTheme.Space.HeaderH
             Width: =Parent.Width
-            Height: =Parent.Height - Theme.Space.HeaderH - 68
+            Height: =Parent.Height - gTheme.Space.HeaderH - 68
           Children:
             - lblPdUidCap:
                 Control: Label@2.5.1
                 Properties:
                   Text: ="Product ID  *   (ISIN, ticker or internal ID)"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
                   FillPortions: =0
                   LayoutMinHeight: =18
@@ -104,8 +104,8 @@ Screens:
                   Default: =If(gPdMode = "Edit", gEditProduct.product_uid, "")
                   Placeholder: ="e.g. XS1234567890"
                   TriggerOutput: =TriggerOutput.Delayed
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
                   FillPortions: =0
                   LayoutMinHeight: =36
                   Width: =Parent.Width - 48
@@ -119,9 +119,9 @@ Screens:
                 Properties:
                   Visible: =gPdDup = true
                   Text: ="A product with this ID already exists. Use it instead of creating a second one."
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.Danger
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.Danger
                   VerticalAlign: =VerticalAlign.Middle
                   FillPortions: =0
                   LayoutMinHeight: =18
@@ -158,9 +158,9 @@ Screens:
                 Control: Label@2.5.1
                 Properties:
                   Text: ="Description  *"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
                   FillPortions: =0
                   LayoutMinHeight: =18
@@ -173,8 +173,8 @@ Screens:
                   Placeholder: ="What this product is"
                   Type: =TextInputType.Multiline
                   TriggerOutput: =TriggerOutput.Delayed
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
                   FillPortions: =0
                   LayoutMinHeight: =84
                   Width: =Parent.Width - 48
@@ -184,8 +184,8 @@ Screens:
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
-            Fill: =Theme.Color.Surface
-            BorderColor: =Theme.Color.Border
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
             BorderThickness: =1
             X: =0
             Y: =Parent.Height - 68
@@ -201,25 +201,25 @@ Screens:
               If( Len(Trim(txtPdUid.Text)) = 0, "a product ID   ", "" ) &
               If( Len(gPdTypePath) = 0,         "a product type   ", "" ) &
               If( Len(Trim(txtPdDesc.Text)) = 0, "a description   ", "" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.Danger
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.Danger
             VerticalAlign: =VerticalAlign.Middle
-            X: =Theme.Space.Gutter
+            X: =gTheme.Space.Gutter
             Y: =Parent.Height - 68
-            Width: =Parent.Width - Theme.Space.Gutter - 320
+            Width: =Parent.Width - gTheme.Space.Gutter - 320
             Height: =68
       - btnPdCancel:
           Control: Classic/Button@2.2.0
           Properties:
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.Primary
-            BorderColor: =Theme.Color.Primary
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
             BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            X: =Parent.Width - Theme.Space.Gutter - 140 - 8 - 140
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - gTheme.Space.Gutter - 140 - 8 - 140
             Y: =Parent.Height - 68 + 12
             Width: =140
             Height: =44
@@ -230,13 +230,13 @@ Screens:
             Text: |
               =If( gSaving, "Saving…",
                    If(gPdMode = "Edit", "Save product", "Create product") )
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
             BorderThickness: =0
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            X: =Parent.Width - Theme.Space.Gutter - 140
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - gTheme.Space.Gutter - 140
             Y: =Parent.Height - 68 + 12
             Width: =140
             Height: =44

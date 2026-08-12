@@ -4,7 +4,7 @@
 # REACHABLE FROM EXACTLY TWO PLACES, and that is deliberate:
 #   1. scrReference ▸ Clients         — maintenance
 #   2. cmpPicker ▸ "＋ New"           — quick creation mid-flow
-# It is NOT in NavMenu. A client is reference data, not a place you browse to.
+# It is NOT in gNavMenu. A client is reference data, not a place you browse to.
 #
 # THE RETURN CONTRACT (`gClReturn`) is what makes the picker route work.
 # When the picker sends you here it sets gClReturn to the name of the global the
@@ -36,7 +36,7 @@
 Screens:
   scrClientEdit:
     Properties:
-      Fill: =Theme.Color.Bg
+      Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnClSave
         Set( gClName,   If( gClMode = "Edit", Coalesce(gEditClient.client_name, ""), "" ) );
@@ -65,32 +65,32 @@ Screens:
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
-            Fill: =Theme.Color.Primary
+            Fill: =gTheme.Color.Primary
             X: =0
             Y: =0
             Width: =Parent.Width
-            Height: =Theme.Space.HeaderH
+            Height: =gTheme.Space.HeaderH
       - AppTitle:
           Control: Label@2.5.1
           Properties:
             Text: =If(gClMode = "Edit", "Edit client", "New client")
-            Color: =Theme.Color.OnPrimary
-            Font: =Theme.Font
-            Size: =Theme.Size.H2
+            Color: =gTheme.Color.OnPrimary
+            Font: =gTheme.Font
+            Size: =gTheme.Size.H2
             FontWeight: =FontWeight.Semibold
             VerticalAlign: =VerticalAlign.Middle
-            X: =Theme.Space.Gutter
+            X: =gTheme.Space.Gutter
             Y: =0
             Width: =Parent.Width - 120
-            Height: =Theme.Space.HeaderH
+            Height: =gTheme.Space.HeaderH
       - BackIcon:
           Control: Classic/Icon@2.5.0
           Properties:
             Icon: =Icon.Cancel
-            Color: =Theme.Color.OnPrimary
+            Color: =gTheme.Color.OnPrimary
             Tooltip: ="Close without saving"
-            X: =Parent.Width - 24 - Theme.Space.Gutter
-            Y: =(Theme.Space.HeaderH - 24) / 2
+            X: =Parent.Width - 24 - gTheme.Space.Gutter
+            Y: =(gTheme.Space.HeaderH - 24) / 2
             Width: =24
             Height: =24
             OnSelect: =Back()
@@ -101,24 +101,24 @@ Screens:
             LayoutDirection: =LayoutDirection.Vertical
             LayoutAlignItems: =LayoutAlignItems.Start
             LayoutGap: =12
-            PaddingTop: =Theme.Space.Gutter
-            PaddingBottom: =Theme.Space.Gutter
-            PaddingLeft: =Theme.Space.Gutter
-            PaddingRight: =Theme.Space.Gutter
+            PaddingTop: =gTheme.Space.Gutter
+            PaddingBottom: =gTheme.Space.Gutter
+            PaddingLeft: =gTheme.Space.Gutter
+            PaddingRight: =gTheme.Space.Gutter
             LayoutOverflowY: =LayoutOverflow.Scroll
-            Fill: =Theme.Color.Surface
+            Fill: =gTheme.Color.Surface
             X: =0
-            Y: =Theme.Space.HeaderH
+            Y: =gTheme.Space.HeaderH
             Width: =Parent.Width
-            Height: =Parent.Height - Theme.Space.HeaderH - 68
+            Height: =Parent.Height - gTheme.Space.HeaderH - 68
           Children:
             - lblClNameCap:
                 Control: Label@2.5.1
                 Properties:
                   Text: ="Client name  *"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
                   FillPortions: =0
                   LayoutMinHeight: =18
@@ -130,8 +130,8 @@ Screens:
                   Default: =If(gClMode = "Edit", gEditClient.client_name, "")
                   Placeholder: ="Legal or trading name"
                   TriggerOutput: =TriggerOutput.Delayed
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
                   FillPortions: =0
                   LayoutMinHeight: =36
                   Width: =Parent.Width - 48
@@ -141,9 +141,9 @@ Screens:
                 Control: Label@2.5.1
                 Properties:
                   Text: ="Type  *"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
                   FillPortions: =0
                   LayoutMinHeight: =18
@@ -167,9 +167,9 @@ Screens:
                 Control: Label@2.5.1
                 Properties:
                   Text: ="Coverage  *"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
                   FillPortions: =0
                   LayoutMinHeight: =18
@@ -250,9 +250,9 @@ Screens:
                 Control: Label@2.5.1
                 Properties:
                   Text: ="Notes"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
                   FillPortions: =0
                   LayoutMinHeight: =18
@@ -265,8 +265,8 @@ Screens:
                   Placeholder: ="Optional"
                   Type: =TextInputType.Multiline
                   TriggerOutput: =TriggerOutput.Delayed
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
                   FillPortions: =0
                   LayoutMinHeight: =60
                   Width: =Parent.Width - 48
@@ -276,8 +276,8 @@ Screens:
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
-            Fill: =Theme.Color.Surface
-            BorderColor: =Theme.Color.Border
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
             BorderThickness: =1
             X: =0
             Y: =Parent.Height - 68
@@ -296,25 +296,25 @@ Screens:
               If( Len(gClCov) = 0,               "a coverage group   ", "" ) &
               If( Len(gClSales.Mail) = 0,        "a sales owner   ", "" ) &
               If( Len(gClRegionPath) = 0,        "a region   ", "" ) )
-            Font: =Theme.Font
-            Size: =Theme.Size.Small
-            Color: =Theme.Color.Danger
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.Danger
             VerticalAlign: =VerticalAlign.Middle
-            X: =Theme.Space.Gutter
+            X: =gTheme.Space.Gutter
             Y: =Parent.Height - 68
-            Width: =Parent.Width - Theme.Space.Gutter - 320
+            Width: =Parent.Width - gTheme.Space.Gutter - 320
             Height: =68
       - btnClCancel:
           Control: Classic/Button@2.2.0
           Properties:
             Text: ="Cancel"
-            Fill: =Theme.Color.Surface
-            Color: =Theme.Color.Primary
-            BorderColor: =Theme.Color.Primary
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
             BorderThickness: =1
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            X: =Parent.Width - Theme.Space.Gutter - 140 - 8 - 140
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - gTheme.Space.Gutter - 140 - 8 - 140
             Y: =Parent.Height - 68 + 12
             Width: =140
             Height: =44
@@ -325,13 +325,13 @@ Screens:
             Text: |
               =If( gSaving, "Saving…",
                    If(gClMode = "Edit", "Save client", "Create client") )
-            Fill: =Theme.Color.Primary
-            Color: =Theme.Color.OnPrimary
-            BorderColor: =Theme.Color.Primary
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
             BorderThickness: =0
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            X: =Parent.Width - Theme.Space.Gutter - 140
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - gTheme.Space.Gutter - 140
             Y: =Parent.Height - 68 + 12
             Width: =140
             Height: =44

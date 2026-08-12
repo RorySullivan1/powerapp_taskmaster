@@ -567,3 +567,27 @@ In order of cost:
 
 Record whatever you learn in `tools/studio-enums.json` and the validator's allow-list, with
 its provenance. A token grounded once should never need grounding twice.
+
+## `Theme` is a BUILT-IN name — never use it for your own global (2026-08-12)
+
+Enabling modern controls also enables **modern theming**, and that puts `Theme` in the app's
+namespace. MS Learn, *Use modern themes in canvas apps*:
+
+> Reference the currently active theme object by using **`App.Theme`**. Reference any theme
+> loaded into the app **by its instance name**… **Theme Name** … must be **unique within the app**.
+
+This repo used a named formula called `Theme` for months. **Studio tolerated it**, which is what
+made it expensive: the collision never produced an error. It surfaced as colours resolving
+inconsistently and a header control disappearing — a control whose `Height` came from
+`Theme.Space.HeaderH`, so a wrong resolution silently became 0. Renamed to **`gTheme`** across 946
+references.
+
+**The general rule this bought:** a contested identifier does not have to be *rejected* to ruin
+you. It only has to resolve to something other than what you meant, somewhere you were not
+looking — and a theme object resolving instead of yours gives blanks, and blanks give black fills
+and zero dimensions. **Prefix app-level globals (`g…`), the way this repo already does for
+`gSelProject` / `gEditMode`, and the whole class disappears.**
+
+Names to treat as taken in a modern-controls app: `Theme` and any theme instance name, plus the
+usual `App`, `Self`, `Parent`, `ThisItem`, `ThisRecord`. When a name is generic enough that the
+platform might want it, assume it does.

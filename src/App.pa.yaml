@@ -1,6 +1,6 @@
 # App object — the named formulas every screen reads.
 #
-# Theme.* is the single source for colour, type and spacing; ClaimPrefix and
+# gTheme.* is the single source for colour, type and spacing; ClaimPrefix and
 # StageWeights are read by the edit screens and the roll-up screens. Changing a
 # value here changes it everywhere, which is the point of putting them here.
 #
@@ -15,18 +15,38 @@ App:
     #
     # These were named formulas in `Formulas` until 2026-08-12. They are here now
     # because `Theme` was NOT RESOLVING IN THE PUBLISHED APP: every screen went
-    # black (`Fill: =Theme.Color.Bg` -> blank -> black), every control collapsed to
-    # the origin (`Theme.Space.*` -> blank -> 0) and the app bar vanished outright
-    # (its `Height` IS `Theme.Space.HeaderH`). Setting the same record in a control
+    # black (`Fill: =gTheme.Color.Bg` -> blank -> black), every control collapsed to
+    # the origin (`gTheme.Space.*` -> blank -> 0) and the app bar vanished outright
+    # (its `Height` IS `gTheme.Space.HeaderH`). Setting the same record in a control
     # worked immediately. Studio was fine throughout, so nothing in the source ever
     # looked wrong — the evidence came from the running app, not from reading.
     #
-    # THE NAMES ARE DELIBERATELY UNCHANGED, AND THAT IS THE POINT. `Set(Theme, …)` makes
-    # `Theme` a global with the same identifier, so all 939 `Theme.*` references
-    # across 11 screens and 9 components keep resolving exactly as they did. This
-    # is a change of DEFINITION SITE, not a rename — zero screens were touched.
+    # ===== `gTheme`, NOT `Theme` — DO NOT RENAME IT BACK =====================
+    # `Theme` COLLIDES WITH A BUILT-IN. This app has modern controls enabled
+    # (ModernTextInput / ModernCombobox / ModernDatePicker), and that brings modern
+    # THEMING with it: Power Apps defines an `App.Theme` property, and every theme
+    # loaded into the app occupies a global identifier by its own name — MS Learn,
+    # *Use modern themes in canvas apps*: "Reference the currently active theme
+    # object by using App.Theme. Reference any theme loaded into the app by its
+    # instance name", and "Theme Name ... must be unique within the app".
     #
-    # ORDER IS IMPERATIVE HERE, unlike Formulas. Theme goes first because it is what
+    # Studio TOLERATED `Theme` as a named formula for months, and that is exactly
+    # what made this expensive. The collision surfaced as colours resolving
+    # inconsistently and the header vanishing — never as an error. **A contested
+    # identifier does not have to be REJECTED to ruin you; it only has to resolve to
+    # something other than what you meant, somewhere you were not looking.**
+    #
+    # The `g` prefix matches this repo's convention for globals (gSelProject,
+    # gEditMode, gUserEmail), which is what these now are. 946 references renamed
+    # across 11 screens and 9 components in one pass. `gNavMenu`, `gStageWeights`
+    # and `gClaimPrefix` moved with it for consistency, not because they collided.
+    # ========================================================================
+    #
+    # ONLY THE IDENTIFIER CHANGED. The MEMBERS are untouched — `.Color.*`,
+    # `.Size.*`, `.Space.*` and `.Font` all read exactly as before — so every screen
+    # changed by one token and nothing else.
+    #
+    # ORDER IS IMPERATIVE HERE, unlike Formulas. gTheme goes first because it is what
     # everything else is measured against; nothing below depends on anything above,
     # so the rest is alphabetical-ish by convenience.
     #
@@ -44,7 +64,7 @@ App:
     # =========================================================================
     OnStart: |-
       =
-       Set( Theme, {
+       Set( gTheme, {
           Color: {
               Primary:      RGBA(0,  90, 158, 1),   // EQD desk blue
               PrimaryDark:  RGBA(0,  60, 110, 1),
@@ -64,14 +84,14 @@ App:
           Font: Font.'Segoe UI'
       } );
 
-       Set( NavMenu, Table(
+       Set( gNavMenu, Table(
           { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
           { Key: 2, Title: "Reports",   Icon: Icon.DetailList,     NeedsLicence: true  },
           { Key: 3, Title: "Projects",  Icon: Icon.Document, NeedsLicence: false },
           { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false }
       ) );
 
-       Set( StageWeights, Table(
+       Set( gStageWeights, Table(
           { Stage: "Not Started",  Weight: 0   },
           { Stage: "Planning",     Weight: 10  },
           { Stage: "Drafting",     Weight: 35  },
@@ -86,7 +106,7 @@ App:
           // deliberately if that gap is wrong; do not drift into it.
       ) );
 
-       Set( ClaimPrefix, "i:0#.f|membership|" );
+       Set( gClaimPrefix, "i:0#.f|membership|" );
 
        Set( gHasPowerBiLicence, false );
 
@@ -103,7 +123,7 @@ App:
       // gUserEmail MOVED TO OnStart 2026-08-12, with the other constants.
 
       // --- Theme ------------------------------------------------------------------
-      // One record, referenced as Theme.Color.* / Theme.Size.* / Theme.Space.*.
+      // One record, referenced as gTheme.Color.* / gTheme.Size.* / gTheme.Space.*.
       // The single styling channel for the whole app (distillation T7/T16).
       // Theme MOVED TO OnStart 2026-08-12 — see the note there. It did not resolve
       // in the published app, and every screen reads it.

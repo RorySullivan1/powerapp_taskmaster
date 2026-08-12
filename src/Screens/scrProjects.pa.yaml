@@ -6,7 +6,7 @@
 # component (cmpAppBar), declared LAST so the fly-out floats over the content.
 # =============================================================================
 # VERTICAL BANDS — resolved, so they can be checked against Studio by eye.
-# Theme.Space: HeaderH 64 · Gutter 24 · Gap 16.  Screen height 768 (tablet).
+# gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.  Screen height 768 (tablet).
 #
 #     0 ..  64   appBar (the blue bar; declared LAST, floats above everything)
 #    88 .. 148   hdrProjects      = HeaderH + Gutter,           height 60
@@ -21,16 +21,16 @@
 Screens:
   scrProjects:
     Properties:
-      Fill: =Theme.Color.Bg
+      Fill: =gTheme.Color.Bg
     Children:
       # ---- Content: header + filter strip + search + empty gallery --------
       - hdrProjects:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
           Properties:
-            X: =Theme.Space.Gutter
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter
-            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            X: =gTheme.Space.Gutter
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter
+            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
             Height: =60
             Title: ="Projects"
             Subtitle: ="Browse and open a project"
@@ -51,8 +51,8 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpSelection
           Properties:
-            X: =Theme.Space.Gutter
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            X: =gTheme.Space.Gutter
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
             Width: =360
             Height: =40
             Items: |
@@ -70,12 +70,12 @@ Screens:
             # type "Portfolio Review", on the app's busiest list screen. This was the
             # only text input in the repo missing it.
             TriggerOutput: =TriggerOutput.Delayed
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
             Height: =40
             Width: =360
-            X: =Theme.Space.Gutter + 360 + Theme.Space.Gap
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap
+            X: =gTheme.Space.Gutter + 360 + gTheme.Space.Gap
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
       # ---- Projects gallery (delegable) -----------------------------------
       # Each If branch is INDEPENDENTLY delegable, and the Sort sits INSIDE each
       # branch — `Sort(If(...))` would NOT fold, because If is not a delegable
@@ -114,27 +114,27 @@ Screens:
                          project_name ) )
             TemplateSize: =72
             TemplatePadding: =0
-            Width: =Parent.Width - (Theme.Space.Gutter * 2)
+            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
             # ABSOLUTE, not `txtProjSearch.Y + txtProjSearch.Height + …`. A cross-control
             # geometry reference is fragile across this gap: Studio suffixes a
             # colliding name on paste (txtProjSearch -> txtProjSearch_1), and if the
             # reference then fails to resolve the gallery jumps to the top of the
             # screen and covers the filter and search row. Same arithmetic as every
             # other screen: header band 88, section header 60, gap, filter row 40, gap.
-            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap) - Theme.Space.Gutter
-            X: =Theme.Space.Gutter
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap
-            TemplateFill: =If(ThisItem.ID = gSelProject.ID, Theme.Color.Accent, Theme.Color.Surface)
+            Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
+            X: =gTheme.Space.Gutter
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap
+            TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
             - rowName:
                 Control: Label@2.5.1
                 Properties:
                   Text: =ThisItem.project_name
-                  Font: =Theme.Font
+                  Font: =gTheme.Font
                   FontWeight: =FontWeight.Semibold
-                  Size: =Theme.Size.H3
-                  Color: =Theme.Color.TextPrimary
-                  X: =Theme.Space.Gap
+                  Size: =gTheme.Size.H3
+                  Color: =gTheme.Color.TextPrimary
+                  X: =gTheme.Space.Gap
                   Y: =10
                   Width: =Parent.TemplateWidth * 0.42
                   Height: =26
@@ -147,10 +147,10 @@ Screens:
                   Text: |
                     =ThisItem.project_phase.Value & "  ·  " & ThisItem.project_priority.Value
                      & "  ·  " & Coalesce(ThisItem.project_manager.DisplayName, "Unassigned")
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  X: =Theme.Space.Gap
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  X: =gTheme.Space.Gap
                   Y: =36
                   Width: =Parent.TemplateWidth * 0.42
                   Height: =20
@@ -161,15 +161,15 @@ Screens:
                   Text: |
                     =If( IsBlank(ThisItem.project_date_target), "No target date",
                          "Target " & Text(ThisItem.project_date_target, "dd mmm yyyy") )
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
                   # Overdue only counts while the project is still running.
                   Color: |
                     =If( !IsBlank(ThisItem.project_date_target)
                       && ThisItem.project_date_target < Today()
                       && ThisItem.project_phase.Value <> "Complete"
                       && ThisItem.project_phase.Value <> "Archived",
-                         Theme.Color.Danger, Theme.Color.TextMuted )
+                         gTheme.Color.Danger, gTheme.Color.TextMuted )
                   X: =Parent.TemplateWidth * 0.46
                   Y: =26
                   Width: =Parent.TemplateWidth * 0.24
@@ -181,11 +181,11 @@ Screens:
                   # Weighted rollup maintained app-side (C3). Blank until the
                   # first in-app stage change writes it.
                   Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
                   Align: =Align.Right
-                  X: =Parent.TemplateWidth - 180 - Theme.Space.Gap
+                  X: =Parent.TemplateWidth - 180 - gTheme.Space.Gap
                   Y: =26
                   Width: =180
                   Height: =20
@@ -215,16 +215,16 @@ Screens:
               =If( IsBlank(txtProjSearch.Text),
                    "No projects match this filter.",
                    "No projects start with """ & txtProjSearch.Text & """." )
-            Font: =Theme.Font
-            Size: =Theme.Size.Body
-            Color: =Theme.Color.TextMuted
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Color: =gTheme.Color.TextMuted
             Align: =Align.Center
             VerticalAlign: =VerticalAlign.Middle
             Visible: =IsEmpty(galProjects.AllItems)
-            X: =Theme.Space.Gutter
-            Y: =Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap
-            Width: =Parent.Width - (Theme.Space.Gutter * 2)
-            Height: =Parent.Height - (Theme.Space.HeaderH + Theme.Space.Gutter + 60 + Theme.Space.Gap + 40 + Theme.Space.Gap) - Theme.Space.Gutter
+            X: =gTheme.Space.Gutter
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap
+            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
+            Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #
@@ -241,8 +241,8 @@ Screens:
             X: =0
             Y: =0
             Width: =Parent.Width
-            Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)
-            Items: =NavMenu
+            Height: =If(gNavOpen, Parent.Height, gTheme.Space.HeaderH)
+            Items: =gNavMenu
             ActiveKey: =3
             HasLicence: =gHasPowerBiLicence
             AppTitle: ="EQD Taskmaster"
