@@ -82,6 +82,14 @@ session can't relitigate a settled call.
 - **The schema is defined here, not discovered.** `schema/schema.yaml` is the golden source;
   SharePoint is provisioned to match it and `provisioned:` tracks which lists are live. Internal
   names freeze at creation, so settle `open_recommendations` **before** provisioning.
+- **COMMENTS ARE NOT A CHANGELOG.** Do not write history into `src/`: no dates, no "was X",
+  no "moved/superseded/reversed on <date>", no narration of what a previous session got wrong.
+  **Git has the history and `.claude/memory/` has the decisions** — a comment that duplicates
+  them rots the moment either changes, and it is dead weight in a file a human has to read.
+  A comment earns its place only if it stops someone breaking the code: a non-obvious
+  constraint, a delegation trap, a token that looks wrong but is right, a "do not optimise this
+  away". Write it in the present tense, about the code as it is now, and keep it short.
+  If the reasoning is long, it belongs in `.claude/memory/` with a one-line pointer here.
 - Skill folder name always equals the skill's `name:` frontmatter.
 - Operational hooks are compiled from `.claude/hooks/*.json` into `settings.json` by
   `build-hooks.py`; edit fragments, not `settings.json`.

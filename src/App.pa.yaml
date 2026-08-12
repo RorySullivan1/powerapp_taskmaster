@@ -1,80 +1,27 @@
-# App object — the named formulas every screen reads.
-#
-# gTheme.* is the single source for colour, type and spacing; ClaimPrefix and
-# StageWeights are read by the edit screens and the roll-up screens. Changing a
-# value here changes it everywhere, which is the point of putting them here.
-#
-# The lone `=` on the first line of the block is the pa-yaml marker for a Power Fx
-# formula (the schema requires the value to start with one). It sits on its own
-# line because the formulas below open with a comment, and `=//` reads as though
-# the whole formula were commented out.
+# App object. Two formula-bar properties: OnStart holds the constants, Formulas
+# holds the data-source filters. Both are pasted by hand — see the studio-transfer
+# skill, and tools/formula_bar_body.py for a comment-free body.
 App:
   Properties:
-    # =========================================================================
-    # OnStart — THE CONSTANTS, ACTIVELY SET.
+    # Constants. `Set`, not named formulas: named formulas did not resolve in the
+    # published app, which blanked every colour and dimension.
     #
-    # These were named formulas in `Formulas` until 2026-08-12. They are here now
-    # because `Theme` was NOT RESOLVING IN THE PUBLISHED APP: every screen went
-    # black (`Fill: =gTheme.Color.Bg` -> blank -> black), every control collapsed to
-    # the origin (`gTheme.Space.*` -> blank -> 0) and the app bar vanished outright
-    # (its `Height` IS `gTheme.Space.HeaderH`). Setting the same record in a control
-    # worked immediately. Studio was fine throughout, so nothing in the source ever
-    # looked wrong — the evidence came from the running app, not from reading.
-    #
-    # ===== `gTheme`, NOT `Theme` — DO NOT RENAME IT BACK =====================
-    # `Theme` COLLIDES WITH A BUILT-IN. This app has modern controls enabled
-    # (ModernTextInput / ModernCombobox / ModernDatePicker), and that brings modern
-    # THEMING with it: Power Apps defines an `App.Theme` property, and every theme
-    # loaded into the app occupies a global identifier by its own name — MS Learn,
-    # *Use modern themes in canvas apps*: "Reference the currently active theme
-    # object by using App.Theme. Reference any theme loaded into the app by its
-    # instance name", and "Theme Name ... must be unique within the app".
-    #
-    # Studio TOLERATED `Theme` as a named formula for months, and that is exactly
-    # what made this expensive. The collision surfaced as colours resolving
-    # inconsistently and the header vanishing — never as an error. **A contested
-    # identifier does not have to be REJECTED to ruin you; it only has to resolve to
-    # something other than what you meant, somewhere you were not looking.**
-    #
-    # The `g` prefix matches this repo's convention for globals (gSelProject,
-    # gEditMode, gUserEmail), which is what these now are. 946 references renamed
-    # across 11 screens and 9 components in one pass. `gNavMenu`, `gStageWeights`
-    # and `gClaimPrefix` moved with it for consistency, not because they collided.
-    # ========================================================================
-    #
-    # ONLY THE IDENTIFIER CHANGED. The MEMBERS are untouched — `.Color.*`,
-    # `.Size.*`, `.Space.*` and `.Font` all read exactly as before — so every screen
-    # changed by one token and nothing else.
-    #
-    # ORDER IS IMPERATIVE HERE, unlike Formulas. gTheme goes first because it is what
-    # everything else is measured against; nothing below depends on anything above,
-    # so the rest is alphabetical-ish by convenience.
-    #
-    # THE KNOWN COST, stated honestly: OnStart is non-blocking, so a screen CAN
-    # render before it finishes. That risk is about long OnStarts that call data —
-    # every statement here is a literal, evaluated without a network round trip, so
-    # the window is vanishingly small. It is not zero. If a screen ever flashes
-    # unstyled on launch, this is why, and the fix is App.StartScreen, not moving
-    # these back.
-    #
-    # WHAT STAYS IN Formulas AND MUST NOT MOVE HERE: the three data-source filters.
-    # `Set(ActiveProjects, Filter(...))` would capture a TABLE VALUE, and filtering a
-    # variable does not delegate — it would silently cap every cross-project query at
-    # the data row limit, undoing the whole archived-exclusion design.
-    # =========================================================================
+    # `gTheme`, NOT `Theme`. `Theme` collides with modern theming — Power Apps
+    # defines `App.Theme` and loads theme objects by instance name. Studio tolerates
+    # the collision silently; the player does not.
     OnStart: |-
       =
        Set( gTheme, {
           Color: {
-              Primary:      RGBA(0,  90, 158, 1),   // EQD desk blue
+              Primary:      RGBA(0,  90, 158, 1),
               PrimaryDark:  RGBA(0,  60, 110, 1),
               Accent:       RGBA(102, 182, 227, 1),
-              Bg:           RGBA(245, 247, 250, 1),  // app canvas
-              Surface:      RGBA(255, 255, 255, 1),  // cards / nav panel
+              Bg:           RGBA(245, 247, 250, 1),
+              Surface:      RGBA(255, 255, 255, 1),
               Border:       RGBA(225, 229, 235, 1),
               TextPrimary:  RGBA(32,  38,  45,  1),
               TextMuted:    RGBA(110, 120, 130, 1),
-              OnPrimary:    RGBA(255, 255, 255, 1),  // text on Primary fill
+              OnPrimary:    RGBA(255, 255, 255, 1),
               Success:      RGBA(49,  130, 93,  1),
               Warning:      RGBA(214, 152, 40,  1),
               Danger:       RGBA(197, 58,  58,  1)
@@ -82,245 +29,59 @@ App:
           Size: { H1: 28, H2: 20, H3: 16, Body: 14, Small: 12 },
           Space: { Gutter: 24, Gap: 16, HeaderH: 64, NavW: 240, RowH: 52 },
           Font: Font.'Segoe UI'
-      } );
+       } );
 
+       // Key maps to a Navigate in each nav gallery's Switch — keep them in step.
+       // NeedsLicence greys the Power BI entry without hiding it.
        Set( gNavMenu, Table(
-          { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
-          { Key: 2, Title: "Reports",   Icon: Icon.DetailList,     NeedsLicence: true  },
-          { Key: 3, Title: "Projects",  Icon: Icon.Document, NeedsLicence: false },
-          { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false }
-      ) );
+          { Key: 1, Title: "Home",      Icon: Icon.Home,       NeedsLicence: false },
+          { Key: 2, Title: "Reports",   Icon: Icon.DetailList, NeedsLicence: true  },
+          { Key: 3, Title: "Projects",  Icon: Icon.Document,   NeedsLicence: false },
+          { Key: 4, Title: "Reference", Icon: Icon.Bookmark,   NeedsLicence: false }
+       ) );
 
+       // Mirrors schema.yaml -> rollups.stage_weights. Keep the two in step.
        Set( gStageWeights, Table(
           { Stage: "Not Started",  Weight: 0   },
           { Stage: "Planning",     Weight: 10  },
           { Stage: "Drafting",     Weight: 35  },
           { Stage: "Finalizing",   Weight: 85  },
           { Stage: "Complete",     Weight: 100 }
-          // "Under Review" (was 60) and "Archived" were REMOVED from task_stage on
-          // 2026-08-12 — review is signalled by ISSUES, and archiving by the PROJECT.
-          // The surviving weights are UNCHANGED on purpose: re-spacing them would move
-          // every project's stored project_perc_completion without a single task
-          // changing, so historical numbers would stop being comparable. The cost is a
-          // visible 35 -> 85 jump at Drafting -> Finalizing. Say so and re-space
-          // deliberately if that gap is wrong; do not drift into it.
-      ) );
+       ) );
 
+       // Prefix + lowercased UPN forms a Person column's Claims:
+       //   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+       //     Claims: gClaimPrefix & Lower(<mail>), DisplayName: …, Email: …,
+       //     Department: "", JobTitle: "", Picture: "" }
+       // Community-confirmed shape, not first-party: first suspect if a Person write fails.
        Set( gClaimPrefix, "i:0#.f|membership|" );
 
+       // Soft gate. No in-app Power BI licence API exists, so everyone is treated as
+       // unlicensed: Reports stays reachable and falls back to the licence-free rings.
        Set( gHasPowerBiLicence, false );
 
+       // Inlines into the server-side predicates on scrHome / scrReports.
        Set( gUserEmail, Lower(User().Email) )
+
+    # Data-source filters. These must stay named formulas: `Set(x, Filter(...))`
+    # captures a table value, and filtering a variable does not delegate — every
+    # cross-project query would silently cap at the data row limit.
+    #
+    # Filtering OVER one of these folds into a single server query (verified in Live
+    # Monitor). Only CROSS-PROJECT queries use them; a query already scoped to one
+    # project reads the raw list, so opening an archived project still shows its work.
     Formulas: |-
       =
-      // --- Identity ---------------------------------------------------------------
-      // Lowercased to match the Person-column Claims convention (schema.md).
-      // NOTE: this named formula INLINES into the server-side predicates on scrHome /
-      // scrReports (task_lead.Email = gUserEmail). User() inside a Filter has
-      // historically tripped the delegation analyser. If either Filter shows a blue
-      // underline on first paste, the grounded fallback is to delete this line and
-      // instead put  Set(gUserEmail, Lower(User().Email))  in App.OnStart.
-      // gUserEmail MOVED TO OnStart 2026-08-12, with the other constants.
-
-      // --- Theme ------------------------------------------------------------------
-      // One record, referenced as gTheme.Color.* / gTheme.Size.* / gTheme.Space.*.
-      // The single styling channel for the whole app (distillation T7/T16).
-      // Theme MOVED TO OnStart 2026-08-12 — see the note there. It did not resolve
-      // in the published app, and every screen reads it.
-
-      // --- Navigation model (native, licence-independent — Q2 decision) -----------
-      // Screens are NOT stored here. An earlier version had `Screen: scrHome` in each
-      // record; a screen is a control reference, not a value, so a table column can't
-      // hold one and the whole named formula fails to type — which is what produced
-      // Studio's "expecting a table" on every nav gallery's Items.
-      //
-      // So the table carries a plain numeric Key, and each nav gallery turns that into
-      // a Navigate with a Switch. Verbose by exactly five lines, and it types.
-      // NeedsLicence flags the Power BI-gated entry so the shell can grey it for
-      // unlicensed users without the dashboard ever carrying navigation.
-      //
-      // KEY MAP — the galleries depend on it, so keep it in step:
-      //   1 scrHome · 2 scrReports · 3 scrProjects · 4 scrReference
-      //   scrAdmin was DELETED 2026-08-11 and its reference-data galleries moved to
-      //   scrReference, so there is no fifth entry and key 4 is the Switch default.
-      // NavMenu MOVED TO OnStart 2026-08-12, with the other constants.
-
-      // --- Power BI licence gate (Q2) ---------------------------------------------
-      // DECIDED 2026-08-03 — SOFT GATE. An unlicensed user sees the Reports entry
-      // GREYED, can still open it, and lands on the empty-state card plus the three
-      // licence-free KPI rings. Reports is never hidden: a hidden feature is one nobody
-      // knows to ask for a licence for, and the rings are useful on their own.
-      //
-      // There is no in-app Power BI licence API, so this stays FALSE — everyone is
-      // treated as unlicensed until a real signal is supplied. That is the safe default
-      // for a soft gate: the worst case is a licensed user seeing the fallback rings
-      // and one extra click, not an unlicensed user hitting a broken embed.
-      //
-      // To supply a signal later, replace this line only — nav and the Reports screen
-      // both read it, so nothing else changes. A lookup/config allow-list column or an
-      // Entra group check are the two obvious sources.
-      // gHasPowerBiLicence MOVED TO OnStart 2026-08-12, with the other constants.
-
-      // --- Task-stage weights (C3: project completion is a WEIGHTED rollup) --------
-      // Golden source for these numbers: schema/schema.yaml -> rollups:
-      //   project_perc_completion. Keep the two in step — this table is the app-side
-      //   copy that the write-back below reads.
-      //
-      // A named formula is a VALUE, so the weights live here; the write-back is a
-      // side effect and therefore lives in a behaviour property (snippet below).
-      // StageWeights MOVED TO OnStart 2026-08-12, with the other constants.
-
-      // --- Live-work sets (perf stage 1, 2026-08-12) ------------------------------
-      // THERE ARE TWO SEPARATE "IS THIS LIVE" AXES AND THEY ARE NOT THE SAME QUESTION.
-      // An earlier draft of this block conflated them; the names below keep them apart.
-      //
-      //  1. PROJECT ARCHIVING — `project_phase = "Archived"`, set on scrProjectEdit.
-      //     This is what "archived" means in this app, and it CASCADES IN DATA as of
-      //     2026-08-12: scrProjectEdit's save writes `*_project_archived` onto every
-      //     child, so each child list can answer "is my project archived" WITHOUT a
-      //     join. That denormalised column is the whole reason `LiveTasks` and
-      //     `OpenIssues` below can exist and delegate.
-      //  2. A CHILD'S OWN LIFECYCLE. For ISSUES this is `issue_status` and it is real.
-      //     For TASKS IT NO LONGER EXISTS: "Archived" was removed from task_stage on
-      //     2026-08-12 precisely because conflating the two axes was the bug. A task
-      //     cannot be shelved on its own any more — its project is shelved instead.
-      //
-      // The value of naming them here is ONE definition instead of a rule hand-copied
-      // per screen. That mattered enormously for the task-stage chain, which WAS in
-      // seven Filters across five screens — and which is now deleted outright rather
-      // than centralised, because the schema change removed the thing it excluded.
-      //
-      // WHY A NAMED FORMULA AND NOT A COLLECTION IN OnStart. Named formulas "can't use
-      // behavior functions" (MS Learn, object-app#formulas-property), so ClearCollect
-      // cannot live here at all — but that limitation is pointing at the better design:
-      //  * these stay DELEGABLE, so they are evaluated by SharePoint, not capped at the
-      //    2000-row data limit a ClearCollect would silently truncate at;
-      //  * they are always fresh, which matters because this is a MULTI-USER app — a
-      //    launch-time snapshot would hide a colleague's work until a manual refresh;
-      //  * they are computed LAZILY, only when a screen actually uses one, and never
-      //    block app start the way OnStart does.
-      // There is no penalty for a definition the app doesn't use.
-      //
-      // ENUMERATING the live values is what makes ActiveProjects delegable: `<>
-      // "Archived"` is a Text <> and does NOT delegate. Keep the list in step with the
-      // Choice values in schema/schema.yaml — a value added there and missed here
-      // disappears from the app with nothing to see and nothing to catch it.
-      //
-      // PROVEN 2026-08-12: a screen-level `Filter(ActiveProjects, …)` FOLDS into ONE
-      // server query. Verified in Live Monitor — a single `getRows` returning
-      // already-filtered rows, not the repeated walk a client-side filter produces.
-      // The blue underline could not have answered this ("not every nondelegable case
-      // shows this warning" — MS Learn), and neither could the gallery looking right.
-      // That result is what makes these definitions usable at all: every cross-project
-      // query now filters over one of them instead of restating the rule.
+      // Enumerate the live phases — `<> "Archived"` is a Text <> and does not delegate.
       ActiveProjects = Filter( taskmaster_projects,
           project_phase.Value = "Planning" || project_phase.Value = "Active"
        || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" );
 
-      // NO TASK SET AT ALL, and that is the point of the 2026-08-12 schema change.
-      // `UnarchivedTasks` lived here for one day: it enumerated the six non-archived
-      // stages so Archived could be excluded server-side. **task_stage no longer HAS
-      // an "Archived" value**, so every stage is live and the filter it existed to
-      // express is the identity. The same six-value Or-chain has been deleted from
-      // five screens for the same reason — it is not simplification, it is a filter
-      // that now selects everything, and one that would silently drop any row with a
-      // blank stage.
-      //
-      // AXIS 2 for ISSUES only, and it is a lifecycle, not archiving. The four
-      // statuses are Open plus three terminal ones, so "open" is a single equality —
-      // which delegates more cheaply than the four-way Or-chain it replaced.
-      // Both predicates delegate and compose: an issue is live when its PROJECT is
-      // live, and open when its OWN status says so. Two different axes, one filter.
-      // Written out rather than layered over a `LiveIssues`: that would nest a named
-      // formula inside a named formula, and what Live Monitor proved on 2026-08-12 is
-      // that ONE level of composition folds. Two is a reasonable inference and nothing
-      // more, and the failure mode here is a silently truncated home queue.
+      // Two axes at once: the project is live, and the issue's own status is Open.
       OpenIssues = Filter( taskmaster_issues,
           issue_project_archived = false && issue_status.Value = "Open" );
 
-      // ARCHIVED WORK IS EXCLUDED AT THE SOURCE. Each child list carries a
-      // denormalised `*_project_archived` Boolean mirroring its parent's phase, so
-      // "belongs to a live project" is a delegable `= false` instead of a join.
-      //
-      // WHY THE COLLECTION APPROACH WAS DROPPED (it lasted one day): it collected the
-      // archived projects and RemoveIf'd the children in memory — which means the
-      // child rows were FETCHED FIRST and only then discarded. The data row limit
-      // still applied to the fetch, so past it archived work silently reappeared, and
-      // the collection itself grew for the life of the app. THE AIM IS TO KEEP THE
-      // ROWS IN SCOPE UNDER 2000, and only a server-side predicate does that.
-      //
-      // These are the sets any CROSS-PROJECT query starts from. A query scoped to ONE
-      // project does NOT use them, and that is not an oversight — if you have opened an
-      // archived project you want to see its work, and one project's children are
-      // bounded anyway. The cascade in scrProjectEdit is the sharpest case: it must
-      // read EVERY child, including the ones it is about to flag, so it filters the raw
-      // list on purpose.
+      // `*_project_archived` mirrors the parent's phase, maintained by scrProjectEdit's
+      // save. It exists because a child row cannot otherwise answer "is my project
+      // archived" without a join, and joins do not delegate.
       LiveTasks = Filter( taskmaster_tasks, task_project_archived = false );
-
-      // NO LiveTransactions AND NO LiveIssues, deliberately. Both existed for one day
-      // with zero consumers: every transaction query in the app is scoped to a single
-      // project, and the only cross-project issue query wants OPEN issues, which
-      // `OpenIssues` already covers. A named formula nobody calls is not free — it is a
-      // second place for the rule to drift from the schema, unnoticed because nothing
-      // exercises it. Add one when a query actually needs it; do not keep a definition
-      // alive on speculation.
-
-      // --- Person-column claims prefix --------------------------------------------
-      // A SharePoint Person column is patched as an expanded-user record whose Claims
-      // string is this prefix plus the LOWERCASED user principal name. One definition
-      // so the four edit screens cannot drift from each other:
-      //
-      //   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-      //     Claims: ClaimPrefix & Lower(<mail>), DisplayName: ..., Email: ...,
-      //     Department: "", JobTitle: "", Picture: "" }
-      //
-      // COMMUNITY-CONFIRMED shape, not first-party — same risk class as the managed-
-      // metadata write (docs/managed-metadata-picker.md §2). If a Person write fails on
-      // first paste, this line and the record shape around it are the first suspects.
-      // ClaimPrefix MOVED TO OnStart 2026-08-12, with the other constants.
-
-      // --- NO FX TABLE HERE, DELIBERATELY (Q14 decided 2026-08-03) ----------------
-      // An `FxToUsd` table briefly lived here so the transaction form could normalise
-      // transaction_notional_usd at write time. It has been REMOVED: currency
-      // conversion now happens in the REPORT layer, against a proper FX dimension in
-      // Power BI, and the app writes only the native `transaction_notional` +
-      // `transaction_currency`.
-      //
-      // Why this is the better place for it: a write-time rate freezes whatever number
-      // happened to be in the app on the day of the trade, and nothing downstream can
-      // ever correct it. Report-time conversion can be restated, back-dated and audited.
-      //
-      // CONSEQUENCE, and it is a real one: **the app can no longer show a
-      // cross-currency total anywhere.** Any figure that mixes currencies must either
-      // be shown per-currency or deferred to Power BI — see scrProject's transactions
-      // tab, which now totals per currency and says so. Do not reintroduce a rate table
-      // to "just add a total".
-      // --- Write-back: recompute one project's % (app-side writer, C3) -------------
-      // IMPLEMENTED in src/Screens/scrTaskEdit.pa.yaml -> btnTkSave.OnSelect, which since
-      // 2026-08-10 is the SOLE writer of a task (scrTask was deleted — two writers for one
-      // row is how the completion date drifted). This block is the reference for any OTHER
-      // place a stage can change (a kanban drag, the editable grid's save). Substitute the
-      // project's ID for <pid>.
-      //
-      //   With(
-      //       { scored:
-      //           AddColumns(
-      //               // Delegable: `=` on an indexed Lookup FK, and nothing else needed.
-      //               // The six-stage Or-chain that used to sit here was deleted on
-      //               // 2026-08-12 — task_stage has no "Archived" value to exclude any
-      //               // more, so every task under the project counts.
-      //               Filter( taskmaster_tasks, task_project_id.Id = <pid> ),
-      //               wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
-      //       Patch( taskmaster_projects,
-      //              LookUp(taskmaster_projects, ID = <pid>),
-      //              { project_perc_completion:
-      //                    If( CountRows(scored) = 0, 0, RoundDown(Average(scored, wgt), 0) ) } )
-      //   )
-      //
-      // Notes:
-      //  * Average/CountRows here run LOCALLY over the already-filtered page — correct
-      //    because the Filter narrows to one project first. Only exact if a project
-      //    holds fewer tasks than the data row limit (set it to 2000).
-      //  * App-side writer means the value is only as fresh as the app: a stage edited
-      //    directly in SharePoint leaves project_perc_completion stale until the next
-      //    in-app change to that project.
