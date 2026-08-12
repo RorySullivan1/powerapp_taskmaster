@@ -1,28 +1,3 @@
-# =============================================================================
-# cmpSelection  —  single-select selector over a dynamic Items table (component)
-# =============================================================================
-# A reusable "pick one" control: a horizontal strip of option buttons bound to an
-# Items table, with the chosen row surfaced back to the app. A component CAN
-# contain a gallery (the restriction is component-INSIDE-gallery, not the reverse).
-#
-# Contract:
-#   Items    (Input, Table)   — options; schema {Id:Number, Label:Text}
-#   DefaultId(Input, Number)   — initially selected Id
-#   Selected (Output, Record)  — the chosen row (app reads cmpSelection_1.Selected)
-#   OnChange (Event)           — raised on a new pick
-#
-# Selection is owned by the INTERNAL GALLERY, not a hand-managed variable:
-#   * galSel.Default seeds the initial pick from DefaultId
-#   * Selected output = galSel.Selected (idiomatic "output reads a control")
-#   * the row template highlights via ThisItem.IsSelected
-#   * OnChange is raised from the button ONLY (no gallery OnSelect) so a tap
-#     fires exactly once
-# Delegation isn't a concern — Items is passed in already-shaped and small
-# (power-fx-development owns sourcing).
-#
-# DIALECT v3.0 pa.yaml. UNCONFIRMED token: the gallery `Variant` (same unknown as
-# the screen shells). See _COMPONENTS-NOTES.md.
-# =============================================================================
 ComponentDefinitions:
   cmpSelection:
     DefinitionType: CanvasComponent
@@ -58,35 +33,19 @@ ComponentDefinitions:
       Width: =360
       Fill: =RGBA(0, 0, 0, 0)
       Selected: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
-      # WITHOUT THIS THE STRIP LIES. A gallery re-reads its `Default` only on
-      # Reset, and `galSel.Default` is the seed from `DefaultId` — so an instance
-      # bound to per-record state kept showing the PREVIOUS record's pick while
-      # the screen's global (and therefore the save) held the new one. Open issue
-      # A as Blocked, back, open issue B as Open: the strip said Blocked and the
-      # save wrote Open.
-      #
-      # This is the same defect that made scrTask unusable and got that screen
-      # deleted on 2026-08-10 — a display that disagrees with the write. The
-      # mechanism was recorded then ("cmpSelection is un-resettable because it
-      # HAS NO OnReset, not because components can't be reset") but the three
-      # live per-record instances were never checked. Fixed at the source, so
-      # every consumer gets it: the screen just calls Reset(<instance>).
+      # A gallery re-reads its `Default` only on Reset, and `galSel.Default` is the seed from
+      # `DefaultId` — so an instance bound to per-record state kept showing the PREVIOUS
+      # record's pick while the screen's global (and therefore the save) held the new one.
+      # The mechanism was recorded then ("cmpSelection is un-resettable because it HAS NO
+      # OnReset, not because components can't be reset") but the three live per-record instances
+      # were never checked.
       OnReset: =Reset( galSel )
     Children:
-      # A HORIZONTAL STRIP BUILT FROM A VERTICAL GALLERY.
-      #
-      # `WrapCount` = row count lays every item across before wrapping, giving one
-      # row — a horizontal strip from a vertical gallery. Kept now that the real
-      # variant tokens are known (2026-08-03): switching to
-      # `BrowseLayout_Horizontal_TwoTextOneImageVariant_ver5.0` would work too,
-      # but this needs no second token confirmed and TemplateSize already means
-      # item HEIGHT here, which is what the layout wants.
       - galSel:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: =cmpSelection.Items
-            # Seed the initial selection from DefaultId (no hand-managed variable).
             Default: =LookUp(cmpSelection.Items, Id = cmpSelection.DefaultId)
             Height: =Parent.Height
             Width: =Parent.Width
@@ -101,11 +60,9 @@ ComponentDefinitions:
                 Properties:
                   Text: =ThisItem.Label
                   Font: =Font.'Segoe UI'
-                  # Tunable per instance: a 7-option stage strip needs smaller text
-                  # than a 2-option Yes/No, and this is a component so it cannot read
-                  # gTheme.Size.*. Default 11.
+                  # Tunable per instance: a 7-option stage strip needs smaller text than a
+                  # 2-option Yes/No, and this is a component so it cannot read gTheme.Size.*.
                   Size: =cmpSelection.FontSize
-                  # Highlight the gallery's selected row.
                   Fill: =If(ThisItem.IsSelected, RGBA(0, 90, 158, 1), RGBA(255, 255, 255, 1))
                   Color: =If(ThisItem.IsSelected, RGBA(255, 255, 255, 1), RGBA(32, 38, 45, 1))
                   BorderColor: =RGBA(0, 90, 158, 1)
@@ -114,5 +71,4 @@ ComponentDefinitions:
                   Width: =Parent.TemplateWidth - 8
                   X: =4
                   Y: =2
-                  # Select this row (drives galSel.Selected) and raise OnChange ONCE.
                   OnSelect: =Select(Parent); cmpSelection.OnChange()

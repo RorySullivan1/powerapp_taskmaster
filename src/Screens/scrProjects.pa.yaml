@@ -23,7 +23,6 @@ Screens:
     Properties:
       Fill: =gTheme.Color.Bg
     Children:
-      # ---- Content: header + filter strip + search + empty gallery --------
       - hdrProjects:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
@@ -36,17 +35,14 @@ Screens:
             Subtitle: ="Browse and open a project"
             ShowAction: =true
             ActionLabel: ="New project"
-            # gSelProject is cleared too: the child edit screens pre-attach to it,
-            # and a stale selection would silently parent the next new item to the
-            # last project the user happened to open.
+            # gSelProject is cleared too: the child edit screens pre-attach to it, and a stale
+            # selection would silently parent the next new item to the last project the user
+            # happened to open.
             OnAction: |
               =Set( gEditMode, "New" );
                Set( gEditProject, Blank() );
                Set( gSelProject, Blank() );
                Navigate( scrProjectEdit, ScreenTransition.Cover )
-      # Filter strip — drives galProjects.Items. There is no boolean archive
-      # flag in this model: "Archived" is a value of the project_phase Choice
-      # (schema.md, the Or-of-equals pattern), so each branch enumerates phases with an Or of `=`.
       - selFilter:
           Control: CanvasComponent
           ComponentName: cmpSelection
@@ -63,12 +59,7 @@ Screens:
           Control: ModernTextInput@1.1.1
           Properties:
             Type: =TextInputType.Search
-            # Phase 2: drives StartsWith(project_name, txtProjSearch.Text) on the projects gallery.
             Placeholder: ="Search projects…"
-            # galProjects.Items reads .Text directly, so without this every keystroke
-            # fires a delegated query against taskmaster_projects — ~16 round trips to
-            # type "Portfolio Review", on the app's busiest list screen. This was the
-            # only text input in the repo missing it.
             TriggerOutput: =TriggerOutput.Delayed
             Font: =gTheme.Font
             Size: =gTheme.Size.Body
@@ -76,12 +67,11 @@ Screens:
             Width: =360
             X: =gTheme.Space.Gutter + 360 + gTheme.Space.Gap
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-      # ---- Projects gallery (delegable) -----------------------------------
-      # Each If branch is INDEPENDENTLY delegable, and the Sort sits INSIDE each
-      # branch — `Sort(If(...))` would NOT fold, because If is not a delegable
-      # operation, so the sort would run locally over one arbitrary page.
-      # No IsBlank guard: StartsWith(col, "") is already true for every row, and
-      # IsBlank in a predicate is a delegation risk for no benefit.
+      # ---- Projects gallery (delegable) ----
+      # Each If branch is
+      # INDEPENDENTLY delegable, and the Sort sits INSIDE each branch — `Sort(If(...))` would
+      # NOT fold, because If is not a delegable operation, so the sort would run locally over
+      # one arbitrary page.
       - galProjects:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
@@ -93,19 +83,6 @@ Screens:
                           && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    selFilter.Selected.Id = 2,
-                   // `ActiveProjects` is the named formula in App.Formulas holding the
-                   // four-live-phase chain that used to be written out here. Filtering
-                   // over it FOLDS into one server query — verified in Live Monitor on
-                   // 2026-08-12 (a single getRows of already-filtered rows, not the
-                   // repeated walk a client-side filter produces).
-                   //
-                   // That result is what let every cross-project query in the app move
-                   // onto a named formula, so the archived/live rules have ONE definition
-                   // instead of a copy per screen. This branch was the canary and is now
-                   // just the first consumer.
-                   //
-                   // The other two branches stay on the raw list ON PURPOSE: branch 3 IS
-                   // the archived view, and the default branch means All.
                    Sort( Filter( ActiveProjects,
                              StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
@@ -115,12 +92,10 @@ Screens:
             TemplateSize: =72
             TemplatePadding: =0
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            # ABSOLUTE, not `txtProjSearch.Y + txtProjSearch.Height + …`. A cross-control
-            # geometry reference is fragile across this gap: Studio suffixes a
-            # colliding name on paste (txtProjSearch -> txtProjSearch_1), and if the
-            # reference then fails to resolve the gallery jumps to the top of the
-            # screen and covers the filter and search row. Same arithmetic as every
-            # other screen: header band 88, section header 60, gap, filter row 40, gap.
+            # A cross-control geometry reference is fragile across this gap: Studio suffixes a
+            # colliding name on paste (txtProjSearch -> txtProjSearch_1), and if the reference
+            # then fails to resolve the gallery jumps to the top of the screen and covers the
+            # filter and search row.
             Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
             X: =gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap
@@ -142,8 +117,6 @@ Screens:
             - rowMeta:
                 Control: Label@2.5.1
                 Properties:
-                  # Person and Choice subfields read locally off the returned row —
-                  # no extra call, so this is not an N+1.
                   Text: |
                     =ThisItem.project_phase.Value & "  ·  " & ThisItem.project_priority.Value
                      & "  ·  " & Coalesce(ThisItem.project_manager.DisplayName, "Unassigned")
@@ -163,7 +136,6 @@ Screens:
                          "Target " & Text(ThisItem.project_date_target, "dd mmm yyyy") )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
-                  # Overdue only counts while the project is still running.
                   Color: |
                     =If( !IsBlank(ThisItem.project_date_target)
                       && ThisItem.project_date_target < Today()
@@ -178,8 +150,6 @@ Screens:
             - rowPercent:
                 Control: Label@2.5.1
                 Properties:
-                  # Weighted rollup maintained app-side (C3). Blank until the
-                  # first in-app stage change writes it.
                   Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
@@ -196,7 +166,7 @@ Screens:
                   # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
                   # OnSelect does not reliably fire when the click lands on a child control, so
                   # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
+                  # and do nothing.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   BorderThickness: =0
@@ -207,7 +177,6 @@ Screens:
                   OnSelect: |
                     =Select(Parent);
                      Set(gSelProject, ThisItem); Navigate(scrProject, ScreenTransition.Cover)
-      # Empty state — only when the query genuinely returns nothing.
       - ProjectsEmptyLabel:
           Control: Label@2.5.1
           Properties:
@@ -226,14 +195,12 @@ Screens:
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
             Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
-      # DECLARED LAST so positional z-order floats the fly-out over the content.
-      #
-      # Height is dynamic and that is the whole trick: a component intercepts every
-      # click inside its bounds, so closed it must own nothing but the 64px header
-      # strip. Open, covering the screen is exactly right — the scrim wants the click.
-      #
-      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
-      # the chosen entry and this screen does the navigating.
+      # DECLARED LAST
+      # so positional z-order floats the fly-out over the content.
+      # Height is dynamic and that is the whole trick: a component intercepts every click inside
+      # its bounds, so closed it must own nothing but the 64px header strip.
+      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports the chosen
+      # entry and this screen does the navigating.
       - appBar:
           Control: CanvasComponent
           ComponentName: cmpAppBar

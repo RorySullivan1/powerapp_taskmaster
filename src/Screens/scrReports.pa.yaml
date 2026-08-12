@@ -1,27 +1,18 @@
-# =============================================================================
-# scrReports  —  Power BI dashboard panel (screen-map §2). CORE-SHELL: header +
-# nav + the real Q2 empty-state (unlicensed users get a card, never a broken
-# embed). Phase 3 adds the PowerBI control for licensed users + the native SVG
-# KPI fallback (distillation C1). Header + nav identical to scrHome by design.
-# DIALECT: modern structured schema; positional z-order. Header + nav are one
-# component (cmpAppBar), declared LAST so the fly-out floats over the content.
-# =============================================================================
+# CORE-SHELL: header + nav + the real Q2 empty-state (unlicensed users get a card, never a
+# broken embed).
+# DIALECT: modern structured schema; positional z-order.
+# Header + nav are one component (cmpAppBar), declared LAST so the fly-out floats over the
+# content.
 Screens:
   scrReports:
     Properties:
       Fill: =gTheme.Color.Bg
-      # ---- PHASE-2 DATA (Q2 licence-free fallback) --------------------------
-      # SCOPE MATTERS: SharePoint cannot count org-wide accurately from the app —
-      # CountRows never delegates, so it only ever counts the rows already pulled
-      # (the data row limit). Every figure here is therefore deliberately scoped
-      # to a set small enough to be exact: YOUR tasks, and the active projects
-      # list. Org-wide analytics stay in Power BI, which imports the lists whole.
+      # ---- PHASE-2 DATA (Q2 licence-free fallback) ----
+      # SCOPE MATTERS:
+      # SharePoint cannot count org-wide accurately from the app — CountRows never delegates, so
+      # it only ever counts the rows already pulled (the data row limit).
       OnVisible: |
         =Concurrent(
-            // Both filter over a NAMED FORMULA; the composition folds into one server
-            // query (Live Monitor, 2026-08-12). LiveTasks holds the archived exclusion
-            // and ActiveProjects holds the four-live-phase chain that used to be
-            // written out here — the last hand-copy of it in the app.
             ClearCollect( colMyTasks,
                 Filter( LiveTasks,
                     task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
@@ -44,8 +35,6 @@ Screens:
                  RoundDown( Average( AddColumns( colMyProjects, pc,
                      Coalesce(project_perc_completion, 0) ), pc ), 0 ) ) )
     Children:
-      # ---- Empty state: unlicensed (Q2). Phase 3 wraps in
-      #      If(gHasPowerBiLicence, <PowerBI embed>, <this card>). ------------
       - LicenceCard:
           Control: Rectangle@2.3.0
           Properties:
@@ -91,12 +80,8 @@ Screens:
             Width: =LicenceHeading.Width
             Height: =90
             Visible: =Not(gHasPowerBiLicence)
-      # ---- Native SVG KPI fallback (Q2 / distillation C1) ------------------
-      # Licence-free headline visuals via cmpKpiRing, fed by the locals Set in
-      # OnVisible. Rings 1-2 read task_status (health), which is required with a
-      # Green default (C9), so green% + amber-red% now sum to 100. Ring 3 is the
-      # mean of project_perc_completion, the app-side weighted rollup (C3) — it
-      # reads 0 until the write-back is placed on a task-edit screen.
+      # Rings 1-2 read task_status (health), which is required with a Green default (C9), so
+      # green% + amber-red% now sum to 100.
       - hdrFallback:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
@@ -146,14 +131,12 @@ Screens:
             Label: =gRptPortfolio & "% of yours"
             AccentHex: ="#005A9E"
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
-      # DECLARED LAST so positional z-order floats the fly-out over the content.
-      #
-      # Height is dynamic and that is the whole trick: a component intercepts every
-      # click inside its bounds, so closed it must own nothing but the 64px header
-      # strip. Open, covering the screen is exactly right — the scrim wants the click.
-      #
-      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
-      # the chosen entry and this screen does the navigating.
+      # DECLARED LAST
+      # so positional z-order floats the fly-out over the content.
+      # Height is dynamic and that is the whole trick: a component intercepts every click inside
+      # its bounds, so closed it must own nothing but the 64px header strip.
+      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports the chosen
+      # entry and this screen does the navigating.
       - appBar:
           Control: CanvasComponent
           ComponentName: cmpAppBar

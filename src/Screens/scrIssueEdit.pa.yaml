@@ -1,51 +1,17 @@
-# =============================================================================
-# scrIssueEdit  —  create / edit an issue.
+# Create / edit an issue. Entered with gEditMode + gEditIssue; gSelProject pre-attaches
+# a new issue to that project.
 #
-# Entered with:  Set(gEditMode, "New" | "Edit");  Set(gEditIssue, <record>)
-#                (gEditIssue is ignored when gEditMode = "New")
-# If gSelProject is set, a NEW issue is pre-attached to that project.
+# The pattern all four scr*Edit screens share:
+#  1. Seed globals in OnVisible, write from globals — never from a control's live state.
+#  2. Picker globals have ONE fixed record shape; "nothing picked" is the empty/zero
+#     record, tested with Len(...) = 0 or .Id <= 0, never IsBlank on a record.
+#  3. Overlay pickers are DECLARED LAST — z-order is positional in this dialect.
+#  4. Required columns go in the Patch; optional ones are If(cond, value, Blank()) inside
+#     the same record. Writing {Value: ""} to an unset Choice fails.
+#  5. Success is never assumed: Errors() returns a table, so IsError(Errors(...)) never
+#     fires. Capture FirstError.Message inside IfError's fallback and gate on it.
 #
-# THE SHARED EDIT-SCREEN PATTERN — all four scr*Edit screens follow it, so read
-# this header once. See _EDIT-NOTES.md for the rationale in full.
-#
-#  1. SEED GLOBALS IN OnVisible, WRITE FROM GLOBALS. Never write from a control's
-#     or component's live state. A cmpSelection strip keeps the previous record's
-#     pick. (An earlier note here claimed Reset cannot reach inside a component.
-#     THAT IS WRONG — Reset(<instance>) fires the component's OnReset; cmpSelection
-#     simply had none until 2026-08-11. The claim misled two code reviewers.)
-#     Whether it clears on
-#     navigation is precisely what a one-way gap cannot verify — so re-seeding
-#     here makes the WRITE correct regardless of what the screen is displaying.
-#  2. NORMALISED PICKER RECORDS. Every picker global has ONE fixed schema —
-#     people are {DisplayName, Mail}, lookups are {Id, Value} — because a global
-#     assigned two different record shapes is a type conflict. "Nothing picked"
-#     is the empty/zero record, tested with Len(...) = 0 / .Id <= 0, never with
-#     IsBlank on a record whose type was inferred from Blank().
-#  3. OVERLAY PICKER GALLERIES ARE DECLARED LAST. Z-order is positional in this
-#     dialect, so a result list declared at the end floats above the fields it
-#     covers — that is what makes a search box behave like a dropdown without
-#     needing an unverified ComboBox token.
-#  4. REQUIRED FIELDS GO IN THE FIRST PATCH; OPTIONAL ONES FOLLOW, GUARDED.
-#     Power Fx cannot conditionally omit a field from a record literal, and
-#     writing {Value: ""} to an unset Choice fails. So each optional field gets
-#     its own guarded Patch: set it when chosen, clear it (Blank()) only when
-#     editing. Errors are then attributable to one field instead of the form.
-#  5. SUCCESS IS NEVER ASSUMED. Errors() returns a TABLE, so `IsError(Errors(…))`
-#     would never fire. The save captures FirstError.Message into a g*Err variable
-#     inside IfError's fallback — the only scope where FirstError exists — and
-#     everything that tells the user it worked lives behind `Len(g*Err) = 0`.
-#     Every IfError argument is a single statement; no ";" chains inside one.
-#
-# CONNECTION PREREQUISITE: Office 365 Users must be added in Studio before this
-# pastes (people pickers). See HANDOFF.md.
-#
-# Grounded tokens only. Modern controls where they earn their place:
-# ModernTextInput (output is still `.Text`), ModernDatePicker (`.SelectedDate`)
-# and ModernButton. The two date fields no longer parse text, so their
-# "⚠ not a date" echo labels are gone — a picker cannot produce a bad date.
-# Every column token resolves to schema/schema.yaml (golden source).
-#
-# =============================================================================
+# Office 365 Users must be added in Studio before this pastes.
 Screens:
   scrIssueEdit:
     Properties:
@@ -55,9 +21,8 @@ Screens:
         Set( gIssProject,
               If( gEditMode = "Edit",
                   { Id: gEditIssue.issue_project_id.Id,
-                    // NOT redundant. The lookup column's live display field is the target's ID,
-                    // so `.Value` is a NUMBER — see schema.yaml on this column. Resolving the
-                    // name app-side is the fix from 2026-08-09; do not "optimise" it away.
+                    // NOT redundant.
+                    // it away.
                     Value: LookUp(taskmaster_projects, ID = gEditIssue.issue_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
@@ -103,14 +68,6 @@ Screens:
                  ForAll( Filter( taskmaster_transactions,
                                  transaction_project_id.Id = gIssProject.Id ) As x,
                          { Id: x.ID, Label: x.transaction_name } ) );
-        // A STORED LINK THAT THE OPTION SET DOES NOT CONTAIN IS STILL A LINK.
-        // Two ways an issue holds one: it was made with the OLD tenant-wide picker,
-        // which searched every task and transaction regardless of project; or the
-        // linked row has since been deleted. In both, Filter(...) below finds nothing,
-        // the box reads "Select…", and the screen tells the user there is no related
-        // task while the save writes the link straight back — the display lies.
-        // Adding the stored value to the list makes DefaultSelectedItems resolve, so
-        // the box shows the truth and the user can change or clear it deliberately.
         If( gIssTask.Id > 0 && IsBlank( LookUp(colIssTaskOpts, Id = gIssTask.Id) ),
             Collect( colIssTaskOpts, { Id: gIssTask.Id, Label: gIssTask.Value } ) );
         If( gIssTx.Id > 0 && IsBlank( LookUp(colIssTxOpts, Id = gIssTx.Id) ),
@@ -122,12 +79,10 @@ Screens:
         Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose );
-        // A combo box re-reads DefaultSelectedItems ONLY on Reset. cboIssStatus is
-        // one of these now too — it stopped being a cmpSelection strip on 2026-08-12.
+        // A combo box re-reads DefaultSelectedItems ONLY on Reset.
         Reset( cboIssTask ); Reset( cboIssTx ); Reset( cboIssStatus );
-        // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the
-        // strip shows the previous record's pick while the save writes this one.
-        // The component gained OnReset on 2026-08-11; these two are its consumers.
+        // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the strip shows
+        // the previous record's pick while the save writes this one.
         Reset( selIssType );
         Reset( selIssImpact )
     Children:
@@ -232,8 +187,6 @@ Screens:
                         LayoutGridColumnEnd: =2
                         LayoutGridRowStart: =1
                         LayoutGridRowEnd: =10
-                        # 66, not 62: 18 caption + 8 gap + 40 combo. The 120-high grid cell
-                        # has room, so nothing below moves.
                         Height: =66
                       Children:
                         - lblIssStatusCap:
@@ -243,24 +196,10 @@ Screens:
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
-                              # PINNED. Every auto-layout child is flexible along the parent's
-                              # direction BY DEFAULT, so leaving both children unpinned split
-                              # the 54px of free space 27/27 — the declared 18 and 40 were
-                              # ignored and the combo box rendered at 27px, below its usable
-                              # height. A chip strip tolerated that; a combo box does not.
                               FillPortions: =0
                               LayoutMinHeight: =18
                               Width: =Parent.Width
                               Height: =18
-                        # A COMBO BOX, NOT A cmpSelection STRIP — swapped 2026-08-12 with the
-                        # status values themselves. cmpSelection lays every option across ONE
-                        # row (`WrapCount = CountRows(Items)`), so each chip gets Width/N. That
-                        # was fine for "Open / Review / Waiting / Blocked / Closed"; it is not
-                        # fine for three ~19-character "Closed - …" labels, which would clip at
-                        # 11pt with no way to widen them. The label IS the stored Choice value
-                        # (`Set(gIssStatus, …Label)`), so shortening the text was not available.
-                        # cboTkStage on scrTaskEdit is the proven pattern for a value list that
-                        # does not fit a strip. Output is `.Selected.Value`, not `.Selected.Label`.
                         - cboIssStatus:
                             Control: ModernCombobox@1.1.1
                             Properties:
@@ -273,7 +212,6 @@ Screens:
                               InputTextPlaceholder: ="Select…"
                               Color: |
                                 =If( gIssStatus = "Open", gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
-                              # Pinned for the same reason as the caption above.
                               FillPortions: =0
                               LayoutMinHeight: =40
                               Width: =Parent.Width
@@ -434,29 +372,14 @@ Screens:
                         - cboIssTask:
                             Control: ModernCombobox@1.1.1
                             Properties:
-                              # SCOPED TO THIS PROJECT — that is the whole change. An issue
-                              # belongs to a project, so the only tasks and transactions it can
-                              # sensibly reference are that project's. The old search picker
-                              # offered EVERY row in the tenant and made you type two characters
-                              # to find out.
-                              # A bounded set does not need a search dialog: `colIss*Opts` is
-                              # collected once in OnVisible and the list is just shown.
                               Items: =colIssTaskOpts
                               ItemDisplayText: =ThisItem.Label
-                              # Always resolves to a row — the "(none)" one at Id 0 when
-                              # nothing is linked, and otherwise the linked row, which
-                              # OnVisible guarantees is present even when it falls outside
-                              # this project. Without that guarantee this claim was false
-                              # for cross-project and deleted links.
                               DefaultSelectedItems: =Filter( colIssTaskOpts, Id = gIssTask.Id )
                               SelectMultiple: =false
                               IsSearchable: =true
                               InputTextPlaceholder: ="Select…"
                               Width: =Parent.Width
                               Height: =36
-                              # Id 0 IS the clear. It replaces cmpLookupField's ✕ — the save
-                              # already treats `.Id > 0` as "linked", so selecting "(none)"
-                              # writes Blank() to the column exactly as the ✕ used to.
                               OnChange: |
                                 =Set( gIssTask,
                                       { Id:    cboIssTask.Selected.Id,
@@ -523,29 +446,14 @@ Screens:
                         - cboIssTx:
                             Control: ModernCombobox@1.1.1
                             Properties:
-                              # SCOPED TO THIS PROJECT — that is the whole change. An issue
-                              # belongs to a project, so the only tasks and transactions it can
-                              # sensibly reference are that project's. The old search picker
-                              # offered EVERY row in the tenant and made you type two characters
-                              # to find out.
-                              # A bounded set does not need a search dialog: `colIss*Opts` is
-                              # collected once in OnVisible and the list is just shown.
                               Items: =colIssTxOpts
                               ItemDisplayText: =ThisItem.Label
-                              # Always resolves to a row — the "(none)" one at Id 0 when
-                              # nothing is linked, and otherwise the linked row, which
-                              # OnVisible guarantees is present even when it falls outside
-                              # this project. Without that guarantee this claim was false
-                              # for cross-project and deleted links.
                               DefaultSelectedItems: =Filter( colIssTxOpts, Id = gIssTx.Id )
                               SelectMultiple: =false
                               IsSearchable: =true
                               InputTextPlaceholder: ="Select…"
                               Width: =Parent.Width
                               Height: =36
-                              # Id 0 IS the clear. It replaces cmpLookupField's ✕ — the save
-                              # already treats `.Id > 0` as "linked", so selecting "(none)"
-                              # writes Blank() to the column exactly as the ✕ used to.
                               OnChange: |
                                 =Set( gIssTx,
                                       { Id:    cboIssTx.Selected.Id,
@@ -611,22 +519,10 @@ Screens:
                                  Set( gIssQuery, "" )
                               OnClear: |
                                 =Set( gIssAssignee, { DisplayName: "", Mail: "" } )
-                  # ---------------------------------------------------------------
-                  # PROVENANCE — READ ONLY, and read ONLY from SharePoint's own
-                  # system columns. This slot used to hold a "Business owner"
-                  # people-picker writing `issue_owner`, plus a hidden `issue_date_open`
-                  # the save stamped with Now(). Both were app-written, so both were
-                  # editable, wrong-able and duplicable — and neither was what anyone
-                  # actually wanted from them: who raised this, and when.
-                  #
-                  # `Created` and `Created By` are stamped by SharePoint on insert,
-                  # cannot be patched from the app at all (schema.yaml `system_columns`
-                  # says so in as many words), and need no column, no picker, no write
-                  # and no clearing arm. The best field is the one you don't have.
-                  #
-                  # THE COLUMN NAME HAS A SPACE, so it is quoted: `'Created By'`. That
-                  # is the one token here that a failed paste would point at.
-                  # ---------------------------------------------------------------
+                  # `Created` and `Created By` are stamped by SharePoint on insert, cannot be
+                  # patched from the app at all (schema.yaml `system_columns` says so in as many
+                  # words), and need no column, no picker, no write and no clearing arm.
+                  # The best field is the one you don't have.
                   - colIssOpened:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -640,9 +536,6 @@ Screens:
                         - lblIssOpenedCap:
                             Control: Label@2.5.1
                             Properties:
-                              # Matches cmpLookupField's caption exactly (12pt muted,
-                              # 18 high) so this reads as a field in the same row, not
-                              # as a stray note.
                               Text: ="Opened by"
                               Font: =gTheme.Font
                               Size: =12
@@ -655,9 +548,6 @@ Screens:
                         - lblIssOpenedVal:
                             Control: Label@2.5.1
                             Properties:
-                              # On NEW there is nothing to show — SharePoint has not
-                              # stamped anything yet — so say that rather than render a
-                              # blank that looks like a load failure.
                               Text: |
                                 =If( gEditMode <> "Edit",
                                      "Recorded automatically when you save",
@@ -699,10 +589,9 @@ Screens:
                         Text: |
                           =Trim(
                              If( Len(Trim(txtIssName.Text)) = 0, "summary   ", "" ) &
-                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on
-                             // this form, but a blank one would still be rejected by SharePoint —
-                             // and silently, since there is nothing on screen to point at. Same
-                             // guard scrTaskEdit keeps for the same reason.
+                             // The project is DERIVED and has no field on this form, but a
+                             // blank one would still be rejected by SharePoint — and silently,
+                             // since there is nothing on screen to point at.
                              If( gIssProject.Id <= 0,            "a parent project (not set — reopen from the project screen)   ", "" ) &
                              If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) &
                              // issue_status is required:true and the save writes it
@@ -764,55 +653,35 @@ Screens:
                   Text: |
                     =If( gSaving, "Saving…",
                          If(gEditMode = "Edit", "Save issue", "Create issue") )
-                  # ALWAYS ENABLED — see scrTaskEdit btnTkSave. A disabled button cannot fire
-                  # OnSelect, so a record missing a required field gave a click that did
-                  # nothing at all. The requirement moved into OnSelect, where it can speak.
+                  # A disabled button cannot fire OnSelect, so a record missing a required field
+                  # gave a click that did nothing at all.
                   FillPortions: =0
                   LayoutMinWidth: =200
                   Width: =200
                   Height: =48
-                  # ONE WRITE. Every column, required and optional, is in a single Patch;
-                  # the optionals are If(condition, value, Blank()) inside the record.
-                  # It used to be one Patch plus FIVE guarded follow-ups against the row
-                  # just written — six serial round trips to save one issue. Folding also
-                  # killed the unlink bug at the root: three of those follow-ups had no
-                  # clearing arm, so a cleared task/transaction/owner never saved.
-                  #
-                  # The gate is gIssErr, captured in IfError's fallback: FirstError is
-                  # only in scope THERE, so the message is stashed and acted on
-                  # afterwards. Two reasons it is not `IsBlank(gIssSaved)`: Errors()
-                  # returns a TABLE (so IsError(Errors(...)) never fires), and what a
-                  # failed Patch leaves in the Set target is not something a one-way gap
-                  # can verify. Each IfError argument is a SINGLE statement — no ";"
-                  # chains inside a function argument.
-                  #
-                  # EVERY IfError ARGUMENT IS A `Set(...)`, AND THAT IS LOAD-BEARING.
-                  # "IfError returns the value of one of its arguments. The types of all
-                  # values that might be returned by IfError must be compatible" — and
-                  # MS Learn adds that *currently* ALL arguments must be compatible, not
-                  # just the ones that could be returned. `Patch` returns a record and
-                  # `Notify` returns a boolean, so the obvious `IfError(Patch(…),
-                  # Notify(…))` — which the docs themselves show — is rejected today with
-                  # "expecting a record". Wrapping the Patch in a Set makes both sides a
-                  # Set and it types. Failures are therefore accumulated into gIssWarn
-                  # and reported in ONE banner after the guarded block, which also beats
-                  # up to five separate toasts.
+                  # Every column, required and optional, is in a single Patch; the optionals are
+                  # If(condition, value, Blank()) inside the record.
+                  # Folding also killed the unlink bug at the root: three of those follow-ups
+                  # had no clearing arm, so a cleared task/transaction/owner never saved.
+                  # Two reasons it is not `IsBlank(gIssSaved)`: Errors() returns a TABLE (so
+                  # IsError(Errors(...)) never fires), and what a failed Patch leaves in the Set
+                  # target is not something a one-way gap can verify.
+                  # The types of all values that might be returned by IfError must be
+                  # compatible" — and MS Learn adds that *currently* ALL arguments must be
+                  # compatible, not just the ones that could be returned.
+                  # `Patch` returns a record and `Notify` returns a boolean, so the obvious
+                  # `IfError(Patch(…), Notify(…))` — which the docs themselves show — is
+                  # rejected today with "expecting a record".
                   OnSelect: |
                     =If( gSaving,
-                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
-                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
-                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
-                    // record. `Set` applies immediately within a behaviour chain, so the flag is
-                    // already true by the time the second tap is evaluated.
-                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
-                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
-                    // instead, and the guard below is what actually blocks the duplicate.
+                    // A disabled button cannot fire OnSelect and cannot say why; the Text says
+                    // "Saving…" instead, and the guard below is what actually blocks the
+                    // duplicate.
                     false,
                     Set( gSaving, true );
                     If( Len(lblIssMissing.Text) > 0,
-                    // The requirement that used to disable the button, moved here so a blocked
-                    // save names the field. These are required in schema.yaml — SharePoint would
-                    // reject the write regardless; this only decides whether the user is told.
+                    // These are required in schema.yaml — SharePoint would reject the write
+                    // regardless; this only decides whether the user is told.
                     Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
                     NotificationType.Error ),
                     Set( gIssSaved, Blank() );
@@ -840,21 +709,12 @@ Screens:
                                      issue_status:      { Value: gIssStatus },
                                      issue_date_target: dtpIssTarget.SelectedDate,
                                      issue_date_close:  dtpIssClose.SelectedDate,
-                                     // --- FOLDED OPTIONALS: were five separate Patches --------
-                                     // Blank() as the else is how a field is CLEARED, which is
-                                     // what the follow-up clear-arms did. Folding also removes
-                                     // the unlink bug at its root rather than patching around it.
                                      issue_type:
                                          If( gIssType <> "(none)", { Value: gIssType }, Blank() ),
                                      issue_impact:
                                          If( gIssImpact <> "(none)", { Value: gIssImpact }, Blank() ),
                                      issue_task_name:
                                          If( gIssTask.Id > 0, { Id: gIssTask.Id, Value: gIssTask.Value }, Blank() ),
-                                     // NO issue_owner and NO issue_date_open in this record.
-                                     // Both were app-written duplicates of what SharePoint
-                                     // already stamps in `Created By` / `Created`, and both are
-                                     // retired in schema.yaml — not dropped, so the columns and
-                                     // their data are still in the list.
                                      issue_transaction_name:
                                          If( gIssTx.Id > 0, { Id: gIssTx.Id, Value: gIssTx.Value }, Blank() ) } ) ),
                         Set( gIssErr, FirstError.Message )
@@ -884,13 +744,7 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
-      # =====================================================================
-      # PICKER — ONE cmpPicker instance for the two person fields AND the two
-      # record lookups. Declared LAST so the dialog paints above the footer.
-      # gIssPicker names the field being filled and selects the row kind.
-      # AllowCreate is false throughout: an issue links to things that already
-      # exist. See scrTaskEdit's instance for the full contract commentary.
-      # =====================================================================
+      # Declared LAST so the dialog paints above the footer.
       - cmpIssPick:
           Control: CanvasComponent
           ComponentName: cmpPicker
@@ -900,8 +754,6 @@ Screens:
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            # ONE state now. "Task" and "Tx" became project-scoped dropdowns on
-            # 2026-08-12 — a bounded list does not need a search dialog.
             Title: ="Select assignee"
             # Queries run HERE — AccessAppScope false. Bound to gIssQuery, which
             # OnSearch sets, never to the instance's own Query output.

@@ -1,57 +1,5 @@
-# scrProject — the project cockpit.  REWORKED 2026-08-07, tabs removed entirely.
-#
-#   +--------------------------------------------------------------+
-#   | name + 8 explicit facts             | ring |  edit / delete   |   info card
-#   +---------------------------------+----------------------------+
-#   | Tasks        n of m complete  [+]|  Issues              [+]  |
-#   |   ...list...                     |  name | linked | status   |
-#   | Transactions       n        [+]  |         | type | impact   |   work band
-#   |   ...list...                     |  ...list...               |
-#   +---------------------------------+----------------------------+
-#
-# WHY NO TABS.  The tab list hid two thirds of a project behind a click, and its
-# `Default` had to be an ITEM rather than a value, which is what was erroring.
-# Everything is on screen at once now, so there is no tab state to seed and
-# `gProjTab` is gone.
-#
-# WHY ISSUES SIT APART.  A task or a transaction is a unit of work under the
-# project; an issue is raised AGAINST the project and points at one of them.  It
-# needs five columns to be worth reading, so it gets its own full-height column
-# rather than a third of a stacked list.
-#
-# LAYOUT IS CONTAINERS, NOT COORDINATES.  This screen used to be ~30 absolutely
-# positioned controls whose Y values encoded a tab-bar height that did not match
-# the tab bar (see the 2026-08-07 band-collision fix).  Everything below the
-# header band is now auto-layout, so nothing has to agree with anything else's
-# height.  The header band itself stays absolute — three controls, no collisions.
-#
-# EVERY auto-layout child sets FillPortions EXPLICITLY.  It defaults to 1 at
-# every nesting level, so one unset child silently steals height from its
-# siblings; that default has cost this repo four round trips.  0 = "keep your own
-# size", 1+ = "share what is left".
-#
-# A CHILD'S WIDTH MUST SUBTRACT ITS PARENT'S HORIZONTAL PADDING (fixed 2026-08-11).
-# `Parent.Width` inside a container returns the container's FULL width, padding
-# included — it is NOT the content box.  A child written `Width: =Parent.Width`
-# is therefore placed at the content-box LEFT edge but sized to the FULL width,
-# so it hangs off the right by exactly PaddingLeft + PaddingRight.  Every child on
-# this screen had that bug; scrProjectEdit, the container reference, has always
-# written `=Parent.Width - 48` inside its 24-padded containers.  Resolved at
-# 1366x768, and this is what the overlapping task row actually was:
-#
-#            was                                    now
-#   rowWork   24 .. 1390  (24 OFF-SCREEN)     rowWork   24 .. 1342
-#   galTasks  40 ..  850  (16 past its card)  galTasks  40 ..  818
-#   cellTaskWho  615 .. 842                   cellTaskWho  600 .. 810
-#                ^ 24 past the tasks card border and 8 into colIssues,
-#                  which begins at 850 — "Assigned to" drawn over the
-#                  issues column.  Now it stops 8px inside its own card.
-#
-# Bands, so Studio's numbers can be checked by eye:
-#      0 ..  64   header       (absolute: HeaderBar / AppTitle / BackIcon)
-#     64 .. 768   bodyRoot     (padding 24 -> content 24..1342 x 88..744)
-#     88 .. 260   cardInfo     (172 tall, FillPortions 0)
-#    276 .. 744   rowWork      (FillPortions 1; colLists 3 : colIssues 2)
+# One project: info card + KPI ring over a work band — tasks and transactions stacked
+# left, issues full height right. Containers throughout below the header.
 Screens:
   scrProject:
     Properties:
@@ -60,16 +8,11 @@ Screens:
         =ClearCollect( colProjectTasks,
             Filter( taskmaster_tasks,
                 task_project_id.Id = gSelProject.ID ) );
-        // NO gProjArchived. It counted this project's individually-archived TASKS, and
-        // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
-        // ever return 0 and the "N archived (hidden)" caption it fed could never show.
-        // Nothing is hidden from the task list any more: it is every task on the project.
+        // It counted this project's individually-archived TASKS, and task_stage has no
+        // archived (hidden)" caption it fed could never show.
         // Delete is a TWO-PRESS action and must never open already armed.
         Set( gPrDelArm, false )
     Children:
-      # =====================================================================
-      # HEADER BAND — absolute, three controls, no collisions.
-      # =====================================================================
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -102,9 +45,6 @@ Screens:
             Width: =24
             Height: =24
             OnSelect: =Back()
-      # =====================================================================
-      # BODY — one vertical container holding the info card and the work band.
-      # =====================================================================
       - bodyRoot:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -121,9 +61,6 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height - gTheme.Space.HeaderH
           Children:
-            # -------------------------------------------------------------
-            # 1. PROJECT INFORMATION — stated outright, not left to be guessed.
-            # -------------------------------------------------------------
             - cardInfo:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -481,14 +418,10 @@ Screens:
                                           LayoutMinHeight: =22
                                           Width: =Parent.Width
                                           Height: =22
-                  # The ring sits between the facts and the actions, as asked.
-                  #
-                  # It is WRAPPED because the layout properties belong on the wrapper,
-                  # not on the instance: FillPortions and LayoutMinWidth are proven on
-                  # GroupContainer but NOT on a CanvasComponent instance, and the
-                  # contract check rejects them there. scrProjectEdit's pickers set
-                  # only Width/Height for the same reason. Without a pinned wrapper the
-                  # ring would default to FillPortions 1 and stretch across the card.
+                  # It is WRAPPED because the layout properties belong on the wrapper, not on
+                  # the instance: FillPortions and LayoutMinWidth are proven on GroupContainer
+                  # but NOT on a CanvasComponent instance, and the contract check rejects them
+                  # there.
                   - wrapRing:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -505,13 +438,11 @@ Screens:
                             Control: CanvasComponent
                             ComponentName: cmpKpiRing
                             Properties:
-                              # The app-side weighted rollup (C3), maintained by scrTaskEdit.
                               Width: =120
                               Height: =120
                               Percent: =Coalesce(gSelProject.project_perc_completion, 0)
                               Label: =Coalesce(gSelProject.project_perc_completion, 0) & "%"
                               AccentHex: ="#005A9E"
-                  # Edit and delete, stacked, as icons.
                   - colActions:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -538,10 +469,6 @@ Screens:
                                 =Set( gEditMode, "Edit" );
                                  Set( gEditProject, gSelProject );
                                  Navigate( scrProjectEdit, ScreenTransition.Cover )
-                        # Two presses. The first only ARMS it — the icon changes to a
-                        # filled bin and the caption below says so — because there is
-                        # no undo behind this. OnVisible disarms, so leaving the screen
-                        # is always a way out.
                         - icoDeleteProject:
                             Control: Classic/Icon@2.5.0
                             Properties:
@@ -559,22 +486,18 @@ Screens:
                                 =If( !gPrDelArm,
                                      Set( gPrDelArm, true ),
                                      Set( gPrDelErr, "" );
-                                     // Children FIRST. Every child carries a REQUIRED lookup
-                                     // to the project, so removing the parent while they
-                                     // exist would leave rows SharePoint will not let
-                                     // anything edit afterwards.
-                                     //
-                                     // Each removal is wrapped in a Set. MS Learn's own idiom
-                                     // is IfError( Remove(...), Notify(...) ), but Remove and
-                                     // RemoveIf "return the modified data source as a TABLE"
-                                     // while Notify and Set return a boolean, and IfError
-                                     // requires ALL its arguments to be type-compatible — so
-                                     // the documented form is rejected. gPrDelScrap exists
-                                     // only to make both arms a Set.
-                                     //
-                                     // RemoveIf is NOT delegable: it pulls matching rows up
-                                     // to the data row limit and deletes them one by one, so
-                                     // a project with more children than that limit needs a
+                                     // Every child carries a REQUIRED lookup to the project, so
+                                     // removing the parent while they exist would leave rows
+                                     // SharePoint will not let anything edit afterwards.
+                                     // MS Learn's own idiom is IfError( Remove(...),
+                                     // Notify(...) ), but Remove and RemoveIf "return the
+                                     // modified data source as a TABLE" while Notify and Set
+                                     // return a boolean, and IfError requires ALL its arguments
+                                     // to be type-compatible — so the documented form is
+                                     // rejected.
+                                     // RemoveIf is NOT delegable: it pulls matching rows up to
+                                     // the data row limit and deletes them one by one, so a
+                                     // project with more children than that limit needs a
                                      // second press to finish.
                                      IfError( Set( gPrDelScrap,
                                                    RemoveIf( taskmaster_issues,
@@ -615,10 +538,6 @@ Screens:
                               LayoutMinHeight: =16
                               Width: =Parent.Width
                               Height: =16
-            # -------------------------------------------------------------
-            # 2 + 3. WORK BAND — tasks/transactions stacked on the left,
-            #        issues full height on the right.
-            # -------------------------------------------------------------
             - rowWork:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -661,7 +580,6 @@ Screens:
                               Width: =Parent.Width
                               Height: =(Parent.Height - gTheme.Space.Gap) / 2
                             Children:
-                              # Title and the New button on ONE line, as asked.
                               - rowTasksHead:
                                   Control: GroupContainer@1.5.0
                                   Variant: AutoLayout
@@ -691,9 +609,6 @@ Screens:
                                     - btnNewTask:
                                         Control: Classic/Button@2.2.0
                                         Properties:
-                                          # NOT OFFERED ON AN ARCHIVED PROJECT. Archived work is excluded from every
-                                          # cross-project query, so anything created here would be invisible the moment
-                                          # it was saved — and it would grow a list the exclusion exists to keep small.
                                           Visible: =Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
                                           Fill: =gTheme.Color.Surface
                                           Color: =gTheme.Color.Primary
@@ -726,12 +641,6 @@ Screens:
                                   Control: Gallery@2.15.0
                                   Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                                   Properties:
-                                    # LIFECYCLE ORDER, not alphabetical. task_stage is a Choice and
-                                    # Sort on .Value is a TEXT sort, which ordered the list
-                                    # Complete, Drafting, Finalizing, Not Started, Planning, Under
-                                    # Review — finished work at the top, unstarted work fourth.
-                                    # StageWeights already holds the real ordering, and this is an
-                                    # in-memory collection so the LookUp costs nothing.
                                     Items: |
                                       =Sort( colProjectTasks,
                                              Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) )
@@ -797,8 +706,7 @@ Screens:
                                           # OnSelect: a gallery's own OnSelect does not reliably
                                           # fire when the click lands on a child control, so
                                           # without a transparent full-template button declared
-                                          # LAST the rows look right and do nothing. Confirmed
-                                          # in Studio on the nav rail, 2026-08-03.
+                                          # LAST the rows look right and do nothing.
                                           Text: =""
                                           Fill: =RGBA(0, 0, 0, 0)
                                           BorderThickness: =0
@@ -806,33 +714,15 @@ Screens:
                                           Y: =0
                                           Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight
-                                          # Goes STRAIGHT to the editor, exactly like the
-                                          # transaction and issue rows below. The old
-                                          # scrTask detail screen was deleted 2026-08-10:
-                                          # it was a second, weaker writer for the same
-                                          # row that seeded every control from `Default`
-                                          # and never called `Reset()`, so on the second
-                                          # task opened it still displayed the FIRST
-                                          # task's name, stage, health and priority — and
-                                          # saving wrote those stale values back. It also
-                                          # wrote `task_stage` WITHOUT the derived
-                                          # `task_date_completion` that scrTaskEdit
-                                          # maintains, so completing a task from there
-                                          # left the completion date blank.
-                                          #
-                                          # LookUp, not ThisItem: colProjectTasks is a
-                                          # snapshot taken in OnVisible, and the editor
-                                          # Patches against whatever record it is handed.
-                                          # Re-reading the live row on the way in costs
-                                          # one delegable ID lookup and removes a whole
-                                          # class of write-stale-data bug.
-                                          #
-                                          # A LookUp can MISS — the row may have been
-                                          # deleted by someone else since OnVisible took
-                                          # the snapshot. Opening the editor on a blank
-                                          # record would show an empty "Edit task" form
-                                          # and then Patch against nothing, so refuse and
-                                          # say so instead.
+                                          # The old scrTask detail screen was deleted
+                                          # same row that seeded every control from `Default`
+                                          # and never called `Reset()`, so on the second task
+                                          # opened it still displayed the FIRST task's name,
+                                          # stage, health and priority — and saving wrote those
+                                          # stale values back.
+                                          # Re-reading the live row on the way in costs one
+                                          # delegable ID lookup and removes a whole class of
+                                          # write-stale-data bug.
                                           OnSelect: |
                                             =Select(Parent);
                                             Set( gEditTask, LookUp(taskmaster_tasks, ID = ThisItem.ID) );
@@ -860,7 +750,6 @@ Screens:
                               Width: =Parent.Width
                               Height: =(Parent.Height - gTheme.Space.Gap) / 2
                             Children:
-                              # Title and the New button on ONE line, as asked.
                               - rowTxHead:
                                   Control: GroupContainer@1.5.0
                                   Variant: AutoLayout
@@ -889,9 +778,6 @@ Screens:
                                     - btnNewTx:
                                         Control: Classic/Button@2.2.0
                                         Properties:
-                                          # NOT OFFERED ON AN ARCHIVED PROJECT. Archived work is excluded from every
-                                          # cross-project query, so anything created here would be invisible the moment
-                                          # it was saved — and it would grow a list the exclusion exists to keep small.
                                           Visible: =Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
                                           Fill: =gTheme.Color.Surface
                                           Color: =gTheme.Color.Primary
@@ -990,8 +876,7 @@ Screens:
                                           # OnSelect: a gallery's own OnSelect does not reliably
                                           # fire when the click lands on a child control, so
                                           # without a transparent full-template button declared
-                                          # LAST the rows look right and do nothing. Confirmed
-                                          # in Studio on the nav rail, 2026-08-03.
+                                          # LAST the rows look right and do nothing.
                                           Text: =""
                                           Fill: =RGBA(0, 0, 0, 0)
                                           BorderThickness: =0
@@ -999,18 +884,9 @@ Screens:
                                           Y: =0
                                           Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight
-                                          # Re-read on the way in, like the task row. This
-                                          # gallery binds to a LIVE Filter rather than a
-                                          # ClearCollect snapshot, so the exposure is
-                                          # smaller than the task one was — ThisItem is a
-                                          # genuine data-source row and Patch hits the
-                                          # right ID either way. What it does NOT give is
-                                          # freshness: the query result is cached between
-                                          # refreshes, so the editor can seed its form
-                                          # from values someone else has since changed and
-                                          # patch them straight back. The LookUp costs one
-                                          # delegable read; the guard covers the row being
-                                          # gone entirely.
+                                          # Re-read on the way in, like the task row.
+                                          # The LookUp costs one delegable read; the guard
+                                          # covers the row being gone entirely.
                                           OnSelect: |
                                             =Select(Parent);
                                             Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.ID) );
@@ -1019,11 +895,7 @@ Screens:
                                                         NotificationType.Error ),
                                                 Set( gEditMode, "Edit" );
                                                 Navigate( scrTransactionEdit, ScreenTransition.Cover ) )
-                        # Preserved from the tabbed version, decision and all: there is no
-                        # cross-currency total to show, because since Q14 the app stores only
-                        # the native notional. Totalling ONE currency at a time is the honest
-                        # thing an app can do; the blended figure belongs to Power BI. Sum and
-                        # CountRows never delegate, so this is the RETURNED PAGE only.
+                        # Sum and CountRows never delegate, so this is the RETURNED PAGE only.
                         - lblTxTotal:
                             Control: Label@2.5.1
                             Properties:
@@ -1048,9 +920,6 @@ Screens:
                               LayoutMinHeight: =22
                               Width: =Parent.Width
                               Height: =22
-                  # ISSUES — its own full-height column, five columns wide, because an
-                  # issue is raised AGAINST the project and points at a task or a
-                  # transaction; it is not another unit of work under it.
                   - colIssues:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1098,9 +967,6 @@ Screens:
                               - btnNewIssue:
                                   Control: Classic/Button@2.2.0
                                   Properties:
-                                    # NOT OFFERED ON AN ARCHIVED PROJECT. Archived work is excluded from every
-                                    # cross-project query, so anything created here would be invisible the moment
-                                    # it was saved — and it would grow a list the exclusion exists to keep small.
                                     Visible: =Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
                                     Fill: =gTheme.Color.Surface
                                     Color: =gTheme.Color.Primary
@@ -1116,7 +982,6 @@ Screens:
                                     OnSelect: |
                                       =Set( gEditMode, "New" );
                                        Navigate( scrIssueEdit, ScreenTransition.Cover )
-                        # Column headings, so five terse cells read as a table.
                         - rowIssuesCols:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -1259,16 +1124,6 @@ Screens:
                               - cellIss2:
                                   Control: Label@2.5.1
                                   Properties:
-                                    # SHORT FORM, DISPLAY ONLY — the stored value keeps its
-                                    # "Closed - " prefix; this cell drops it. The column is
-                                    # 1/7 of the gallery (~62px at 12pt) and "Closed -
-                                    # Unresolved" is ~19 characters, so the full value would
-                                    # wrap or clip in a 43px row. Stripping the prefix costs
-                                    # nothing: in a column headed "Status", "Resolved" and
-                                    # "Unresolved" are unambiguous, and the worst case is then
-                                    # 10 characters — exactly what `issue_type` already renders
-                                    # in the same width ("Compliance"). Widening instead would
-                                    # mean re-portioning all five columns.
                                     Text: |
                                       =Switch( Coalesce(ThisItem.issue_status.Value, "—"),
                                                "Closed - Resolved",   "Resolved",
@@ -1312,7 +1167,6 @@ Screens:
                               - galIssuesHit:
                                   Control: Classic/Button@2.2.0
                                   Properties:
-                                    # Same reason as the other two galleries — see rowTasksLine.
                                     Text: =""
                                     Fill: =RGBA(0, 0, 0, 0)
                                     BorderThickness: =0
@@ -1320,9 +1174,9 @@ Screens:
                                     Y: =0
                                     Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight
-                                    # Re-read on the way in — see the transaction row for
-                                    # why the live-Filter binding makes this a freshness
-                                    # fix rather than an identity one.
+                                    # Re-read on the way in — see the transaction row for why
+                                    # the live-Filter binding makes this a freshness fix rather
+                                    # than an identity one.
                                     OnSelect: |
                                       =Select(Parent);
                                        Set( gEditIssue, LookUp(taskmaster_issues, ID = ThisItem.ID) );

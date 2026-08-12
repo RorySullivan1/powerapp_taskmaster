@@ -1,23 +1,8 @@
-# =============================================================================
-# scrReference  —  REFERENCE DATA. Clients and products: browse, filter, open,
-# and create. Absorbed scrAdmin 2026-08-11, which was deleted — its two
-# maintenance galleries and two create buttons are the whole of this screen now,
-# so there is one place to maintain reference data rather than two.
-#
-# NavMenu dropped from five entries to four. Key 4 is this screen and is now the
-# Switch DEFAULT in every OnNavigate, since there is no fifth destination.
-#
-# A tabbed Settings screen (user settings / reference data / admin settings) was
-# considered and DROPPED 2026-08-11 — saved settings are not being built. This is
-# the reference-data screen, not a tab of something larger, and the app stores no
-# per-user or global preferences. Nothing here is waiting on anything.
-# =============================================================================
 Screens:
   scrReference:
     Properties:
       Fill: =gTheme.Color.Bg
     Children:
-      # ---- Content placeholder --------------------------------------------
       - RefEmpty:
           Control: Rectangle@2.3.0
           Properties:
@@ -26,12 +11,6 @@ Screens:
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
             X: =gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter
-      # ---- Reference data ---------------------------------------------------
-      # scrClientEdit and scrProductEdit are reachable from EXACTLY two places:
-      # the Reference screen, and cmpPicker's "＋ New". They are deliberately NOT in
-      # NavMenu — reference data is something you maintain, not somewhere you
-      # browse to. Both are opened in New mode with an EMPTY return contract, so
-      # the save just comes back here rather than filling a caller's field.
       - lblAdminRefHead:
           Control: Label@2.5.1
           Properties:
@@ -81,18 +60,11 @@ Screens:
               =Set( gPdMode, "New" );
                Set( gPdReturn, "" );
                Navigate( scrProductEdit, ScreenTransition.Cover )
-      # ---- Maintenance lists -----------------------------------------------
-      # THESE ARE WHAT DEFINE `gEditClient` / `gEditProduct`. Until they existed
-      # the two create screens READ those globals but nothing in the app ever
-      # Set them, so Studio reported both as unknown — an undefined global has no
-      # type, and `gEditClient.client_name` cannot resolve against nothing.
-      # The Edit path had no entry point, which was the actual gap: scrReference
-      # could only CREATE reference data, never open any.
-      #
-      # Bands, computed (1366x768):
-      #   112..140  heading      152..196  new buttons
-      #   210..230  caption      234..270  search      278..744  gallery
-      #   left col X 24..675     right col X 691..1342
+      # Until they existed the two create screens READ those globals but nothing in the app ever
+      # Set them, so Studio reported both as unknown — an undefined global has no type, and
+      # `gEditClient.client_name` cannot resolve against nothing.
+      # The Edit path had no entry point, which was the actual gap: scrReference could only
+      # CREATE reference data, never open any.
       - lblAdminClients:
           Control: Label@2.5.1
           Properties:
@@ -120,8 +92,8 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
-            # Delegable: StartsWith on an indexed Text column, and an empty search
-            # box matches everything rather than nothing.
+            # Delegable: StartsWith on an indexed Text column, and an empty search box matches
+            # everything rather than nothing.
             Items: |
               =Sort( Filter( taskmaster_clients,
                              StartsWith(client_name, txtAdminClientSearch.Text) ),
@@ -174,9 +146,8 @@ Screens:
             - hitAdminCl:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  # Transparent full-template button declared LAST — a gallery's
-                  # own OnSelect does not reliably fire when the click lands on a
-                  # child control.
+                  # Transparent full-template button declared LAST — a gallery's own OnSelect
+                  # does not reliably fire when the click lands on a child control.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   BorderThickness: =0
@@ -288,14 +259,12 @@ Screens:
                          Navigate( scrProductEdit, ScreenTransition.Cover ) )
 
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
-      # DECLARED LAST so positional z-order floats the fly-out over the content.
-      #
-      # Height is dynamic and that is the whole trick: a component intercepts every
-      # click inside its bounds, so closed it must own nothing but the 64px header
-      # strip. Open, covering the screen is exactly right — the scrim wants the click.
-      #
-      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
-      # the chosen entry and this screen does the navigating.
+      # DECLARED LAST
+      # so positional z-order floats the fly-out over the content.
+      # Height is dynamic and that is the whole trick: a component intercepts every click inside
+      # its bounds, so closed it must own nothing but the 64px header strip.
+      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports the chosen
+      # entry and this screen does the navigating.
       - appBar:
           Control: CanvasComponent
           ComponentName: cmpAppBar

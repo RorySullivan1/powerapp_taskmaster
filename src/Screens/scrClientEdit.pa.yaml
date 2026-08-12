@@ -1,38 +1,6 @@
-# =============================================================================
-# scrClientEdit  —  create / edit ONE client. Compact by instruction.
-#
-# REACHABLE FROM EXACTLY TWO PLACES, and that is deliberate:
-#   1. scrReference ▸ Clients         — maintenance
-#   2. cmpPicker ▸ "＋ New"           — quick creation mid-flow
-# It is NOT in gNavMenu. A client is reference data, not a place you browse to.
-#
-# THE RETURN CONTRACT (`gClReturn`) is what makes the picker route work.
-# When the picker sends you here it sets gClReturn to the name of the global the
-# caller wants filled. On a successful save this screen writes the new client
-# into THAT global as {Id, Value} — the shape a Lookup write needs — and Back()s,
-# so the user lands where they left off with the new client already selected.
-# From scrReference, gClReturn is "" and the save just returns.
-#
-# WHY A SCREEN AND NOT A "+" INSIDE THE PICKER DIALOG:
-# taskmaster_clients has FIVE required columns, one of them a Person. That is a
-# form. And a canvas component clips its children to its own bounds, so a picker
-# dialog cannot host the people picker this form needs — the nested dialog would
-# be cut off. Confirmed constraint, not a preference.
-#
-# PEOPLE ARE NEVER CREATED. client_sales is a Person column filled from Microsoft
-# 365 through cmpPicker, exactly like every other person field in the app.
-# Only the CLIENT record is created here.
-#
-# CHOICE VALUES ARE READ, NOT HARDCODED. client_type and client_coverage are
-# Choice columns whose allowed values live in SharePoint; Choices() returns them
-# at runtime, so the Managed Metadata retirement needs no app change and no value
-# is ever invented here. Same pattern as scrProjectEdit's coverage picker.
-#
-# BAND ARITHMETIC (1366x768):
-#      0 ..  64   header (absolute)
-#     64 .. 700   bodyRoot, vertical auto-layout, 24 padding
-#    700 .. 768   actionBar (opaque, absolute)
-# =============================================================================
+# Create / edit a client. Reachable from scrReference and from cmpPicker's "+ New".
+# taskmaster_clients has five required columns, one of them a Person.
+# People are never created here — client_sales is filled from Microsoft 365.
 Screens:
   scrClientEdit:
     Properties:
@@ -55,8 +23,6 @@ Screens:
         Set( gClNotes, If( gClMode = "Edit", Coalesce(gEditClient.client_notes, ""), "" ) );
         ClearCollect( colMapRegionCl, mapping_regions );
         Set( gClPicker, "" );
-        // Every seeded input needs an explicit Reset or it keeps the PREVIOUS
-        // record's value — Default and DefaultSelectedItems are read once.
         Reset( txtClName ); Reset( txtClNotes );
         Reset( cboClType ); Reset( cboClCov );
         Reset( pickClRegion );
@@ -189,10 +155,8 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =32
                   OnChange: =Set( gClCov, cboClCov.Selected.Value )
-            # WRAPPED IN A COL — this was the one lookup field of the nineteen that sat
-            # directly in bodyRoot rather than in a col/row container. A component
-            # instance cannot carry FillPortions or LayoutMinHeight, so the wrapper has
-            # to exist for the auto-layout contract to live somewhere.
+            # A component instance cannot carry FillPortions or LayoutMinHeight, so the wrapper
+            # has to exist for the auto-layout contract to live somewhere.
             - colClSales:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -272,7 +236,6 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =60
                   OnChange: =Set( gClNotes, txtClNotes.Text )
-      # ---- Action bar (opaque, absolute) ------------------------------------
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -287,8 +250,6 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Visible: =Len(Self.Text) > 0
-            # KEEP THIS A BARE LIST — btnClSave tests Len(...) > 0, so a static
-            # prefix would make it permanently non-empty and block every save.
             Text: |
               =Trim(
               If( Len(Trim(txtClName.Text)) = 0, "a name   ", "" ) &
@@ -338,28 +299,18 @@ Screens:
             # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
             OnSelect: |
               =If( gSaving,
-              // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
-              // A SharePoint Patch takes seconds; the button stayed live throughout, so a
-              // double-tap ran the whole handler twice and Defaults() built a SECOND new
-              // record. `Set` applies immediately within a behaviour chain, so the flag is
-              // already true by the time the second tap is evaluated.
-              // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
-              // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
-              // instead, and the guard below is what actually blocks the duplicate.
+              // A disabled button cannot fire OnSelect and cannot say why; the Text says
+              // "Saving…" instead, and the guard below is what actually blocks the duplicate.
               false,
               Set( gSaving, true );
               If( Len(lblClMissing.Text) > 0,
               Notify( "Can't save yet — this client still needs: " & lblClMissing.Text,
               NotificationType.Error ),
-              // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last
-              // successful save, gClSaved makes the IsBlank(.ID) guard below pass on a
-              // PREVIOUS record — so a write that fails with an empty error message
-              // reported success and handed the caller's form the WRONG record.
-              // scrTaskEdit has always blanked its equivalent; these two did not.
+              // Left holding the last successful save, gClSaved makes the IsBlank(.ID) guard
+              // below pass on a PREVIOUS record — so a write that fails with an empty error
+              // message reported success and handed the caller's form the WRONG record.
               Set( gClSaved, Blank() );
               Set( gClErr, "" );
-              // ONE WRITE. All six columns in a single Patch; nothing here is
-              // optional enough to need a guarded second pass.
               IfError(
               Set( gClSaved,
               Patch( taskmaster_clients,
@@ -372,16 +323,13 @@ Screens:
               client_region_path: gClRegionPath,
               client_notes:       txtClNotes.Text } ) ),
               Set( gClErr, FirstError.Message ) );
-              // Trust the RECORD, never the message — a write can fail and still
-              // leave FirstError.Message empty.
+              // Trust the RECORD, never the message — a write can fail and still leave
+              // FirstError.Message empty.
               If( IsBlank(gClSaved.ID) && Len(gClErr) = 0,
               Set( gClErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
               If( Len(gClErr) > 0,
               Notify( "Couldn't save the client: " & gClErr, NotificationType.Error ) );
               If( Len(gClErr) = 0 && !IsBlank(gClSaved.ID),
-              // THE RETURN CONTRACT. If a picker sent us here, hand the new
-              // client straight back in the shape a Lookup write needs, so the
-              // user returns to their form with it already selected.
               If( gClReturn = "TaskClient",
               Set( gTkClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ),
               gClReturn = "TxClient",
@@ -390,9 +338,9 @@ Screens:
               Notify( If(gClMode = "Edit", "Client saved", "Client created"), NotificationType.Success );
               Back() ) );
               Set( gSaving, false ) )
-      # ---- Picker — declared LAST so it paints above the action bar ---------
-      # One state only here (the sales owner), but the same cmpPicker every
-      # other screen uses. See scrTaskEdit's instance for the full commentary.
+      # ---- Picker — declared LAST so it paints above the action bar ----
+      # One state only
+      # here (the sales owner), but the same cmpPicker every other screen uses.
       - cmpClPick:
           Control: CanvasComponent
           ComponentName: cmpPicker
@@ -403,11 +351,8 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: ="Select sales owner"
-            # The directory call runs HERE — the component cannot reach a data
-            # source with AccessAppScope false. Bound to the global that OnSearch
-            # fills, not to the instance's own Query output, which would be a
-            # same-instance cycle. Key is the person's Mail; Primary/Secondary are
-            # the display name and the address the row shows.
+            # The directory call runs HERE — the component cannot reach a data source with
+            # AccessAppScope false.
             Results: |
               =If( Len(gClQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gClQuery, top: 25 }).value As u,

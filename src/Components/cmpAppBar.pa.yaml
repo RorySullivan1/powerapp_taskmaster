@@ -1,59 +1,9 @@
-# =============================================================================
-# cmpAppBar  —  header bar + fly-out navigation, in one component
-# =============================================================================
-# Supersedes cmpNavMenu (deleted) and the HeaderBar / AppTitle / ScreenTitle trio
-# that was copy-pasted into every nav screen. One definition, eight instances.
-#
-# Closed, it is a 64px header with a hamburger. Tapping the hamburger flies the
-# nav rail out over the screen with a scrim behind it; tapping the scrim, or
-# choosing an entry, closes it again.
-#
-# ---------------------------------------------------------------------------
-# THE INSTANCE HEIGHT IS DYNAMIC, AND THAT IS THE WHOLE TRICK.
-#
-#   Height: =If(gNavOpen, Parent.Height, gTheme.Space.HeaderH)
-#
-# A component intercepts every click inside its bounds — a transparent fill does
-# not help, which is what made scrHome completely unresponsive earlier (see
-# _SHELL-NOTES.md). A fly-out needs to cover the screen when open, so the
-# component must be full-height *then* and only header-height the rest of the
-# time. Closed, it owns a 64px strip and nothing below it is affected. Open,
-# covering everything is exactly right: the scrim is meant to swallow the click,
-# and it uses it to close the menu.
-#
-# It must also be declared LAST on the screen so positional z-order floats the
-# fly-out above the content.
-# ---------------------------------------------------------------------------
-#
-# THE COMPONENT DOES NOT NAVIGATE — it cannot see the app's screens. It reports
-# the chosen entry and the screen acts:
-#
-#   OnNavigate: =Switch( appBar.SelectedKey, 1, Navigate(scrHome, …), … );
-#               Set(gNavOpen, false)
-#   OnToggle:   =Set(gNavOpen, !gNavOpen)
-#
-# Each row carries a transparent full-template `Classic/Button` declared LAST,
-# because a gallery's own OnSelect does not reliably fire when the click lands on
-# a child control — without it the rail looks right and does nothing.
-#
-# Contract:
-#   Items        (Input, Table)   {Key, Title, Icon, NeedsLicence} — bind to NavMenu
-#   ActiveKey    (Input, Number)  Key of the screen hosting this instance
-#   HasLicence   (Input, Boolean) pass gHasPowerBiLicence; a component can't read globals
-#   AppTitle     (Input, Text)    left-hand product name
-#   ScreenTitle  (Input, Text)    right-hand screen name
-#   IsOpen       (Input, Boolean) pass gNavOpen — the screen owns the state
-#   SelectedKey  (Output, Number) Key just chosen
-#   OnNavigate   (Event)          raised on choosing an entry
-#   OnToggle     (Event)          raised by the hamburger AND the scrim
-#
-# Colours are literals — a component cannot read app-scope named formulas. They
-# mirror Theme; if Theme changes, change them here too.
-# Grounded tokens only: Rectangle@2.3.0, Label@2.5.1, Classic/Icon@2.5.0,
-# Classic/Button@2.2.0, Gallery@2.15.0. Icon names are checked against the real
-# 180-value enum (tools/studio-enums.json) — `Icon.Hamburger` turns out to BE
-# valid, so the drawn hamburger below is now optional; see the note by btnMenu.
-# =============================================================================
+# Header bar + fly-out nav rail.
+# Must be DECLARED LAST on the screen so positional z-order floats the fly-out over the
+# content, and the instance must be full-height while open and header-height otherwise.
+# It does NOT navigate — it cannot see the app's screens, so it reports the picked key
+# and the screen runs the Switch.
+# Colours are literals: AccessAppScope is false, so it cannot read gTheme.
 ComponentDefinitions:
   cmpAppBar:
     DefinitionType: CanvasComponent
@@ -114,9 +64,6 @@ ComponentDefinitions:
       Fill: =RGBA(0, 0, 0, 0)
       SelectedKey: =galNav.Selected.Key
     Children:
-      # ---- Fly-out layer, declared FIRST so the header sits above it ---------
-      # The scrim covers everything below the bar. Its job is to be clicked:
-      # tapping outside the rail is the expected way to dismiss a fly-out.
       - navScrim:
           Control: Rectangle@2.3.0
           Properties:
@@ -179,7 +126,6 @@ ComponentDefinitions:
                   VerticalAlign: =VerticalAlign.Middle
                   X: =56
                   Width: =Parent.TemplateWidth - 56 - 16
-            # LAST within the row: the actual hit target. See the header.
             - navHit:
                 Control: Classic/Button@2.2.0
                 Properties:
@@ -200,15 +146,9 @@ ComponentDefinitions:
             Y: =0
             Width: =Parent.Width
             Height: =64
-      # The hamburger is DRAWN rather than an icon, and that is now a CHOICE, not a
-      # necessity. It was authored this way because MS Learn documents the Icon
-      # property without ever enumerating its values, so `Icon.Hamburger` could not
-      # be grounded — and one unknown token fails the WHOLE body paste. The real
-      # 180-value enum has since been recovered from Templates.json inside the
-      # example .msapp, and `Hamburger` IS in it. These four controls could collapse
-      # to one `Classic/Icon` with `Icon: =Icon.Hamburger`; it is left alone only
-      # because this component is landed and working, and re-pasting a working body
-      # to save three rectangles is a bad trade across this gap.
+      # It was authored this way because MS Learn documents the Icon property without ever
+      # enumerating its values, so `Icon.Hamburger` could not be grounded — and one unknown
+      # token fails the WHOLE body paste.
       - menuLine1:
           Control: Rectangle@2.3.0
           Properties:
@@ -233,7 +173,6 @@ ComponentDefinitions:
             Y: =39
             Width: =24
             Height: =2
-      # Declared after the lines so it takes the click; transparent so they show.
       - btnMenu:
           Control: Classic/Button@2.2.0
           Properties:

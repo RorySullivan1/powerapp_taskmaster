@@ -1,49 +1,14 @@
-# =============================================================================
-# cmpLookupField  —  the FORM FIELD for a lookup, not the dialog behind it
-# =============================================================================
-# One field: a caption, a "＋ Choose …" button while empty, and a chip with a
-# clear ✕ once something is chosen. It is the widget that was hand-copied
-# NINETEEN times across five screens — 882 lines in 35 controls — and had
-# already split into two variants that were drifting apart:
+# The lookup form field: caption + "choose" button + chip + clear.
+# Stateless — the screen owns the value and passes Display/HasValue in, so there is no
+# OnReset to forget and no stale pick.
+# AccessAppScope is false: no data access, no gTheme, colours are literals.
 #
-#   scrProjectEdit    chip = a Classic/Button whose Text ends in a literal "✕"
-#   everywhere else   chip = a container holding a Label + a real Classic/Icon
+# FIVE properties to hand-type in Studio: Caption / Display / HasValue / PickLabel
+# (Input), OnPick / OnClear (Event).
+# HasValue is a separate input, not Len(Display) > 0, because callers key on different
+# things (.Id > 0 for a lookup, Len(.Mail) > 0 for a person).
 #
-# This is the second variant, which is the better one: a real icon is a real
-# hit target with its own Tooltip, where a "✕" glued to the end of a label means
-# clicking anywhere on the chip clears it.
-#
-# THE COMPANION OF cmpPicker, NOT A REPLACEMENT. That owns the DIALOG —
-# searching and choosing. This owns the FIELD — showing what is chosen and
-# offering to change or clear it. Neither knows about the other; the screen
-# wires them together with its `g*Picker` global.
-#
-# STATELESS BY DESIGN, so there is no OnReset to forget.
-# The screen owns the value and passes it in as `Display` / `HasValue`. Nothing
-# is cached here, so the class of bug that made cmpSelection show the previous
-# record's pick cannot occur — there is nothing to go stale.
-#
-# NO DATA ACCESS, NO THEME. AccessAppScope is false like every component here, so
-# the colours below are LITERALS lifted from Theme — keep them in step by hand.
-#
-# Contract — FIVE properties to hand-type in Studio:
-#   Caption   (Input, Text)     — "Client  *"
-#   Display   (Input, Text)     — the chosen value's label; ignored when empty
-#   HasValue  (Input, Boolean)  — drives which of the two states shows
-#   OnPick    (Event)           — the button was pressed; screen opens its dialog
-#   OnClear   (Event)           — the ✕ was pressed; screen empties its global
-#
-# WHY `HasValue` IS A SEPARATE INPUT rather than `Len(Display) > 0`: the callers
-# key on different things — a lookup on `g.Id > 0`, a person on
-# `Len(g.Mail) > 0`. Deriving it here would force every caller to pass a display
-# string that happens to be empty in exactly the right cases, which is the kind
-# of implicit coupling that breaks quietly. The screen already knows; let it say.
-#
-# SIZING: the instance is 62 tall (18 caption + 8 gap + 36 control), matching the
-# clusters it replaces. Put it in the col/row wrapper that is already there —
-# a component instance cannot carry FillPortions, LayoutMinHeight or the
-# LayoutGrid* properties, so the wrapper keeps holding the layout contract.
-# =============================================================================
+# An instance cannot carry FillPortions, LayoutMinHeight or LayoutGrid* — wrap it.
 ComponentDefinitions:
   cmpLookupField:
     DefinitionType: CanvasComponent
@@ -128,9 +93,6 @@ ComponentDefinitions:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
-                  # A HIDDEN CHILD TAKES NO SPACE, so the two states occupy the
-                  # same 36px row without any absolute positioning — exactly one
-                  # of them is ever visible.
                   Visible: =cmpLookupField.HasValue
                   LayoutDirection: =LayoutDirection.Horizontal
                   LayoutAlignItems: =LayoutAlignItems.Center
@@ -159,10 +121,6 @@ ComponentDefinitions:
                   - lfClear:
                       Control: Classic/Icon@2.5.0
                       Properties:
-                        # A REAL ICON, not a "✕" glued to the end of the label.
-                        # The scrProjectEdit variant put the ✕ in a Classic/Button's
-                        # Text, which makes the WHOLE chip a clear button — so
-                        # clicking the chip to see the full value wiped it instead.
                         Icon: =Icon.Cancel
                         Color: =RGBA(110, 120, 130, 1)
                         Tooltip: ="Clear"

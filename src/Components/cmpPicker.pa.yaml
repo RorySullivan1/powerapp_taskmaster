@@ -1,54 +1,15 @@
-# =============================================================================
-# cmpPicker  —  ONE modal search dialog for people AND records
-# =============================================================================
-# Replaces cmpPeoplePicker and cmpRecordPicker, which were 802 lines of which
-# 91% were identical: same controls, same geometry constants, same OnReset, same
-# footer. Only two things actually differed, and both are now generic.
+# Modal single-select search over {Key, Primary, Secondary} rows — serves people and
+# records alike. Key is TEXT: Mail for a person, Text(ID) for a record.
 #
-# THE ROW SHAPE IS {Key, Primary, Secondary} AND `Key` IS TEXT.
-# That is the whole merge. The two pickers keyed on different things —
+# AccessAppScope is false, so it cannot read app globals, named formulas or data sources.
+# Colours are literals, and the SCREEN runs the query and passes rows in via Results.
 #
-#     record:  rpPicked.Id > 0          &&  rpPicked.Id = ThisItem.Id
-#     person:  Len(ppPicked.Mail) > 0   &&  ppPicked.Mail = ThisItem.Mail
+# NINE properties to hand-type in Studio: Title / Results / AllowCreate (Input),
+# Query / Picked (Output), OnSearch / OnConfirm / OnCancel / OnCreateNew (Event).
 #
-# — because a record has an ID and a person has none; Mail is a person's natural
-# key. A single Text `Key` covers both, so the screen projects:
-#
-#     records  Key: Text(c.ID)   Primary: c.client_name   Secondary: <detail>
-#     people   Key: u.Mail       Primary: u.DisplayName   Secondary: u.Mail
-#
-# and writes back `{ Id: Value(Picked.Key), Value: Picked.Primary }` for a
-# Lookup, or `{ DisplayName: Picked.Primary, Mail: Picked.Secondary }` for a
-# Person. Text(ID) round-trips through Value() exactly; a SharePoint ID is an
-# integer, so there is no precision to lose.
-#
-# THIS COMPONENT TOUCHES NOTHING OUTSIDE ITSELF. AccessAppScope is false, so it
-# cannot read app globals, App named formulas (Theme included) or data sources.
-# Colours are LITERALS lifted from Theme — keep them in step by hand — and the
-# query runs on the SCREEN, which passes rows in through Results.
-#
-# Contract — NINE properties to hand-type in Studio (one contract instead of the
-# two that had to be kept in step):
-#   Title       (Input, Text)     — dialog heading
-#   Results     (Input, Table)    — {Key, Primary, Secondary}; screen supplies
-#   AllowCreate (Input, Boolean)  — show "＋ New"; clients and products only
-#   Query       (Output, Text)    — current search text; read inside OnSearch
-#   Picked      (Output, Record)  — {Key, Primary, Secondary}; read in OnConfirm
-#   OnSearch    (Event)           — debounced box settled, or Search pressed
-#   OnConfirm   (Event)           — check pressed with a row highlighted
-#   OnCancel    (Event)           — dismissed via the X or the scrim
-#   OnCreateNew (Event)           — "＋ New" pressed
-#   OnReset     (built-in)        — not a custom property, nothing to type
-#
-# SEARCH IS DEBOUNCED, NOT ON ENTER. `TriggerOutput.Delayed` fires OnChange once
-# typing stops. **Canvas Power Apps has no keypress or Enter event on a text
-# input at all** (confirmed 2026-08-11), so Enter cannot be bound to anything;
-# debounce is the mechanism and the Search button is the explicit alternative.
-#
-# ONRESET IS LOAD-BEARING. One instance serves every field on a screen AND every
-# record that screen is reused for. Without it the dialog opens on the previous
-# field's highlight and the check commits it.
-# =============================================================================
+# Call Reset(<instance>) when opening: one instance serves every field on a screen, so
+# without it the dialog opens on the previous field's highlight.
+# Search is DEBOUNCED — canvas has no keypress or Enter event on a text input.
 ComponentDefinitions:
   cmpPicker:
     DefinitionType: CanvasComponent
@@ -99,44 +60,25 @@ ComponentDefinitions:
       Width: =1366
       Height: =768
       Fill: =RGBA(0, 0, 0, 0)
-      # Falls back to an empty-Key record rather than Blank(), so the consuming
-      # screen can test `Len(inst.Picked.Key) > 0` without a type surprise.
-      # If(), not Coalesce(): Coalesce is grounded for scalars here, not records.
       Picked: |
         =If( IsBlank(pkPicked), { Key: "", Primary: "", Secondary: "" }, pkPicked )
       Query: |
         =Coalesce( pkQuery, "" )
-      # NO SetFocus HERE — do not re-add it. `SetFocus` cannot target a control
-      # inside a Component, a Gallery, an Edit form OR a Container (MS Learn,
-      # function-setfocus#limitations; Studio rejected it 2026-08-12). Every one
-      # of those exclusions applies somewhere in this app, and the first applies
-      # to every control in this file. `Reset` carries no such restriction, which
-      # is why the line below is fine and the SetFocus line was not.
-      # CONSEQUENCE, ACCEPTED: the dialog opens with nothing focused, so the user
-      # must click into the search box before typing. There is no formula-level
-      # workaround — a PCF code component with an InputEvent property is the only
-      # documented route, and that is a far bigger change than this buys.
+      # NO SetFocus HERE — do not re-add it.
+      # `SetFocus` cannot target a control inside a Component, a Gallery, an Edit form OR a
+      # Container (MS Learn, function-setfocus#limitations;
+      # CONSEQUENCE, ACCEPTED: the dialog opens with nothing focused, so the user must click
+      # into the search box before typing.
       OnReset: |
         =Set( pkQuery, "" );
          Set( pkPicked, Blank() );
          Set( pkTried, false );
          Reset( txtPkSearch )
     Children:
-      # NO AccessibleLabel ON ANY Classic/* CONTROL — the property does not exist
-      # there (confirmed 2026-08-12), so it fails the paste. It survives below on
-      # `txtPkSearch` ONLY because that one is modern. Classic controls take
-      # `Tooltip` instead, which is what `pkClose` uses.
-      # The cost is real and is accepted, not overlooked: `pkRowHit` is an unnamed
-      # transparent button on every result row, so a screen reader announces the
-      # list as "button, button, button" and there is no property here that fixes
-      # it. Converting the row hit target to a modern button is the only route,
-      # and that is a separate, riskier change.
-      # ---- Scrim -------------------------------------------------------------
+      # NO AccessibleLabel ON ANY Classic/* CONTROL — the property does not exist there
       - pkScrim:
           Control: Classic/Button@2.2.0
           Properties:
-            # A button, not a rectangle: it has to be CLICKABLE to dismiss, and a
-            # rectangle's OnSelect is not a reliable hit target behind a dialog.
             Text: =""
             Fill: =RGBA(0, 0, 0, 0.35)
             HoverFill: =RGBA(0, 0, 0, 0.35)
@@ -147,7 +89,6 @@ ComponentDefinitions:
             Width: =Parent.Width
             Height: =Parent.Height
             OnSelect: =cmpPicker.OnCancel()
-      # ---- Dialog card -------------------------------------------------------
       - pkCard:
           Control: Rectangle@2.3.0
           Properties:
@@ -188,15 +129,13 @@ ComponentDefinitions:
             Width: =20
             Height: =20
             OnSelect: =cmpPicker.OnCancel()
-      # ---- Search row --------------------------------------------------------
       - txtPkSearch:
           Control: ModernTextInput@1.1.1
           Properties:
             Placeholder: ="Type at least 2 characters…"
             AccessibleLabel: ="Search"
-            # Delayed: OnChange fires once the user STOPS TYPING, not per
-            # keystroke. Never FocusOut — that fires only on losing focus, which
-            # is what made Enter appear to do nothing.
+            # Never FocusOut — that fires only on losing focus, which is what made Enter appear
+            # to do nothing.
             TriggerOutput: =TriggerOutput.Delayed
             Font: =Font.'Segoe UI'
             Size: =14
@@ -228,7 +167,6 @@ ComponentDefinitions:
                Set( pkPicked, Blank() );
                Set( pkTried, false );
                cmpPicker.OnSearch()
-      # ---- Results -----------------------------------------------------------
       - galPkResults:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
@@ -248,9 +186,6 @@ ComponentDefinitions:
             - pkRowSel:
                 Control: Rectangle@2.3.0
                 Properties:
-                  # Compared on Key, which is Text for both kinds. A record
-                  # comparison against a value rebuilt by Set() is not an
-                  # identity match, so the key has to be a scalar.
                   Fill: =RGBA(102, 182, 227, 1)
                   Visible: |
                     =Len(Coalesce(pkPicked.Key, "")) > 0 && pkPicked.Key = ThisItem.Key
@@ -293,9 +228,8 @@ ComponentDefinitions:
             - pkRowHit:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  # Transparent full-template button declared LAST — a gallery's
-                  # own OnSelect does not reliably fire when the click lands on a
-                  # child control. HIGHLIGHTS ONLY; the check commits.
+                  # Transparent full-template button declared LAST — a gallery's own OnSelect
+                  # does not reliably fire when the click lands on a child control.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   BorderThickness: =0
@@ -308,14 +242,9 @@ ComponentDefinitions:
                      Set( pkPicked,
                           { Key: ThisItem.Key, Primary: ThisItem.Primary, Secondary: ThisItem.Secondary } );
                      Set( pkTried, false )
-      # ---- Empty states ------------------------------------------------------
       - pkHint:
           Control: Label@2.5.1
           Properties:
-            # THREE states on one label, not two. The old pickers covered
-            # "nothing typed" and "too short" but NOT "searched and found
-            # nothing" — so a query matching zero rows rendered 588x264 of blank
-            # white, indistinguishable from still-loading or broken.
             Visible: |
               =Len(Coalesce(pkQuery, "")) < 2 || CountRows(cmpPicker.Results) = 0
             Text: |
@@ -333,9 +262,6 @@ ComponentDefinitions:
             Y: =(Parent.Height - 460) / 2 + 120
             Width: =588
             Height: =264
-      # ---- Footer ------------------------------------------------------------
-      # Row at +400 h40, computed: pkCreateNew 16..136 | pkNudge 144..348 |
-      # pkCancel 356..476 | pkConfirm 484..604.
       - pkCreateNew:
           Control: Classic/Button@2.2.0
           Properties:
@@ -355,8 +281,6 @@ ComponentDefinitions:
       - pkNudge:
           Control: Label@2.5.1
           Properties:
-            # `= true` rather than Coalesce(): blank compares false, and Coalesce
-            # on a Boolean is not grounded in this repo.
             Visible: =pkTried = true
             Text: ="Pick something from the list first."
             Font: =Font.'Segoe UI'
@@ -396,8 +320,8 @@ ComponentDefinitions:
             Y: =(Parent.Height - 460) / 2 + 400
             Width: =120
             Height: =40
-            # ALWAYS ENABLED. With nothing picked it explains itself via pkNudge
-            # rather than sitting inert — a disabled button cannot say why.
+            # With nothing picked it explains itself via pkNudge rather than sitting inert — a
+            # disabled button cannot say why.
             OnSelect: |
               =If( Len(Coalesce(pkPicked.Key, "")) = 0,
                    Set( pkTried, true ),
