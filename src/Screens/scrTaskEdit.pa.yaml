@@ -671,7 +671,10 @@ Screens:
                             Control: Classic/Toggle@2.1.0
                             Properties:
                               Default: |
-                                =If( gEditMode = "Edit", gEditTask.task_client_name.Id > 0, false )
+                                =If( gEditMode = "Edit",
+                                     gEditTask.task_client_name.Id > 0
+                                  || !IsBlank(gEditTask.task_client_stage.Value),
+                                     false )
                               FalseText: =""
                               TrueText: =""
                               FillPortions: =0
@@ -816,7 +819,13 @@ Screens:
                             Control: Classic/Toggle@2.1.0
                             Properties:
                               Default: |
-                                =If( gEditMode = "Edit", !IsBlank(gEditTask.task_output_format.Value), false )
+                                =If( gEditMode = "Edit",
+                                     !IsBlank(gEditTask.task_output_format.Value)
+                                  || !IsBlank(gEditTask.task_output_language.Value)
+                                  || !IsBlank(gEditTask.task_output_branding.Value)
+                                  || !IsBlank(gEditTask.task_output_approval_id)
+                                  || gEditTask.task_product_id.Id > 0,
+                                     false )
                               FalseText: =""
                               TrueText: =""
                               FillPortions: =0
@@ -1087,7 +1096,10 @@ Screens:
                     =Trim(
                     If( Len(Trim(txtTkName.Text)) = 0, "a task name   ", "" ) &
                     If( Len(gTkLead.Mail) = 0,         "a lead   ", "" ) &
-                    If( gTkProject.Id = 0,             "a parent project   ", "" ) )
+                    If( gTkProject.Id = 0,             "a parent project   ", "" ) &
+                    If( Len(gTkStage) = 0,             "a stage   ", "" ) &
+                    If( Len(gTkStatus) = 0,            "a health   ", "" ) &
+                    If( Len(gTkPriority) = 0,          "a priority   ", "" ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.Danger
@@ -1254,7 +1266,10 @@ Screens:
                     With( { newPc: If( CountRows(gTkRollupScored) = 0, 0, RoundDown(Average(gTkRollupScored, wgt), 0) ) },
                     // Don't spend a write on a number that has not moved. Most stage changes
                     // inside a big project leave the rounded average where it was.
-                    If( newPc <> gTkRollupProj.project_perc_completion,
+                    // Coalesce to -1: a just-inserted row holds NULL and newPc is 0, so a bare
+                    // compare can skip the write and leave NULL. Power BI's AVERAGE drops blanks
+                    // from the denominator, so portfolio completion then reads high.
+                    If( newPc <> Coalesce(gTkRollupProj.project_perc_completion, -1),
                     IfError(
                     Set( gSelProject,
                     Patch( taskmaster_projects, gTkRollupProj, { project_perc_completion: newPc } ) ),

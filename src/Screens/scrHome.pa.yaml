@@ -10,9 +10,8 @@
 #
 # Component INSTANCES use v3.0 dialect: `Control: CanvasComponent` +
 # `ComponentName:` + `Properties:` (base props X/Y/W/H AND custom props;
-# instances have NO Children). The referenced components must exist in the app
+# instances have NO Children). The referenced components must exist in the app.
 # Screens read gTheme; components cannot, so components use literal colours.
-# (only components can't), so gTheme.* tokens stay here.
 #
 # Demo UI-state globals (no schema, no OnStart — blank is falsy):
 #   gToastMsg / gToastTone  — feed the toast; gConfirmOpen — the confirm modal.
@@ -41,7 +40,14 @@ Screens:
       #  * task_stage / issue_status are REQUIRED with defaults (C9), so no row is
       #    lost to a blank Choice — these counts miss nothing.
       OnVisible: |
-        =Concurrent(
+        =
+        // SELF-HEAL, and it is not belt-and-braces. App.OnStart is NON-BLOCKING, so this
+        // screen can run before it finishes. A blank gUserEmail makes the Person filters
+        // below match NOTHING, and these KPIs are imperative Sets — they run once and never
+        // re-fire when the global later arrives, so the dashboard latches at zero until a
+        // manual refresh. Declarative properties like gTheme self-heal; these cannot.
+        If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+        Concurrent(
             ClearCollect( colMyTasks,
                 Filter( LiveTasks,
                     task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),

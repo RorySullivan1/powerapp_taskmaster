@@ -164,7 +164,7 @@ fixed list:
 - **Choice** → `cmpSelection` strips, **but only while the labels are short**. Optional Choices
   carry a real `"(none)"` option, because `{Value: ""}` is not a legal write and an optional column
   has to be clearable. The strip's label size is the `FontSize` input (default **11**), and a
-  component cannot read `Theme.Size.*`, so tune it on the instance.
+  component cannot read `gTheme.Size.*`, so tune it on the instance.
   **A strip lays every option across ONE row** (`WrapCount = CountRows(Items)`), so each chip gets
   `Width / N` — which is why long values need a `ModernCombobox` instead. Both stage
   (`cboTkStage`, 2026-08-07) and issue status (`cboIssStatus`, 2026-08-12, when its values became
@@ -265,7 +265,7 @@ one hand-built shape left, and therefore the highest-risk write in the app:
 
 ```powerapps
 { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-  Claims: ClaimPrefix & Lower(mail), DisplayName: name, Email: mail,
+  Claims: gClaimPrefix & Lower(mail), DisplayName: name, Email: mail,
   Department: "", JobTitle: "", Picture: "" }
 ```
 

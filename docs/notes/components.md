@@ -9,8 +9,8 @@ is the generated, always-current inventory; this file is the contract notes.
 Authored in the **v3.0
 `.pa.yaml` `ComponentDefinitions`** schema (grounded on the official schema:
 `microsoft/PowerApps-Tooling` `schemas/pa-yaml/v3.0/pa.schema.yaml`). Data-independent —
-no `tm*` tokens. Colours **inline** the `App.Formulas` `Theme` palette because a component
-is isolated and can't read app globals; keep the hex/RGBA in step with `Theme`.
+no `tm*` tokens. Colours **inline** the `App.Formulas` `gTheme` palette because a component
+is isolated and can't read app globals; keep the hex/RGBA in step with `gTheme`.
 
 ## The set
 

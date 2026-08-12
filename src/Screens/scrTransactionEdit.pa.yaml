@@ -62,6 +62,9 @@ Screens:
         Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
         // date — it blocked the save outright on every edit.
+        // A text input re-reads Default ONLY on Reset. Without this the previous
+        // transaction's notional stays on screen and is written onto the next one.
+        Reset( numTxNotional );
         Reset( dtpTxDate );
         // cmpSelection re-reads its DefaultId ONLY on Reset, so without this the
         // strip shows the PREVIOUS record's currency while the save writes this
@@ -496,6 +499,7 @@ Screens:
                     // reject the write regardless; this only decides whether the user is told.
                     Notify( "Can't save yet — this still needs: " & lblTxMissing.Text,
                     NotificationType.Error ),
+                    Set( gTxSaved, Blank() );
                     Set( gTxErr, "" );
                     IfError(
                         // The Set wrapper is not decoration: IfError requires all its
@@ -526,6 +530,11 @@ Screens:
                                  transaction_date:        dtpTxDate.SelectedDate } ) ),
                         Set( gTxErr, FirstError.Message )
                     );
+                    // Trust the RECORD, never the message: a write can fail and still leave
+                    // FirstError.Message empty, and reading that as success reports a save
+                    // that never happened.
+                    If( IsBlank(gTxSaved.ID) && Len(gTxErr) = 0,
+                        Set( gTxErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                     If( Len(gTxErr) > 0,
                         Notify("Couldn't save the transaction: " & gTxErr, NotificationType.Error) );
                     If( Len(gTxErr) = 0,

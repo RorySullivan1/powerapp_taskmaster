@@ -41,7 +41,7 @@ Key facts:
 
 | File | Transfer path | What it is |
 |---|---|---|
-| `../patches/App.Formulas.pa.fx` | **Formula bar only** (App object has no code view) | `gUserEmail`, `Theme`, `NavMenu`, `gHasPowerBiLicence` |
+| `../patches/App.Formulas.pa.fx` | **Formula bar only** (App object has no code view) | `gUserEmail`, `gTheme`, `gNavMenu`, `gHasPowerBiLicence` |
 | `scrHome.pa.yaml` | Code view | Landing shell — the reference header+nav template |
 | `scrReports.pa.yaml` | Code view | Reports shell + the Q2 unlicensed empty-state card |
 | `scrProjects.pa.yaml` | Code view | Projects shell + search box + empty placeholder |
@@ -53,11 +53,12 @@ Key facts:
 
 1. **Create four blank screens** in Studio, rename them exactly:
    `scrHome`, `scrReports`, `scrProjects`, `scrReference`.
-   (`scrAdmin` was deleted 2026-08-11 — NavMenu is four entries.)
-   (`NavMenu` holds live Screen references — they must exist by those names first.)
+   (`scrAdmin` was deleted 2026-08-11 — gNavMenu is four entries.)
+   (`gNavMenu` holds live Screen references — they must exist by those names first.)
 2. **Recreate the components** in the component editor (`components/_COMPONENTS-NOTES.md`).
-3. **Paste `App.Formulas`** into the formula bar — **now step 3, not last.** The data-bound
-   screens reference `StageWeights`, which is defined there, so it must exist before they paste.
+3. **Paste `App.OnStart` and `App.Formulas`** into the formula bar — **step 3, not last.** The
+   data-bound screens reference `gStageWeights` and `gTheme` (OnStart) and `ActiveProjects` /
+   `OpenIssues` / `LiveTasks` (Formulas), so both must exist before they paste. Run OnStart after.
 4. **Paste each screen's controls** via code view (one screen at a time, onto a blank screen;
    rename any `_1` suffix back and log it). The header + nav block is identical across screens.
    `scrHome` / `scrProjects` / `scrReports` additionally require their **lists provisioned and
@@ -121,21 +122,21 @@ version if omitted — so a version mismatch is not a failure mode; only the con
   via code view), so the whole shell collapsed into one definition with eight instances.
 
   The rail is no longer a permanent 240px column. It overlays the content when the hamburger is
-  tapped and a scrim dismisses it, so screens start their content at `Theme.Space.Gutter` and use
-  the full width. `Theme.Space.NavW` survives only as the rail's own width.
+  tapped and a scrim dismisses it, so screens start their content at `gTheme.Space.Gutter` and use
+  the full width. `gTheme.Space.NavW` survives only as the rail's own width.
 
   **The instance `Height` carries the whole design:**
-  `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)`. A component intercepts every click
+  `Height: =If(gNavOpen, Parent.Height, gTheme.Space.HeaderH)`. A component intercepts every click
   in its bounds regardless of fill — the lesson that cost a preview session below — so closed it
   must own only its 64px strip. The instance is declared **last** on each screen so positional
   z-order floats the fly-out over the content.
 
   `cmpAppBar` **cannot Navigate** (a component can't see app screens): it exposes `SelectedKey`
   and raises `OnNavigate`, and the screen runs the `Switch` then `Set(gNavOpen, false)`. That is
-  the only reason `NavMenu` carries a numeric `Key` rather than a screen — *a screen reference in
+  the only reason `gNavMenu` carries a numeric `Key` rather than a screen — *a screen reference in
   a table is perfectly legal*, contrary to an earlier note here.
 
-- **Absolute positioning tied to `Parent.Width/Height` + `Theme.Space.*`**, not nested
+- **Absolute positioning tied to `Parent.Width/Height` + `gTheme.Space.*`**, not nested
   responsive containers (T15). Simpler to paste one control at a time and diagnose. Revisit
   if a phone layout is required (open thread: tablet-vs-phone target).
 

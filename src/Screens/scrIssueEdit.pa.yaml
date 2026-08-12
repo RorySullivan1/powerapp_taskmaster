@@ -755,6 +755,9 @@ Screens:
                                          If( gIssTx.Id > 0, { Id: gIssTx.Id, Value: gIssTx.Value }, Blank() ) } ) ),
                         Set( gIssErr, FirstError.Message )
                     );
+                    // Trust the RECORD, never the message — see scrTaskEdit.
+                    If( IsBlank(gIssSaved.ID) && Len(gIssErr) = 0,
+                        Set( gIssErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                     If( Len(gIssErr) > 0,
                         Notify("Couldn't save the issue: " & gIssErr, NotificationType.Error) );
                     If( Len(gIssErr) = 0,

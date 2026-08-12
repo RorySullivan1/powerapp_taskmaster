@@ -259,13 +259,16 @@ Screens:
               // scrTaskEdit has always blanked its equivalent; these two did not.
               Set( gPdSaved, Blank() );
               Set( gPdErr, "" );
-              // product_uid is a business key and SharePoint does not enforce
-              // uniqueness, so check first. Delegable: `=` on an indexed Text
-              // column. On an EDIT the row itself is excluded by ID.
+              // product_uid is a business key and SharePoint does not enforce uniqueness,
+              // so check first. The query is `=` on an indexed Text column ONLY — an
+              // `ID <>` clause used to sit here too, and `<>` DOES NOT DELEGATE on ID
+              // (delegation.md [id]), which quietly made the whole LookUp local: past the
+              // data row limit a duplicate slipped through with no warning. Excluding the
+              // row being edited is a comparison on the RESULT, not part of the query.
               Set( gPdClash,
-              LookUp( taskmaster_products,
-              product_uid = Trim(txtPdUid.Text) && ID <> If(gPdMode = "Edit", gEditProduct.ID, 0) ) );
-              If( !IsBlank(gPdClash.ID),
+              LookUp( taskmaster_products, product_uid = Trim(txtPdUid.Text) ) );
+              If( !IsBlank(gPdClash.ID)
+              && gPdClash.ID <> If(gPdMode = "Edit", gEditProduct.ID, 0),
               Set( gPdDup, true );
               Notify( "A product with ID " & Trim(txtPdUid.Text) & " already exists.",
               NotificationType.Error ),

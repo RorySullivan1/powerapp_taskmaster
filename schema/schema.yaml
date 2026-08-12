@@ -431,7 +431,7 @@ rollups:
       # on 2026-08-12. The survivors keep their original numbers DELIBERATELY: re-spacing
       # would move every stored project_perc_completion without a task changing, so
       # history would stop being comparable. Cost: a 35 -> 85 jump at Drafting ->
-      # Finalizing. Re-space on purpose if that is wrong — App.Formulas StageWeights is
+      # Finalizing. Re-space on purpose if that is wrong — App.Formulas gStageWeights is
       # the app-side copy and must move with it.
       # There is no longer any EXCLUDED stage, so every task under a project now counts
       # in both numerator and denominator.
@@ -439,7 +439,7 @@ rollups:
     writer_notes: >-
       The app recomputes and patches project_perc_completion whenever a task's stage
       changes (task form OnSuccess / kanban drop / grid save). Weight table is mirrored
-      in src/patches/App.Formulas.pa.fx as the named formula StageWeights; the
+      in src/App.pa.yaml as the named formula gStageWeights; the
       write-back snippet lives beside it. Consequence: a stage edited directly in
       SharePoint (or bulk-imported) leaves the value stale until the next in-app change
       to that project.
@@ -640,7 +640,7 @@ open_recommendations:
   - id: C3
     what: "project_perc_completion has no writer"
     options: ["Power Automate rollup on task change (needs Q12)", "manual entry", "drop the column"]
-    status: APPLIED  # 2026-08-03 — weighted stage rollup, written APP-SIDE; weights in rollups: + App.Formulas StageWeights
+    status: APPLIED  # 2026-08-03 — weighted stage rollup, written APP-SIDE; weights in rollups: + App.Formulas gStageWeights
   - id: C4
     what: "task_date_start is Calculated — cannot be indexed, nothing delegates"
     options: ["convert to DateTime written at creation (recommended)", "keep Calculated and never filter/sort on it"]

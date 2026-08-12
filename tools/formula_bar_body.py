@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Emit src/App.pa.yaml's Formulas body ready for the Studio FORMULA BAR.
+"""Emit src/App.pa.yaml's OnStart or Formulas body ready for the Studio FORMULA BAR.
 
-The App object has no code view, so App.Formulas crosses the gap through the
+The App object has no code view, so both properties cross the gap through the
 formula bar by hand. Two things about that channel bite:
 
   1. THE LEADING `=` IS A pa-yaml MARKER, NOT PART OF THE FORMULA. The formula
@@ -11,9 +11,9 @@ formula bar by hand. Two things about that channel bite:
   2. `//` RUNS TO END OF LINE. If the paste loses its newlines - which is what
      a COLLAPSED formula bar does to multi-line text - the first comment
      swallows the entire rest of the property. Our body opens with a comment,
-     so the result is that NOTHING is defined: no Theme, no NavMenu, no
-     StageWeights. Every screen then reads blank for every colour and every
-     Theme.Space.* dimension, which renders as squished and black.
+     so the result is that NOTHING is set: no gTheme, no gNavMenu, no
+     gStageWeights. Every screen then reads blank for every colour and every
+     gTheme.Space.* dimension, which renders as squished and black.
 
 `--bare` stops that being possible by removing the comments. The reasoning
 stays in the repo, which is the authoritative source; Studio only needs the

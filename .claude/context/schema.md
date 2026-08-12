@@ -160,7 +160,7 @@ hard cap of two people per task — accepted as sufficient.
 
 **C3 ✅ Resolved 2026-08-03 — weighted stage rollup, written app-side.**
 `project_perc_completion` is the **mean stage-weight across a project's tasks**, not a done/total
-count. Weights (`schema.yaml` → `rollups:`, mirrored as the `StageWeights` named formula in
+count. Weights (`schema.yaml` → `rollups:`, mirrored as the `gStageWeights` named formula in
 `src/App.pa.yaml`): `Not Started` 0 · `Planning` 10 · `Drafting` 35 ·
 `Finalizing` 85 · `Complete` 100. `Under Review` (60) and `Archived` (excluded) went with the
 stages themselves on 2026-08-12; **the survivors keep their original numbers on purpose**, so stored
@@ -168,7 +168,7 @@ percentages stay comparable — at the cost of a 35 → 85 jump. **Nothing is ex
 every task under a project counts in both numerator and denominator.
 
 **The app is the writer** — it recomputes and patches the parent whenever a task's stage changes
-(task form `OnSuccess`, kanban drop, grid save). The canonical snippet lives beside `StageWeights`.
+(task form `OnSuccess`, kanban drop, grid save). The canonical snippet lives beside `gStageWeights`.
 Two properties of that snippet are load-bearing:
 
 - **There is no stage filter at all any more.** It listed the six non-archived stages as an `Or`

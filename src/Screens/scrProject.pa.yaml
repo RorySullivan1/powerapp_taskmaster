@@ -502,27 +502,29 @@ Screens:
                                      // RemoveIf "return the modified data source as a TABLE"
                                      // while Notify and Set return a boolean, and IfError
                                      // requires ALL its arguments to be type-compatible — so
-                                     // the documented form is rejected. gPrDelScrap exists
+                                     // the documented form is rejected. Four DIFFERENT scrap names: a global's
+                                     // type unifies across every Set, so one name holding four
+                                     // differently-shaped tables is a type conflict. They exist
                                      // only to make both arms a Set.
                                      //
                                      // RemoveIf is NOT delegable: it pulls matching rows up
                                      // to the data row limit and deletes them one by one, so
                                      // a project with more children than that limit needs a
                                      // second press to finish.
-                                     IfError( Set( gPrDelScrap,
+                                     IfError( Set( gPrDelScrapI,
                                                    RemoveIf( taskmaster_issues,
                                                              issue_project_id.Id = gSelProject.ID ) ),
                                               Set( gPrDelErr, FirstError.Message ) );
-                                     IfError( Set( gPrDelScrap,
+                                     IfError( Set( gPrDelScrapX,
                                                    RemoveIf( taskmaster_transactions,
                                                              transaction_project_id.Id = gSelProject.ID ) ),
                                               Set( gPrDelErr, FirstError.Message ) );
-                                     IfError( Set( gPrDelScrap,
+                                     IfError( Set( gPrDelScrapT,
                                                    RemoveIf( taskmaster_tasks,
                                                              task_project_id.Id = gSelProject.ID ) ),
                                               Set( gPrDelErr, FirstError.Message ) );
                                      If( Len(gPrDelErr) = 0,
-                                         IfError( Set( gPrDelScrap,
+                                         IfError( Set( gPrDelScrapP,
                                                        Remove( taskmaster_projects, gSelProject ) ),
                                                   Set( gPrDelErr, FirstError.Message ) ) );
                                      If( Len(gPrDelErr) > 0,

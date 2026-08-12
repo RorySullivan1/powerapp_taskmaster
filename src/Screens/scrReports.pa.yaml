@@ -17,7 +17,14 @@ Screens:
       # to a set small enough to be exact: YOUR tasks, and the active projects
       # list. Org-wide analytics stay in Power BI, which imports the lists whole.
       OnVisible: |
-        =Concurrent(
+        =
+        // SELF-HEAL, and it is not belt-and-braces. App.OnStart is NON-BLOCKING, so this
+        // screen can run before it finishes. A blank gUserEmail makes the Person filters
+        // below match NOTHING, and these KPIs are imperative Sets — they run once and never
+        // re-fire when the global later arrives, so the dashboard latches at zero until a
+        // manual refresh. Declarative properties like gTheme self-heal; these cannot.
+        If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+        Concurrent(
             ClearCollect( colMyTasks,
                 Filter( LiveTasks,
                     task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),

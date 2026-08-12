@@ -284,14 +284,15 @@ never see; never describe the app as if authored-but-unlanded work is live.
 - **Orchestrating a whole change** (freshness → author → audit → hand off → record) → the
   **change-end-to-end** workflow, which invokes this skill for the transfer steps.
 
-## App.Formulas: the comment trap (2026-08-12)
+## App.OnStart / App.Formulas: the comment trap (2026-08-12)
 
-`App.Formulas` is the one property that crosses the gap through the **formula bar**, and it is
-also the one whose failure is total: every named formula lives in a single property, so **one
-rejection takes out `Theme`, `NavMenu`, `StageWeights` and `ClaimPrefix` together.** Every screen
-then reads blank for every colour and every `Theme.Space.*` dimension — blank coerces to 0 — and
-the app renders **squished and black**. That symptom is not a layout bug and not a theme bug; it
-is "App.Formulas defined nothing."
+Both properties cross the gap through the **formula bar**, and both fail totally: everything lives
+in a single property, so **one rejection of `App.OnStart` takes out `gTheme`, `gNavMenu`,
+`gStageWeights` and `gClaimPrefix` together.** Every screen then reads blank for every colour and
+every `gTheme.Space.*` dimension — blank coerces to 0 — and the app renders **squished and black**.
+That symptom is not a layout bug and not a theme bug; it is "App.OnStart set nothing."
+`App.Formulas` fails the same way, but its blast radius is the three data-source filters
+(`ActiveProjects`, `OpenIssues`, `LiveTasks`), which read as empty galleries rather than black.
 
 Two ways the paste fails, both silent-ish:
 
@@ -304,12 +305,13 @@ Two ways the paste fails, both silent-ish:
 
 **EXPAND the formula bar before pasting.** And when in doubt, paste code with no comments at all:
 
-    python3 tools/formula_bar_body.py --bare
+    python3 tools/formula_bar_body.py onstart  --bare
+    python3 tools/formula_bar_body.py formulas --bare
 
 The reasoning belongs in the repo, which is the authoritative source; Studio only needs the code.
 Stripping the comments for transfer loses nothing and removes the failure mode entirely.
 
-**The decisive diagnostic**, because "it didn't work" cannot localise a 250-line property: in
-Studio, type `Theme.` into any control's `Fill`. If IntelliSense does not offer the members,
-`App.Formulas` defined nothing — go back to the property itself and check whether it is one long
-line or starts with a stray `=`. App checker (Advanced tools) lists the error app-wide.
+**The decisive diagnostic**, because "it didn't work" cannot localise a long property: run OnStart
+(App → Run OnStart), then type `gTheme.` into any control's `Fill`. If IntelliSense does not offer
+the members, `App.OnStart` set nothing — go back to the property itself and check whether it is one
+long line or starts with a stray `=`. App checker (Advanced tools) lists the error app-wide.
