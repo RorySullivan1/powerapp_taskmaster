@@ -46,7 +46,8 @@ Screens:
                    || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
             ClearCollect( colMyIssues,
                 Filter( taskmaster_issues,
-                    ( issue_assignee.Email = gUserEmail || issue_owner.Email = gUserEmail )
+                    // Assigned to me, full stop — see the note on the other copy.
+                    issue_assignee.Email = gUserEmail
                  && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
                    || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) )
         );
@@ -89,7 +90,14 @@ Screens:
                          || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
                   ClearCollect( colMyIssues,
                       Filter( taskmaster_issues,
-                          ( issue_assignee.Email = gUserEmail || issue_owner.Email = gUserEmail )
+                          // ASSIGNED TO ME, full stop. The second arm was
+                          // `|| issue_owner.Email = gUserEmail`, and issue_owner is
+                          // retired. It was NOT replaced with `'Created By'`: that
+                          // column is not indexed, so an Or-arm on it would drop
+                          // delegation for the WHOLE filter and silently truncate this
+                          // list at 500 rows. "My issues" is now what I must act on,
+                          // not what I happened to raise.
+                          issue_assignee.Email = gUserEmail
                        && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
                          || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) )
               );
