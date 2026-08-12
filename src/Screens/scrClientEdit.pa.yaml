@@ -38,7 +38,8 @@ Screens:
     Properties:
       Fill: =Theme.Color.Bg
       OnVisible: |
-        =Set( gClName,   If( gClMode = "Edit", Coalesce(gEditClient.client_name, ""), "" ) );
+        =Set( gSaving, false );   // see btnClSave
+        Set( gClName,   If( gClMode = "Edit", Coalesce(gEditClient.client_name, ""), "" ) );
         // Choice values come from the column itself — never a literal here.
         ClearCollect( colClTypeChoices, Choices([@taskmaster_clients].client_type) );
         ClearCollect( colClCovChoices,  Choices([@taskmaster_clients].client_coverage) );
@@ -321,7 +322,9 @@ Screens:
       - btnClSave:
           Control: Classic/Button@2.2.0
           Properties:
-            Text: =If(gClMode = "Edit", "Save client", "Create client")
+            Text: |
+              =If( gSaving, "Saving…",
+                   If(gClMode = "Edit", "Save client", "Create client") )
             Fill: =Theme.Color.Primary
             Color: =Theme.Color.OnPrimary
             BorderColor: =Theme.Color.Primary
@@ -334,7 +337,18 @@ Screens:
             Height: =44
             # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
             OnSelect: |
-              =If( Len(lblClMissing.Text) > 0,
+              =If( gSaving,
+              // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+              // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+              // double-tap ran the whole handler twice and Defaults() built a SECOND new
+              // record. `Set` applies immediately within a behaviour chain, so the flag is
+              // already true by the time the second tap is evaluated.
+              // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+              // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+              // instead, and the guard below is what actually blocks the duplicate.
+              false,
+              Set( gSaving, true );
+              If( Len(lblClMissing.Text) > 0,
               Notify( "Can't save yet — this client still needs: " & lblClMissing.Text,
               NotificationType.Error ),
               // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last
@@ -374,7 +388,8 @@ Screens:
               Set( gTxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ) );
               Set( gClReturn, "" );
               Notify( If(gClMode = "Edit", "Client saved", "Client created"), NotificationType.Success );
-              Back() ) )
+              Back() ) );
+              Set( gSaving, false ) )
       # ---- Picker — declared LAST so it paints above the action bar ---------
       # One state only here (the sales owner), but the same cmpPicker every
       # other screen uses. See scrTaskEdit's instance for the full commentary.

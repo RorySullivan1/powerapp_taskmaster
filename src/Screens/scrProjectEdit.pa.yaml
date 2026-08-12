@@ -153,7 +153,8 @@ Screens:
     Properties:
       Fill: =Theme.Color.Bg
       OnVisible: |
-        =Set( gPrManager,
+        =Set( gSaving, false );   // see btnPrSave
+        Set( gPrManager,
               If( gEditMode = "Edit",
                   { DisplayName: Coalesce(gEditProject.project_manager.DisplayName, ""),
                     Mail:        Coalesce(gEditProject.project_manager.Email, "") },
@@ -1281,9 +1282,10 @@ Screens:
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
                   Text: |
-                    =If( gEditMode = "Edit", "Save project", "Create project" ) &
+                    =If( gSaving, "Saving…",
+                     If( gEditMode = "Edit", "Save project", "Create project" ) &
                      If( CountRows(colNewTasks) + CountRows(colNewTransactions) > 0,
-                         " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) ) & " item(s)", "" )
+                         " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) ) & " item(s)", "" ) )
                   DisplayMode: |
                     =If( Len(Trim(txtPrName.Text)) > 0
                          && Len(gPrManager.Mail) > 0
@@ -1293,7 +1295,18 @@ Screens:
                   Width: =300
                   Height: =48
                   OnSelect: |
-                    =Set( gPrSaved, Blank() );
+                    =If( gSaving,
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
+                    false,
+                    Set( gSaving, true );
+                    Set( gPrSaved, Blank() );
                     Set( gPrErr, "" );
                     Set( gPrWarn, "" );
                     // The name as TYPED. Patch returns a record that does not reliably
@@ -1513,7 +1526,8 @@ Screens:
                                       & "   " & First(colChildErrors).Kind & " """ & First(colChildErrors).Name & """: "
                                       & First(colChildErrors).Message,
                                     NotificationType.Error ) )
-                    )
+                    );
+                    Set( gSaving, false ) )
       # =======================================================================
       # MODAL — ADD A TASK        card 700 x 540, body scrolls, buttons pinned
       # =======================================================================

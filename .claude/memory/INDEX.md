@@ -4,12 +4,12 @@
 - **Phase: BUILT — now editing and refining.** 11 screens, 9 components and the App object
   exist in Studio, the lists are added, `App.Formulas` is in. Work is fixing and refining, not creating.
 - **LANDED 2026-08-12 (user confirmed): `cmpLookupField`, `cmpPicker`, and all five re-pasted
-  `scr*Edit` screens are IN STUDIO.** So are the four code-review batches, the picker merge and the
-  zero-results state. **UNCONFIRMED, assume NOT done:** the Studio-side DELETIONS —
-  `cmpPeoplePicker`, `cmpRecordPicker`, the four batch-4 components (`cmpUiKit`,
-  `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`), and the 61 controls orphaned by the
-  `cmpLookupField` rollout. Deletions are hand work in Studio with no repo trace, so **the size win
-  is not real until they happen** — ask, don't assume.
+  `scr*Edit` screens are IN STUDIO**, along with the four code-review batches. **THERE ARE NO
+  ORPHANED CONTROLS — the user DELETES a screen before pasting it back** (confirmed 2026-08-12),
+  so a re-paste is a genuine replace and there are no `_1` suffixes either. Stop carrying an
+  orphan backlog. Still outstanding: deleting the superseded COMPONENTS in Studio
+  (`cmpPeoplePicker`, `cmpRecordPicker`, `cmpUiKit`, `cmpEditableGrid`, `cmpStatusPill`,
+  `cmpChoicePill`) — instance-free but still shipping inside the `.msapp`.
 - **Repo restructured 2026-08-05 to plain source**: `src/App.pa.yaml`, `src/Screens/*.pa.yaml`,
   `src/Components/*.pa.yaml`. 22/22 valid. Component definitions are WHOLE files again — the
   contract/body split, the skeleton variants, the `.msapp` packing and the `studio/` tree are all
@@ -301,11 +301,12 @@
 - [2026-08-12] **`cmpPeoplePicker` + `cmpRecordPicker` MERGED into one `cmpPicker`; the 9 screen instances became 5.** The two components were 802 lines of which ~91% was identical — same geometry constants, same scrim/card/header, same debounced search, same footer, same `OnReset`. **Only the KEY differed**: a record has an ID (`rpPicked.Id > 0 && rpPicked.Id = ThisItem.Id`), a person has none and keys on Mail. **Making the row shape a generic `{Key, Primary, Secondary}` with `Key` as TEXT is the whole merge** — the screen projects `Text(c.ID)` or `u.Mail` into it and writes back `{Id: Value(Picked.Key), Value: Picked.Primary}` for a lookup or `{DisplayName: Picked.Primary, Mail: Picked.Secondary}` for a person. A SharePoint ID is an integer, so `Text()` then `Value()` round-trips exactly. **The instance merge fell out of it for free**: `g*Picker` already named the field being filled, so it can select the row KIND too — one `Visible`, one `Title` Switch, one `Results` If chain, one `OnConfirm`, and ONE `Reset()` target per screen instead of two. `ShowColumns` could not survive the merge (it can only keep the source's own column names, and neither a directory row nor a list row has a `Key`), so **every branch is now `ForAll(… As alias, {record literal})`, people included** — uniform shape is what lets the If chain type-check. Net −337 lines across the screens plus −802 from the deleted components — src/Components/cmpPicker.pa.yaml
 - [2026-08-12] **Three picker UX gaps closed in the same pass, because they all live in the file the merge rewrites.** (a) **Zero-results was invisible**: the hint label covered "nothing typed" and "too short" but not "searched and found nothing", so a query matching no rows rendered 588×264 of blank white, indistinguishable from still-loading or broken — now a three-state `If`, ending `"No matches for ""…""."`. (b) **`AccessibleLabel` added to the search box — and REVERTED everywhere else, because the property does not exist on `Classic/*` controls** (user, 2026-08-12). It survives only on `txtPkSearch`, which is a `ModernTextInput`. **The same property was already sitting on two `Classic/TextInput` notional fields on `scrProjectEdit` / `scrTransactionEdit`, so those were latent paste failures too; both removed.** The accessibility cost is real and accepted, not overlooked: `pkRowHit` is an unnamed transparent `Classic/Button` on every result row, so a screen reader still announces the list as "button, button, button", and `Tooltip` — the classic equivalent — is a hover hint, not a name. Converting the row hit target to a modern button is the only real fix and is a separate change. Recorded in the powerapp-canvas-controls skill. (c) **`SetFocus(txtPkSearch)` added to `OnReset` — and REMOVED 2026-08-12 when Studio rejected it.** **`SetFocus` cannot target a control inside a Component, a Gallery, an Edit form OR a Container** (MS Learn `function-setfocus#limitations`); the first exclusion covers every control in this file and the last covers most of the app. `Reset` on the line above was fine because it carries none of those restrictions — **when one of a pair throws and the other does not, that asymmetry is the tell.** **My stated reason for guarding it was WRONG**: I theorised a timing problem (target not yet visible when `OnReset` runs), which reads well and is unfalsifiable across a one-way gap. The restriction is categorical and documented. **When a function is rejected, read its Limitations section before theorising about evaluation order.** CONSEQUENCE, ACCEPTED: the dialog opens with nothing focused and the user must click into the search box; a PCF code component with an `InputEvent` property is the only documented workaround and is not worth it — src/Components/cmpPicker.pa.yaml
 
+- [2026-08-12] **BUSY STATE on all six save buttons — `gSaving`, guarded in `OnSelect`, NOT via `DisplayMode`.** A SharePoint Patch takes seconds and every save button stayed live throughout, so a double-tap ran the whole handler twice and `Defaults()` built a SECOND record. The guard is `If( gSaving, false, <original handler>; Set(gSaving,false) )` with `Set(gSaving,true)` first: **`Set` applies immediately within a behaviour chain, so the flag is already true when the second tap is evaluated.** **Deliberately NO `DisplayMode` gate** — this repo removed those from three save buttons on 2026-08-10 precisely because a disabled button cannot fire `OnSelect` and so cannot explain itself, and a stranded flag would resurrect that dead-click bug wholesale. Feedback is the button TEXT instead (`"Saving…"`). **`Set( gSaving, false )` also runs in every editor's `OnVisible`, and that is not belt-and-braces**: closing an editor mid-save via the header X leaves the flag true, and without the reset the next editor opens on a permanently dead "Saving…" button — src/Screens/
+- [2026-08-12] **`scrTaskEdit`'s `task_date_completion` was the one unguarded `gEditTask` read on the screen, and it silently dated new tasks wrong.** Every other read is behind `gEditMode = "Edit"`; this one was not, and **`gEditTask` is never cleared on New**. So a task CREATED straight after editing a completed task inherited that task's completion date — `Coalesce(gEditTask.task_date_completion, Now())` found the stale value and kept it instead of stamping `Now()`. Fixed by splitting insert from update explicitly (`If( gEditMode <> "Edit", …)`) rather than trusting `Coalesce` to notice a blank that isn't there. **Identical to `project_date_complete` on `scrProjectEdit`, fixed 2026-08-11 — the same defect twice means the pattern is the lesson: a Coalesce over a global that survives mode changes is not a default, it is a leak** — src/Screens/scrTaskEdit.pa.yaml
+
 ## Threads          (open items; remove when closed)
-- **Still open from the 2026-08-11 review** (not in batches 1-3): no busy state on any save, so a
-  double-tap during a multi-second write creates duplicate records; `scrTaskEdit`'s
-  `task_date_completion` has the same stale-`gEditTask` leak fixed on `scrProjectEdit`;
-  `scrProjectEdit`'s rollup runs unconditionally; unindexed `issue_owner` / `issue_date_open`.
+- **Still open from the 2026-08-11 review**: `scrProjectEdit`'s rollup runs unconditionally;
+  unindexed `issue_owner` / `issue_date_open` (a SharePoint change, not a paste).
 - **Await the Studio binary on scrProject's padding fix** (13 formula-bar edits, handed off
   2026-08-11). If labels STILL overlap, padding overflow is ruled out — ask which two labels
   touch and whether the columns sit too far left or too far right.
@@ -318,11 +319,15 @@
 - **Ask the human for a `GridLayout` container's OWN code view** — one that has had its columns
   and rows configured in the Studio pane. That is the only missing piece before a grid can be
   authored here rather than merely filled.
-- **The Studio DELETIONS are outstanding and invisible from here.** `cmpPeoplePicker`,
-  `cmpRecordPicker` and the four batch-4 components are superseded and instance-free but still ship
-  inside the `.msapp` and load at app start; 61 controls orphaned by the `cmpLookupField` rollout
-  sit on four screens. Now safe to do — `cmpPicker` has landed, so nothing holds an instance of the
-  old two. **Deleting from the repo does not shrink the running app**; only the Studio delete does.
+- **Six superseded COMPONENTS still to delete in Studio** — `cmpPeoplePicker`, `cmpRecordPicker`,
+  `cmpUiKit`, `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`. All instance-free now that
+  `cmpPicker` has landed, but they still ship inside the `.msapp` and load at app start.
+  **Deleting from the repo does not shrink the running app**; only the Studio delete does.
+- **`scrProjectEdit`'s `btnPrSave` STILL CARRIES A `DisplayMode` GATE** on four required fields —
+  the exact pattern removed from the other three editors on 2026-08-10 because a disabled button
+  cannot fire `OnSelect` and so cannot say why it is dead. Not touched while adding the busy
+  state (that was scoped to 1 & 2), but it is the same defect class and the fix is the same:
+  move the requirement into `OnSelect` behind a `Notify` that names the missing field.
 - **`scrIssueEdit` still saves with guarded follow-up Patches** (the pattern folded out of
   `scrTaskEdit` on 2026-08-10). Same fold available if its save also feels slow;
   `scrTransactionEdit` already writes in a single Patch and needs nothing.
@@ -441,3 +446,4 @@
 - 2026-08-11 1325 | scrProject task-list overlap root-caused: `Parent.Width` is the OUTER width, so every child of a padded container overflowed by its padding; 12 widths + 1 height fixed, cardInfo fact values -> 12pt | sessions/2026-08-11-1325-scrproject-padding-overflow.md
 - 2026-08-12 | cmpPeoplePicker + cmpRecordPicker merged into cmpPicker on a generic {Key, Primary, Secondary} row (Key is TEXT: Mail for a person, Text(ID) for a record); 9 screen instances collapsed to 5, one Reset target per screen; zero-results state added; AccessibleLabel (classic-only failure) and SetFocus (component/container restriction) both reverted after Studio rejected them | INDEX Decisions 2026-08-12
 - 2026-08-12 | cmpPicker + cmpLookupField + all five re-pasted scr*Edit screens LANDED in Studio; both reverted properties confirmed by that landing (AccessibleLabel is modern-only, SetFocus cannot target a control inside a Component/Container); Studio-side deletions still outstanding | INDEX Decisions 2026-08-12
+- 2026-08-12 | busy state (gSaving) on all six save buttons, OnSelect-guarded not DisplayMode-gated, with an OnVisible reset; task_date_completion stale-gEditTask leak fixed by splitting insert from update | INDEX Decisions 2026-08-12

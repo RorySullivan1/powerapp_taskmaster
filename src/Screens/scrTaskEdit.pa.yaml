@@ -41,7 +41,8 @@ Screens:
       # On a RETURN there is nothing to seed: the globals already hold the
       # in-progress values. So skip the whole body and clear the flag.
       OnVisible: |
-        =If( gTkResume,
+        =Set( gSaving, false );   // see btnTkSave
+        If( gTkResume,
          Set( gTkResume, false ),
          Set( gTkProject,
               If( gEditMode = "Edit",
@@ -1141,7 +1142,9 @@ Screens:
                   BorderThickness: =0
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
-                  Text: =If(gEditMode = "Edit", "Save task", "Create task")
+                  Text: |
+                    =If( gSaving, "Saving…",
+                         If(gEditMode = "Edit", "Save task", "Create task") )
                   # DELIBERATELY ALWAYS ENABLED — do not put the DisplayMode gate back.
                   # It used to read `If(Len(lblTkMissing.Text) = 0, Edit, Disabled)`, and a
                   # DISABLED BUTTON CANNOT FIRE OnSelect, so a task missing a required
@@ -1156,7 +1159,18 @@ Screens:
                   Width: =200
                   Height: =48
                   OnSelect: |
-                    =If( Len(lblTkMissing.Text) > 0,
+                    =If( gSaving,
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
+                    false,
+                    Set( gSaving, true );
+                    If( Len(lblTkMissing.Text) > 0,
                     // The requirement that used to disable the button. Enforced HERE so a
                     // blocked save says which field is blocking it. All three are
                     // `required: true` in schema.yaml, so SharePoint would reject the
@@ -1193,8 +1207,22 @@ Screens:
                     // DERIVED, not entered. Complete stamps it and keeps the original on a
                     // re-save; Archived PRESERVES whatever was there, because archiving a
                     // finished task must not erase when it finished; anything else CLEARS it.
+                    //
+                    // THE NEW BRANCH IS SEPARATE, AND THAT IS THE WHOLE POINT.
+                    // `gEditTask` IS NEVER CLEARED ON NEW — this screen only ever reads it
+                    // under a `gEditMode = "Edit"` guard, and every other read here has one.
+                    // This was the one that did not, so a task CREATED straight after editing
+                    // a completed task inherited that task's completion date: Coalesce found
+                    // the stale value and kept it instead of stamping Now(). Same defect
+                    // class as `project_date_complete` on scrProjectEdit, fixed 2026-08-11 —
+                    // and fixed the same way, by splitting insert from update explicitly
+                    // rather than trusting a Coalesce to notice.
                     task_date_completion:
-                    If( gTkStage = "Complete",
+                    If( gEditMode <> "Edit",
+                    // NEW: there is nothing to preserve. Complete stamps now, and a brand
+                    // new task saved straight to Archived has no completion date to keep.
+                    If( gTkStage = "Complete", Now(), Blank() ),
+                    gTkStage = "Complete",
                     Coalesce(gEditTask.task_date_completion, Now()),
                     gTkStage = "Archived",
                     gEditTask.task_date_completion,
@@ -1273,7 +1301,8 @@ Screens:
                     Notify( "Task saved, but: " & gTkWarn, NotificationType.Warning ) );
                     If( Len(gTkWarn) = 0,
                     Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
-                    Back() ) )
+                    Back() ) );
+                    Set( gSaving, false ) )
       # =====================================================================
       # PICKER — ONE cmpPicker instance for BOTH person fields AND both
       # lookups. Declared LAST so the dialog paints above the fixed footer.

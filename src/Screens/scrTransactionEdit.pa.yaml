@@ -32,7 +32,8 @@ Screens:
       # On a RETURN there is nothing to seed: the globals already hold the
       # in-progress values. So skip the whole body and clear the flag.
       OnVisible: |
-        =If( gTxResume,
+        =Set( gSaving, false );   // see btnTxSave
+        If( gTxResume,
          Set( gTxResume, false ),
          Set( gTxProject,
               If( gEditMode = "Edit",
@@ -479,7 +480,8 @@ Screens:
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
                   Text: |
-                    =If(gEditMode = "Edit", "Save transaction", "Create transaction")
+                    =If( gSaving, "Saving…",
+                         If(gEditMode = "Edit", "Save transaction", "Create transaction") )
                   # ALWAYS ENABLED — see scrTaskEdit btnTkSave. This gate gated on SIX
                   # fields, so editing any older transaction missing one of them produced a
                   # click that did nothing and said nothing. Moved into OnSelect.
@@ -491,7 +493,18 @@ Screens:
                   # — no guarded second pass is needed. transaction_notional_usd is NOT
                   # written: it has no app-side writer by decision (Q14).
                   OnSelect: |
-                    =If( Len(lblTxMissing.Text) > 0,
+                    =If( gSaving,
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
+                    false,
+                    Set( gSaving, true );
+                    If( Len(lblTxMissing.Text) > 0,
                     // The requirement that used to disable the button, moved here so a blocked
                     // save names the field. All six are required in schema.yaml — SharePoint would
                     // reject the write regardless; this only decides whether the user is told.
@@ -526,7 +539,8 @@ Screens:
                     If( Len(gTxErr) = 0,
                         Notify( If(gEditMode = "Edit", "Transaction saved", "Transaction created"),
                                 NotificationType.Success );
-                        Back() ) )
+                        Back() ) );
+                    Set( gSaving, false ) )
             - btnTxCancel:
                 Control: Classic/Button@2.2.0
                 Properties:

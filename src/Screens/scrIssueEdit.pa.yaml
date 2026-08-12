@@ -51,7 +51,8 @@ Screens:
     Properties:
       Fill: =Theme.Color.Bg
       OnVisible: |
-        =Set( gIssProject,
+        =Set( gSaving, false );   // see btnIssSave
+        Set( gIssProject,
               If( gEditMode = "Edit",
                   { Id: gEditIssue.issue_project_id.Id,
                     // NOT redundant. The lookup column's live display field is the target's ID,
@@ -606,7 +607,9 @@ Screens:
                   BorderThickness: =0
                   Font: =Theme.Font
                   Size: =Theme.Size.Body
-                  Text: =If(gEditMode = "Edit", "Save issue", "Create issue")
+                  Text: |
+                    =If( gSaving, "Saving…",
+                         If(gEditMode = "Edit", "Save issue", "Create issue") )
                   # ALWAYS ENABLED — see scrTaskEdit btnTkSave. A disabled button cannot fire
                   # OnSelect, so a record missing a required field gave a click that did
                   # nothing at all. The requirement moved into OnSelect, where it can speak.
@@ -641,7 +644,18 @@ Screens:
                   # and reported in ONE banner after the guarded block, which also beats
                   # up to five separate toasts.
                   OnSelect: |
-                    =If( Len(lblIssMissing.Text) > 0,
+                    =If( gSaving,
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
+                    false,
+                    Set( gSaving, true );
+                    If( Len(lblIssMissing.Text) > 0,
                     // The requirement that used to disable the button, moved here so a blocked
                     // save names the field. These are required in schema.yaml — SharePoint would
                     // reject the write regardless; this only decides whether the user is told.
@@ -698,7 +712,8 @@ Screens:
                         If( Len(gIssWarn) = 0,
                             Notify( If(gEditMode = "Edit", "Issue saved", "Issue created"), NotificationType.Success ) );
                         Back()
-                    ) )
+                    ) );
+                    Set( gSaving, false ) )
             - btnIssCancel:
                 Control: Classic/Button@2.2.0
                 Properties:
