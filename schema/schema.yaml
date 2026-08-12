@@ -48,6 +48,15 @@ types:
   Hyperlink:       { sp: "Hyperlink or Picture", delegates: [],                          indexable: false, join_cost: 0 }
   Calculated:      { sp: "Calculated",           delegates: [],                          indexable: false, join_cost: 0 }
 
+# ARCHIVED WORK IS EXCLUDED AT THE SOURCE, NOT IN THE APP (decided 2026-08-12).
+# `project_phase = "Archived"` hides a project; `*_project_archived = false` on each
+# child list is what keeps its tasks, transactions and issues out of every
+# cross-project query. Both predicates delegate, so the rows never reach the app and
+# every list stays comfortably under the 2000-row data limit as archived work
+# accumulates. The earlier design — collect the archived projects and RemoveIf the
+# children locally — is GONE: it pulled the rows first and then dropped them, so the
+# limit still bit, and past it archived work silently reappeared.
+
 # Present on every list, managed by SharePoint. NEVER patch these from the app.
 # That read-only-ness is a FEATURE, not just a caveat: where a list needs provenance
 # — who created this row, and when — these columns supply it with no column to
@@ -183,6 +192,24 @@ lists:
       #                    shelved inside live projects there is no longer a way to say
       #                    so, and that work needs a home before the value is deleted.
       - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, Finalizing, Complete] }
+      # ---------------------------------------------------------------------
+      # DENORMALISED PARENT STATE — added 2026-08-12. Mirrors project_phase =
+      # "Archived" on the PARENT. It exists for exactly one reason: a child row
+      # carries only `*_project_id`, never the parent's phase, so "belongs to a live
+      # project" cannot be a server-side predicate without a join — and joins do
+      # not delegate to SharePoint. Without this column the exclusion has to
+      # happen locally, after the rows are already in the app, which defeats the
+      # point: THE AIM IS TO KEEP THE ROWS IN SCOPE SAFELY UNDER 2000 so no query
+      # can silently truncate.
+      # Boolean because that is what the predicate needs; indexed because an
+      # unindexed filter fails outright past 5000 items. NOT a copy of the phase
+      # itself — that would be a second source of truth for something the project
+      # row already owns.
+      # MAINTAINED BY: scrProjectEdit's save, which is the ONLY place the app
+      # writes project_phase. Children created by the app always write false,
+      # which is always correct because the app does not let you add children to
+      # an archived project.
+      - { name: task_project_archived, type: Boolean, required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Denormalised so the exclusion delegates; see the note above" }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
       - { name: task_lead,             type: Person, multi: false, required: true,  indexed: true,  desc: "Primary owner" }
       - { name: task_supporter,        type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
@@ -217,6 +244,24 @@ lists:
       - { name: transaction_product_id, type: Lookup,   required: true,                  desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
       - { name: transaction_sales,      type: Person, multi: false, required: true,                  desc: "Sales owner" }
       - { name: transaction_notional,   type: Currency, required: false,                 desc: "Trade notional amount (positive)" }
+      # ---------------------------------------------------------------------
+      # DENORMALISED PARENT STATE — added 2026-08-12. Mirrors project_phase =
+      # "Archived" on the PARENT. It exists for exactly one reason: a child row
+      # carries only `*_project_id`, never the parent's phase, so "belongs to a live
+      # project" cannot be a server-side predicate without a join — and joins do
+      # not delegate to SharePoint. Without this column the exclusion has to
+      # happen locally, after the rows are already in the app, which defeats the
+      # point: THE AIM IS TO KEEP THE ROWS IN SCOPE SAFELY UNDER 2000 so no query
+      # can silently truncate.
+      # Boolean because that is what the predicate needs; indexed because an
+      # unindexed filter fails outright past 5000 items. NOT a copy of the phase
+      # itself — that would be a second source of truth for something the project
+      # row already owns.
+      # MAINTAINED BY: scrProjectEdit's save, which is the ONLY place the app
+      # writes project_phase. Children created by the app always write false,
+      # which is always correct because the app does not let you add children to
+      # an archived project.
+      - { name: transaction_project_archived, type: Boolean, required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Denormalised so the exclusion delegates; see the note above" }
       - { name: transaction_currency,   type: Choice,   required: true,                  desc: "Currency denomination", values: [USD, EUR, GBP, JPY, CHF] }
       # SUPERSEDED 2026-08-03 (Q14) — DO NOT PROVISION. Kept here so the decision is
       # discoverable rather than silently missing. Currency conversion moved to the
@@ -260,6 +305,24 @@ lists:
       #                                 and any row that was really unresolved needs
       #                                 fixing by hand)
       - { name: issue_status,           type: Choice,   required: true,  indexed: true,  default: Open,          desc: "Current status; the three Closed values record the OUTCOME", values: [Open, "Closed - Resolved", "Closed - Unresolved", "Closed - No Change"] }
+      # ---------------------------------------------------------------------
+      # DENORMALISED PARENT STATE — added 2026-08-12. Mirrors project_phase =
+      # "Archived" on the PARENT. It exists for exactly one reason: a child row
+      # carries only `*_project_id`, never the parent's phase, so "belongs to a live
+      # project" cannot be a server-side predicate without a join — and joins do
+      # not delegate to SharePoint. Without this column the exclusion has to
+      # happen locally, after the rows are already in the app, which defeats the
+      # point: THE AIM IS TO KEEP THE ROWS IN SCOPE SAFELY UNDER 2000 so no query
+      # can silently truncate.
+      # Boolean because that is what the predicate needs; indexed because an
+      # unindexed filter fails outright past 5000 items. NOT a copy of the phase
+      # itself — that would be a second source of truth for something the project
+      # row already owns.
+      # MAINTAINED BY: scrProjectEdit's save, which is the ONLY place the app
+      # writes project_phase. Children created by the app always write false,
+      # which is always correct because the app does not let you add children to
+      # an archived project.
+      - { name: issue_project_archived, type: Boolean, required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Denormalised so the exclusion delegates; see the note above" }
       - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue", values: [Approval, Process, Compliance, Branding, Technical] }
       - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact", values: [Low, Moderate, High, Critical] }
       # RETIRED 2026-08-12 — SUPERSEDED BY THE SYSTEM COLUMN `Created`.

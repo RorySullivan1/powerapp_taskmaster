@@ -124,6 +124,13 @@ Filter(taskmaster_tasks,
  || task_stage.Value = "Drafting"    || task_stage.Value = "Finalizing")
 ```
 
+**Archived work is excluded AT THE SOURCE (2026-08-12).** Each child list carries a denormalised
+`*_project_archived` Boolean mirroring its parent's `project_phase`, indexed, maintained by
+scrProjectEdit's save. That is what makes "belongs to a live project" a delegable `= false` instead
+of a join — and a join is the only alternative, since a child row does not carry its parent's phase.
+The aim is a threshold one: **keep the rows in scope under 2000 so no query can silently truncate.**
+A local `RemoveIf` cannot serve that, because the rows are fetched before they are dropped.
+
 **The archived-exclusion chains are GONE, and not because they were verbose.** `task_stage` has no
 `Archived` value any more, so a chain enumerating the "live" stages selects everything — and would
 silently drop any row with a blank stage. Archiving is a **project** state, and a task/transaction/

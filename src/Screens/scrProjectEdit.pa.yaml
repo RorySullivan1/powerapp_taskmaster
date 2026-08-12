@@ -1334,6 +1334,14 @@ Screens:
                     // so the rollup was skipped and project_perc_completion never got
                     // its initial 0 — the one thing the guard exists to guarantee.
                     Set( gPrInsert, gEditMode = "New" || IsBlank(gEditProject.ID) );
+                    // DOES THIS SAVE CROSS THE ARCHIVED BOUNDARY? Captured HERE, for the
+                    // same reason as gPrInsert: step 4 re-reads gEditProject from the
+                    // server, after which the OLD phase is gone and the comparison is
+                    // impossible. An insert never crosses — a new project is not archived
+                    // and has no children yet.
+                    Set( gPrWasArchived, !gPrInsert && gEditProject.project_phase.Value = "Archived" );
+                    Set( gPrNowArchived, gPrPhase = "Archived" );
+                    Set( gPrArcFlip, !gPrInsert && gPrWasArchived <> gPrNowArchived );
                     Set( gPrRollup, gPrInsert || CountRows(colNewTasks) > 0 );
                     Set( gPrSaved, Blank() );
                     Set( gPrErr, "" );
@@ -1455,6 +1463,11 @@ Screens:
                                   Message:
                                     IfError( Text(
                                         Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
+                                               // Inherits the parent's archived state. Almost
+                                               // always false — you cannot add children to an
+                                               // archived project — but a project archived in
+                                               // the SAME save would otherwise leave them live.
+                                               { task_project_archived: gPrNowArchived },
                                             { task_name:       t.t_name,
                                               task_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
                                               task_stage:      { Value: t.t_stage },
@@ -1477,6 +1490,11 @@ Screens:
                                   Message:
                                     IfError( Text(
                                         Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
+                                               // Inherits the parent's archived state. Almost
+                                               // always false — you cannot add children to an
+                                               // archived project — but a project archived in
+                                               // the SAME save would otherwise leave them live.
+                                               { transaction_project_archived: gPrNowArchived },
                                             { transaction_name:        x.x_name,
                                               transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
                                               transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
@@ -1561,6 +1579,47 @@ Screens:
                                         Set( gSelProject,
                                             Patch( taskmaster_projects, gPrSaved,
                                                    { project_perc_completion: newPc } ) ), Set( gPrWarn, gPrWarn & "Project saved, but the completion rollup didn't update: " & FirstError.Message & "   " )) ) ) ) ) ) );
+                        // --- 6. CASCADE THE ARCHIVED FLAG TO THE CHILDREN --------
+                        // `*_project_archived` is a denormalised mirror of this project's
+                        // phase, and it exists so every cross-project query can exclude
+                        // archived work with a delegable `= false` instead of a join. This
+                        // is the ONE place the app writes project_phase, so it is the one
+                        // place the mirror can be kept true.
+                        //
+                        // ONLY ON A FLIP. Rewriting every child on every project save
+                        // would be a ForAll over hundreds of rows to change nothing.
+                        //
+                        // ForAll + Patch DOES NOT DELEGATE — it pulls up to the data row
+                        // limit and writes one row at a time. A project with more children
+                        // than that limit would be PARTIALLY cascaded, which is worse than
+                        // not at all: the leftovers keep the old flag and quietly stay in
+                        // (or out of) every query. So each list is counted FIRST and the
+                        // whole cascade refuses rather than half-doing it — the same
+                        // shape as the >= 500 refusal in the rollup above.
+                        If( gPrArcFlip,
+                            With( { nT: CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gPrSaved.ID) ),
+                                    nX: CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gPrSaved.ID) ),
+                                    nI: CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gPrSaved.ID) ) },
+                                If( nT >= 500 || nX >= 500 || nI >= 500,
+                                    Set( gPrWarn, gPrWarn & "Project saved, but it has too many attached items to re-flag them all in one pass, so they were left as they were. Ask for the cleanup workflow to re-sync them.   " ),
+                                    IfError(
+                                        Set( gPrScrap,
+                                            ForAll( Filter(taskmaster_tasks, task_project_id.Id = gPrSaved.ID) As t,
+                                                    Patch( taskmaster_tasks, t,
+                                                           { task_project_archived: gPrNowArchived } ) ) ),
+                                        Set( gPrWarn, gPrWarn & "Project saved, but its tasks kept the old archived flag: " & FirstError.Message & "   " ) );
+                                    IfError(
+                                        Set( gPrScrap2,
+                                            ForAll( Filter(taskmaster_transactions, transaction_project_id.Id = gPrSaved.ID) As x,
+                                                    Patch( taskmaster_transactions, x,
+                                                           { transaction_project_archived: gPrNowArchived } ) ) ),
+                                        Set( gPrWarn, gPrWarn & "Project saved, but its transactions kept the old archived flag: " & FirstError.Message & "   " ) );
+                                    IfError(
+                                        Set( gPrScrap3,
+                                            ForAll( Filter(taskmaster_issues, issue_project_id.Id = gPrSaved.ID) As i,
+                                                    Patch( taskmaster_issues, i,
+                                                           { issue_project_archived: gPrNowArchived } ) ) ),
+                                        Set( gPrWarn, gPrWarn & "Project saved, but its issues kept the old archived flag: " & FirstError.Message & "   " ) ) ) ) );
                         // One banner for every optional column that didn't stick, rather
                         // than up to seven. gPrWarn is appended to by each guarded Patch's
                         // IfError fallback — the only place FirstError is in scope.

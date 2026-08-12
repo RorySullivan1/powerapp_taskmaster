@@ -109,10 +109,11 @@ App:
       // An earlier draft of this block conflated them; the names below keep them apart.
       //
       //  1. PROJECT ARCHIVING — `project_phase = "Archived"`, set on scrProjectEdit.
-      //     This is what "archived" means in this app. It CASCADES IN INTENT but NOT in
-      //     data: a task, transaction or issue does not carry its parent's phase, so
-      //     none of the child sets below can express "belongs to a live project".
-      //     `ArchivedProjects` is the set the screens test membership against.
+      //     This is what "archived" means in this app, and it CASCADES IN DATA as of
+      //     2026-08-12: scrProjectEdit's save writes `*_project_archived` onto every
+      //     child, so each child list can answer "is my project archived" WITHOUT a
+      //     join. That denormalised column is the whole reason `LiveTasks` /
+      //     `LiveTransactions` / `LiveIssues` below can exist and delegate.
       //  2. A CHILD'S OWN LIFECYCLE. For ISSUES this is `issue_status` and it is real.
       //     For TASKS IT NO LONGER EXISTS: "Archived" was removed from task_stage on
       //     2026-08-12 precisely because conflating the two axes was the bug. A task
@@ -158,26 +159,30 @@ App:
       // AXIS 2 for ISSUES only, and it is a lifecycle, not archiving. The four
       // statuses are Open plus three terminal ones, so "open" is a single equality —
       // which delegates more cheaply than the four-way Or-chain it replaced.
-      OpenIssues = Filter( taskmaster_issues, issue_status.Value = "Open" );
+      // Both predicates delegate and compose: an issue is live when its PROJECT is
+      // live, and open when its OWN status says so. Two different axes, one filter.
+      OpenIssues = Filter( taskmaster_issues,
+          issue_project_archived = false && issue_status.Value = "Open" );
 
-      // AXIS 1, and the ONLY set that answers "is this project archived". Screens that
-      // load children ACROSS projects collect this once and test membership locally.
+      // ARCHIVED WORK IS EXCLUDED AT THE SOURCE. Each child list carries a
+      // denormalised `*_project_archived` Boolean mirroring its parent's phase, so
+      // "belongs to a live project" is a delegable `= false` instead of a join.
       //
-      // WHY MEMBERSHIP-TESTED LOCALLY AND NOT FILTERED SERVER-SIDE: a child row carries
-      // only `*_project_id`, never the parent's phase, so "parent is not archived" needs
-      // a join — and neither a join nor `in` over a set delegates to SharePoint. The
-      // alternative is denormalising an archived flag onto all three child lists and
-      // cascading it on every phase change; that is a schema change plus a bulk write,
-      // and it is NOT needed here because every cross-project child query is ALREADY
-      // narrow (my tasks, my issues) or capped (FirstN 50). Local is correct and free.
+      // WHY THE COLLECTION APPROACH WAS DROPPED (it lasted one day): it collected the
+      // archived projects and RemoveIf'd the children in memory — which means the
+      // child rows were FETCHED FIRST and only then discarded. The data row limit
+      // still applied to the fetch, so past it archived work silently reappeared, and
+      // the collection itself grew for the life of the app. THE AIM IS TO KEEP THE
+      // ROWS IN SCOPE UNDER 2000, and only a server-side predicate does that.
       //
-      // NOT a named formula used directly in a predicate: a named formula over a data
-      // source re-queries, and evaluating one inside a per-row RemoveIf could issue a
-      // call per row. The screens ClearCollect it ONCE, then test against the local copy.
-      ArchivedProjects = Filter( taskmaster_projects, project_phase.Value = "Archived" );
+      // These are the sets any CROSS-PROJECT query should start from. A query scoped
+      // to ONE project does not use them: if you have opened an archived project you
+      // want to see its work, and one project's children are bounded anyway.
+      LiveTasks = Filter( taskmaster_tasks, task_project_archived = false );
 
-      // NO transaction set on either axis. taskmaster_transactions has NO status, stage
-      // or archived column at all, so a transaction's liveness is ENTIRELY its project's.
+      LiveTransactions = Filter( taskmaster_transactions, transaction_project_archived = false );
+
+      LiveIssues = Filter( taskmaster_issues, issue_project_archived = false );
 
       // --- Person-column claims prefix --------------------------------------------
       // A SharePoint Person column is patched as an expanded-user record whose Claims
