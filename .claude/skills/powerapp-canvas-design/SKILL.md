@@ -162,3 +162,44 @@ All colour, size and spacing goes through the `Theme` named formula
   literals that mirror Theme, and must be kept in step by hand.
 - Because layout formulas freeze (§4), `Theme.Space.*` only ever applies **at paste time**.
   Colours and sizes stay live; positions do not.
+
+## "Fine in Studio, broken when published" is a DISPLAY SETTING, not a formula (2026-08-12)
+
+Reported as *"all screens squished and black in the published app, Studio is fine."* Nothing in
+the source was wrong. MS Learn documents the two surfaces diverging under exactly one
+configuration — *Change screen size and orientation of canvas apps*:
+
+| Scale to fit | Lock aspect ratio | Behaviour |
+|---|---|---|
+| On | On | Screen size is the maker's; **the screen scales to the window**. Dark bars where the window's ratio differs. |
+| On | **Off** | **In Studio the screen scales to the window. In the END-USER experience Power Apps scales to the smallest edge, then FILLS the larger edge.** ← the divergence |
+| Off | Off | Genuinely responsive. You must write the layout for it. |
+
+The preview docs say the same in fewer words: *"If Scale To Fit is on and Lock Aspect Ratio is
+off, your preview won't be accurate. This configuration isn't recommended."*
+
+**So: Studio scales; the player stretches.** A fixed-canvas app then looks correct to its author
+and distorted to everyone else — the worst possible split, because authoring never reveals it.
+
+### Which setting a given app wants
+
+Decide from the SOURCE, not from taste. Count the absolute placements:
+
+    grep -rcE '^\s+(X|Y): =Theme\.Space' src/Screens/*.pa.yaml
+
+- **Absolute bands, hardcoded design width, `X`/`Y` arithmetic** → the app is a fixed canvas.
+  It wants **Scale to fit ON + Lock aspect ratio ON**. It will letterbox on odd window shapes,
+  and that is correct behaviour, not a bug — the alternative is distortion.
+- **Auto-layout containers all the way down, no absolute X/Y, no design-size constants** → it can
+  take **both OFF** and be truly responsive.
+
+Turning both off on a fixed-canvas app does not make it responsive. It removes the scaling that
+was hiding the absolute positioning, and the layout falls apart at every size but one.
+
+### Do not diagnose this from the symptom
+
+"Squished and black" is also what a failed `App.Formulas` paste looks like, because `Theme` then
+resolves blank and blank coerces to 0. **The discriminator is one question: does STUDIO look
+right too?** If Studio is broken, it is the formula. If only the published app is broken, it is
+the display setting, and no amount of reading the source will show it — the setting is not in the
+source at all.

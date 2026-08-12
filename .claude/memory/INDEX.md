@@ -333,7 +333,16 @@
 - [2026-08-12] **REJECTED: moving `Theme` from `App.Formulas` to `App.OnStart`.** It is the intuitive fix for "the theme never lands" and it would make things WORSE, for a documented reason. A named formula's "value is always available — there is no timing dependency, no OnStart that must run first before the value is set, no time in which the formula's value is incorrect" (MS Learn, object-app#formulas-property). **`OnStart` is the opposite**: it is non-blocking by default, and "a screen can render and become interactive before App.OnStart finishes running" — so a `Set(gTheme, …)` there produces exactly the intermittent squished-and-black being diagnosed, only harder to reproduce. It would also cost a rename of every `Theme.*` reference in 11 screens and 9 components. **The symptom is a TRANSFER failure, not a placement problem** — src/App.pa.yaml
 
 ## Threads          (open items; remove when closed)
-- **SQUISHED AND BLACK = `App.Formulas` DEFINED NOTHING.** Reported 2026-08-12 after the
+- **SQUISHED AND BLACK, PUBLISHED ONLY = A DISPLAY SETTING (2026-08-12, root-caused).** Studio was
+  fine, so `Theme` resolved and the source was never the problem. MS Learn documents the two
+  surfaces diverging under exactly one configuration: **Scale to fit ON + Lock aspect ratio OFF** —
+  *"in Power Apps Studio the screen scales to the window; in the end-user experience Power Apps
+  scales to the smallest edge, then fills the larger edge."* Studio scales, the player stretches,
+  so the author is the one person who never sees it. **FIX: Settings > Display > Lock aspect ratio
+  = ON, then REPUBLISH.** This app is a FIXED CANVAS — 1366x768, 66 absolute X/Y placements, three
+  components hardcoding the design size — so it needs proportional scaling and must never be told
+  to stretch. Dark bars on odd window shapes are then correct behaviour, not a bug.
+- **SUPERSEDED for that symptom, still true as a hazard: `App.Formulas` defining nothing.** Reported 2026-08-12 after the
   formula-bar paste. Every named formula lives in ONE property, so one rejection takes out `Theme`,
   `NavMenu`, `StageWeights` and `ClaimPrefix` at once; every screen then reads blank for every
   colour and every `Theme.Space.*` dimension, and blank coerces to 0. **The repo source is
