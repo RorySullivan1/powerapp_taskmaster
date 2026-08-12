@@ -1325,7 +1325,16 @@ Screens:
                     // RemoveIf has stripped the successful rows out of colNewTasks, so a
                     // count taken there would see only the FAILURES and read exactly
                     // backwards. Capture it here, before either mutation.
-                    Set( gPrRollup, gEditMode <> "Edit" || CountRows(colNewTasks) > 0 );
+                    // ONE definition of "this save INSERTS", captured before anything
+                    // mutates gEditMode. It must match the Patch's own base-record test
+                    // below EXACTLY — `gEditMode = "New" || IsBlank(gEditProject.ID)`,
+                    // which includes the self-heal for an Edit that arrived with no
+                    // record. Writing `gEditMode <> "Edit"` here instead left the
+                    // self-heal path inserting a brand-new project with gPrRollup FALSE,
+                    // so the rollup was skipped and project_perc_completion never got
+                    // its initial 0 — the one thing the guard exists to guarantee.
+                    Set( gPrInsert, gEditMode = "New" || IsBlank(gEditProject.ID) );
+                    Set( gPrRollup, gPrInsert || CountRows(colNewTasks) > 0 );
                     Set( gPrSaved, Blank() );
                     Set( gPrErr, "" );
                     Set( gPrWarn, "" );
@@ -1354,7 +1363,7 @@ Screens:
                     IfError(
                         Set( gPrSaved,
                             Patch( taskmaster_projects,
-                                If( gEditMode = "New" || IsBlank(gEditProject.ID),
+                                If( gPrInsert,
                                     Defaults(taskmaster_projects), gEditProject ),
                                 { project_name:        Trim(txtPrName.Text),
                                   project_description: txtPrDesc.Text,
@@ -1390,7 +1399,7 @@ Screens:
                                   // Complete, Coalesce kept that stale date instead of
                                   // stamping Now(). Insert and update are now separated.
                                   project_date_complete:
-                                      If( gEditMode = "New" || IsBlank(gEditProject.ID),
+                                      If( gPrInsert,
                                           If( gPrPhase = "Complete", Now(), Blank() ),
                                           If( gPrPhase = "Complete",
                                               Coalesce(gEditProject.project_date_complete, Now()),
@@ -1538,7 +1547,16 @@ Screens:
                                     // which is the safe direction to be wrong in.
                                     With( { newPc: If( CountRows(scored) = 0, 0,
                                                        RoundDown(Average(scored, wgt), 0) ) },
-                                        If( newPc <> gEditProject.project_perc_completion,
+                                        // Coalesce to -1, NOT a bare compare. A just-inserted
+                                        // row has project_perc_completion NULL, and newPc is 0
+                                        // for a project with no tasks — so a bare `0 <> Blank()`
+                                        // may be FALSE, skipping the write and leaving NULL.
+                                        // That defeats the initial-0 guarantee, and it is not
+                                        // cosmetic: Power BI's AVERAGE drops blanks from the
+                                        // denominator instead of counting a 0, so portfolio
+                                        // completion reads HIGH. -1 can never equal a real
+                                        // percentage, so the first write always happens.
+                                        If( newPc <> Coalesce(gEditProject.project_perc_completion, -1),
                                     IfError(
                                         Set( gSelProject,
                                             Patch( taskmaster_projects, gPrSaved,

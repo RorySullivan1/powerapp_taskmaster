@@ -103,6 +103,18 @@ Screens:
                  ForAll( Filter( taskmaster_transactions,
                                  transaction_project_id.Id = gIssProject.Id ) As x,
                          { Id: x.ID, Label: x.transaction_name } ) );
+        // A STORED LINK THAT THE OPTION SET DOES NOT CONTAIN IS STILL A LINK.
+        // Two ways an issue holds one: it was made with the OLD tenant-wide picker,
+        // which searched every task and transaction regardless of project; or the
+        // linked row has since been deleted. In both, Filter(...) below finds nothing,
+        // the box reads "Select…", and the screen tells the user there is no related
+        // task while the save writes the link straight back — the display lies.
+        // Adding the stored value to the list makes DefaultSelectedItems resolve, so
+        // the box shows the truth and the user can change or clear it deliberately.
+        If( gIssTask.Id > 0 && IsBlank( LookUp(colIssTaskOpts, Id = gIssTask.Id) ),
+            Collect( colIssTaskOpts, { Id: gIssTask.Id, Label: gIssTask.Value } ) );
+        If( gIssTx.Id > 0 && IsBlank( LookUp(colIssTxOpts, Id = gIssTx.Id) ),
+            Collect( colIssTxOpts, { Id: gIssTx.Id, Label: gIssTx.Value } ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
@@ -431,8 +443,11 @@ Screens:
                               # collected once in OnVisible and the list is just shown.
                               Items: =colIssTaskOpts
                               ItemDisplayText: =ThisItem.Label
-                              # Always resolves to a row, including the "(none)" one at Id 0,
-                              # so the box is never blank-with-no-explanation.
+                              # Always resolves to a row — the "(none)" one at Id 0 when
+                              # nothing is linked, and otherwise the linked row, which
+                              # OnVisible guarantees is present even when it falls outside
+                              # this project. Without that guarantee this claim was false
+                              # for cross-project and deleted links.
                               DefaultSelectedItems: =Filter( colIssTaskOpts, Id = gIssTask.Id )
                               SelectMultiple: =false
                               IsSearchable: =true
@@ -517,8 +532,11 @@ Screens:
                               # collected once in OnVisible and the list is just shown.
                               Items: =colIssTxOpts
                               ItemDisplayText: =ThisItem.Label
-                              # Always resolves to a row, including the "(none)" one at Id 0,
-                              # so the box is never blank-with-no-explanation.
+                              # Always resolves to a row — the "(none)" one at Id 0 when
+                              # nothing is linked, and otherwise the linked row, which
+                              # OnVisible guarantees is present even when it falls outside
+                              # this project. Without that guarantee this claim was false
+                              # for cross-project and deleted links.
                               DefaultSelectedItems: =Filter( colIssTxOpts, Id = gIssTx.Id )
                               SelectMultiple: =false
                               IsSearchable: =true
@@ -649,7 +667,7 @@ Screens:
                               Font: =Theme.Font
                               Size: =Theme.Size.Body
                               Color: |
-                                =If( gEditMode <> "Edit", Theme.Color.TextMuted, Theme.Color.Text )
+                                =If( gEditMode <> "Edit", Theme.Color.TextMuted, Theme.Color.TextPrimary )
                               VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =0
                               LayoutMinHeight: =36
@@ -686,7 +704,15 @@ Screens:
                              // and silently, since there is nothing on screen to point at. Same
                              // guard scrTaskEdit keeps for the same reason.
                              If( gIssProject.Id <= 0,            "a parent project (not set — reopen from the project screen)   ", "" ) &
-                             If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) )
+                             If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) &
+                             // issue_status is required:true and the save writes it
+                             // UNGUARDED, so an empty gIssStatus sends {Value: ""} — not a
+                             // member, and the connector rejects the whole insert. That is
+                             // the exact failure project_coverage already paid for. The
+                             // combo box can empty it (deselecting a selected item), and a
+                             // legacy row holding a retired status seeds it to something
+                             // the new Items cannot display.
+                             If( Len(gIssStatus) = 0,            "status   ", "" ) )
                         Font: =Theme.Font
                         Size: =Theme.Size.Small
                         Color: =Theme.Color.Danger
