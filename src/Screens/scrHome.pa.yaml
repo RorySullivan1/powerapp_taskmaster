@@ -85,13 +85,11 @@ Screens:
                       Filter( LiveTasks,
                           task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
                   ClearCollect( colMyIssues,
-                      // ASSIGNED TO ME, full stop. The second arm was
-                      // `|| issue_owner.Email = gUserEmail`, and issue_owner is
-                      // retired. It was NOT replaced with `'Created By'`: that
-                      // column is not indexed, so an Or-arm on it would drop
-                      // delegation for the WHOLE filter and silently truncate this
-                      // list at 500 rows. "My issues" is now what I must act on,
-                      // not what I happened to raise.
+                      // ASSIGNED TO ME, full stop. Do not add back
+                      // `|| issue_owner.Email = gUserEmail`: issue_owner is not
+                      // indexed, so an Or-arm on it drops delegation for the WHOLE
+                      // filter and silently truncates this list at 500 rows.
+                      // "My issues" is what I must act on, not what I raised.
                       Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
               );
               Set( gMyOpen, CountRows(Filter(colMyTasks, task_stage.Value <> "Complete")) );

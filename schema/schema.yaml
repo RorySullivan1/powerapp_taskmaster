@@ -58,15 +58,15 @@ types:
 # limit still bit, and past it archived work silently reappeared.
 
 # Present on every list, managed by SharePoint. NEVER patch these from the app.
-# That read-only-ness is a FEATURE, not just a caveat: where a list needs provenance
-# — who created this row, and when — these columns supply it with no column to
-# provision, no form field, no write and no way for a user to get it wrong.
-# taskmaster_issues uses them exactly that way as of 2026-08-12 (see issue_owner /
-# issue_date_open, both retired in favour of `Created By` / `Created`).
-# In Power Fx the two-word names are quoted: `rec.'Created By'.DisplayName`, `rec.Created`.
-# NOT INDEXED BY DEFAULT. Sorting or filtering a >5,000-item list on `Created` needs
-# an index like any other column — modern SharePoint auto-indexes on sort only while
-# the list is under 20,000 items, and creates it in the background above that.
+#
+# DO NOT REFERENCE THESE FROM POWER FX. Confirmed in Studio 2026-08-12: the canvas
+# SharePoint connector does NOT surface `Created By` on taskmaster_issues, so
+# `rec.'Created By'` does not resolve — the column the app can see is not the same
+# set as the column the list has. They are listed here because they EXIST on the
+# list (a SharePoint view or a Power BI query can project them), not because the app
+# can read them. Provenance the APP has to show must be an app-written column.
+# NOT INDEXED BY DEFAULT either, so a >5,000-item list cannot sort or filter on
+# `Created` without an index like any other column.
 system_columns: [Created, Modified, Created By, Modified By]
 
 # =============================================================================
@@ -273,10 +273,9 @@ lists:
   taskmaster_issues:
     role: Freeform issues raised against a project, optionally a task or transaction.
     provisioned: live        # 2026-08-04
-    # 5 -> 4 on 2026-08-12: issue_owner retired. A view that projects `Created By`
-    # spends that join back (Person = 1), so this stays at 4-5 either way and is
-    # nowhere near SharePoint's block at 8.
-    join_cost: 4
+    # 5. Two Person columns (issue_assignee, issue_owner) + 3 Lookups. Nowhere near
+    # SharePoint's block at 8, so a view can still project a system column or two.
+    join_cost: 5
     columns:
       - { name: issue_name,             type: Text,     required: true,  indexed: true,  desc: "Issue summary / title" }
       - { name: issue_description,      type: Note,     required: false,                 desc: "Detailed description (display only)" }
@@ -318,18 +317,18 @@ lists:
       - { name: issue_project_archived, type: Boolean, required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Denormalised so the exclusion delegates; see the note above" }
       - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue", values: [Approval, Process, Compliance, Branding, Technical] }
       - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact", values: [Low, Moderate, High, Critical] }
-      # RETIRED 2026-08-12 — SUPERSEDED BY THE SYSTEM COLUMN `Created`.
-      # The app no longer writes or reads either of the two columns below. They are
-      # NOT dropped: both are still in the live list holding whatever they collected,
-      # and deleting a provisioned column is destructive and is the user's call.
-      # WHY: both were app-written, so both were editable, wrong-able and duplicable —
-      # and what was actually wanted from them ("who raised this, and when") is stamped
-      # by SharePoint on insert, cannot be patched from the app at all, costs no column
-      # and needs no picker, no write and no clearing arm. See `system_columns` above.
-      - { name: issue_date_open,        type: DateTime, required: false, retired: true,   desc: "RETIRED — use the system column Created. Was app-stamped with Now() on insert" }
+      # PROVENANCE — who raised this issue, and when. Both are APP-WRITTEN, stamped
+      # in a second Patch that runs on INSERT ONLY; the update path never names them,
+      # so an edit leaves them alone. There is no picker and no form field for either:
+      # not-user-manipulable is achieved by not offering the control, not by relying on
+      # SharePoint's read-only-ness.
+      # THEY ARE NOT `Created By` / `Created`. Those were tried and reverted — the
+      # canvas connector does not surface `Created By` on this list, so the reference
+      # did not resolve in Studio. See `system_columns` at the top of this file.
+      - { name: issue_date_open,        type: DateTime, required: false,                 desc: "When the issue was raised; stamped with Now() on insert only" }
       - { name: issue_date_target,      type: DateTime, required: false, indexed: true,  desc: "Expected resolution date" }
       - { name: issue_date_close,       type: DateTime, required: false,                 desc: "Resolution date" }
-      - { name: issue_owner,            type: Person, multi: false, required: false, retired: true, desc: "RETIRED — use the system column Created By. The old desc called it \"distinct from Created By\", but in practice it was filled with whoever raised the issue, which is exactly what Created By already records" }
+      - { name: issue_owner,            type: Person, multi: false, required: false,     desc: "Who raised the issue; stamped with User() on insert only. Display only — no picker" }
 
   # ---------------------------------------------------------------------------
   taskmaster_clients:

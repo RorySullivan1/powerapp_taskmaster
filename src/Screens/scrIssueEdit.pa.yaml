@@ -41,8 +41,8 @@ Screens:
                   { DisplayName: Coalesce(gEditIssue.issue_assignee.DisplayName, ""),
                     Mail:        Coalesce(gEditIssue.issue_assignee.Email, "") },
                   { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
-        // NO gIssOwner SEED. The business-owner field is gone; who raised the issue
-        // is SharePoint's `Created By`, read straight off gEditIssue and never staged.
+        // NO gIssOwner SEED. issue_owner is stamped once on insert and displayed
+        // straight off gEditIssue — it is never staged, because nothing edits it.
         // OPTION SETS FOR THE TWO ASSOCIATION DROPDOWNS. Collected here, AFTER
         // gIssProject is seeded above — they depend on it.
         // Delegable: `=` on an indexed Lookup FK. The "(none)" row is Collected first
@@ -530,13 +530,14 @@ Screens:
                   # editable, wrong-able and duplicable — and neither was what anyone
                   # actually wanted from them: who raised this, and when.
                   #
-                  # `Created` and `Created By` are stamped by SharePoint on insert,
-                  # cannot be patched from the app at all (schema.yaml `system_columns`
-                  # says so in as many words), and need no column, no picker, no write
-                  # and no clearing arm. The best field is the one you don't have.
+                  # `issue_owner` / `issue_date_open` are stamped ONCE, by a second Patch
+                  # that runs on insert only — the update path never names them, so an
+                  # edit cannot move them. There is no picker and no form field: the
+                  # field is un-manipulable because the app offers no way to touch it.
                   #
-                  # THE COLUMN NAME HAS A SPACE, so it is quoted: `'Created By'`. That
-                  # is the one token here that a failed paste would point at.
+                  # NOT `Created By` / `Created`. The canvas connector does not surface
+                  # `Created By` on this list, so `gEditIssue.'Created By'` does not
+                  # resolve — see `system_columns` in schema.yaml.
                   # ---------------------------------------------------------------
                   - colIssOpened:
                       Control: GroupContainer@1.5.0
@@ -566,9 +567,9 @@ Screens:
                               Text: |
                                 =If( gEditMode <> "Edit",
                                      "Recorded automatically when you save",
-                                     Coalesce( gEditIssue.'Created By'.DisplayName, "someone no longer listed" )
-                                     & If( IsBlank(gEditIssue.Created), "",
-                                           "   ·   " & Text(gEditIssue.Created, "d mmm yyyy") ) )
+                                     Coalesce( gEditIssue.issue_owner.DisplayName, "not recorded" )
+                                     & If( IsBlank(gEditIssue.issue_date_open), "",
+                                           "   ·   " & Text(gEditIssue.issue_date_open, "d mmm yyyy") ) )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Body
                               Color: |
@@ -761,6 +762,24 @@ Screens:
                     // Trust the RECORD, never the message — see scrTaskEdit.
                     If( IsBlank(gIssSaved.ID) && Len(gIssErr) = 0,
                         Set( gIssErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
+                    // PROVENANCE, INSERT ONLY. A second Patch rather than two fields in the
+                    // one above, because the update path must not NAME these columns at all:
+                    // a field named in a Patch is written, and there is no value to write on
+                    // an edit that is not either a rewrite or a clear. Omitting them is the
+                    // only way to leave them alone. Failure is a warning, not an error — the
+                    // issue itself is already saved by this point.
+                    If( gEditMode <> "Edit" && Len(gIssErr) = 0,
+                        IfError(
+                            Set( gIssStamped,
+                                Patch( taskmaster_issues, gIssSaved,
+                                       { issue_owner:
+                                             { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                               Claims:      gClaimPrefix & Lower(User().Email),
+                                               DisplayName: User().FullName,
+                                               Email:       User().Email,
+                                               Department: "", JobTitle: "", Picture: "" },
+                                         issue_date_open: Now() } ) ),
+                            Set( gIssWarn, gIssWarn & "who opened it and when: " & FirstError.Message & "   " ) ) );
                     If( Len(gIssErr) > 0,
                         Notify("Couldn't save the issue: " & gIssErr, NotificationType.Error) );
                     If( Len(gIssErr) = 0,
