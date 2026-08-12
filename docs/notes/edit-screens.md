@@ -161,11 +161,18 @@ fixed list:
   as real date values from control to collection to `Patch`.
 - **Numbers** → `ModernNumberInput@1.0.0`, read as `.Value` (a number). Same reasoning: the two
   notional fields no longer go through `Value()` and no longer need an `IsError` guard.
-- **Choice** → `cmpSelection` strips. Optional Choices carry a real `"(none)"` option,
-  because `{Value: ""}` is not a legal write and an optional column has to be clearable.
-  The strip's label size is the `FontSize` input (default **11**): a seven-option stage strip
-  needs smaller text than a three-option health strip, and a component cannot read `Theme.Size.*`.
-  Tune it on the instance — no repo round trip needed.
+- **Choice** → `cmpSelection` strips, **but only while the labels are short**. Optional Choices
+  carry a real `"(none)"` option, because `{Value: ""}` is not a legal write and an optional column
+  has to be clearable. The strip's label size is the `FontSize` input (default **11**), and a
+  component cannot read `Theme.Size.*`, so tune it on the instance.
+  **A strip lays every option across ONE row** (`WrapCount = CountRows(Items)`), so each chip gets
+  `Width / N` — which is why long values need a `ModernCombobox` instead. Both stage
+  (`cboTkStage`, 2026-08-07) and issue status (`cboIssStatus`, 2026-08-12, when its values became
+  `"Closed - Unresolved"` and friends) left the strip for exactly that reason. Health, type and
+  impact are still strips and should stay strips.
+  **If you swap a strip for a combo box, PIN BOTH CHILDREN** (`FillPortions: =0` +
+  `LayoutMinHeight`). Auto-layout children are flexible by default, so the declared heights are
+  otherwise ignored and the space splits evenly — a strip squashes gracefully, a combo box does not.
 
 ## 4. Required fields in one Patch; optional ones after, guarded
 

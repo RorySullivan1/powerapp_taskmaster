@@ -164,9 +164,10 @@ every task under a project counts in both numerator and denominator.
 (task form `OnSuccess`, kanban drop, grid save). The canonical snippet lives beside `StageWeights`.
 Two properties of that snippet are load-bearing:
 
-- **Archived is excluded server-side by enumeration**, not by `<>`. The filter lists the six
-  non-archived stages as an `Or` of `=`; `task_stage.Value <> "Archived"` is a Text `<>` and would
-  **not** delegate. Tasks with a blank stage match nothing and are omitted.
+- **There is no stage filter at all any more.** It listed the six non-archived stages as an `Or`
+  of `=` (because `task_stage.Value <> "Archived"` is a Text `<>` and would **not** delegate) — but
+  `task_stage` lost its `Archived` value on 2026-08-12, so every task under the project counts.
+  The rollup filter is now just the indexed FK. Archiving is a **project** state; see above.
 - **`Average`/`CountRows` run locally** over the already-narrowed page — correct because the
   `Filter` reduces to one project first (indexed FK). Exact so long as a project holds fewer tasks
   than the data row limit (set it to 2,000).

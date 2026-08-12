@@ -13,10 +13,10 @@
 #    New) and never asked for.  It is still WRITTEN, and it still drives the C3
 #    rollup at the end of Save.
 #
-#  - COMPLETION DATE IS DERIVED, NOT ENTERED.  Picking Complete stamps it; picking
-#    anything other than Complete or Archived clears it.  Archived KEEPS whatever was
-#    there, because archiving a finished task must not erase when it finished.  It is
-#    shown read-only so the value is visible without being editable.
+#  - COMPLETION DATE IS DERIVED, NOT ENTERED.  Picking Complete stamps it; anything
+#    else clears it.  (The "Archived keeps whatever was there" arm went with the stage
+#    itself on 2026-08-12 — task_stage no longer has an Archived value.)  It is shown
+#    read-only so the value is visible without being editable.
 #
 #  - STAGE / HEALTH / PRIORITY are combo boxes whose text colour follows the value.
 #    `Color` is the current modern combo box's text colour (it was `FontColor` before
@@ -1220,8 +1220,8 @@ Screens:
                     // rather than trusting a Coalesce to notice.
                     task_date_completion:
                     If( gEditMode <> "Edit",
-                    // NEW: there is nothing to preserve. Complete stamps now, and a brand
-                    // new task saved straight to Archived has no completion date to keep.
+                    // NEW: there is nothing to preserve — Complete stamps now, everything
+                    // else stays blank.
                     If( gTkStage = "Complete", Now(), Blank() ),
                     gTkStage = "Complete",
                     Coalesce(gEditTask.task_date_completion, Now()),
@@ -1271,8 +1271,9 @@ Screens:
                     Set( gTkRollupProj, LookUp(taskmaster_projects, ID = gTkProject.Id) ),
                     Set( gTkRollupScored,
                     AddColumns(
-                    // Delegable: FK = on an indexed Lookup, plus an Or-of-equals over the six
-                    // FK. The six-stage Or-chain is gone: task_stage has no "Archived".
+                    // Delegable: `=` on an indexed Lookup FK, and nothing else needed.
+                    // The six-stage Or-chain that used to sit here is gone — task_stage
+                    // has no "Archived" value to exclude any more.
                     Filter( taskmaster_tasks,
                     task_project_id.Id = gTkProject.Id ),
                     wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) ) );

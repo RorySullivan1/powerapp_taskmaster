@@ -1236,8 +1236,22 @@ Screens:
                               - cellIss2:
                                   Control: Label@2.5.1
                                   Properties:
+                                    # SHORT FORM, DISPLAY ONLY — the stored value keeps its
+                                    # "Closed - " prefix; this cell drops it. The column is
+                                    # 1/7 of the gallery (~62px at 12pt) and "Closed -
+                                    # Unresolved" is ~19 characters, so the full value would
+                                    # wrap or clip in a 43px row. Stripping the prefix costs
+                                    # nothing: in a column headed "Status", "Resolved" and
+                                    # "Unresolved" are unambiguous, and the worst case is then
+                                    # 10 characters — exactly what `issue_type` already renders
+                                    # in the same width ("Compliance"). Widening instead would
+                                    # mean re-portioning all five columns.
                                     Text: |
-                                      =Coalesce(ThisItem.issue_status.Value, "—")
+                                      =Switch( Coalesce(ThisItem.issue_status.Value, "—"),
+                                               "Closed - Resolved",   "Resolved",
+                                               "Closed - Unresolved", "Unresolved",
+                                               "Closed - No Change",  "No change",
+                                               Coalesce(ThisItem.issue_status.Value, "—") )
                                     Font: =Theme.Font
                                     Size: =Theme.Size.Small
                                     Color: =Theme.Color.TextMuted

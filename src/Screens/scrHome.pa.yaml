@@ -26,16 +26,20 @@ Screens:
       # The pattern (power-fx-development): narrow SERVER-side to a bounded set,
       # then aggregate LOCALLY — Sum/CountRows/Average never delegate to SharePoint.
       # Everything inside these two Filters delegates: Person `.Email =`, Choice
-      # `.Value =`, and And/Or over them. Archived is excluded by ENUMERATING the
-      # six live stages — `<> "Archived"` is a Text <> and would NOT delegate.
-      # `task_supporter` is a single Person (C1), so "mine" is fully server-side.
+      # `.Value =`, and And/Or over them. `task_supporter` is a single Person (C1),
+      # so "mine" is fully server-side.
+      # THERE IS NO STAGE PREDICATE ANY MORE. It enumerated the six non-archived
+      # stages; task_stage lost "Archived" on 2026-08-12, so the chain selected
+      # everything. Archiving is a PROJECT state now, and it is applied BELOW, in
+      # memory, via colArchivedProjects — it cannot be a server-side predicate
+      # because a task does not carry its parent's phase.
       #
       # TWO LIMITS TO KNOW:
       #  * A delegable Filter still returns at most the DATA ROW LIMIT into a
       #    collection — set Settings > General > Data row limit to 2000. (While
       #    testing, set it to 1: any non-delegable clause then shows up instantly.)
-      #  * task_stage / issue_status are REQUIRED with defaults (C9), so every row
-      #    matches one of the enumerated values — these counts miss nothing.
+      #  * task_stage / issue_status are REQUIRED with defaults (C9), so no row is
+      #    lost to a blank Choice — these counts miss nothing.
       OnVisible: |
         =Concurrent(
             ClearCollect( colMyTasks,
