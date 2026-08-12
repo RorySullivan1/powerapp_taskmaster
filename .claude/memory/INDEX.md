@@ -328,14 +328,23 @@
     Data Row Limit (max 2000); this is a MULTI-USER app so a launch snapshot goes stale and every
     save site would need write-through; and MS warns OnStart both slows launch and can race
     ("a screen can render and become interactive before App.OnStart finishes").
-  - **PLAN: (0)** measure with Power Apps Monitor in Studio first — no profiler crosses the gap.
-    **(1)** named formulas `ActiveProjects` / `ActiveTasks` in `App.Formulas` to centralise the
-    Or-chains that are currently hand-copied in 4 places — delegable, always fresh, computed lazily.
-    **VERIFY on first paste** that a screen-level `Filter(ActiveProjects, …)` still delegates
-    (nested Filter over a named formula is the one unproven step — watch for the blue underline).
-    **(2)** collections ONLY for slow-changing reference data (clients, products, mapping_*), which
-    is the genuine cache candidate. **(3)** the child-of-archived-project exclusion LAST, and only
-    if Monitor says it matters, because it is the only step that costs a schema change.
+  - **STAGE 1 TRANCHE A SHIPPED 2026-08-12** — `ActiveProjects`, `ActiveTasks`, `OpenIssues`
+    declared in `App.Formulas`; **exactly ONE consumer converted (`scrProjects`' Active branch)
+    as a deliberate canary.** No `ActiveTransactions`: that list has no status column at all.
+  - **BLOCKING ON A BINARY:** does `Filter(ActiveProjects, StartsWith(...))` still delegate?
+    Nested Filter over a named formula is the one unproven step, and **a delegation failure here
+    is SILENT — it truncates at 500 rows rather than erroring**, so the signal is the BLUE
+    UNDERLINE in Studio, not runtime behaviour. If it underlines: revert that branch to the inline
+    Or-chain (git 72e19c4) and stop stage 1 there. If clean: tranche B converts the other 6 sites
+    across scrHome (x4), scrReports (x2), scrProject, scrTaskEdit, scrProjectEdit.
+  - **App.Formulas is FORMULA-BAR ONLY** — the App object has no code view, so tranche A is a
+    formula-bar paste plus one screen re-paste.
+  - **Honest sizing: stage 1 is a DE-DUPLICATION win, not a speed win.** A named formula still
+    queries SharePoint per use; it does not cache across screens. The speed question is stage 2/3
+    and should not be started before Monitor says where the time actually goes.
+  - **(2)** collections ONLY for slow-changing reference data (clients, products, mapping_*), the
+    genuine cache candidates. **(3)** child-of-archived-project exclusion LAST, only if Monitor
+    justifies it, because it is the only step that costs a schema change.
 - **The 2026-08-11 code review is CLOSED.** Its last item (index `issue_owner` /
   `issue_date_open`) was dissolved rather than done — both columns are retired in favour of
   SharePoint's system columns. **One index is still worth adding: `Created` on

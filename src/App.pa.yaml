@@ -100,6 +100,54 @@ App:
           // numerator and denominator, so a shelved task can't drag a project down.
       );
 
+      // --- Live-work sets (perf stage 1, 2026-08-12) ------------------------------
+      // ONE definition of "not archived", instead of the same Or-chain hand-copied into
+      // seven Filters across five screens. Any of those copies could have drifted from
+      // the others silently — a missing stage in one chain just makes rows vanish from
+      // one screen, with nothing to see and nothing to catch it.
+      //
+      // WHY A NAMED FORMULA AND NOT A COLLECTION IN OnStart. Named formulas "can't use
+      // behavior functions" (MS Learn, object-app#formulas-property), so ClearCollect
+      // cannot live here at all — but that limitation is pointing at the better design:
+      //  * these stay DELEGABLE, so they are evaluated by SharePoint, not capped at the
+      //    2000-row data limit a ClearCollect would silently truncate at;
+      //  * they are always fresh, which matters because this is a MULTI-USER app — a
+      //    launch-time snapshot would hide a colleague's work until a manual refresh;
+      //  * they are computed LAZILY, only when a screen actually uses one, and never
+      //    block app start the way OnStart does.
+      // There is no penalty for a definition the app doesn't use, so all three are
+      // declared here even though stage 1 rewires only scrProjects.
+      //
+      // ENUMERATING the live values is what makes this delegable: `<> "Archived"` is a
+      // Text <> and does NOT delegate. Keep each list in step with the Choice values in
+      // schema/schema.yaml — a value added there and missed here disappears from the app.
+      //
+      // NOT YET PROVEN: whether a screen-level `Filter(ActiveProjects, …)` still folds
+      // into ONE server query. Nested Filter over a named formula is the single
+      // unverified step in stage 1, which is why only one screen is converted so far.
+      ActiveProjects = Filter( taskmaster_projects,
+          project_phase.Value = "Planning" || project_phase.Value = "Active"
+       || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" );
+
+      // Six live stages; "Archived" is the seventh and is the one left out. Matches
+      // StageWeights above, which omits Archived for the same reason.
+      ActiveTasks = Filter( taskmaster_tasks,
+          task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
+       || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
+       || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" );
+
+      // Issues have no "Archived" — the lifecycle ends at Closed, so "live" means
+      // not-Closed. Named for what it is rather than forced into the Active* pattern.
+      OpenIssues = Filter( taskmaster_issues,
+          issue_status.Value = "Open"    || issue_status.Value = "Review"
+       || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" );
+
+      // NO ActiveTransactions. taskmaster_transactions has NO status, stage or archived
+      // column at all — a transaction is only reachable through its project, so "live
+      // transactions" cannot be expressed here. Excluding the children of an archived
+      // project needs a join or an `in` over a set, neither of which delegates; that is
+      // stage 3 and it costs a denormalised flag on the child lists.
+
       // --- Person-column claims prefix --------------------------------------------
       // A SharePoint Person column is patched as an expanded-user record whose Claims
       // string is this prefix plus the LOWERCASED user principal name. One definition

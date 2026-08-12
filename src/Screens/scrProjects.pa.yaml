@@ -93,10 +93,23 @@ Screens:
                           && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    selFilter.Selected.Id = 2,
-                   Sort( Filter( taskmaster_projects,
-                             ( project_phase.Value = "Planning" || project_phase.Value = "Active"
-                            || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" )
-                          && StartsWith(project_name, txtProjSearch.Text) ),
+                   // THE CANARY FOR PERF STAGE 1 — this is the only site converted so
+                   // far, deliberately. `ActiveProjects` is a named formula in
+                   // App.Formulas holding the four-live-phase Filter that used to be
+                   // written out here; the rule now has ONE definition instead of the
+                   // copy-per-screen it had.
+                   //
+                   // WHAT TO WATCH ON THE FIRST PASTE: a BLUE UNDERLINE under this
+                   // Filter. Nesting a Filter over a named formula that is itself a
+                   // Filter should fold into one server query, but that is the one
+                   // thing about stage 1 no amount of reading settles — and if it does
+                   // NOT fold, this gallery silently truncates at 500 rows instead of
+                   // erroring. If the underline appears, revert THIS branch to the
+                   // inline Or-chain (it is in git at 72e19c4) and stage 1 stops here;
+                   // the named formulas are still worth keeping for the screens that
+                   // consume them whole.
+                   Sort( Filter( ActiveProjects,
+                             StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    Sort( Filter( taskmaster_projects,
                              StartsWith(project_name, txtProjSearch.Text) ),
