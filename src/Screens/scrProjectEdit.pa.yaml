@@ -600,54 +600,22 @@ Screens:
                         Width: =(Parent.Width - 32) / 3
                         Height: =58
                       Children:
-                        - lblPrMgrCap:
-                            Control: Label@2.5.1
+                        - fldManager:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
                             Properties:
-                              Text: ="Project manager  *"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
+                              Caption: ="Project manager  *"
+                              PickLabel: ="＋  Choose a manager"
+                              HasValue: =Len(gPrManager.Mail) > 0
+                              Display: =gPrManager.DisplayName
                               Width: =Parent.Width
-                              Height: =16
-                        # The person box and the chip occupy the SAME slot — a hidden
-                        # child of an auto-layout container takes no space, so the
-                        # column never shows both and never reserves room for both.
-                        - btnPrMgrPick:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =Len(gPrManager.Mail) = 0
-                              Text: ="＋  Choose a manager"
-                              Align: =Align.Left
-                              Fill: =Theme.Color.Bg
-                              Color: =Theme.Color.TextMuted
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrPicker, "Manager");
-                                 Reset(cmpPrPeople);
-                                 Set(gPrPeopleQuery, "")
-                        - btnPrMgrChip:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =Len(gPrManager.Mail) > 0
-                              Text: =gPrManager.DisplayName & "     ✕"
-                              Align: =Align.Left
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Fill: =RGBA(0, 0, 0, 0)
-                              Color: =Theme.Color.TextPrimary
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrManager, { DisplayName: "", Mail: "" });
-                                 Reset(cmpPrPeople);
-                                 Set(gPrPicker, "")
+                              Height: =62
+                              OnPick: |
+                                =Set( gPrPicker, "Manager" );
+                                 Reset( cmpPrPeople );
+                                 Set( gPrPeopleQuery, "" )
+                              OnClear: |
+                                =Set( gPrManager, { DisplayName: "", Mail: "" } )
                   - colPrReq:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -658,54 +626,22 @@ Screens:
                         Width: =(Parent.Width - 32) / 3
                         Height: =58
                       Children:
-                        - lblPrReqCap:
-                            Control: Label@2.5.1
+                        - fldRequestor:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
                             Properties:
-                              Text: ="Requestor"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
+                              Caption: ="Requestor"
+                              PickLabel: ="＋  Choose a requestor"
+                              HasValue: =Len(gPrRequestor.Mail) > 0
+                              Display: =gPrRequestor.DisplayName
                               Width: =Parent.Width
-                              Height: =16
-                        # The person box and the chip occupy the SAME slot — a hidden
-                        # child of an auto-layout container takes no space, so the
-                        # column never shows both and never reserves room for both.
-                        - btnPrReqPick:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =Len(gPrRequestor.Mail) = 0
-                              Text: ="＋  Choose a requestor"
-                              Align: =Align.Left
-                              Fill: =Theme.Color.Bg
-                              Color: =Theme.Color.TextMuted
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrPicker, "Requestor");
-                                 Reset(cmpPrPeople);
-                                 Set(gPrPeopleQuery, "")
-                        - btnPrReqChip:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =Len(gPrRequestor.Mail) > 0
-                              Text: =gPrRequestor.DisplayName & "     ✕"
-                              Align: =Align.Left
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Fill: =RGBA(0, 0, 0, 0)
-                              Color: =Theme.Color.TextPrimary
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrRequestor, { DisplayName: "", Mail: "" });
-                                 Reset(cmpPrPeople);
-                                 Set(gPrPicker, "")
+                              Height: =62
+                              OnPick: |
+                                =Set( gPrPicker, "Requestor" );
+                                 Reset( cmpPrPeople );
+                                 Set( gPrPeopleQuery, "" )
+                              OnClear: |
+                                =Set( gPrRequestor, { DisplayName: "", Mail: "" } )
                   - colPrSup:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -716,54 +652,22 @@ Screens:
                         Width: =(Parent.Width - 32) / 3
                         Height: =58
                       Children:
-                        - lblPrSupCap:
-                            Control: Label@2.5.1
+                        - fldSupporter:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
                             Properties:
-                              Text: ="Supporter"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
+                              Caption: ="Supporter"
+                              PickLabel: ="＋  Choose a supporter"
+                              HasValue: =Len(gPrSupporter.Mail) > 0
+                              Display: =gPrSupporter.DisplayName
                               Width: =Parent.Width
-                              Height: =16
-                        # The person box and the chip occupy the SAME slot — a hidden
-                        # child of an auto-layout container takes no space, so the
-                        # column never shows both and never reserves room for both.
-                        - btnPrSupPick:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =Len(gPrSupporter.Mail) = 0
-                              Text: ="＋  Choose a supporter"
-                              Align: =Align.Left
-                              Fill: =Theme.Color.Bg
-                              Color: =Theme.Color.TextMuted
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrPicker, "Supporter");
-                                 Reset(cmpPrPeople);
-                                 Set(gPrPeopleQuery, "")
-                        - btnPrSupChip:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =Len(gPrSupporter.Mail) > 0
-                              Text: =gPrSupporter.DisplayName & "     ✕"
-                              Align: =Align.Left
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Fill: =RGBA(0, 0, 0, 0)
-                              Color: =Theme.Color.TextPrimary
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gPrSupporter, { DisplayName: "", Mail: "" });
-                                 Reset(cmpPrPeople);
-                                 Set(gPrPicker, "")
+                              Height: =62
+                              OnPick: |
+                                =Set( gPrPicker, "Supporter" );
+                                 Reset( cmpPrPeople );
+                                 Set( gPrPeopleQuery, "" )
+                              OnClear: |
+                                =Set( gPrSupporter, { DisplayName: "", Mail: "" } )
             # -----------------------------------------------------------------
             # CLASSIFICATION  (managed metadata — one combobox bound to Choices() per column)
             # -----------------------------------------------------------------
@@ -1776,50 +1680,22 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =58
                 Children:
-                  - lblNtLeadCap:
-                      Control: Label@2.5.1
+                  - fldNtLead:
+                      Control: CanvasComponent
+                      ComponentName: cmpLookupField
                       Properties:
-                        Text: ="Task lead  *  —  anyone in the directory"
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
+                        Caption: ="Task lead  *  —  anyone in the directory"
+                        PickLabel: ="＋  Choose a task lead"
+                        HasValue: =Len(gNtLead.Mail) > 0
+                        Display: =gNtLead.DisplayName
                         Width: =Parent.Width
-                        Height: =18
-                  - btnNtLeadPick:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =!(Len(gNtLead.Mail) > 0)
-                        Text: ="＋  Choose a task lead"
-                        Align: =Align.Left
-                        Fill: =Theme.Color.Bg
-                        Color: =Theme.Color.TextMuted
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
+                        Height: =62
+                        OnPick: |
                           =Set( gPrPicker, "NtLead" );
                            Reset( cmpPrPeople );
                            Set( gPrPeopleQuery, "" )
-                  - btnNtLeadChip:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =Len(gNtLead.Mail) > 0
-                        Text: =gNtLead.DisplayName & "     ✕"
-                        Align: =Align.Left
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Fill: =RGBA(0, 0, 0, 0)
-                        Color: =Theme.Color.TextPrimary
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
-                          =Set(gNtLead, { DisplayName: "", Mail: "" });
-                           Reset( cmpPrPeople )
+                        OnClear: |
+                          =Set( gNtLead, { DisplayName: "", Mail: "" } )
       # Buttons sit OUTSIDE mdNtBody, on the card's own anchor, so they stay
       # pinned to the card's bottom edge however tall the body grows.
       - mdNtAdd:
@@ -2081,50 +1957,22 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =58
                 Children:
-                  - lblNxClientCap:
-                      Control: Label@2.5.1
+                  - fldNxClient:
+                      Control: CanvasComponent
+                      ComponentName: cmpLookupField
                       Properties:
-                        Text: ="Client  *"
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
+                        Caption: ="Client  *"
+                        PickLabel: ="＋  Choose a client"
+                        HasValue: =gNxClient.Id > 0
+                        Display: =gNxClient.Value
                         Width: =Parent.Width
-                        Height: =18
-                  - btnNxClientPick:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =!(gNxClient.Id > 0)
-                        Text: ="＋  Choose a client"
-                        Align: =Align.Left
-                        Fill: =Theme.Color.Bg
-                        Color: =Theme.Color.TextMuted
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
+                        Height: =62
+                        OnPick: |
                           =Set( gPrPicker, "NxClient" );
                            Reset( cmpPrRecord );
                            Set( gPrRecQuery, "" )
-                  - btnNxClientChip:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =gNxClient.Id > 0
-                        Text: =gNxClient.Value & "     ✕"
-                        Align: =Align.Left
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Fill: =RGBA(0, 0, 0, 0)
-                        Color: =Theme.Color.TextPrimary
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
-                          =Set(gNxClient, { Id: 0, Value: "" });
-                           Reset( cmpPrRecord )
+                        OnClear: |
+                          =Set( gNxClient, { Id: 0, Value: "" } )
             - rowNxProduct:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -2135,50 +1983,22 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =58
                 Children:
-                  - lblNxProdCap:
-                      Control: Label@2.5.1
+                  - fldNxProduct:
+                      Control: CanvasComponent
+                      ComponentName: cmpLookupField
                       Properties:
-                        Text: ="Product  *"
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
+                        Caption: ="Product  *"
+                        PickLabel: ="＋  Choose a product"
+                        HasValue: =gNxProduct.Id > 0
+                        Display: =gNxProduct.Value
                         Width: =Parent.Width
-                        Height: =18
-                  - btnNxProductPick:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =!(gNxProduct.Id > 0)
-                        Text: ="＋  Choose a product"
-                        Align: =Align.Left
-                        Fill: =Theme.Color.Bg
-                        Color: =Theme.Color.TextMuted
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
+                        Height: =62
+                        OnPick: |
                           =Set( gPrPicker, "NxProduct" );
                            Reset( cmpPrRecord );
                            Set( gPrRecQuery, "" )
-                  - btnNxProductChip:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =gNxProduct.Id > 0
-                        Text: =gNxProduct.Value & "     ✕"
-                        Align: =Align.Left
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Fill: =RGBA(0, 0, 0, 0)
-                        Color: =Theme.Color.TextPrimary
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
-                          =Set(gNxProduct, { Id: 0, Value: "" });
-                           Reset( cmpPrRecord )
+                        OnClear: |
+                          =Set( gNxProduct, { Id: 0, Value: "" } )
             - rowNxSales:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -2189,50 +2009,22 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =58
                 Children:
-                  - lblNxSalesCap:
-                      Control: Label@2.5.1
+                  - fldNxSales:
+                      Control: CanvasComponent
+                      ComponentName: cmpLookupField
                       Properties:
-                        Text: ="Sales owner  *  —  anyone in the directory"
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Color: =Theme.Color.TextMuted
+                        Caption: ="Sales owner  *  —  anyone in the directory"
+                        PickLabel: ="＋  Choose a sales owner"
+                        HasValue: =Len(gNxSales.Mail) > 0
+                        Display: =gNxSales.DisplayName
                         Width: =Parent.Width
-                        Height: =18
-                  - btnNxSalesPick:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =!(Len(gNxSales.Mail) > 0)
-                        Text: ="＋  Choose a sales owner"
-                        Align: =Align.Left
-                        Fill: =Theme.Color.Bg
-                        Color: =Theme.Color.TextMuted
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
+                        Height: =62
+                        OnPick: |
                           =Set( gPrPicker, "NxSales" );
                            Reset( cmpPrPeople );
                            Set( gPrPeopleQuery, "" )
-                  - btnNxSalesChip:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Visible: =Len(gNxSales.Mail) > 0
-                        Text: =gNxSales.DisplayName & "     ✕"
-                        Align: =Align.Left
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Small
-                        Fill: =RGBA(0, 0, 0, 0)
-                        Color: =Theme.Color.TextPrimary
-                        BorderColor: =Theme.Color.Border
-                        BorderThickness: =1
-                        Width: =Parent.Width
-                        Height: =36
-                        OnSelect: |
-                          =Set(gNxSales, { DisplayName: "", Mail: "" });
-                           Reset( cmpPrPeople )
+                        OnClear: |
+                          =Set( gNxSales, { DisplayName: "", Mail: "" } )
       - mdNxAdd:
           Control: Classic/Button@2.2.0
           Properties:

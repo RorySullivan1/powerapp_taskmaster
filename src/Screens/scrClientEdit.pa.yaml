@@ -188,89 +188,38 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =32
                   OnChange: =Set( gClCov, cboClCov.Selected.Value )
-            - lblClSalesCap:
-                Control: Label@2.5.1
-                Properties:
-                  Text: ="Sales owner  *"
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Small
-                  Color: =Theme.Color.TextMuted
-                  VerticalAlign: =VerticalAlign.Middle
-                  FillPortions: =0
-                  LayoutMinHeight: =18
-                  Width: =Parent.Width - 48
-                  Height: =18
-            # Empty person box -> opens cmpClPeople. People are NEVER created;
-            # they come from Microsoft 365 through the shared picker.
-            - btnClSalesPick:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  Visible: =Len(gClSales.Mail) = 0
-                  Text: ="＋  Choose a sales owner"
-                  Align: =Align.Left
-                  Fill: =Theme.Color.Bg
-                  Color: =Theme.Color.TextMuted
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
-                  Font: =Theme.Font
-                  Size: =Theme.Size.Body
-                  FillPortions: =0
-                  LayoutMinHeight: =36
-                  Width: =Parent.Width - 48
-                  Height: =36
-                  OnSelect: |
-                    =Set( gClPicker, "Sales" );
-                     Reset( cmpClPeople );
-                     Set( gClPeopleQuery, "" )
-            - chipClSales:
+            # WRAPPED IN A COL — this was the one lookup field of the nineteen that sat
+            # directly in bodyRoot rather than in a col/row container. A component
+            # instance cannot carry FillPortions or LayoutMinHeight, so the wrapper has
+            # to exist for the auto-layout contract to live somewhere.
+            - colClSales:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
-                  Visible: =Len(gClSales.Mail) > 0
-                  LayoutDirection: =LayoutDirection.Horizontal
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =6
-                  PaddingLeft: =10
-                  PaddingRight: =10
-                  Fill: =Theme.Color.Bg
-                  BorderColor: =Theme.Color.Border
-                  BorderThickness: =1
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =0
                   FillPortions: =0
-                  LayoutMinHeight: =36
+                  LayoutMinHeight: =62
                   Width: =Parent.Width - 48
-                  Height: =36
+                  Height: =62
                 Children:
-                  - lblClSalesName:
-                      Control: Label@2.5.1
+                  - fldSales:
+                      Control: CanvasComponent
+                      ComponentName: cmpLookupField
                       Properties:
-                        Text: =gClSales.DisplayName
-                        Font: =Theme.Font
-                        Size: =Theme.Size.Body
-                        Color: =Theme.Color.TextPrimary
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =1
-                        LayoutMinWidth: =80
-                        Height: =24
-                  - icoClSalesClear:
-                      Control: Classic/Icon@2.5.0
-                      Properties:
-                        Icon: =Icon.Cancel
-                        Color: =Theme.Color.TextMuted
-                        Tooltip: ="Clear"
-                        FillPortions: =0
-                        LayoutMinWidth: =16
-                        Width: =16
-                        Height: =16
-                        OnSelect: |
-                          =Set( gClSales, { DisplayName: "", Mail: "" } );
-                           Set( gClPicker, "" )
-            # Region is the composed mapping_regions path — same cascading picker
-            # scrProjectEdit uses, and the same " | " separator, which is part of
-            # the stored data rather than a display choice.
-            # WRAPPED IN A COL. A component instance accepts only its own custom
-            # properties plus the built-ins, so it cannot carry FillPortions or
-            # LayoutMinHeight — the validator rejects that as a paste failure.
-            # The wrapper holds the auto-layout contract; the instance just sizes.
+                        Caption: ="Sales owner  *"
+                        PickLabel: ="＋  Choose a sales owner"
+                        HasValue: =Len(gClSales.Mail) > 0
+                        Display: =gClSales.DisplayName
+                        Width: =Parent.Width
+                        Height: =62
+                        OnPick: |
+                          =Set( gClPicker, "Sales" );
+                           Reset( cmpClPeople );
+                           Set( gClPeopleQuery, "" )
+                        OnClear: |
+                          =Set( gClSales, { DisplayName: "", Mail: "" } )
             - colClRegion:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout

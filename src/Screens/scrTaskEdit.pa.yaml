@@ -513,89 +513,22 @@ Screens:
                               LayoutGridRowEnd: =1
                               Height: =62
                             Children:
-                              - lblTkLeadCap:
-                                  Control: Label@2.5.1
+                              - fldLead:
+                                  Control: CanvasComponent
+                                  ComponentName: cmpLookupField
                                   Properties:
-                                    Text: ="Lead  *"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
+                                    Caption: ="Lead  *"
+                                    PickLabel: ="＋  Choose a lead"
+                                    HasValue: =Len(gTkLead.Mail) > 0
+                                    Display: =gTkLead.DisplayName
                                     Width: =Parent.Width
-                                    Height: =18
-                              # THE EMPTY PERSON BOX. Was a search input that filtered a
-                              # floating gallery as you typed; it is now a button that
-                              # opens cmpTkPeople, where the search lives. Reset() on the
-                              # instance is what clears the previous field's query and
-                              # highlight — without it the dialog opens showing whatever
-                              # was picked last, and the check would commit it.
-                              - btnTkLeadPick:
-                                  Control: Classic/Button@2.2.0
-                                  Properties:
-                                    Visible: =Len(gTkLead.Mail) = 0
-                                    Text: ="＋  Choose a lead"
-                                    Align: =Align.Left
-                                    Fill: =Theme.Color.Bg
-                                    Color: =Theme.Color.TextMuted
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Body
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnSelect: |
+                                    Height: =62
+                                    OnPick: |
                                       =Set( gTkPicker, "Lead" );
                                        Reset( cmpTkPeople );
                                        Set( gTkPeopleQuery, "" )
-                              # The chip REPLACES the search box once somebody is chosen —
-                              # same shape as scrProjectEdit. One row either way.
-                              - chipTkLead:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
-                                  Properties:
-                                    Visible: =Len(gTkLead.Mail) > 0
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =10
-                                    PaddingRight: =10
-                                    Fill: =Theme.Color.Bg
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                  Children:
-                                    - lblchipTkLeadName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =gTkLead.DisplayName
-                                          Font: =Theme.Font
-                                          Size: =Theme.Size.Body
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =80
-                                          Height: =24
-                                    - icoTkLeadClear:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Clear"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Set( gTkLead, { DisplayName: "", Mail: "" } );
-                                             Reset( cmpTkPeople );
-                                             Set( gTkPicker, "" )
+                                    OnClear: |
+                                      =Set( gTkLead, { DisplayName: "", Mail: "" } )
                         - colTkStart:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -644,84 +577,22 @@ Screens:
                               LayoutGridRowEnd: =2
                               Height: =62
                             Children:
-                              - lblTkSuppCap:
-                                  Control: Label@2.5.1
+                              - fldSupporter:
+                                  Control: CanvasComponent
+                                  ComponentName: cmpLookupField
                                   Properties:
-                                    Text: ="Supporter"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
+                                    Caption: ="Supporter"
+                                    PickLabel: ="＋  Choose a supporter"
+                                    HasValue: =Len(gTkSupporter.Mail) > 0
+                                    Display: =gTkSupporter.DisplayName
                                     Width: =Parent.Width
-                                    Height: =18
-                              # Empty person box — see btnTkLeadPick.
-                              - btnTkSuppPick:
-                                  Control: Classic/Button@2.2.0
-                                  Properties:
-                                    Visible: =Len(gTkSupporter.Mail) = 0
-                                    Text: ="＋  Choose a supporter"
-                                    Align: =Align.Left
-                                    Fill: =Theme.Color.Bg
-                                    Color: =Theme.Color.TextMuted
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Body
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnSelect: |
+                                    Height: =62
+                                    OnPick: |
                                       =Set( gTkPicker, "Supporter" );
                                        Reset( cmpTkPeople );
                                        Set( gTkPeopleQuery, "" )
-                              # The chip REPLACES the search box once somebody is chosen —
-                              # same shape as scrProjectEdit. One row either way.
-                              - chipTkSupp:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
-                                  Properties:
-                                    Visible: =Len(gTkSupporter.Mail) > 0
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =10
-                                    PaddingRight: =10
-                                    Fill: =Theme.Color.Bg
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                  Children:
-                                    - lblchipTkSuppName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =gTkSupporter.DisplayName
-                                          Font: =Theme.Font
-                                          Size: =Theme.Size.Body
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =80
-                                          Height: =24
-                                    - icoTkSuppClear:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Clear"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Set( gTkSupporter, { DisplayName: "", Mail: "" } );
-                                             Reset( cmpTkPeople );
-                                             Set( gTkPicker, "" )
+                                    OnClear: |
+                                      =Set( gTkSupporter, { DisplayName: "", Mail: "" } )
                         - colTkTarget:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -856,84 +727,22 @@ Screens:
                               LayoutMinWidth: =200
                               Height: =62
                             Children:
-                              - lblTkClientCap:
-                                  Control: Label@2.5.1
+                              - fldClient:
+                                  Control: CanvasComponent
+                                  ComponentName: cmpLookupField
                                   Properties:
-                                    Text: ="Client"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
+                                    Caption: ="Client"
+                                    PickLabel: ="＋  Choose a client"
+                                    HasValue: =gTkClient.Id > 0
+                                    Display: =gTkClient.Value
                                     Width: =Parent.Width
-                                    Height: =18
-                              # Opens the shared record picker. Was a search box that filtered a
-                              # floating gallery as you typed; the search now lives in the dialog.
-                              # Reset() clears the previous field's query and highlight — one
-                              # instance serves every lookup on this screen.
-                              - btnTkClientPick:
-                                  Control: Classic/Button@2.2.0
-                                  Properties:
-                                    Visible: =gTkClient.Id = 0
-                                    Text: ="＋  Choose a client"
-                                    Align: =Align.Left
-                                    Fill: =Theme.Color.Bg
-                                    Color: =Theme.Color.TextMuted
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Body
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnSelect: |
+                                    Height: =62
+                                    OnPick: |
                                       =Set( gTkPicker, "Client" );
                                        Reset( cmpTkRecord );
                                        Set( gTkRecQuery, "" )
-                              - chipTkClient:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
-                                  Properties:
-                                    Visible: =gTkClient.Id > 0
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =10
-                                    PaddingRight: =10
-                                    Fill: =Theme.Color.Bg
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                  Children:
-                                    - lblchipTkClientName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =gTkClient.Value
-                                          Font: =Theme.Font
-                                          Size: =Theme.Size.Body
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =80
-                                          Height: =24
-                                    - icoTkClientClear:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Clear"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Set( gTkClient, { Id: 0, Value: "" } );
-                                             Set( gTkPicker, "" )
+                                    OnClear: |
+                                      =Set( gTkClient, { Id: 0, Value: "" } )
                         - colTkCliStage:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -1100,84 +909,22 @@ Screens:
                               LayoutMinWidth: =200
                               Height: =62
                             Children:
-                              - lblTkProductCap:
-                                  Control: Label@2.5.1
+                              - fldProduct:
+                                  Control: CanvasComponent
+                                  ComponentName: cmpLookupField
                                   Properties:
-                                    Text: ="Product"
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: =Theme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
+                                    Caption: ="Product"
+                                    PickLabel: ="＋  Choose a product"
+                                    HasValue: =gTkProduct.Id > 0
+                                    Display: =gTkProduct.Value
                                     Width: =Parent.Width
-                                    Height: =18
-                              # Opens the shared record picker. Was a search box that filtered a
-                              # floating gallery as you typed; the search now lives in the dialog.
-                              # Reset() clears the previous field's query and highlight — one
-                              # instance serves every lookup on this screen.
-                              - btnTkProductPick:
-                                  Control: Classic/Button@2.2.0
-                                  Properties:
-                                    Visible: =gTkProduct.Id = 0
-                                    Text: ="＋  Choose a product"
-                                    Align: =Align.Left
-                                    Fill: =Theme.Color.Bg
-                                    Color: =Theme.Color.TextMuted
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Body
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnSelect: |
+                                    Height: =62
+                                    OnPick: |
                                       =Set( gTkPicker, "Product" );
                                        Reset( cmpTkRecord );
                                        Set( gTkRecQuery, "" )
-                              - chipTkProduct:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
-                                  Properties:
-                                    Visible: =gTkProduct.Id > 0
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =6
-                                    PaddingLeft: =10
-                                    PaddingRight: =10
-                                    Fill: =Theme.Color.Bg
-                                    BorderColor: =Theme.Color.Border
-                                    BorderThickness: =1
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                  Children:
-                                    - lblchipTkProductName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =gTkProduct.Value
-                                          Font: =Theme.Font
-                                          Size: =Theme.Size.Body
-                                          Color: =Theme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =1
-                                          LayoutMinWidth: =80
-                                          Height: =24
-                                    - icoTkProductClear:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =Theme.Color.TextMuted
-                                          Tooltip: ="Clear"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Set( gTkProduct, { Id: 0, Value: "" } );
-                                             Set( gTkPicker, "" )
+                                    OnClear: |
+                                      =Set( gTkProduct, { Id: 0, Value: "" } )
                   - rowTkOut2:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
