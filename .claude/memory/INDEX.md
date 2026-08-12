@@ -311,6 +311,31 @@
 - [2026-08-12] **`scrHome`'s "My issues" NARROWED to assigned-to-me, and the delegation reason is why it was not replaced like-for-like.** The filter was `issue_assignee.Email = gUserEmail || issue_owner.Email = gUserEmail`. The obvious swap — `|| 'Created By'.Email = gUserEmail` — **would have been a silent disaster: `Created By` is not indexed, and one non-delegable arm inside an `Or` drops delegation for the WHOLE filter**, truncating the home queue at 500 rows with no warning. Semantics agree with the constraint anyway: a work queue is what I must ACT on, not what I happened to raise. Two identical copies of the filter on that screen, both changed — src/Screens/scrHome.pa.yaml
 
 ## Threads          (open items; remove when closed)
+- **PERF PROPOSAL ASSESSED 2026-08-12 — front-load non-archived items into app-scope collections.
+  VERDICT: right instinct, wrong vehicle; do the named-formula half, not the collection half.**
+  - **BLOCKER, grounded:** named formulas "can't use behavior functions or otherwise cause side
+    effects" (MS Learn, object-app#formulas-property), so **`ClearCollect` CANNOT live in
+    `App.Formulas`**. The "init in Formulas, call on refresh" design cannot be built as stated.
+  - **The prize is smaller than it looks.** Archived is ALREADY excluded everywhere it can be
+    delegably: `scrHome` + `scrReports` filter to the 6 live task stages / 4 live project phases,
+    and `scrProjects` has an Active option with the same Or-chain. Those two screens ALREADY
+    ClearCollect (colMyTasks / colMyProjects / colMyIssues) at screen scope.
+  - **The "therefore" does NOT hold for children.** A task/transaction/issue does not carry its
+    parent's phase, and `taskmaster_transactions` has no status/stage column AT ALL. Excluding
+    children of archived projects needs a join or an `in` over a set — neither delegates. It needs
+    a denormalised flag on the child lists, i.e. a schema change, or it cannot be done at source.
+  - **Risks of app-scope collections here:** ClearCollect from SharePoint truncates SILENTLY at the
+    Data Row Limit (max 2000); this is a MULTI-USER app so a launch snapshot goes stale and every
+    save site would need write-through; and MS warns OnStart both slows launch and can race
+    ("a screen can render and become interactive before App.OnStart finishes").
+  - **PLAN: (0)** measure with Power Apps Monitor in Studio first — no profiler crosses the gap.
+    **(1)** named formulas `ActiveProjects` / `ActiveTasks` in `App.Formulas` to centralise the
+    Or-chains that are currently hand-copied in 4 places — delegable, always fresh, computed lazily.
+    **VERIFY on first paste** that a screen-level `Filter(ActiveProjects, …)` still delegates
+    (nested Filter over a named formula is the one unproven step — watch for the blue underline).
+    **(2)** collections ONLY for slow-changing reference data (clients, products, mapping_*), which
+    is the genuine cache candidate. **(3)** the child-of-archived-project exclusion LAST, and only
+    if Monitor says it matters, because it is the only step that costs a schema change.
 - **The 2026-08-11 code review is CLOSED.** Its last item (index `issue_owner` /
   `issue_date_open`) was dissolved rather than done — both columns are retired in favour of
   SharePoint's system columns. **One index is still worth adding: `Created` on
