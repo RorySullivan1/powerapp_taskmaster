@@ -320,6 +320,30 @@
 - [2026-08-12] **REVIEW FINDING CONFIRMED AND FIXED: `colIssStatus`'s two children were both UNPINNED.** `cboIssStatus` declared `Height: =40` and its caption `Height: =18`, but **every auto-layout child is flexible along the parent's direction BY DEFAULT** — so the 54px of free space split 27/27, both declared heights were ignored, and the combo box would have rendered at 27px, below usable. The old `cmpSelection` chip strip tolerated being squashed; a combo box does not, which is why swapping the control exposed a latent bug rather than creating one. Both children now carry `FillPortions: =0` + `LayoutMinHeight`, and the container is 62 -> 66 (18+8+40) inside a 120-high grid cell. **Same latent pattern still in `colIssType`, `colIssImpact`, `colIssMissing`** — all still hold cmpSelection, so left alone — src/Screens/scrIssueEdit.pa.yaml
 
 ## Threads          (open items; remove when closed)
+- **PASTE ORDER FOR THE UNLANDED BATCH — sequencing is the main risk, not tokens.** Reviewed
+  2026-08-12; no invented columns, no ungrounded control tokens, paren-balance clean, 22/22 valid.
+  1. **`App.Formulas` FIRST** (formula bar only — the App object has no code view; strip the
+     standalone `=` marker line or you get `==`). `ActiveProjects` / `ArchivedProjects` are NEW
+     names: a screen pasted before them fails to resolve, and the human reports "didn't work"
+     against the wrong file.
+  2. **The SharePoint Choice-value edits NEXT** (task_stage 7->5, issue_status 5->4). `scrTaskEdit`
+     and `scrIssueEdit` offer and Patch the new values; a Patch of a value the live column does not
+     list FAILS at runtime.
+  3. **`scrIssueEdit` is the only CREATE-paste**, and go by container subtree — `colIssStatus`,
+     `colIssTask`, `colIssTx`, `colIssOpened` — then rename off the `_1` suffix and delete the old
+     `selIssStatus` / `fldTask` / `fldTx` / `fldOwner`. Paste creates, it never patches.
+  4. Everything else is PROPERTY-LEVEL. Hand over control name + property + formula body (no
+     leading `=`) rather than re-pasting screens, which re-freezes every X/Y/Width/Height.
+  **Do NOT delete `cmpSelection` or `cmpLookupField`** — still consumed by `selIssType`,
+  `selIssImpact`, `fldAssignee`.
+- **The `scrProjects` delegation canary needs a POSITIVE test, not the absence of a warning.** A
+  blue underline only fires when the source COULD exceed the limit, so on a small list its absence
+  proves nothing. Real test: **Settings > General > Data row limit = 1**, then compare the Active
+  branch's row count against the All branch.
+- **Known edge, accepted:** an issue whose linked task/transaction belongs to a DIFFERENT project
+  (only possible from the old tenant-wide picker) shows a BLANK dropdown while still being linked.
+  `OnChange` never fires, so the save preserves the link — display-only, no data loss. Negligible
+  with example data; revisit only if real cross-project links exist.
 - **SharePoint migration for the Choice-value change: USER IS HANDLING IT, and it is a non-issue —
   the lists hold only example items (confirmed 2026-08-12). Closed; do not re-raise.**
 - **Three auto-layout containers still have BOTH children unpinned** — `colIssType`,

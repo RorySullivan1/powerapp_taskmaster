@@ -85,6 +85,14 @@ Screens:
         // ForAll(... As alias, {record literal}) narrows each row to {Id, Label}; a
         // literal cannot be Collected alongside a raw SharePoint row, whose schema is
         // far wider, so both halves are projected to the same two columns.
+        //
+        // THE Filter DELEGATES; THE ForAll AROUND IT DOES NOT. So each option list is
+        // capped at the DATA ROW LIMIT (set it to 2000). A project with more tasks than
+        // that gets a silently short dropdown. The repo already treats 500-per-project
+        // as reachable — scrProjectEdit's C3 rollup refuses to compute above it — so
+        // this is a real ceiling, not a theoretical one. It is accepted here because the
+        // alternative is going back to a search picker over the whole tenant, which is
+        // what this replaced; revisit if a project ever nears the limit.
         ClearCollect( colIssTaskOpts, { Id: 0, Label: "(none)" } );
         Collect( colIssTaskOpts,
                  ForAll( Filter( taskmaster_tasks,
@@ -798,10 +806,6 @@ Screens:
                                            Email:       gIssAssignee.Mail,
                                            Department: "", JobTitle: "", Picture: "" },
                                      issue_status:      { Value: gIssStatus },
-                                     // NO issue_date_open. It was `If(gEditMode = "Edit",
-                                     // gEditIssue.issue_date_open, Now())` — an app-stamped
-                                     // "when was this opened" that SharePoint already keeps
-                                     // in `Created`, for free and beyond reach of the app.
                                      issue_date_target: dtpIssTarget.SelectedDate,
                                      issue_date_close:  dtpIssClose.SelectedDate,
                                      // --- FOLDED OPTIONALS: were five separate Patches --------
@@ -814,13 +818,13 @@ Screens:
                                          If( gIssImpact <> "(none)", { Value: gIssImpact }, Blank() ),
                                      issue_task_name:
                                          If( gIssTask.Id > 0, { Id: gIssTask.Id, Value: gIssTask.Value }, Blank() ),
+                                     // NO issue_owner and NO issue_date_open in this record.
+                                     // Both were app-written duplicates of what SharePoint
+                                     // already stamps in `Created By` / `Created`, and both are
+                                     // retired in schema.yaml — not dropped, so the columns and
+                                     // their data are still in the list.
                                      issue_transaction_name:
                                          If( gIssTx.Id > 0, { Id: gIssTx.Id, Value: gIssTx.Value }, Blank() ) } ) ),
-                                     // NO issue_owner. It was a second Person column the user
-                                     // filled by hand to record who raised the issue —
-                                     // duplicating `Created By`, which SharePoint stamps and
-                                     // the app cannot touch. Retired in schema.yaml, not
-                                     // dropped: the column and its data are still in the list.
                         Set( gIssErr, FirstError.Message )
                     );
                     If( Len(gIssErr) > 0,
