@@ -96,3 +96,46 @@ delegate — reserve `StartsWith` for plain Text columns.
 - Delegable **data sources** differ: Dataverse and SQL delegate more (e.g. `in` on SQL as
   `("val" in col)`, aggregates on Dataverse to 50k). This file is **SharePoint-specific** —
   moving the backend changes the matrix.
+
+## 6. When reasoning runs out: LIVE MONITOR is the positive test
+
+§5's warning is a **one-way signal** and Microsoft says so outright:
+
+> A delegation warning often appears in the formula bar as a yellow triangle when Power Apps
+> can't push a formula operation to the data source, **but not every nondelegable case shows
+> this warning.**
+> — MS Learn, *Understand data sources for canvas apps*
+
+So "no underline" is not evidence of delegation, and on a small list it is nearly meaningless.
+The documented tool for exactly this is **Live Monitor**:
+
+> To troubleshoot delegation issues that aren't flagged, use Live Monitor under **Advanced
+> tools** to inspect the queries Power Apps sends and the data returned from each data source.
+
+**The procedure — this is the only way to settle a delegation question across the air gap,
+because it produces evidence a human can read back in one sentence:**
+
+1. Studio → **Advanced tools** → **Monitor**. Play the app; events stream live.
+2. Do the one thing under test (open the screen, type in the search box).
+3. Find the **`getRows`** event for the list. Select it to see the data source, timing, result
+   and the formula that caused it.
+4. **Delegated:** a small number of `getRows`, each returning a page of already-filtered rows.
+   **Not delegated:** *repeated* `getRows` walking the list, then filtering on the client —
+   "look for repeated `getRows` calls; these calls might indicate a nondelegable formula."
+
+Pair it with **Settings → General → Data row limit = 1** when you want the failure to be
+loud: anything non-delegable then returns a single record, which is impossible to miss.
+
+**Ask for the `getRows` count, not for "did it work".** A non-delegable query looks completely
+correct on a small list — that is the entire danger — so "it works" is not an answer to a
+delegation question, and neither is a screenshot of the gallery.
+
+### The open case in this repo
+
+**Nesting a `Filter` over a named formula that is itself a `Filter`** —
+`Filter(ActiveProjects, StartsWith(project_name, …))` on `scrProjects`. Both halves delegate
+alone (Or-of-equals on a Choice; `StartsWith` on an indexed Text column). Whether Power Fx
+folds the pair into ONE server query is not documented either way, and it decides whether
+`ActiveProjects` / `LiveTasks` / `LiveTransactions` / `LiveIssues` / `OpenIssues` become the
+app's single definition of "live" or get deleted as unusable. One `getRows` = adopt them
+everywhere; repeated `getRows` = keep the predicates inlined per screen and delete them.

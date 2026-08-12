@@ -99,15 +99,26 @@ Screens:
                    // written out here; the rule now has ONE definition instead of the
                    // copy-per-screen it had.
                    //
-                   // WHAT TO WATCH ON THE FIRST PASTE: a BLUE UNDERLINE under this
-                   // Filter. Nesting a Filter over a named formula that is itself a
-                   // Filter should fold into one server query, but that is the one
-                   // thing about stage 1 no amount of reading settles — and if it does
-                   // NOT fold, this gallery silently truncates at 500 rows instead of
-                   // erroring. If the underline appears, revert THIS branch to the
-                   // inline Or-chain (it is in git at 72e19c4) and stage 1 stops here;
-                   // the named formulas are still worth keeping for the screens that
-                   // consume them whole.
+                   // HOW TO TEST THIS — AND IT IS NOT "DOES THE GALLERY LOOK RIGHT".
+                   // A non-delegable query looks perfect on a small list; that is the
+                   // whole danger. It is also NOT the blue underline: MS Learn states
+                   // plainly that "not every nondelegable case shows this warning", so
+                   // its absence proves nothing here.
+                   //
+                   // Use LIVE MONITOR (Studio > Advanced tools > Monitor), which
+                   // Microsoft documents for exactly this. Play the app, open this
+                   // screen with the Active filter, and read the `getRows` events:
+                   //   ONE getRows returning filtered rows  -> it folded. Adopt the
+                   //     named formulas everywhere and delete the inlined predicates.
+                   //   REPEATED getRows walking the list    -> it did not. Revert this
+                   //     branch to the inline Or-chain (git 72e19c4) and DELETE
+                   //     ActiveProjects / LiveTasks / LiveTransactions / LiveIssues /
+                   //     OpenIssues, which would then be permanently unusable.
+                   // Set Data row limit = 1 first if you want the failure to be loud.
+                   //
+                   // This is the ONLY nesting site in the app. Everything else writes
+                   // its predicates inline, deliberately, until this question is
+                   // answered — so a wrong answer costs one branch, not nine.
                    Sort( Filter( ActiveProjects,
                              StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),

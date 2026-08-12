@@ -352,10 +352,21 @@
      leading `=`) rather than re-pasting screens, which re-freezes every X/Y/Width/Height.
   **Do NOT delete `cmpSelection` or `cmpLookupField`** — still consumed by `selIssType`,
   `selIssImpact`, `fldAssignee`.
-- **The `scrProjects` delegation canary needs a POSITIVE test, not the absence of a warning.** A
-  blue underline only fires when the source COULD exceed the limit, so on a small list its absence
-  proves nothing. Real test: **Settings > General > Data row limit = 1**, then compare the Active
-  branch's row count against the All branch.
+- **THE ONE OPEN QUESTION, and it now has a documented test: does `Filter(<named formula that is
+  itself a Filter>, <more predicates>)` fold into ONE server query?** Grounded 2026-08-12: MS Learn
+  states outright that **"not every nondelegable case shows this warning"**, so the blue underline
+  cannot answer it, and neither can "the gallery looks right" — a non-delegable query looks perfect
+  on a small list, which is the whole danger.
+  **THE TEST: Studio > Advanced tools > LIVE MONITOR**, which MS documents for precisely this
+  ("to troubleshoot delegation issues that aren't flagged"). Play the app, open `scrProjects` on
+  the Active filter, read the `getRows` events. **ONE `getRows` of filtered rows = it folded.
+  REPEATED `getRows` walking the list = it did not.** Set Data row limit = 1 first to make the
+  failure loud. **Ask for the getRows COUNT, never for "did it work".**
+  **WHAT IT DECIDES:** `ActiveProjects` / `LiveTasks` / `LiveTransactions` / `LiveIssues` /
+  `OpenIssues` are ALL currently unconsumed — every screen writes its predicates inline on purpose.
+  Folds -> adopt them everywhere and delete the inlined copies. Does not fold -> revert the one
+  canary branch (git 72e19c4) and DELETE all five, which would then be permanently unusable.
+  `scrProjects`' Active branch is the ONLY nesting site, so a wrong answer costs one branch.
 - **Known edge, accepted:** an issue whose linked task/transaction belongs to a DIFFERENT project
   (only possible from the old tenant-wide picker) shows a BLANK dropdown while still being linked.
   `OnChange` never fires, so the save preserves the link — display-only, no data loss. Negligible
