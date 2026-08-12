@@ -119,6 +119,15 @@ ComponentDefinitions:
          // Last means everything above it has already run if it does throw.
          SetFocus( txtPkSearch )
     Children:
+      # NO AccessibleLabel ON ANY Classic/* CONTROL — the property does not exist
+      # there (confirmed 2026-08-12), so it fails the paste. It survives below on
+      # `txtPkSearch` ONLY because that one is modern. Classic controls take
+      # `Tooltip` instead, which is what `pkClose` uses.
+      # The cost is real and is accepted, not overlooked: `pkRowHit` is an unnamed
+      # transparent button on every result row, so a screen reader announces the
+      # list as "button, button, button" and there is no property here that fixes
+      # it. Converting the row hit target to a modern button is the only route,
+      # and that is a separate, riskier change.
       # ---- Scrim -------------------------------------------------------------
       - pkScrim:
           Control: Classic/Button@2.2.0
@@ -126,7 +135,6 @@ ComponentDefinitions:
             # A button, not a rectangle: it has to be CLICKABLE to dismiss, and a
             # rectangle's OnSelect is not a reliable hit target behind a dialog.
             Text: =""
-            AccessibleLabel: ="Close the picker"
             Fill: =RGBA(0, 0, 0, 0.35)
             HoverFill: =RGBA(0, 0, 0, 0.35)
             PressedFill: =RGBA(0, 0, 0, 0.35)
@@ -171,7 +179,6 @@ ComponentDefinitions:
           Properties:
             Icon: =Icon.Cancel
             Color: =RGBA(255, 255, 255, 1)
-            AccessibleLabel: ="Close without choosing"
             Tooltip: ="Close without choosing"
             X: =(Parent.Width - 620) / 2 + 620 - 16 - 20
             Y: =(Parent.Height - 460) / 2 + 16
@@ -203,7 +210,6 @@ ComponentDefinitions:
           Control: Classic/Button@2.2.0
           Properties:
             Text: ="Search"
-            AccessibleLabel: ="Run the search again"
             Fill: =RGBA(0, 90, 158, 1)
             Color: =RGBA(255, 255, 255, 1)
             BorderColor: =RGBA(0, 90, 158, 1)
@@ -288,9 +294,6 @@ ComponentDefinitions:
                   # own OnSelect does not reliably fire when the click lands on a
                   # child control. HIGHLIGHTS ONLY; the check commits.
                   Text: =""
-                  # Was an unnamed button on every row, so a screen reader
-                  # announced the whole result list as "button, button, button".
-                  AccessibleLabel: =ThisItem.Primary & ", " & ThisItem.Secondary
                   Fill: =RGBA(0, 0, 0, 0)
                   BorderThickness: =0
                   X: =0
@@ -335,7 +338,6 @@ ComponentDefinitions:
           Properties:
             Visible: =cmpPicker.AllowCreate
             Text: ="＋  New"
-            AccessibleLabel: ="Create a new one"
             Fill: =RGBA(255, 255, 255, 1)
             Color: =RGBA(0, 90, 158, 1)
             BorderColor: =RGBA(0, 90, 158, 1)

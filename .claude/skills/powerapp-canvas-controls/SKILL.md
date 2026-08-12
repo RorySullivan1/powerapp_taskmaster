@@ -152,6 +152,20 @@ control that renamed `TriggerOutput` to `DelayOutput`; the text input did **not*
 > which is what this repo uses in all eight places) or an explicit button beside the box. If a
 > spec asks for "press Enter to search", say up front that it cannot be built.
 
+### `AccessibleLabel` is a MODERN-ONLY property
+
+**`AccessibleLabel` does not exist on `Classic/*` controls — confirmed 2026-08-12.** Writing it
+on a `Classic/Button`, `Classic/Icon` or `Classic/TextInput` fails the paste. It is valid on
+modern controls (`ModernTextInput` and its siblings), which is the whole reason the mistake is
+easy to make: the property is real, it is just not on the family you reached for.
+
+The classic equivalent is **`Tooltip`**, which is grounded and used throughout this repo — but
+it is a hover hint, not a name, so it does not solve the same problem. Where a classic control
+carries no visible text (a transparent full-row hit target, a scrim), **there is no property
+that names it**, and a screen reader announces it as a bare "button". Say so plainly rather
+than reaching for a label property that does not exist; the only real fix is converting that
+control to a modern one, which is a separate change with its own paste risk.
+
 ### Modern controls still get REVISED — the revision renames properties
 
 The revision is real even though the token doesn't move. The combo box's current shape:
