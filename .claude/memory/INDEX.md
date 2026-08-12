@@ -330,7 +330,19 @@
 - [2026-08-12] **ROLLOUT: every CROSS-PROJECT query now filters over a named formula; the rules have ONE definition.** `scrHome` (x4 — both OnVisible and the Refresh action), `scrReports` (x2), `scrProjects` (x1). `ActiveProjects` 2 consumers, `LiveTasks` 3, `OpenIssues` 2. **PROJECT-SCOPED queries deliberately stay on the raw list** — 13 of them — because opening an archived project should show its work, and one project's children are bounded anyway. **The sharpest case is scrProjectEdit's cascade: it must read EVERY child including the ones it is about to flag**, so filtering a Live* set there would make it skip exactly the rows it exists to fix. `scrProjects`' other two branches also stay raw: branch 3 IS the archived view, and the default means All — src/App.pa.yaml
 - [2026-08-12] **`LiveTransactions` and `LiveIssues` DELETED after one day — zero consumers each.** Every transaction query in the app is project-scoped, and the only cross-project issue query wants OPEN issues, which `OpenIssues` covers. **A named formula nobody calls is not free**: it is a second place for the rule to drift from the schema, unnoticed precisely because nothing exercises it. Add one when a query needs it. Related call: `OpenIssues` writes its archived predicate out rather than layering over a `LiveIssues` — that would nest a named formula inside a named formula, and **what Monitor proved is that ONE level of composition folds; two is an inference**, with a silently truncated home queue as the failure mode — src/App.pa.yaml
 
+- [2026-08-12] **REJECTED: moving `Theme` from `App.Formulas` to `App.OnStart`.** It is the intuitive fix for "the theme never lands" and it would make things WORSE, for a documented reason. A named formula's "value is always available — there is no timing dependency, no OnStart that must run first before the value is set, no time in which the formula's value is incorrect" (MS Learn, object-app#formulas-property). **`OnStart` is the opposite**: it is non-blocking by default, and "a screen can render and become interactive before App.OnStart finishes running" — so a `Set(gTheme, …)` there produces exactly the intermittent squished-and-black being diagnosed, only harder to reproduce. It would also cost a rename of every `Theme.*` reference in 11 screens and 9 components. **The symptom is a TRANSFER failure, not a placement problem** — src/App.pa.yaml
+
 ## Threads          (open items; remove when closed)
+- **SQUISHED AND BLACK = `App.Formulas` DEFINED NOTHING.** Reported 2026-08-12 after the
+  formula-bar paste. Every named formula lives in ONE property, so one rejection takes out `Theme`,
+  `NavMenu`, `StageWeights` and `ClaimPrefix` at once; every screen then reads blank for every
+  colour and every `Theme.Space.*` dimension, and blank coerces to 0. **The repo source is
+  structurally sound — 9 named formulas, all terminated, parens balanced (verified) — so this is a
+  TRANSFER failure, not an authoring one.** Two causes: the leading `=` marker (yields `==`), or a
+  COLLAPSED formula bar flattening the paste so the opening `//` comment swallows the property.
+  **Fix: expand the formula bar, or paste `python3 tools/formula_bar_body.py --bare` (41 lines, no
+  comments).** Decisive check: type `Theme.` in any Fill — no IntelliSense members means nothing
+  was defined. **DO NOT move Theme to App.OnStart** — see the Decisions entry.
 - **F6 is now MOOT** — the collection it described no longer exists. (F11) the C3 rollup no longer self-heals —
   guarding it removed the only repair path for a number already wrong; a "Recalculate completion"
   action beats reinstating the unconditional cost. (F12) the `RemoveIf` predicates shadow `ID`

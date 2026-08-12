@@ -283,3 +283,33 @@ never see; never describe the app as if authored-but-unlanded work is live.
   and the `schema` context brief.
 - **Orchestrating a whole change** (freshness → author → audit → hand off → record) → the
   **change-end-to-end** workflow, which invokes this skill for the transfer steps.
+
+## App.Formulas: the comment trap (2026-08-12)
+
+`App.Formulas` is the one property that crosses the gap through the **formula bar**, and it is
+also the one whose failure is total: every named formula lives in a single property, so **one
+rejection takes out `Theme`, `NavMenu`, `StageWeights` and `ClaimPrefix` together.** Every screen
+then reads blank for every colour and every `Theme.Space.*` dimension — blank coerces to 0 — and
+the app renders **squished and black**. That symptom is not a layout bug and not a theme bug; it
+is "App.Formulas defined nothing."
+
+Two ways the paste fails, both silent-ish:
+
+1. **The leading `=`.** It is the pa-yaml marker, not part of the formula. The formula bar renders
+   its own `=` outside the editable area, so pasting ours yields `==` and an error that reads like
+   a syntax fault in the first statement.
+2. **`//` runs to end of line.** A **collapsed** formula bar flattens multi-line paste into one
+   line — and our body OPENS with a comment, so the first `//` swallows the entire property.
+   Nothing is defined, and there is no error to see because a comment is valid.
+
+**EXPAND the formula bar before pasting.** And when in doubt, paste code with no comments at all:
+
+    python3 tools/formula_bar_body.py --bare
+
+The reasoning belongs in the repo, which is the authoritative source; Studio only needs the code.
+Stripping the comments for transfer loses nothing and removes the failure mode entirely.
+
+**The decisive diagnostic**, because "it didn't work" cannot localise a 250-line property: in
+Studio, type `Theme.` into any control's `Fill`. If IntelliSense does not offer the members,
+`App.Formulas` defined nothing — go back to the property itself and check whether it is one long
+line or starts with a stray `=`. App checker (Advanced tools) lists the error app-wide.
