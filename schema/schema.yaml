@@ -167,7 +167,22 @@ lists:
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
       - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
-      - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, "Under Review", Finalizing, Complete, Archived] }
+      # CHANGED 2026-08-12 — "Under Review" and "Archived" REMOVED. Review is signalled
+      # by raising an ISSUE against the task, and archiving is a PROJECT state
+      # (project_phase), not something a task carries. Removing "Archived" deletes the
+      # task-level archiving axis entirely, which is why the six-value Or-chain that
+      # excluded it is gone from App.Formulas and five screens.
+      # MIGRATION — existing rows keep whatever string SharePoint stored, and a row
+      # holding a value no longer in the list matches NO filter and vanishes from the
+      # app. Re-map BEFORE removing the values in list settings. Defaults proposed,
+      # NOT applied — both need the user's call:
+      #   "Under Review" -> "Finalizing"   (it is past drafting; "Drafting" is the
+      #                                     alternative if review precedes the draft)
+      #   "Archived"     -> ??? genuinely ambiguous. If those tasks belong to projects
+      #                    that are now archived, "Complete" loses least; if they were
+      #                    shelved inside live projects there is no longer a way to say
+      #                    so, and that work needs a home before the value is deleted.
+      - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, Finalizing, Complete] }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
       - { name: task_lead,             type: Person, multi: false, required: true,  indexed: true,  desc: "Primary owner" }
       - { name: task_supporter,        type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
@@ -234,7 +249,17 @@ lists:
       - { name: issue_task_name,        type: Lookup,   required: false,                 desc: "Related task", lookup: { list: taskmaster_tasks, show: task_name } }
       - { name: issue_transaction_name, type: Lookup,   required: false,                 desc: "Related transaction", lookup: { list: taskmaster_transactions, show: transaction_name } }
       - { name: issue_assignee,         type: Person, multi: false, required: true,  indexed: true,  desc: "Responsible resolver" }
-      - { name: issue_status,           type: Choice,   required: true,  indexed: true,  default: Open,          desc: "Current status", values: [Open, Review, Waiting, Blocked, Closed] }
+      # CHANGED 2026-08-12 — was [Open, Review, Waiting, Blocked, Closed]. The three
+      # intermediate states collapse into Open, and Closed splits into an OUTCOME. The
+      # app's "open issues" test is now a single equality (= "Open") rather than a
+      # four-way Or, which delegates more cheaply.
+      # MIGRATION — re-map BEFORE removing values, same reason as task_stage:
+      #   Review / Waiting / Blocked -> "Open"              (none of them was closed)
+      #   Closed                     -> "Closed - Resolved" (proposed; the stored rows
+      #                                 do not record WHICH outcome, so this is a guess
+      #                                 and any row that was really unresolved needs
+      #                                 fixing by hand)
+      - { name: issue_status,           type: Choice,   required: true,  indexed: true,  default: Open,          desc: "Current status; the three Closed values record the OUTCOME", values: [Open, "Closed - Resolved", "Closed - Unresolved", "Closed - No Change"] }
       - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue", values: [Approval, Process, Compliance, Branding, Technical] }
       - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact", values: [Low, Moderate, High, Critical] }
       # RETIRED 2026-08-12 — SUPERSEDED BY THE SYSTEM COLUMN `Created`.
@@ -344,10 +369,16 @@ rollups:
       "Not Started":  0
       "Planning":     10
       "Drafting":     35
-      "Under Review": 60
       "Finalizing":   85
       "Complete":     100
-      "Archived":     null    # null = EXCLUDED from numerator AND denominator
+      # "Under Review" (60) and "Archived" (excluded) went with the stages themselves
+      # on 2026-08-12. The survivors keep their original numbers DELIBERATELY: re-spacing
+      # would move every stored project_perc_completion without a task changing, so
+      # history would stop being comparable. Cost: a 35 -> 85 jump at Drafting ->
+      # Finalizing. Re-space on purpose if that is wrong — App.Formulas StageWeights is
+      # the app-side copy and must move with it.
+      # There is no longer any EXCLUDED stage, so every task under a project now counts
+      # in both numerator and denominator.
     writer: app-side          # DECIDED 2026-08-03 — the app patches the parent
     writer_notes: >-
       The app recomputes and patches project_perc_completion whenever a task's stage

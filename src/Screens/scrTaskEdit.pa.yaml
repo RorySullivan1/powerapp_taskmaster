@@ -349,7 +349,10 @@ Screens:
                               - cboTkStage:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
-                                    Items: =["Not Started", "Planning", "Drafting", "Under Review", "Finalizing", "Complete", "Archived"]
+                                    # FIVE stages as of 2026-08-12. "Under Review" is gone —
+                                    # review is signalled by raising an ISSUE — and "Archived"
+                                    # is gone because archiving is a PROJECT state.
+                                    Items: =["Not Started", "Planning", "Drafting", "Finalizing", "Complete"]
                                     ItemDisplayText: =ThisItem.Value
                                     DefaultSelectedItems: =Filter( [gTkStage], !IsBlank(Value) )
                                     SelectMultiple: =false
@@ -358,9 +361,7 @@ Screens:
                                     Color: |
                                       =Switch( gTkStage,
                                       "Complete",     Theme.Color.Success,
-                                      "Under Review", Theme.Color.Warning,
                                       "Finalizing",   Theme.Color.Warning,
-                                      "Archived",     Theme.Color.TextMuted,
                                       "Not Started",  Theme.Color.TextMuted,
                                       Theme.Color.TextPrimary )
                                     FillPortions: =0
@@ -614,14 +615,14 @@ Screens:
                                       ="Due date" &
                                        If( !IsBlank(dtpTkTarget.SelectedDate)
                                        && dtpTkTarget.SelectedDate < Today()
-                                       && gTkStage <> "Complete" && gTkStage <> "Archived",
+                                       && gTkStage <> "Complete",
                                            "   ·   OVERDUE", "" )
                                     Font: =Theme.Font
                                     Size: =Theme.Size.Small
                                     Color: |
                                       =If( !IsBlank(dtpTkTarget.SelectedDate)
                                       && dtpTkTarget.SelectedDate < Today()
-                                      && gTkStage <> "Complete" && gTkStage <> "Archived",
+                                      && gTkStage <> "Complete",
                                            Theme.Color.Danger, Theme.Color.TextMuted )
                                     VerticalAlign: =VerticalAlign.Middle
                                     FillPortions: =0
@@ -1205,8 +1206,8 @@ Screens:
                     task_date_start:  dtpTkStart.SelectedDate,
                     task_date_target: dtpTkTarget.SelectedDate,
                     // DERIVED, not entered. Complete stamps it and keeps the original on a
-                    // re-save; Archived PRESERVES whatever was there, because archiving a
-                    // finished task must not erase when it finished; anything else CLEARS it.
+                    // re-save; anything else CLEARS it. The "Archived" arm that used to
+                    // preserve the date is gone with the stage itself (2026-08-12).
                     //
                     // THE NEW BRANCH IS SEPARATE, AND THAT IS THE WHOLE POINT.
                     // `gEditTask` IS NEVER CLEARED ON NEW — this screen only ever reads it
@@ -1224,8 +1225,6 @@ Screens:
                     If( gTkStage = "Complete", Now(), Blank() ),
                     gTkStage = "Complete",
                     Coalesce(gEditTask.task_date_completion, Now()),
-                    gTkStage = "Archived",
-                    gEditTask.task_date_completion,
                     Blank() ),
                     // --- folded optionals: were eight separate Patches ------------------
                     task_supporter:
@@ -1273,12 +1272,9 @@ Screens:
                     Set( gTkRollupScored,
                     AddColumns(
                     // Delegable: FK = on an indexed Lookup, plus an Or-of-equals over the six
-                    // live stages (`<> "Archived"` is a Text <> and would NOT delegate).
+                    // FK. The six-stage Or-chain is gone: task_stage has no "Archived".
                     Filter( taskmaster_tasks,
-                    task_project_id.Id = gTkProject.Id
-                    && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
-                    || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
-                    || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
+                    task_project_id.Id = gTkProject.Id ),
                     wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) ) );
                     If( IsBlank(gTkRollupProj),
                     Notify("Task saved. Parent project not found, so completion was left unchanged.",

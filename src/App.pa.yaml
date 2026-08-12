@@ -93,11 +93,15 @@ App:
           { Stage: "Not Started",  Weight: 0   },
           { Stage: "Planning",     Weight: 10  },
           { Stage: "Drafting",     Weight: 35  },
-          { Stage: "Under Review", Weight: 60  },
           { Stage: "Finalizing",   Weight: 85  },
           { Stage: "Complete",     Weight: 100 }
-          // "Archived" is deliberately ABSENT — archived tasks are excluded from both
-          // numerator and denominator, so a shelved task can't drag a project down.
+          // "Under Review" (was 60) and "Archived" were REMOVED from task_stage on
+          // 2026-08-12 — review is signalled by ISSUES, and archiving by the PROJECT.
+          // The surviving weights are UNCHANGED on purpose: re-spacing them would move
+          // every project's stored project_perc_completion without a single task
+          // changing, so historical numbers would stop being comparable. The cost is a
+          // visible 35 -> 85 jump at Drafting -> Finalizing. Say so and re-space
+          // deliberately if that gap is wrong; do not drift into it.
       );
 
       // --- Live-work sets (perf stage 1, 2026-08-12) ------------------------------
@@ -109,10 +113,10 @@ App:
       //     data: a task, transaction or issue does not carry its parent's phase, so
       //     none of the child sets below can express "belongs to a live project".
       //     `ArchivedProjects` is the set the screens test membership against.
-      //  2. A CHILD'S OWN LIFECYCLE — `task_stage = "Archived"`, `issue_status =
-      //     "Closed"`. A task you shelved individually inside a live project. Real, and
-      //     separately useful (the C3 rollup depends on it — StageWeights omits Archived
-      //     so a shelved task can't drag a project down), but NOT project archiving.
+      //  2. A CHILD'S OWN LIFECYCLE. For ISSUES this is `issue_status` and it is real.
+      //     For TASKS IT NO LONGER EXISTS: "Archived" was removed from task_stage on
+      //     2026-08-12 precisely because conflating the two axes was the bug. A task
+      //     cannot be shelved on its own any more — its project is shelved instead.
       //
       // The value of naming them here is ONE definition instead of the same Or-chain
       // hand-copied into seven Filters across five screens. Any of those copies could
@@ -128,12 +132,12 @@ App:
       //    launch-time snapshot would hide a colleague's work until a manual refresh;
       //  * they are computed LAZILY, only when a screen actually uses one, and never
       //    block app start the way OnStart does.
-      // There is no penalty for a definition the app doesn't use, so all three are
-      // declared here even though stage 1 rewires only scrProjects.
+      // There is no penalty for a definition the app doesn't use.
       //
-      // ENUMERATING the live values is what makes this delegable: `<> "Archived"` is a
-      // Text <> and does NOT delegate. Keep each list in step with the Choice values in
-      // schema/schema.yaml — a value added there and missed here disappears from the app.
+      // ENUMERATING the live values is what makes ActiveProjects delegable: `<>
+      // "Archived"` is a Text <> and does NOT delegate. Keep the list in step with the
+      // Choice values in schema/schema.yaml — a value added there and missed here
+      // disappears from the app with nothing to see and nothing to catch it.
       //
       // NOT YET PROVEN: whether a screen-level `Filter(ActiveProjects, …)` still folds
       // into ONE server query. Nested Filter over a named formula is the single
@@ -142,19 +146,19 @@ App:
           project_phase.Value = "Planning" || project_phase.Value = "Active"
        || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" );
 
-      // AXIS 2, NOT AXIS 1. Six live stages; "Archived" is the seventh and is the one
-      // left out. Matches StageWeights above, which omits Archived for the same reason.
-      // Says NOTHING about whether the parent project is archived.
-      UnarchivedTasks = Filter( taskmaster_tasks,
-          task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
-       || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
-       || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" );
-
-      // AXIS 2 AGAIN, and not even archiving. Issues have no "Archived" — the lifecycle
-      // ends at Closed, so this is simply the not-Closed set.
-      OpenIssues = Filter( taskmaster_issues,
-          issue_status.Value = "Open"    || issue_status.Value = "Review"
-       || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" );
+      // NO TASK SET AT ALL, and that is the point of the 2026-08-12 schema change.
+      // `UnarchivedTasks` lived here for one day: it enumerated the six non-archived
+      // stages so Archived could be excluded server-side. **task_stage no longer HAS
+      // an "Archived" value**, so every stage is live and the filter it existed to
+      // express is the identity. The same six-value Or-chain has been deleted from
+      // five screens for the same reason — it is not simplification, it is a filter
+      // that now selects everything, and one that would silently drop any row with a
+      // blank stage.
+      //
+      // AXIS 2 for ISSUES only, and it is a lifecycle, not archiving. The four
+      // statuses are Open plus three terminal ones, so "open" is a single equality —
+      // which delegates more cheaply than the four-way Or-chain it replaced.
+      OpenIssues = Filter( taskmaster_issues, issue_status.Value = "Open" );
 
       // AXIS 1, and the ONLY set that answers "is this project archived". Screens that
       // load children ACROSS projects collect this once and test membership locally.
@@ -215,15 +219,11 @@ App:
       //   With(
       //       { scored:
       //           AddColumns(
-      //               // Delegable: FK = on an indexed Lookup, plus an Or-of-equals over
-      //               // the six non-archived stages. Enumerating them is how Archived is
-      //               // excluded server-side — `<> "Archived"` is a Text <> and would NOT
-      //               // delegate. Tasks with a blank stage match nothing and are omitted.
-      //               Filter( taskmaster_tasks,
-      //                       task_project_id.Id = <pid>
-      //                    && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
-      //                      || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
-      //                      || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
+      //               // Delegable: `=` on an indexed Lookup FK, and nothing else needed.
+      //               // The six-stage Or-chain that used to sit here was deleted on
+      //               // 2026-08-12 — task_stage has no "Archived" value to exclude any
+      //               // more, so every task under the project counts.
+      //               Filter( taskmaster_tasks, task_project_id.Id = <pid> ),
       //               wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
       //       Patch( taskmaster_projects,
       //              LookUp(taskmaster_projects, ID = <pid>),

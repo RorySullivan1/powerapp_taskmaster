@@ -1525,10 +1525,7 @@ Screens:
                             With( { scored:
                                       AddColumns(
                                           Filter( taskmaster_tasks,
-                                              task_project_id.Id = pid
-                                           && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
-                                             || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
-                                             || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ),
+                                              task_project_id.Id = pid ),
                                           wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
                                 If( CountRows(scored) >= 500,
                                     Notify("Project saved. It has too many tasks to compute completion accurately, so it was left unchanged.",

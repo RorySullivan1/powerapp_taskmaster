@@ -48,7 +48,13 @@ taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name)
 | Column | Axis | Values |
 |---|---|---|
 | `task_status` | **Health** — how it's going | `Green`, `Amber`, `Red` |
-| `task_stage` | **Lifecycle** — where it is | `Not Started`, `Planning`, `Drafting`, `Under Review`, `Finalizing`, `Complete`, `Archived` |
+| `task_stage` | **Lifecycle** — where it is | `Not Started`, `Planning`, `Drafting`, `Finalizing`, `Complete` |
+| `issue_status` | **Lifecycle + outcome** | `Open`, `Closed - Resolved`, `Closed - Unresolved`, `Closed - No Change` |
+
+> **Changed 2026-08-12.** `task_stage` lost `Under Review` (review is signalled by raising an
+> **issue**) and `Archived` (archiving is a **project** state — `project_phase`). That removed the
+> task-level archiving axis altogether. `issue_status` lost its three intermediate states and
+> split `Closed` into an outcome.
 
 Health drives the RAG pill; stage drives the kanban columns. Both are Choice → **no join cost,
 delegable `=`, and sortable** (Managed Metadata was neither).
@@ -109,20 +115,21 @@ A `<>` against a Choice's `.Value` is a **Text `<>`**, which does **not** delega
 the wanted values instead:
 
 ```powerapps
-// Open tasks — delegable
-Filter(taskmaster_tasks,
-    task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
- || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
- || task_stage.Value = "Finalizing")
+// Open issues — delegable, and a SINGLE equality since 2026-08-12
+Filter(taskmaster_issues, issue_status.Value = "Open")
 
-// Open issues — delegable
-Filter(taskmaster_issues,
-    issue_status.Value = "Open"    || issue_status.Value = "Review"
- || issue_status.Value = "Waiting" || issue_status.Value = "Blocked")
+// Not-yet-complete tasks — enumerate the wanted stages rather than `<> "Complete"`
+Filter(taskmaster_tasks,
+    task_stage.Value = "Not Started" || task_stage.Value = "Planning"
+ || task_stage.Value = "Drafting"    || task_stage.Value = "Finalizing")
 ```
 
-Verbose, but it runs server-side. (A Yes/No `is_archived` column would be cheaper and indexable —
-worth considering now that the schema is ours to edit.)
+**The archived-exclusion chains are GONE, and not because they were verbose.** `task_stage` has no
+`Archived` value any more, so a chain enumerating the "live" stages selects everything — and would
+silently drop any row with a blank stage. Archiving is a **project** state, and a task/transaction/
+issue does **not** carry its parent's phase, so it cannot be excluded server-side at all without a
+join. The three cross-project child loads collect `ArchivedProjects` and `RemoveIf` locally; every
+other child query is already scoped to one project. See `App.Formulas`.
 
 ---
 
@@ -148,8 +155,10 @@ hard cap of two people per task — accepted as sufficient.
 `project_perc_completion` is the **mean stage-weight across a project's tasks**, not a done/total
 count. Weights (`schema.yaml` → `rollups:`, mirrored as the `StageWeights` named formula in
 `src/App.pa.yaml`): `Not Started` 0 · `Planning` 10 · `Drafting` 35 ·
-`Under Review` 60 · `Finalizing` 85 · `Complete` 100 · **`Archived` excluded** from numerator *and*
-denominator.
+`Finalizing` 85 · `Complete` 100. `Under Review` (60) and `Archived` (excluded) went with the
+stages themselves on 2026-08-12; **the survivors keep their original numbers on purpose**, so stored
+percentages stay comparable — at the cost of a 35 → 85 jump. **Nothing is excluded any more**, so
+every task under a project counts in both numerator and denominator.
 
 **The app is the writer** — it recomputes and patches the parent whenever a task's stage changes
 (task form `OnSuccess`, kanban drop, grid save). The canonical snippet lives beside `StageWeights`.

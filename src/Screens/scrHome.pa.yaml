@@ -40,16 +40,11 @@ Screens:
         =Concurrent(
             ClearCollect( colMyTasks,
                 Filter( taskmaster_tasks,
-                    ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail )
-                 && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
-                   || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
-                   || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
+                    ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ) ),
             ClearCollect( colMyIssues,
                 Filter( taskmaster_issues,
                     // Assigned to me, full stop — see the note on the other copy.
-                    issue_assignee.Email = gUserEmail
-                 && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
-                   || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) ),
+                    issue_assignee.Email = gUserEmail && issue_status.Value = "Open" ) ),
             // THE PROJECT-LEVEL EXCLUSION. Collected in the same Concurrent so it costs
             // no extra wall-clock, then applied LOCALLY below. Archiving is a PROJECT
             // state; a task or issue does not carry its parent's phase, so this cannot
@@ -97,10 +92,7 @@ Screens:
               Concurrent(
                   ClearCollect( colMyTasks,
                       Filter( taskmaster_tasks,
-                          ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail )
-                       && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
-                         || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
-                         || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) ),
+                          ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ) ),
                   ClearCollect( colMyIssues,
                       Filter( taskmaster_issues,
                           // ASSIGNED TO ME, full stop. The second arm was
@@ -110,9 +102,7 @@ Screens:
                           // delegation for the WHOLE filter and silently truncate this
                           // list at 500 rows. "My issues" is now what I must act on,
                           // not what I happened to raise.
-                          issue_assignee.Email = gUserEmail
-                       && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
-                         || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) ),
+                          issue_assignee.Email = gUserEmail && issue_status.Value = "Open" ) ),
                   // THE PROJECT-LEVEL EXCLUSION. Collected in the same Concurrent so it costs
                   // no extra wall-clock, then applied LOCALLY below. Archiving is a PROJECT
                   // state; a task or issue does not carry its parent's phase, so this cannot

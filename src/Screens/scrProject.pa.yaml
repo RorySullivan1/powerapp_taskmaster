@@ -59,13 +59,11 @@ Screens:
       OnVisible: |
         =ClearCollect( colProjectTasks,
             Filter( taskmaster_tasks,
-                task_project_id.Id = gSelProject.ID
-             && ( task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
-               || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
-               || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" ) ) );
-        Set( gProjArchived,
-             CountRows( Filter( taskmaster_tasks,
-                 task_project_id.Id = gSelProject.ID && task_stage.Value = "Archived" ) ) );
+                task_project_id.Id = gSelProject.ID ) );
+        // NO gProjArchived. It counted this project's individually-archived TASKS, and
+        // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
+        // ever return 0 and the "N archived (hidden)" caption it fed could never show.
+        // Nothing is hidden from the task list any more: it is every task on the project.
         // Delete is a TWO-PRESS action and must never open already armed.
         Set( gPrDelArm, false )
     Children:
@@ -682,8 +680,6 @@ Screens:
                                           Text: |
                                             ="Tasks   " & CountRows( Filter(colProjectTasks, task_stage.Value = "Complete") )
                                             & " of " & CountRows(colProjectTasks) & " complete"
-                                            & If( gProjArchived > 0,
-                                            "   ·   " & gProjArchived & " archived (hidden)", "" )
                                           Font: =Theme.Font
                                           Size: =Theme.Size.H3
                                           FontWeight: =FontWeight.Semibold
@@ -1081,7 +1077,7 @@ Screens:
                                   Control: Label@2.5.1
                                   Properties:
                                     Text: |
-                                      ="Issues   " & CountRows( Filter(galIssues.AllItems, issue_status.Value <> "Closed") )
+                                      ="Issues   " & CountRows( Filter(galIssues.AllItems, issue_status.Value = "Open") )
                                        & " open of " & CountRows(galIssues.AllItems)
                                     Font: =Theme.Font
                                     Size: =Theme.Size.H3

@@ -87,7 +87,7 @@ Screens:
         // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the
         // strip shows the previous record's pick while the save writes this one.
         // The component gained OnReset on 2026-08-11; these are its consumers.
-        Reset( selIssStatus );
+        Reset( cboIssStatus );
         Reset( selIssType );
         Reset( selIssImpact )
     Children:
@@ -203,21 +203,30 @@ Screens:
                               Color: =Theme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - selIssStatus:
-                            Control: CanvasComponent
-                            ComponentName: cmpSelection
+                        # A COMBO BOX, NOT A cmpSelection STRIP — swapped 2026-08-12 with the
+                        # status values themselves. cmpSelection lays every option across ONE
+                        # row (`WrapCount = CountRows(Items)`), so each chip gets Width/N. That
+                        # was fine for "Open / Review / Waiting / Blocked / Closed"; it is not
+                        # fine for three ~19-character "Closed - …" labels, which would clip at
+                        # 11pt with no way to widen them. The label IS the stored Choice value
+                        # (`Set(gIssStatus, …Label)`), so shortening the text was not available.
+                        # cboTkStage on scrTaskEdit is the proven pattern for a value list that
+                        # does not fit a strip. Output is `.Selected.Value`, not `.Selected.Label`.
+                        - cboIssStatus:
+                            Control: ModernCombobox@1.1.1
                             Properties:
-                              FontSize: =11
+                              Items: |
+                                =["Open", "Closed - Resolved", "Closed - Unresolved", "Closed - No Change"]
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gIssStatus], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              Color: |
+                                =If( gIssStatus = "Open", Theme.Color.TextPrimary, Theme.Color.TextMuted )
                               Width: =Parent.Width
                               Height: =40
-                              Items: |
-                                =Table( { Id: 1, Label: "Open" },    { Id: 2, Label: "Review" },
-                                        { Id: 3, Label: "Waiting" }, { Id: 4, Label: "Blocked" },
-                                        { Id: 5, Label: "Closed" } )
-                              DefaultId: |
-                                =Switch( If(gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open"),
-                                         "Open", 1, "Review", 2, "Waiting", 3, "Blocked", 4, 5 )
-                              OnChange: =Set(gIssStatus, selIssStatus.Selected.Label)
+                              OnChange: =Set(gIssStatus, cboIssStatus.Selected.Value)
             - gridIss2:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
