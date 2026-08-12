@@ -3,7 +3,7 @@
 #
 # REACHABLE FROM EXACTLY TWO PLACES, and that is deliberate:
 #   1. scrReference ▸ Clients         — maintenance
-#   2. cmpRecordPicker ▸ "＋ New"     — quick creation mid-flow
+#   2. cmpPicker ▸ "＋ New"           — quick creation mid-flow
 # It is NOT in NavMenu. A client is reference data, not a place you browse to.
 #
 # THE RETURN CONTRACT (`gClReturn`) is what makes the picker route work.
@@ -20,7 +20,7 @@
 # be cut off. Confirmed constraint, not a preference.
 #
 # PEOPLE ARE NEVER CREATED. client_sales is a Person column filled from Microsoft
-# 365 through cmpPeoplePicker, exactly like every other person field in the app.
+# 365 through cmpPicker, exactly like every other person field in the app.
 # Only the CLIENT record is created here.
 #
 # CHOICE VALUES ARE READ, NOT HARDCODED. client_type and client_coverage are
@@ -59,7 +59,7 @@ Screens:
         Reset( txtClName ); Reset( txtClNotes );
         Reset( cboClType ); Reset( cboClCov );
         Reset( pickClRegion );
-        Reset( cmpClPeople )
+        Reset( cmpClPick )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -216,8 +216,8 @@ Screens:
                         Height: =62
                         OnPick: |
                           =Set( gClPicker, "Sales" );
-                           Reset( cmpClPeople );
-                           Set( gClPeopleQuery, "" )
+                           Reset( cmpClPick );
+                           Set( gClQuery, "" )
                         OnClear: |
                           =Set( gClSales, { DisplayName: "", Mail: "" } )
             - colClRegion:
@@ -375,10 +375,12 @@ Screens:
               Set( gClReturn, "" );
               Notify( If(gClMode = "Edit", "Client saved", "Client created"), NotificationType.Success );
               Back() ) )
-      # ---- People picker — declared LAST so it paints above the action bar ---
-      - cmpClPeople:
+      # ---- Picker — declared LAST so it paints above the action bar ---------
+      # One state only here (the sales owner), but the same cmpPicker every
+      # other screen uses. See scrTaskEdit's instance for the full commentary.
+      - cmpClPick:
           Control: CanvasComponent
-          ComponentName: cmpPeoplePicker
+          ComponentName: cmpPicker
           Properties:
             Visible: =gClPicker = "Sales"
             X: =0
@@ -389,16 +391,19 @@ Screens:
             # The directory call runs HERE — the component cannot reach a data
             # source with AccessAppScope false. Bound to the global that OnSearch
             # fills, not to the instance's own Query output, which would be a
-            # same-instance cycle.
+            # same-instance cycle. Key is the person's Mail; Primary/Secondary are
+            # the display name and the address the row shows.
             Results: |
-              =If( Len(gClPeopleQuery) >= 2,
-                   ShowColumns(
-                       Office365Users.SearchUserV2({ searchTerm: gClPeopleQuery, top: 25 }).value,
-                       DisplayName, Mail ) )
-            OnSearch: =Set( gClPeopleQuery, cmpClPeople.Query )
+              =If( Len(gClQuery) >= 2,
+              ForAll( Office365Users.SearchUserV2({ searchTerm: gClQuery, top: 25 }).value As u,
+              { Key:       u.Mail,
+              Primary:   u.DisplayName,
+              Secondary: u.Mail } ) )
+            OnSearch: =Set( gClQuery, cmpClPick.Query )
+            AllowCreate: =false
             OnConfirm: |
               =Set( gClSales,
-                    { DisplayName: cmpClPeople.Picked.DisplayName,
-                      Mail:        cmpClPeople.Picked.Mail } );
+                    { DisplayName: cmpClPick.Picked.Primary,
+                      Mail:        cmpClPick.Picked.Secondary } );
                Set( gClPicker, "" )
             OnCancel: =Set( gClPicker, "" )

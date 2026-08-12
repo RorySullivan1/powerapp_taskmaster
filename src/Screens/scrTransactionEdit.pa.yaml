@@ -64,7 +64,7 @@ Screens:
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
         Reset( txtTxName );
-        Set( gTxPicker, "" ); Set( gTxPeopleQuery, "" ); Reset( cmpTxPeople );
+        Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
         // date — it blocked the save outright on every edit.
         Reset( dtpTxDate );
@@ -320,8 +320,8 @@ Screens:
                               Height: =62
                               OnPick: |
                                 =Set( gTxPicker, "Client" );
-                                 Reset( cmpTxRecord );
-                                 Set( gTxRecQuery, "" )
+                                 Reset( cmpTxPick );
+                                 Set( gTxQuery, "" )
                               OnClear: |
                                 =Set( gTxClient, { Id: 0, Value: "" } )
             - gridTx4:
@@ -358,8 +358,8 @@ Screens:
                               Height: =62
                               OnPick: |
                                 =Set( gTxPicker, "Product" );
-                                 Reset( cmpTxRecord );
-                                 Set( gTxRecQuery, "" )
+                                 Reset( cmpTxPick );
+                                 Set( gTxQuery, "" )
                               OnClear: |
                                 =Set( gTxProduct, { Id: 0, Value: "" } )
                   - colTxSales:
@@ -387,8 +387,8 @@ Screens:
                               Height: =62
                               OnPick: |
                                 =Set( gTxPicker, "Sales" );
-                                 Reset( cmpTxPeople );
-                                 Set( gTxPeopleQuery, "" )
+                                 Reset( cmpTxPick );
+                                 Set( gTxQuery, "" )
                               OnClear: |
                                 =Set( gTxSales, { DisplayName: "", Mail: "" } )
             - colTxMissing:
@@ -543,83 +543,61 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
-      - cmpTxPeople:
+      # =====================================================================
+      # PICKER — ONE cmpPicker instance for the sales owner AND both lookups.
+      # Declared LAST so the dialog paints above the footer. gTxPicker names
+      # the field and selects the row kind.
+      # See scrTaskEdit's instance for the full contract commentary.
+      # =====================================================================
+      - cmpTxPick:
           Control: CanvasComponent
-          ComponentName: cmpPeoplePicker
+          ComponentName: cmpPicker
           Properties:
-            Visible: =gTxPicker = "Sales"
+            Visible: =Len( Coalesce(gTxPicker, "") ) > 0
             X: =0
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            Title: ="Select sales owner"
+            Title: |
+              =Switch( gTxPicker,
+                       "Sales",   "Select sales owner",
+                       "Client",  "Select client",
+                       "Product", "Select product" )
+            # Queries run HERE — AccessAppScope false. Bound to gTxQuery, which
+            # OnSearch sets, never to the instance's own Query output.
+            # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
             Results: |
-              =If( Len(gTxPeopleQuery) >= 2,
-                   ShowColumns(
-                       Office365Users.SearchUserV2({ searchTerm: gTxPeopleQuery, top: 25 }).value,
-                       DisplayName, Mail ) )
-            OnSearch: =Set( gTxPeopleQuery, cmpTxPeople.Query )
-            OnConfirm: |
-              =Set( gTxSales,
-                    { DisplayName: cmpTxPeople.Picked.DisplayName,
-                      Mail:        cmpTxPeople.Picked.Mail } );
-               Set( gTxPicker, "" )
-            OnCancel: =Set( gTxPicker, "" )
-
-      # =====================================================================
-      # RECORD PICKER — declared LAST so the dialog paints above the footer.
-      # ONE instance serves every lookup on this screen; gTxPicker names which.
-      # The query runs HERE, not in the component: with AccessAppScope false
-      # it cannot reach a data source. Each branch is a delegable StartsWith
-      # on an indexed Text column, projected to the {Id, Primary, Secondary}
-      # shape the component declares. ShowColumns takes IDENTIFIERS.
-      # =====================================================================
-      - cmpTxRecord:
-          Control: CanvasComponent
-          ComponentName: cmpRecordPicker
-          Properties:
-            Visible: =gTxPicker = "Client" || gTxPicker = "Product"
-            X: =0
-            Y: =0
-            Width: =Parent.Width
-            Height: =Parent.Height
-            Title: =Switch( gTxPicker, "Client", "Select client", "Select product" )
-            # ForAll(... As alias, {record}) — NOT AddColumns(ShowColumns(...)).
-            # ShowColumns kept `ID` and AddColumns then tried to add `Id`, a name
-            # differing only by case, which Studio rejects — and the result carried
-            # SIX columns where the component declares three. A record literal emits
-            # exactly {Id, Primary, Secondary} and cannot collide. `As` scoping is the
-            # idiom scrProjectEdit already lands.
-            # No else branch, so an unmatched state yields blank — the same shape as
-            # the people picker, which is confirmed working in Studio.
-            # FirstN caps the page at 50: Filter delegates, ForAll does not.
-            Results: |
-              =If( gTxPicker = "Client" && Len(gTxRecQuery) >= 2,
+              =If( gTxPicker = "Sales" && Len(gTxQuery) >= 2,
+              ForAll( Office365Users.SearchUserV2({ searchTerm: gTxQuery, top: 25 }).value As u,
+              { Key:       u.Mail,
+              Primary:   u.DisplayName,
+              Secondary: u.Mail } ),
+              gTxPicker = "Client" && Len(gTxQuery) >= 2,
               ForAll( FirstN( Filter( taskmaster_clients,
-              StartsWith(client_name, gTxRecQuery) ), 50 ) As c,
-              { Id:        c.ID,
+              StartsWith(client_name, gTxQuery) ), 50 ) As c,
+              { Key:       Text(c.ID),
               Primary:   c.client_name,
               Secondary: Coalesce(c.client_type.Value, "") } ),
-              gTxPicker = "Product" && Len(gTxRecQuery) >= 2,
+              gTxPicker = "Product" && Len(gTxQuery) >= 2,
               ForAll( FirstN( Filter( taskmaster_products,
-              StartsWith(product_uid, gTxRecQuery) ), 50 ) As p,
-              { Id:        p.ID,
+              StartsWith(product_uid, gTxQuery) ), 50 ) As p,
+              { Key:       Text(p.ID),
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )
-            OnSearch: =Set( gTxRecQuery, cmpTxRecord.Query )
+            OnSearch: =Set( gTxQuery, cmpTxPick.Query )
             AllowCreate: =gTxPicker = "Client" || gTxPicker = "Product"
             OnConfirm: |
               =Switch( gTxPicker,
-              "Client",  Set( gTxClient,  { Id: cmpTxRecord.Picked.Id, Value: cmpTxRecord.Picked.Primary } ),
-              Set( gTxProduct, { Id: cmpTxRecord.Picked.Id, Value: cmpTxRecord.Picked.Primary } ) );
+              "Sales",   Set( gTxSales,   { DisplayName: cmpTxPick.Picked.Primary, Mail: cmpTxPick.Picked.Secondary } ),
+              "Client",  Set( gTxClient,  { Id: Value(cmpTxPick.Picked.Key), Value: cmpTxPick.Picked.Primary } ),
+              "Product", Set( gTxProduct, { Id: Value(cmpTxPick.Picked.Key), Value: cmpTxPick.Picked.Primary } ) );
               Set( gTxPicker, "" )
-            # ＋ New hands the caller's field name to the create screen via
+            # + New hands the caller's field name to the create screen via
             # gClReturn / gPdReturn; that screen writes the new record back
             # into the right global and returns here with it selected.
-            # DOES NOT TOUCH gEditMode. The create screens carry their OWN mode
-            # (gClMode / gPdMode) — clobbering the caller's mode meant returning
-            # from ＋ New re-seeded this screen as a blank NEW record, losing the
-            # record being edited rather than merely the typed values.
+            # DOES NOT TOUCH gEditMode — the create screens carry their own
+            # (gClMode / gPdMode); clobbering the caller's lost the record being
+            # edited rather than merely the typed values.
             # gTxResume tells this screen's OnVisible that the next show is a RETURN.
             OnCreateNew: |
               =Set( gTxResume, true );

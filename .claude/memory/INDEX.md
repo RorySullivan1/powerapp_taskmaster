@@ -1,9 +1,14 @@
 # MEMORY INDEX  ·  keep ≤ ~80 lines
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **Phase: BUILT and IN SYNC — user confirmed 2026-08-11 that EVERYTHING authored to date is in Studio**, including cmpPeoplePicker across the 4 edit screens, the padding sweep and the save optimisation. **NOT yet in Studio: scrAdmin's two maintenance galleries, and the `cmpRecordPicker` wiring on `scrTaskEdit` / `scrTransactionEdit` / `scrIssueEdit` (3 full re-pastes; 8 orphaned galleries + 8 search boxes to delete by hand).**
-- **Phase: BUILT — now editing and refining.** 10 screens, 12 components and the App object
+- **Phase: BUILT — now editing and refining.** 11 screens, 9 components and the App object
   exist in Studio, the lists are added, `App.Formulas` is in. Work is fixing and refining, not creating.
+- **STUDIO HAND-OFF BACKLOG (repo is ahead of Studio):** create `cmpLookupField` (5 properties) and
+  `cmpPicker` (9 properties: `Title`/`Results`/`AllowCreate` Input, `Query`/`Picked` Output,
+  `OnSearch`/`OnConfirm`/`OnCancel`/`OnCreateNew` Event); re-paste all five `scr*Edit` screens;
+  then DELETE in Studio: `cmpPeoplePicker`, `cmpRecordPicker` and the four batch-4 components
+  (`cmpUiKit`, `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`). Orphaned controls left behind by
+  the `cmpLookupField` rollout (61) must be deleted by hand on the four screens.
 - **Repo restructured 2026-08-05 to plain source**: `src/App.pa.yaml`, `src/Screens/*.pa.yaml`,
   `src/Components/*.pa.yaml`. 22/22 valid. Component definitions are WHOLE files again — the
   contract/body split, the skeleton variants, the `.msapp` packing and the `studio/` tree are all
@@ -292,12 +297,14 @@
 
 - [2026-08-11] **`cmpLookupField` ROLLED OUT to all 19 fields across 5 screens — 6261 -> 5417 lines (-844), 61 controls removed.** `scrTaskEdit` -253, `scrProjectEdit` -208, `scrIssueEdit` -184, `scrTransactionEdit` -148, `scrClientEdit` -51. Ahead of the ~470-line estimate because the clusters averaged ~49 lines, not ~25. **Every wrapper held exactly three controls — caption, pick button, chip — verified before replacing**, so blanket replacement of each container's children was safe; only `scrClientEdit`'s sales field sat directly in `bodyRoot` and needed a new `colClSales` wrapper. Verified after: no dangling control references on any screen, and every `g*Picker` state is still both set and consumed on all five screens (7 states on scrProjectEdit alone). **The two drifting chip variants are now one** — `scrProjectEdit`'s five `btn*Chip` buttons with a literal "✕" in their Text are gone, and with them the bug where clicking a chip to read a truncated value cleared the field — src/Components/cmpLookupField.pa.yaml
 
+- [2026-08-12] **`cmpPeoplePicker` + `cmpRecordPicker` MERGED into one `cmpPicker`; the 9 screen instances became 5.** The two components were 802 lines of which ~91% was identical — same geometry constants, same scrim/card/header, same debounced search, same footer, same `OnReset`. **Only the KEY differed**: a record has an ID (`rpPicked.Id > 0 && rpPicked.Id = ThisItem.Id`), a person has none and keys on Mail. **Making the row shape a generic `{Key, Primary, Secondary}` with `Key` as TEXT is the whole merge** — the screen projects `Text(c.ID)` or `u.Mail` into it and writes back `{Id: Value(Picked.Key), Value: Picked.Primary}` for a lookup or `{DisplayName: Picked.Primary, Mail: Picked.Secondary}` for a person. A SharePoint ID is an integer, so `Text()` then `Value()` round-trips exactly. **The instance merge fell out of it for free**: `g*Picker` already named the field being filled, so it can select the row KIND too — one `Visible`, one `Title` Switch, one `Results` If chain, one `OnConfirm`, and ONE `Reset()` target per screen instead of two. `ShowColumns` could not survive the merge (it can only keep the source's own column names, and neither a directory row nor a list row has a `Key`), so **every branch is now `ForAll(… As alias, {record literal})`, people included** — uniform shape is what lets the If chain type-check. Net −337 lines across the screens plus −802 from the deleted components — src/Components/cmpPicker.pa.yaml
+- [2026-08-12] **Three picker UX gaps closed in the same pass, because they all live in the file the merge rewrites.** (a) **Zero-results was invisible**: the hint label covered "nothing typed" and "too short" but not "searched and found nothing", so a query matching no rows rendered 588×264 of blank white, indistinguishable from still-loading or broken — now a three-state `If`, ending `"No matches for ""…""."`. (b) **`AccessibleLabel` on the scrim, the close icon, the search box and every result row**: the per-row hit target is an unnamed transparent `Classic/Button`, so a screen reader announced the whole result list as "button, button, button"; it now announces `Primary & ", " & Secondary`. (c) **`SetFocus(txtPkSearch)` added to `OnReset`, DELIBERATELY LAST** — it errors when its target is not yet visible, and the screen makes the instance visible via its global one statement before calling `Reset()`; whether that propagates within a single behaviour chain is exactly what a one-way gap cannot confirm, so placing it last means everything above it has already run if it throws. **It is the first thing to delete if the dialog misbehaves on open** — src/Components/cmpPicker.pa.yaml
+
 ## Threads          (open items; remove when closed)
 - **Still open from the 2026-08-11 review** (not in batches 1-3): no busy state on any save, so a
   double-tap during a multi-second write creates duplicate records; `scrTaskEdit`'s
   `task_date_completion` has the same stale-`gEditTask` leak fixed on `scrProjectEdit`;
-  `scrProjectEdit`'s rollup runs unconditionally; pickers have no zero-results state; 462 lines of
-  never-instantiated components; unindexed `issue_owner` / `issue_date_open`.
+  `scrProjectEdit`'s rollup runs unconditionally; unindexed `issue_owner` / `issue_date_open`.
 - **Await the Studio binary on scrProject's padding fix** (13 formula-bar edits, handed off
   2026-08-11). If labels STILL overlap, padding overflow is ruled out — ask which two labels
   touch and whether the columns sit too far left or too far right.
@@ -310,14 +317,10 @@
 - **Ask the human for a `GridLayout` container's OWN code view** — one that has had its columns
   and rows configured in the Studio pane. That is the only missing piece before a grid can be
   authored here rather than merely filled.
-- **`cmpPeoplePicker` is authored but NOT in Studio.** Hand-off: create the component, hand-type
-  its SEVEN custom properties (`Title` Input/Text, `Results` Input/Table, `Query` Output/Text,
-  `Picked` Output/Record, `OnSearch`/`OnConfirm`/`OnCancel` Event/Boolean), paste the body, then
-  re-paste `scrTaskEdit`. Orphans to delete on that screen by hand: `txtTkLeadSearch`,
-  `txtTkSupporterSearch`, `galTkLead`, `galTkSupporter`.
-- **The other three person fields still use the old inline pickers** — `scrIssueEdit` assignee and
-  owner, `scrTransactionEdit` sales owner, `scrProjectEdit` manager/requestor. Deliberately left
-  until `cmpPeoplePicker` is confirmed working on `scrTaskEdit`.
+- **`cmpPicker` is authored but NOT in Studio, and it supersedes two components that ARE.** Order
+  matters: create `cmpPicker` and hand-type its NINE properties FIRST, re-paste the five `scr*Edit`
+  screens, confirm they work, and only THEN delete `cmpPeoplePicker` / `cmpRecordPicker` — deleting
+  a component that still has instances breaks the screens that hold them.
 - **`scrIssueEdit` still saves with guarded follow-up Patches** (the pattern folded out of
   `scrTaskEdit` on 2026-08-10). Same fold available if its save also feels slow;
   `scrTransactionEdit` already writes in a single Patch and needs nothing.
@@ -434,3 +437,4 @@
 - 2026-08-10 1905 | save buttons no longer gate on DisplayMode.Disabled (a disabled button can't fire OnSelect, so a missing required field = silent dead click); requirement moved into OnSelect with a Notify naming the field, on scrTaskEdit + scrIssueEdit + scrTransactionEdit | sessions/2026-08-10-1746-consolidate-task-editor.md
 - 2026-08-10 2015 | task save optimised 12 round trips -> 1 on a typical edit: 8 optional Patches folded into the main one, C3 rollup skipped unless the stage moved, project write skipped when unchanged, Concurrent on the two rollup reads | sessions/2026-08-10-1746-consolidate-task-editor.md
 - 2026-08-11 1325 | scrProject task-list overlap root-caused: `Parent.Width` is the OUTER width, so every child of a padded container overflowed by its padding; 12 widths + 1 height fixed, cardInfo fact values -> 12pt | sessions/2026-08-11-1325-scrproject-padding-overflow.md
+- 2026-08-12 | cmpPeoplePicker + cmpRecordPicker merged into cmpPicker on a generic {Key, Primary, Secondary} row (Key is TEXT: Mail for a person, Text(ID) for a record); 9 screen instances collapsed to 5, one Reset target per screen; zero-results state, AccessibleLabels and SetFocus added in the same pass | INDEX Decisions 2026-08-12

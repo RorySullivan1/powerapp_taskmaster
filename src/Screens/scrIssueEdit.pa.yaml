@@ -83,7 +83,7 @@ Screens:
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
         Reset( txtIssName ); Reset( txtIssDesc );
-        Set( gIssPicker, "" ); Set( gIssPeopleQuery, "" ); Reset( cmpIssPeople );
+        Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose );
         // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the
@@ -372,8 +372,8 @@ Screens:
                               Height: =62
                               OnPick: |
                                 =Set( gIssPicker, "Task" );
-                                 Reset( cmpIssRecord );
-                                 Set( gIssRecQuery, "" )
+                                 Reset( cmpIssPick );
+                                 Set( gIssQuery, "" )
                               OnClear: |
                                 =Set( gIssTask, { Id: 0, Value: "" } )
                   - lblIssTargetCap:
@@ -435,8 +435,8 @@ Screens:
                               Height: =62
                               OnPick: |
                                 =Set( gIssPicker, "Tx" );
-                                 Reset( cmpIssRecord );
-                                 Set( gIssRecQuery, "" )
+                                 Reset( cmpIssPick );
+                                 Set( gIssQuery, "" )
                               OnClear: |
                                 =Set( gIssTx, { Id: 0, Value: "" } )
                   - lblIssCloseCap:
@@ -496,8 +496,8 @@ Screens:
                               Height: =62
                               OnPick: |
                                 =Set( gIssPicker, "Assignee" );
-                                 Reset( cmpIssPeople );
-                                 Set( gIssPeopleQuery, "" )
+                                 Reset( cmpIssPick );
+                                 Set( gIssQuery, "" )
                               OnClear: |
                                 =Set( gIssAssignee, { DisplayName: "", Mail: "" } )
                   - colIssOwner:
@@ -522,8 +522,8 @@ Screens:
                               Height: =62
                               OnPick: |
                                 =Set( gIssPicker, "Owner" );
-                                 Reset( cmpIssPeople );
-                                 Set( gIssPeopleQuery, "" )
+                                 Reset( cmpIssPick );
+                                 Set( gIssQuery, "" )
                               OnClear: |
                                 =Set( gIssOwner, { DisplayName: "", Mail: "" } )
             - colIssMissing:
@@ -714,11 +714,18 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
-      - cmpIssPeople:
+      # =====================================================================
+      # PICKER — ONE cmpPicker instance for the two person fields AND the two
+      # record lookups. Declared LAST so the dialog paints above the footer.
+      # gIssPicker names the field being filled and selects the row kind.
+      # AllowCreate is false throughout: an issue links to things that already
+      # exist. See scrTaskEdit's instance for the full contract commentary.
+      # =====================================================================
+      - cmpIssPick:
           Control: CanvasComponent
-          ComponentName: cmpPeoplePicker
+          ComponentName: cmpPicker
           Properties:
-            Visible: =gIssPicker = "Assignee" || gIssPicker = "Owner"
+            Visible: =Len( Coalesce(gIssPicker, "") ) > 0
             X: =0
             Y: =0
             Width: =Parent.Width
@@ -726,71 +733,37 @@ Screens:
             Title: |
               =Switch( gIssPicker,
                        "Assignee", "Select assignee",
-                       "Owner",    "Select business owner" )
+                       "Owner",    "Select business owner",
+                       "Task",     "Select task",
+                       "Tx",       "Select transaction" )
+            # Queries run HERE — AccessAppScope false. Bound to gIssQuery, which
+            # OnSearch sets, never to the instance's own Query output.
+            # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
             Results: |
-              =If( Len(gIssPeopleQuery) >= 2,
-                   ShowColumns(
-                       Office365Users.SearchUserV2({ searchTerm: gIssPeopleQuery, top: 25 }).value,
-                       DisplayName, Mail ) )
-            OnSearch: =Set( gIssPeopleQuery, cmpIssPeople.Query )
-            OnConfirm: |
-              =Switch( gIssPicker,
-                       "Assignee",
-                       Set( gIssAssignee,
-                            { DisplayName: cmpIssPeople.Picked.DisplayName,
-                              Mail:        cmpIssPeople.Picked.Mail } ),
-                       "Owner",
-                       Set( gIssOwner,
-                            { DisplayName: cmpIssPeople.Picked.DisplayName,
-                              Mail:        cmpIssPeople.Picked.Mail } ) );
-               Set( gIssPicker, "" )
-            OnCancel: =Set( gIssPicker, "" )
-
-      # =====================================================================
-      # RECORD PICKER — declared LAST so the dialog paints above the footer.
-      # ONE instance serves every lookup on this screen; gIssPicker names which.
-      # The query runs HERE, not in the component: with AccessAppScope false
-      # it cannot reach a data source. Each branch is a delegable StartsWith
-      # on an indexed Text column, projected to the {Id, Primary, Secondary}
-      # shape the component declares. ShowColumns takes IDENTIFIERS.
-      # =====================================================================
-      - cmpIssRecord:
-          Control: CanvasComponent
-          ComponentName: cmpRecordPicker
-          Properties:
-            Visible: =gIssPicker = "Task" || gIssPicker = "Tx"
-            X: =0
-            Y: =0
-            Width: =Parent.Width
-            Height: =Parent.Height
-            Title: =Switch( gIssPicker, "Task", "Select task", "Select transaction" )
-            # ForAll(... As alias, {record}) — NOT AddColumns(ShowColumns(...)).
-            # ShowColumns kept `ID` and AddColumns then tried to add `Id`, a name
-            # differing only by case, which Studio rejects — and the result carried
-            # SIX columns where the component declares three. A record literal emits
-            # exactly {Id, Primary, Secondary} and cannot collide. `As` scoping is the
-            # idiom scrProjectEdit already lands.
-            # No else branch, so an unmatched state yields blank — the same shape as
-            # the people picker, which is confirmed working in Studio.
-            # FirstN caps the page at 50: Filter delegates, ForAll does not.
-            Results: |
-              =If( gIssPicker = "Task" && Len(gIssRecQuery) >= 2,
+              =If( (gIssPicker = "Assignee" || gIssPicker = "Owner") && Len(gIssQuery) >= 2,
+              ForAll( Office365Users.SearchUserV2({ searchTerm: gIssQuery, top: 25 }).value As u,
+              { Key:       u.Mail,
+              Primary:   u.DisplayName,
+              Secondary: u.Mail } ),
+              gIssPicker = "Task" && Len(gIssQuery) >= 2,
               ForAll( FirstN( Filter( taskmaster_tasks,
-              StartsWith(task_name, gIssRecQuery) ), 50 ) As t,
-              { Id:        t.ID,
+              StartsWith(task_name, gIssQuery) ), 50 ) As t,
+              { Key:       Text(t.ID),
               Primary:   t.task_name,
               Secondary: Coalesce(t.task_stage.Value, "") } ),
-              gIssPicker = "Tx" && Len(gIssRecQuery) >= 2,
+              gIssPicker = "Tx" && Len(gIssQuery) >= 2,
               ForAll( FirstN( Filter( taskmaster_transactions,
-              StartsWith(transaction_name, gIssRecQuery) ), 50 ) As x,
-              { Id:        x.ID,
+              StartsWith(transaction_name, gIssQuery) ), 50 ) As x,
+              { Key:       Text(x.ID),
               Primary:   x.transaction_name,
               Secondary: Coalesce(x.transaction_currency.Value, "") } ) )
-            OnSearch: =Set( gIssRecQuery, cmpIssRecord.Query )
+            OnSearch: =Set( gIssQuery, cmpIssPick.Query )
             AllowCreate: =false
             OnConfirm: |
               =Switch( gIssPicker,
-              "Task",    Set( gIssTask,    { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ),
-              Set( gIssTx,      { Id: cmpIssRecord.Picked.Id, Value: cmpIssRecord.Picked.Primary } ) );
+              "Assignee", Set( gIssAssignee, { DisplayName: cmpIssPick.Picked.Primary, Mail: cmpIssPick.Picked.Secondary } ),
+              "Owner",    Set( gIssOwner,    { DisplayName: cmpIssPick.Picked.Primary, Mail: cmpIssPick.Picked.Secondary } ),
+              "Task",     Set( gIssTask,     { Id: Value(cmpIssPick.Picked.Key), Value: cmpIssPick.Picked.Primary } ),
+              "Tx",       Set( gIssTx,       { Id: Value(cmpIssPick.Picked.Key), Value: cmpIssPick.Picked.Primary } ) );
               Set( gIssPicker, "" )
             OnCancel: =Set( gIssPicker, "" )

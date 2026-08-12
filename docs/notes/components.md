@@ -1,8 +1,9 @@
 # Reusable components — contracts, constraints, and transfer
 
 **Four of the original ten were deleted 2026-08-11** — see "Removed" below. The table
-below is also PARTIAL: `cmpAppBar`, `cmpNestedSelect`, `cmpPeoplePicker` and
-`cmpRecordPicker` were built after it was written and were never added. `.claude/CATALOG.md`
+below is also PARTIAL: `cmpAppBar`, `cmpNestedSelect`, `cmpPicker` and
+`cmpLookupField` were built after it was written and were never added
+(`cmpPicker` replaced `cmpPeoplePicker` + `cmpRecordPicker` on 2026-08-12). `.claude/CATALOG.md`
 is the generated, always-current inventory; this file is the contract notes.
 
 Authored in the **v3.0

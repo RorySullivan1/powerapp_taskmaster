@@ -87,8 +87,8 @@ Screens:
         // SAME instance, reused across every record this screen opens, so this is
         // what stops task B's dialog opening on task A's highlighted person.
         // The query global is the screen's half of that same state, so it clears here too.
-        Reset( cmpTkPeople );
-        Set( gTkPeopleQuery, "" );
+        Reset( cmpTkPick );
+        Set( gTkQuery, "" );
         Reset( txtTkApprovalId );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without these
         // the previous task's stage/health/priority survive into the next one.
@@ -525,8 +525,8 @@ Screens:
                                     Height: =62
                                     OnPick: |
                                       =Set( gTkPicker, "Lead" );
-                                       Reset( cmpTkPeople );
-                                       Set( gTkPeopleQuery, "" )
+                                       Reset( cmpTkPick );
+                                       Set( gTkQuery, "" )
                                     OnClear: |
                                       =Set( gTkLead, { DisplayName: "", Mail: "" } )
                         - colTkStart:
@@ -589,8 +589,8 @@ Screens:
                                     Height: =62
                                     OnPick: |
                                       =Set( gTkPicker, "Supporter" );
-                                       Reset( cmpTkPeople );
-                                       Set( gTkPeopleQuery, "" )
+                                       Reset( cmpTkPick );
+                                       Set( gTkQuery, "" )
                                     OnClear: |
                                       =Set( gTkSupporter, { DisplayName: "", Mail: "" } )
                         - colTkTarget:
@@ -739,8 +739,8 @@ Screens:
                                     Height: =62
                                     OnPick: |
                                       =Set( gTkPicker, "Client" );
-                                       Reset( cmpTkRecord );
-                                       Set( gTkRecQuery, "" )
+                                       Reset( cmpTkPick );
+                                       Set( gTkQuery, "" )
                                     OnClear: |
                                       =Set( gTkClient, { Id: 0, Value: "" } )
                         - colTkCliStage:
@@ -921,8 +921,8 @@ Screens:
                                     Height: =62
                                     OnPick: |
                                       =Set( gTkPicker, "Product" );
-                                       Reset( cmpTkRecord );
-                                       Set( gTkRecQuery, "" )
+                                       Reset( cmpTkPick );
+                                       Set( gTkQuery, "" )
                                     OnClear: |
                                       =Set( gTkProduct, { Id: 0, Value: "" } )
                   - rowTkOut2:
@@ -1275,111 +1275,92 @@ Screens:
                     Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
                     Back() ) )
       # =====================================================================
-      # PEOPLE PICKER — declared LAST so the dialog paints above the fixed
-      # footer. One instance serves BOTH person fields: gTkPicker names which
-      # one is being filled, and OnConfirm writes to the matching global.
+      # PICKER — ONE cmpPicker instance for BOTH person fields AND both
+      # lookups. Declared LAST so the dialog paints above the fixed footer.
+      #
+      # Was two instances of two near-identical components. gTkPicker already
+      # named the field being filled; now it also selects which KIND of row the
+      # one dialog lists, so Visible, Title, Results and OnConfirm all branch on
+      # the same global and there is one Reset target instead of two.
       #
       # Screen-sized and absolute. A component clips its children to its own
       # bounds, so a field-sized instance could not paint a dialog over the
-      # form — which is why the person BOX stays on the screen (btnTkLeadPick /
-      # btnTkSuppPick and the two chips) and only the dialog lives in here.
+      # form — which is why the person BOX stays on the screen (the cmpLookupField
+      # rows) and only the dialog lives in here.
       # =====================================================================
-      - cmpTkPeople:
+      - cmpTkPick:
           Control: CanvasComponent
-          ComponentName: cmpPeoplePicker
+          ComponentName: cmpPicker
           Properties:
-            Visible: =gTkPicker = "Lead" || gTkPicker = "Supporter"
+            Visible: =Len( Coalesce(gTkPicker, "") ) > 0
             X: =0
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            Title: =If( gTkPicker = "Lead", "Select lead", "Select supporter" )
-            # THE DIRECTORY CALL LIVES HERE, NOT IN THE COMPONENT. With
-            # AccessAppScope false the component cannot reach a data source any
-            # more than it can reach Theme, so it takes rows in — the same
-            # contract as cmpNestedSelect's Terms.
+            Title: |
+              =Switch( gTkPicker,
+                       "Lead",      "Select lead",
+                       "Supporter", "Select supporter",
+                       "Client",    "Select client",
+                       "Product",   "Select product" )
+            # THE QUERIES RUN HERE, NOT IN THE COMPONENT. With AccessAppScope
+            # false it cannot reach Office365Users or a list any more than it can
+            # reach Theme, so it takes rows in.
             #
-            # Bound to gTkPeopleQuery, which OnSearch sets — NOT to
-            # cmpTkPeople.Query directly. Feeding an instance's own output into
-            # its own input is a same-instance cycle Studio may reject; the
-            # global sidesteps it. It also keeps the call on SUBMIT: this only
-            # re-evaluates when OnSearch hands over a new query.
+            # Bound to gTkQuery, which OnSearch sets — NOT to cmpTkPick.Query
+            # directly. Feeding an instance's own output into its own input is a
+            # same-instance cycle Studio may reject; the global sidesteps it, and
+            # it keeps the call on SUBMIT: this only re-evaluates when OnSearch
+            # hands over a new query.
             #
-            # ShowColumns narrows SearchUserV2's wide rows to the two columns the
-            # component declares. Column names are IDENTIFIERS, not strings.
+            # ForAll(... As alias, {record}) on EVERY branch, people included, so
+            # all four yield the same {Key, Primary, Secondary} the component
+            # declares and the If chain type-checks. ShowColumns cannot be used
+            # here: it can only keep the source's own column names, and there is
+            # no `Key` column in either a directory row or a list row.
+            # Key is TEXT for both kinds — Mail for a person, Text(ID) for a
+            # record. That single change is what let the two pickers become one.
+            # Each branch repeats the >= 2 guard and there is NO else branch, so
+            # an unmatched state yields blank of the right shape.
+            # FirstN caps the record pages at 50: Filter delegates, ForAll does not.
             Results: |
-              =If( Len(gTkPeopleQuery) >= 2,
-                   ShowColumns(
-                       Office365Users.SearchUserV2({ searchTerm: gTkPeopleQuery, top: 25 }).value,
-                       DisplayName, Mail ) )
-            OnSearch: =Set( gTkPeopleQuery, cmpTkPeople.Query )
+              =If( (gTkPicker = "Lead" || gTkPicker = "Supporter") && Len(gTkQuery) >= 2,
+              ForAll( Office365Users.SearchUserV2({ searchTerm: gTkQuery, top: 25 }).value As u,
+              { Key:       u.Mail,
+              Primary:   u.DisplayName,
+              Secondary: u.Mail } ),
+              gTkPicker = "Client" && Len(gTkQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_clients,
+              StartsWith(client_name, gTkQuery) ), 50 ) As c,
+              { Key:       Text(c.ID),
+              Primary:   c.client_name,
+              Secondary: Coalesce(c.client_type.Value, "") } ),
+              gTkPicker = "Product" && Len(gTkQuery) >= 2,
+              ForAll( FirstN( Filter( taskmaster_products,
+              StartsWith(product_uid, gTkQuery) ), 50 ) As p,
+              { Key:       Text(p.ID),
+              Primary:   p.product_uid,
+              Secondary: Coalesce(p.product_type_path, "") } ) )
+            OnSearch: =Set( gTkQuery, cmpTkPick.Query )
+            AllowCreate: =gTkPicker = "Client" || gTkPicker = "Product"
             # Picked is read HERE and nowhere else. It is instance state cleared
             # by OnReset on every open, so reading it outside this handler would
             # be reading whatever the last dialog left behind.
+            # Value(Key) round-trips a SharePoint ID exactly — it is an integer,
+            # so Text() then Value() loses nothing.
             OnConfirm: |
-              =If( gTkPicker = "Lead",
-                   Set( gTkLead,
-                        { DisplayName: cmpTkPeople.Picked.DisplayName,
-                          Mail:        cmpTkPeople.Picked.Mail } ),
-                   Set( gTkSupporter,
-                        { DisplayName: cmpTkPeople.Picked.DisplayName,
-                          Mail:        cmpTkPeople.Picked.Mail } ) );
-               Set( gTkPicker, "" )
-            OnCancel: =Set( gTkPicker, "" )
-
-      # =====================================================================
-      # RECORD PICKER — declared LAST so the dialog paints above the footer.
-      # ONE instance serves every lookup on this screen; gTkPicker names which.
-      # The query runs HERE, not in the component: with AccessAppScope false
-      # it cannot reach a data source. Each branch is a delegable StartsWith
-      # on an indexed Text column, projected to the {Id, Primary, Secondary}
-      # shape the component declares. ShowColumns takes IDENTIFIERS.
-      # =====================================================================
-      - cmpTkRecord:
-          Control: CanvasComponent
-          ComponentName: cmpRecordPicker
-          Properties:
-            Visible: =gTkPicker = "Client" || gTkPicker = "Product"
-            X: =0
-            Y: =0
-            Width: =Parent.Width
-            Height: =Parent.Height
-            Title: =If( gTkPicker = "Client", "Select client", "Select product" )
-            # ForAll(... As alias, {record}) — NOT AddColumns(ShowColumns(...)).
-            # ShowColumns kept `ID` and AddColumns then tried to add `Id`, a name
-            # differing only by case, which Studio rejects — and the result carried
-            # SIX columns where the component declares three. A record literal emits
-            # exactly {Id, Primary, Secondary} and cannot collide. `As` scoping is the
-            # idiom scrProjectEdit already lands.
-            # No else branch, so an unmatched state yields blank — the same shape as
-            # the people picker, which is confirmed working in Studio.
-            # FirstN caps the page at 50: Filter delegates, ForAll does not.
-            Results: |
-              =If( gTkPicker = "Client" && Len(gTkRecQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_clients,
-              StartsWith(client_name, gTkRecQuery) ), 50 ) As c,
-              { Id:        c.ID,
-              Primary:   c.client_name,
-              Secondary: Coalesce(c.client_type.Value, "") } ),
-              gTkPicker = "Product" && Len(gTkRecQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_products,
-              StartsWith(product_uid, gTkRecQuery) ), 50 ) As p,
-              { Id:        p.ID,
-              Primary:   p.product_uid,
-              Secondary: Coalesce(p.product_type_path, "") } ) )
-            OnSearch: =Set( gTkRecQuery, cmpTkRecord.Query )
-            AllowCreate: =gTkPicker = "Client" || gTkPicker = "Product"
-            OnConfirm: |
-              =If( gTkPicker = "Client",
-              Set( gTkClient,  { Id: cmpTkRecord.Picked.Id, Value: cmpTkRecord.Picked.Primary } ),
-              Set( gTkProduct, { Id: cmpTkRecord.Picked.Id, Value: cmpTkRecord.Picked.Primary } ) );
+              =Switch( gTkPicker,
+              "Lead",      Set( gTkLead,      { DisplayName: cmpTkPick.Picked.Primary, Mail: cmpTkPick.Picked.Secondary } ),
+              "Supporter", Set( gTkSupporter, { DisplayName: cmpTkPick.Picked.Primary, Mail: cmpTkPick.Picked.Secondary } ),
+              "Client",    Set( gTkClient,    { Id: Value(cmpTkPick.Picked.Key), Value: cmpTkPick.Picked.Primary } ),
+              "Product",   Set( gTkProduct,   { Id: Value(cmpTkPick.Picked.Key), Value: cmpTkPick.Picked.Primary } ) );
               Set( gTkPicker, "" )
-            # ＋ New hands the caller's field name to the create screen via
+            # + New hands the caller's field name to the create screen via
             # gClReturn / gPdReturn; that screen writes the new record back
             # into the right global and returns here with it selected.
             # DOES NOT TOUCH gEditMode. The create screens carry their OWN mode
             # (gClMode / gPdMode) — clobbering the caller's mode meant returning
-            # from ＋ New re-seeded this screen as a blank NEW record, losing the
+            # from + New re-seeded this screen as a blank NEW record, losing the
             # record being edited rather than merely the typed values.
             # gTkResume tells this screen's OnVisible that the next show is a RETURN.
             OnCreateNew: |
