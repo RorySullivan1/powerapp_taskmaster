@@ -331,28 +331,24 @@
 - [2026-08-12] **`LiveTransactions` and `LiveIssues` DELETED after one day — zero consumers each.** Every transaction query in the app is project-scoped, and the only cross-project issue query wants OPEN issues, which `OpenIssues` covers. **A named formula nobody calls is not free**: it is a second place for the rule to drift from the schema, unnoticed precisely because nothing exercises it. Add one when a query needs it. Related call: `OpenIssues` writes its archived predicate out rather than layering over a `LiveIssues` — that would nest a named formula inside a named formula, and **what Monitor proved is that ONE level of composition folds; two is an inference**, with a silently truncated home queue as the failure mode — src/App.pa.yaml
 
 ## Threads          (open items; remove when closed)
-- **SCHEMA WORK OWED IN SHAREPOINT before this batch can land:** add `task_project_archived`,
-  `transaction_project_archived`, `issue_project_archived` — Yes/No, **indexed**, default No — and
-  **backfill every existing row** from its project's phase. An unindexed column fails outright past
-  5000 items, and a NULL flag is not `false` for a `= false` predicate, so the backfill is not
-  optional. User handles migration (example data only).
 - **F6 is now MOOT** — the collection it described no longer exists. (F11) the C3 rollup no longer self-heals —
   guarding it removed the only repair path for a number already wrong; a "Recalculate completion"
   action beats reinstating the unconditional cost. (F12) the `RemoveIf` predicates shadow `ID`
   between two record scopes — correct as written (innermost wins) but worth `As` aliases.
+- **SHAREPOINT IS DONE (user, 2026-08-12): the three `*_project_archived` columns are in, and the
+  task_stage / issue_status value edits are placed.** Nothing SharePoint-side blocks the paste.
+  **If tasks or issues go missing from Home after this lands, look FIRST at whether any child row
+  has a NULL `*_project_archived`** — NULL is not `false`, so a `= false` predicate excludes it.
 - **PASTE ORDER FOR THE UNLANDED BATCH — sequencing is the main risk, not tokens.** Reviewed
   2026-08-12; no invented columns, no ungrounded control tokens, paren-balance clean, 22/22 valid.
   1. **`App.Formulas` FIRST** (formula bar only — the App object has no code view; strip the
-     standalone `=` marker line or you get `==`). `ActiveProjects` / `ArchivedProjects` are NEW
-     names: a screen pasted before them fails to resolve, and the human reports "didn't work"
+     standalone `=` marker line or you get `==`). `ActiveProjects` / `LiveTasks` / `OpenIssues` are
+     NEW names: a screen pasted before them fails to resolve, and the human reports "didn't work"
      against the wrong file.
-  2. **The SharePoint Choice-value edits NEXT** (task_stage 7->5, issue_status 5->4). `scrTaskEdit`
-     and `scrIssueEdit` offer and Patch the new values; a Patch of a value the live column does not
-     list FAILS at runtime.
-  3. **`scrIssueEdit` is the only CREATE-paste**, and go by container subtree — `colIssStatus`,
+  2. **`scrIssueEdit` is the only CREATE-paste**, and go by container subtree — `colIssStatus`,
      `colIssTask`, `colIssTx`, `colIssOpened` — then rename off the `_1` suffix and delete the old
      `selIssStatus` / `fldTask` / `fldTx` / `fldOwner`. Paste creates, it never patches.
-  4. Everything else is PROPERTY-LEVEL. Hand over control name + property + formula body (no
+  3. Everything else is PROPERTY-LEVEL. Hand over control name + property + formula body (no
      leading `=`) rather than re-pasting screens, which re-freezes every X/Y/Width/Height.
   **Do NOT delete `cmpSelection` or `cmpLookupField`** — still consumed by `selIssType`,
   `selIssImpact`, `fldAssignee`.

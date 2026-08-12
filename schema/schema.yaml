@@ -181,16 +181,11 @@ lists:
       # (project_phase), not something a task carries. Removing "Archived" deletes the
       # task-level archiving axis entirely, which is why the six-value Or-chain that
       # excluded it is gone from App.Formulas and five screens.
-      # MIGRATION — existing rows keep whatever string SharePoint stored, and a row
-      # holding a value no longer in the list matches NO filter and vanishes from the
-      # app. Re-map BEFORE removing the values in list settings. Defaults proposed,
-      # NOT applied — both need the user's call:
-      #   "Under Review" -> "Finalizing"   (it is past drafting; "Drafting" is the
-      #                                     alternative if review precedes the draft)
-      #   "Archived"     -> ??? genuinely ambiguous. If those tasks belong to projects
-      #                    that are now archived, "Complete" loses least; if they were
-      #                    shelved inside live projects there is no longer a way to say
-      #                    so, and that work needs a home before the value is deleted.
+      # APPLIED IN SHAREPOINT 2026-08-12 (user). No re-map was needed — the lists held
+      # only example items. The general hazard still stands for any FUTURE value
+      # removal: a row keeps whatever string SharePoint stored, and a row holding a
+      # value no longer in the list matches NO filter, so it vanishes from the app with
+      # nothing to see. Re-map before removing a value, not after.
       - { name: task_stage,            type: Choice,          required: true,  indexed: true,  default: "Not Started", desc: "LIFECYCLE — where it is", values: ["Not Started", Planning, Drafting, Finalizing, Complete] }
       # ---------------------------------------------------------------------
       # DENORMALISED PARENT STATE — added 2026-08-12. Mirrors project_phase =
@@ -205,6 +200,7 @@ lists:
       # unindexed filter fails outright past 5000 items. NOT a copy of the phase
       # itself — that would be a second source of truth for something the project
       # row already owns.
+      # PROVISIONED IN SHAREPOINT 2026-08-12 (user) — Yes/No, indexed.
       # MAINTAINED BY: scrProjectEdit's save, which is the ONLY place the app
       # writes project_phase. Children created by the app always write false,
       # which is always correct because the app does not let you add children to
@@ -257,6 +253,7 @@ lists:
       # unindexed filter fails outright past 5000 items. NOT a copy of the phase
       # itself — that would be a second source of truth for something the project
       # row already owns.
+      # PROVISIONED IN SHAREPOINT 2026-08-12 (user) — Yes/No, indexed.
       # MAINTAINED BY: scrProjectEdit's save, which is the ONLY place the app
       # writes project_phase. Children created by the app always write false,
       # which is always correct because the app does not let you add children to
@@ -298,12 +295,7 @@ lists:
       # intermediate states collapse into Open, and Closed splits into an OUTCOME. The
       # app's "open issues" test is now a single equality (= "Open") rather than a
       # four-way Or, which delegates more cheaply.
-      # MIGRATION — re-map BEFORE removing values, same reason as task_stage:
-      #   Review / Waiting / Blocked -> "Open"              (none of them was closed)
-      #   Closed                     -> "Closed - Resolved" (proposed; the stored rows
-      #                                 do not record WHICH outcome, so this is a guess
-      #                                 and any row that was really unresolved needs
-      #                                 fixing by hand)
+      # APPLIED IN SHAREPOINT 2026-08-12 (user); example data only, so no re-map.
       - { name: issue_status,           type: Choice,   required: true,  indexed: true,  default: Open,          desc: "Current status; the three Closed values record the OUTCOME", values: [Open, "Closed - Resolved", "Closed - Unresolved", "Closed - No Change"] }
       # ---------------------------------------------------------------------
       # DENORMALISED PARENT STATE — added 2026-08-12. Mirrors project_phase =
@@ -318,6 +310,7 @@ lists:
       # unindexed filter fails outright past 5000 items. NOT a copy of the phase
       # itself — that would be a second source of truth for something the project
       # row already owns.
+      # PROVISIONED IN SHAREPOINT 2026-08-12 (user) — Yes/No, indexed.
       # MAINTAINED BY: scrProjectEdit's save, which is the ONLY place the app
       # writes project_phase. Children created by the app always write false,
       # which is always correct because the app does not let you add children to
