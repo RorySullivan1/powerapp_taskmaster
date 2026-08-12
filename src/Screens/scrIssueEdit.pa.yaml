@@ -212,7 +212,9 @@ Screens:
                         LayoutGridColumnEnd: =2
                         LayoutGridRowStart: =1
                         LayoutGridRowEnd: =10
-                        Height: =62
+                        # 66, not 62: 18 caption + 8 gap + 40 combo. The 120-high grid cell
+                        # has room, so nothing below moves.
+                        Height: =66
                       Children:
                         - lblIssStatusCap:
                             Control: Label@2.5.1
@@ -221,6 +223,13 @@ Screens:
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
                               Color: =Theme.Color.TextMuted
+                              # PINNED. Every auto-layout child is flexible along the parent's
+                              # direction BY DEFAULT, so leaving both children unpinned split
+                              # the 54px of free space 27/27 — the declared 18 and 40 were
+                              # ignored and the combo box rendered at 27px, below its usable
+                              # height. A chip strip tolerated that; a combo box does not.
+                              FillPortions: =0
+                              LayoutMinHeight: =18
                               Width: =Parent.Width
                               Height: =18
                         # A COMBO BOX, NOT A cmpSelection STRIP — swapped 2026-08-12 with the
@@ -244,6 +253,9 @@ Screens:
                               InputTextPlaceholder: ="Select…"
                               Color: |
                                 =If( gIssStatus = "Open", Theme.Color.TextPrimary, Theme.Color.TextMuted )
+                              # Pinned for the same reason as the caption above.
+                              FillPortions: =0
+                              LayoutMinHeight: =40
                               Width: =Parent.Width
                               Height: =40
                               OnChange: =Set(gIssStatus, cboIssStatus.Selected.Value)

@@ -316,13 +316,16 @@
 
 - [2026-08-12] **Issue -> task / transaction associations are now PROJECT-SCOPED DROPDOWNS, not tenant-wide search pickers.** An issue belongs to a project, so the only tasks and transactions it can sensibly reference are that project's — the old picker offered every row in the tenant and made you type two characters to find out. A bounded set does not need a search dialog: `colIssTaskOpts` / `colIssTxOpts` are ClearCollected in OnVisible (delegable `=` on the indexed Lookup FK, AFTER `gIssProject` is seeded) and shown in a `ModernCombobox`. **The "(none)" row at Id 0 IS the clear** — Collected first so it sorts to the top, and the save already treats `.Id > 0` as "linked", so picking it writes `Blank()` exactly as `cmpLookupField`'s ✕ did; that is why dropping cmpLookupField here costs no functionality. Both halves are projected to `{Id, Label}` because a record literal cannot be Collected alongside a raw SharePoint row. **`cmpIssPick` falls to ONE state (Assignee)** — its Title stops being a Switch and its Results loses two branches — src/Screens/scrIssueEdit.pa.yaml
 
+- [2026-08-12] **THE APP NO LONGER DELETES ANY RECORD. `scrProject`'s delete became an ARCHIVE.** It used to hard-delete across FOUR lists behind one confirm — `RemoveIf` issues, transactions, tasks, then `Remove` the project — irreversibly. A separate workflow now logs and removes rows on its own schedule; **the app's only job is to stop showing them.** Four Removes became ONE `Patch( taskmaster_projects, gSelProject, { project_phase: { Value: "Archived" } } )`, and **the children need no touching at all** because they are already excluded BY THEIR PARENT'S PHASE (scrProjects' Active filter + `ArchivedProjects` on scrHome/scrReports). That is why archiving needs no cascade — the filtering work done earlier the same day is what makes this a one-row write. Still two presses, but the reason changed: no longer "there is no undo" (archiving IS reversible — the Archived filter lists them and editing the phase brings one back) but "this removes a project from everyone's view". `Icon.Trash`/Danger -> `Icon.Hide`/Warning; `gPrDel*` -> `gPrArc*` — src/Screens/scrProject.pa.yaml
+- [2026-08-12] **REVIEW FINDING CONFIRMED AND FIXED: `colIssStatus`'s two children were both UNPINNED.** `cboIssStatus` declared `Height: =40` and its caption `Height: =18`, but **every auto-layout child is flexible along the parent's direction BY DEFAULT** — so the 54px of free space split 27/27, both declared heights were ignored, and the combo box would have rendered at 27px, below usable. The old `cmpSelection` chip strip tolerated being squashed; a combo box does not, which is why swapping the control exposed a latent bug rather than creating one. Both children now carry `FillPortions: =0` + `LayoutMinHeight`, and the container is 62 -> 66 (18+8+40) inside a 120-high grid cell. **Same latent pattern still in `colIssType`, `colIssImpact`, `colIssMissing`** — all still hold cmpSelection, so left alone — src/Screens/scrIssueEdit.pa.yaml
+
 ## Threads          (open items; remove when closed)
-- **DATA MIGRATION OWED BEFORE THE CHOICE VALUES ARE REMOVED IN SHAREPOINT.** A row holding a
-  value no longer in the list keeps that string and then matches NO filter — it vanishes from the
-  app silently. Re-map first. `Review`/`Waiting`/`Blocked` -> `Open` is unambiguous;
-  `Closed` -> `Closed - Resolved` is a GUESS (the stored rows do not record which outcome);
-  `Under Review` -> `Finalizing` is proposed; **`Archived` tasks are genuinely ambiguous and need
-  the user's call** — if they sat in live projects there is no longer any way to say so.
+- **SharePoint migration for the Choice-value change: USER IS HANDLING IT, and it is a non-issue —
+  the lists hold only example items (confirmed 2026-08-12). Closed; do not re-raise.**
+- **Three auto-layout containers still have BOTH children unpinned** — `colIssType`,
+  `colIssImpact`, `colIssMissing` on scrIssueEdit. Declared heights are ignored and the space
+  splits evenly. Harmless while they hold `cmpSelection` strips, which squash gracefully; fix
+  before ever swapping one for a combo box, as `colIssStatus` had to be.
 - **PERF PROPOSAL ASSESSED 2026-08-12 — front-load non-archived items into app-scope collections.
   VERDICT: right instinct, wrong vehicle; do the named-formula half, not the collection half.**
   - **BLOCKER, grounded:** named formulas "can't use behavior functions or otherwise cause side

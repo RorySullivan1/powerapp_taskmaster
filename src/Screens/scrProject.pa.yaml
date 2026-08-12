@@ -64,8 +64,8 @@ Screens:
         // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
         // ever return 0 and the "N archived (hidden)" caption it fed could never show.
         // Nothing is hidden from the task list any more: it is every task on the project.
-        // Delete is a TWO-PRESS action and must never open already armed.
-        Set( gPrDelArm, false )
+        // Archive is a TWO-PRESS action and must never open already armed.
+        Set( gPrArcArm, false )
     Children:
       # =====================================================================
       # HEADER BAND — absolute, three controls, no collisions.
@@ -538,74 +538,63 @@ Screens:
                                 =Set( gEditMode, "Edit" );
                                  Set( gEditProject, gSelProject );
                                  Navigate( scrProjectEdit, ScreenTransition.Cover )
-                        # Two presses. The first only ARMS it — the icon changes to a
-                        # filled bin and the caption below says so — because there is
-                        # no undo behind this. OnVisible disarms, so leaving the screen
-                        # is always a way out.
-                        - icoDeleteProject:
+                        # ARCHIVES, DOES NOT DELETE — changed 2026-08-12.
+                        # This used to hard-delete: RemoveIf across issues, transactions
+                        # and tasks, then Remove the project — four lists, irreversibly,
+                        # behind one confirm. Nothing in this app deletes a record any
+                        # more. A separate workflow logs and removes rows on its own
+                        # schedule; the app's job is to stop showing them.
+                        #
+                        # ONE Patch instead of four Removes. The children need no touching
+                        # at all: they are excluded BY THEIR PARENT'S PHASE — scrProjects'
+                        # Active filter hides the project, and scrHome / scrReports drop
+                        # its tasks and issues via ArchivedProjects. That is the whole
+                        # mechanism, and it is why archiving needs no cascade.
+                        #
+                        # STILL TWO PRESSES, but no longer because it is irreversible —
+                        # it is now reversible (the Archived filter on scrProjects lists
+                        # archived projects, and opening one and editing its phase brings
+                        # it back). Two presses because it removes a project from
+                        # everyone's view, which is disruptive even when undoable.
+                        - icoArchiveProject:
                             Control: Classic/Icon@2.5.0
                             Properties:
-                              Icon: =If( gPrDelArm, Icon.Warning, Icon.Trash )
-                              Color: =Theme.Color.Danger
+                              Icon: =If( gPrArcArm, Icon.Warning, Icon.Hide )
+                              Color: =Theme.Color.Warning
                               Tooltip: |
-                                =If( gPrDelArm,
-                                     "Press again to delete this project and everything attached to it",
-                                     "Delete this project" )
+                                =If( gPrArcArm,
+                                     "Press again to archive this project — it and everything attached to it stop appearing anywhere in the app",
+                                     "Archive this project" )
                               FillPortions: =0
                               LayoutMinHeight: =28
                               Width: =28
                               Height: =28
                               OnSelect: |
-                                =If( !gPrDelArm,
-                                     Set( gPrDelArm, true ),
-                                     Set( gPrDelErr, "" );
-                                     // Children FIRST. Every child carries a REQUIRED lookup
-                                     // to the project, so removing the parent while they
-                                     // exist would leave rows SharePoint will not let
-                                     // anything edit afterwards.
-                                     //
-                                     // Each removal is wrapped in a Set. MS Learn's own idiom
-                                     // is IfError( Remove(...), Notify(...) ), but Remove and
-                                     // RemoveIf "return the modified data source as a TABLE"
-                                     // while Notify and Set return a boolean, and IfError
-                                     // requires ALL its arguments to be type-compatible — so
-                                     // the documented form is rejected. gPrDelScrap exists
-                                     // only to make both arms a Set.
-                                     //
-                                     // RemoveIf is NOT delegable: it pulls matching rows up
-                                     // to the data row limit and deletes them one by one, so
-                                     // a project with more children than that limit needs a
-                                     // second press to finish.
-                                     IfError( Set( gPrDelScrap,
-                                                   RemoveIf( taskmaster_issues,
-                                                             issue_project_id.Id = gSelProject.ID ) ),
-                                              Set( gPrDelErr, FirstError.Message ) );
-                                     IfError( Set( gPrDelScrap,
-                                                   RemoveIf( taskmaster_transactions,
-                                                             transaction_project_id.Id = gSelProject.ID ) ),
-                                              Set( gPrDelErr, FirstError.Message ) );
-                                     IfError( Set( gPrDelScrap,
-                                                   RemoveIf( taskmaster_tasks,
-                                                             task_project_id.Id = gSelProject.ID ) ),
-                                              Set( gPrDelErr, FirstError.Message ) );
-                                     If( Len(gPrDelErr) = 0,
-                                         IfError( Set( gPrDelScrap,
-                                                       Remove( taskmaster_projects, gSelProject ) ),
-                                                  Set( gPrDelErr, FirstError.Message ) ) );
-                                     If( Len(gPrDelErr) > 0,
-                                         Notify( "Couldn't delete the project: " & gPrDelErr,
+                                =If( !gPrArcArm,
+                                     Set( gPrArcArm, true ),
+                                     Set( gPrArcErr, "" );
+                                     // One write, one row. The Set wrapper is still needed:
+                                     // IfError requires all its arguments to be type-compatible,
+                                     // and a bare Patch (record) against a Set fallback is
+                                     // rejected — the same reason the old Removes were wrapped.
+                                     IfError( Set( gPrArcScrap,
+                                                   Patch( taskmaster_projects, gSelProject,
+                                                          { project_phase: { Value: "Archived" } } ) ),
+                                              Set( gPrArcErr, FirstError.Message ) );
+                                     If( Len(gPrArcErr) > 0,
+                                         Notify( "Couldn't archive the project: " & gPrArcErr,
                                                  NotificationType.Error ),
                                          Set( gSelProject, Blank() );
                                          Set( gEditProject, Blank() );
                                          Clear( colProjectTasks );
-                                         Notify( "Project deleted, with everything attached to it.",
+                                         Notify( "Project archived. It and its tasks, transactions and issues no longer appear — find it under Archived on the projects list.",
                                                  NotificationType.Success );
                                          Navigate( scrProjects, ScreenTransition.UnCover ) );
-                                     Set( gPrDelArm, false ) )
-                        - lblDelArmed:
+                                     Set( gPrArcArm, false ) )
+                        - lblArcArmed:
                             Control: Label@2.5.1
                             Properties:
-                              Visible: =gPrDelArm
+                              Visible: =gPrArcArm
                               Text: ="again"
                               Font: =Theme.Font
                               Size: =Theme.Size.Small
