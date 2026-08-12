@@ -106,18 +106,21 @@ ComponentDefinitions:
         =If( IsBlank(pkPicked), { Key: "", Primary: "", Secondary: "" }, pkPicked )
       Query: |
         =Coalesce( pkQuery, "" )
+      # NO SetFocus HERE — do not re-add it. `SetFocus` cannot target a control
+      # inside a Component, a Gallery, an Edit form OR a Container (MS Learn,
+      # function-setfocus#limitations; Studio rejected it 2026-08-12). Every one
+      # of those exclusions applies somewhere in this app, and the first applies
+      # to every control in this file. `Reset` carries no such restriction, which
+      # is why the line below is fine and the SetFocus line was not.
+      # CONSEQUENCE, ACCEPTED: the dialog opens with nothing focused, so the user
+      # must click into the search box before typing. There is no formula-level
+      # workaround — a PCF code component with an InputEvent property is the only
+      # documented route, and that is a far bigger change than this buys.
       OnReset: |
         =Set( pkQuery, "" );
          Set( pkPicked, Blank() );
          Set( pkTried, false );
-         Reset( txtPkSearch );
-         // SetFocus IS DELIBERATELY LAST, and is the first thing to delete if the
-         // dialog ever misbehaves on open. It errors when its target is not yet
-         // visible, and this instance is made visible by the screen's global one
-         // statement before Reset() is called — whether that propagates within a
-         // single behaviour chain is exactly what a one-way gap cannot confirm.
-         // Last means everything above it has already run if it does throw.
-         SetFocus( txtPkSearch )
+         Reset( txtPkSearch )
     Children:
       # NO AccessibleLabel ON ANY Classic/* CONTROL — the property does not exist
       # there (confirmed 2026-08-12), so it fails the paste. It survives below on

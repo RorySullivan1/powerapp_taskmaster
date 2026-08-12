@@ -66,6 +66,30 @@ an app bar — is declared LAST.
 
 ## Formula rules that have actually bitten
 
+**`SetFocus` is unusable almost everywhere in a real app — check the target's ANCESTRY before
+writing it.** MS Learn (`function-setfocus#limitations`) excludes four containers outright:
+
+> You cannot set the focus to controls that are within a **Gallery**, **Edit form**, or
+> **Component**. […] You cannot set the focus to controls that are within a **Container**.
+
+Plus: the target must be a Button / Icon / Image / Label / TextInput, on the **same screen** as
+the formula, not `DisplayMode.Disabled`, and the call must be in a behaviour formula. In this
+repo that leaves almost nothing — every screen below its header is auto-layout containers, and
+every dialog is a component. **Studio rejected `SetFocus(txtPkSearch)` inside `cmpPicker`'s
+`OnReset` on 2026-08-12**; `Reset(txtPkSearch)` on the line above was fine, because `Reset`
+carries none of these restrictions. If one of a pair throws and the other doesn't, that
+asymmetry is the tell.
+
+The consequence is not fixable in Power Fx: **a modal dialog cannot auto-focus its own search
+box**, so the user must click into it. The only documented route is a PCF code component with
+an `InputEvent` property driven by `"SetFocus" & Text(Rand())`. Say that plainly rather than
+reaching for a formula that cannot exist.
+
+> Beware the plausible wrong diagnosis. The first guess here was a *timing* one — that the
+> control was not yet visible when `OnReset` ran. It reads well, it is unfalsifiable across a
+> one-way gap, and it is wrong: the restriction is categorical and documented. **When a
+> function is rejected, read its Limitations section before theorising about evaluation order.**
+
 **`IfError` requires ALL arguments to be type-compatible.** MS Learn prints
 `IfError(Patch(…), Notify(…))` and then notes that *currently* every argument's type must
 match. `Patch` returns a record, `Notify` a boolean → *"expecting a record"*. Make every arm a
