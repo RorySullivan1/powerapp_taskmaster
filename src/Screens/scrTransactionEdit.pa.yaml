@@ -308,72 +308,22 @@ Screens:
                         LayoutGridRowEnd: =10
                         Height: =62
                       Children:
-                        - lblTxClientCap:
-                            Control: Label@2.5.1
+                        - fldClient:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
                             Properties:
-                              Text: ="Client  *"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
+                              Caption: ="Client  *"
+                              PickLabel: ="＋  Choose a client"
+                              HasValue: =gTxClient.Id > 0
+                              Display: =gTxClient.Value
                               Width: =Parent.Width
-                              Height: =18
-                        # Opens the shared record picker. Was a search box that filtered a
-                        # floating gallery as you typed; the search now lives in the dialog.
-                        # Reset() clears the previous field's query and highlight — one
-                        # instance serves every lookup on this screen.
-                        - btnTxClientPick:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =gTxClient.Id <= 0
-                              Text: ="＋  Choose a client"
-                              Align: =Align.Left
-                              Fill: =Theme.Color.Bg
-                              Color: =Theme.Color.TextMuted
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Body
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
+                              Height: =62
+                              OnPick: |
                                 =Set( gTxPicker, "Client" );
                                  Reset( cmpTxRecord );
                                  Set( gTxRecQuery, "" )
-                        - chipTxClient:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              Visible: =gTxClient.Id > 0
-                              LayoutDirection: =LayoutDirection.Horizontal
-                              LayoutAlignItems: =LayoutAlignItems.Center
-                              LayoutGap: =6
-                              Width: =Parent.Width
-                              Height: =36
-                            Children:
-                              - lblTxClientChip:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =If(gTxClient.Id > 0, gTxClient.Value, "— none selected —")
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: |
-                                      =If(gTxClient.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =1
-                                    LayoutMinWidth: =60
-                                    Height: =36
-                              - icoTxClientClear:
-                                  Control: Classic/Icon@2.5.0
-                                  Properties:
-                                    Icon: =Icon.Cancel
-                                    Color: =Theme.Color.TextMuted
-                                    FillPortions: =0
-                                    LayoutMinWidth: =16
-                                    Height: =16
-                                    Width: =16
-                                    OnSelect: |
-                                      =Set(gTxClient, { Id: 0, Value: "" }); Reset( cmpTxRecord )
+                              OnClear: |
+                                =Set( gTxClient, { Id: 0, Value: "" } )
             - gridTx4:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
@@ -396,72 +346,22 @@ Screens:
                         LayoutGridRowEnd: =10
                         Height: =62
                       Children:
-                        - lblTxProductCap:
-                            Control: Label@2.5.1
+                        - fldProduct:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
                             Properties:
-                              Text: ="Product  *"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
+                              Caption: ="Product  *"
+                              PickLabel: ="＋  Choose a product"
+                              HasValue: =gTxProduct.Id > 0
+                              Display: =gTxProduct.Value
                               Width: =Parent.Width
-                              Height: =18
-                        # Opens the shared record picker. Was a search box that filtered a
-                        # floating gallery as you typed; the search now lives in the dialog.
-                        # Reset() clears the previous field's query and highlight — one
-                        # instance serves every lookup on this screen.
-                        - btnTxProductPick:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =gTxProduct.Id <= 0
-                              Text: ="＋  Choose a product"
-                              Align: =Align.Left
-                              Fill: =Theme.Color.Bg
-                              Color: =Theme.Color.TextMuted
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Body
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
+                              Height: =62
+                              OnPick: |
                                 =Set( gTxPicker, "Product" );
                                  Reset( cmpTxRecord );
                                  Set( gTxRecQuery, "" )
-                        - chipTxProduct:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              Visible: =gTxProduct.Id > 0
-                              LayoutDirection: =LayoutDirection.Horizontal
-                              LayoutAlignItems: =LayoutAlignItems.Center
-                              LayoutGap: =6
-                              Width: =Parent.Width
-                              Height: =36
-                            Children:
-                              - lblTxProductChip:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =If(gTxProduct.Id > 0, gTxProduct.Value, "— none selected —")
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: |
-                                      =If(gTxProduct.Id > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =1
-                                    LayoutMinWidth: =60
-                                    Height: =36
-                              - icoTxProductClear:
-                                  Control: Classic/Icon@2.5.0
-                                  Properties:
-                                    Icon: =Icon.Cancel
-                                    Color: =Theme.Color.TextMuted
-                                    FillPortions: =0
-                                    LayoutMinWidth: =16
-                                    Height: =16
-                                    Width: =16
-                                    OnSelect: |
-                                      =Set(gTxProduct, { Id: 0, Value: "" }); Reset( cmpTxRecord )
+                              OnClear: |
+                                =Set( gTxProduct, { Id: 0, Value: "" } )
                   - colTxSales:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -475,70 +375,22 @@ Screens:
                         LayoutGridRowEnd: =10
                         Height: =62
                       Children:
-                        - lblTxSalesCap:
-                            Control: Label@2.5.1
+                        - fldSales:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
                             Properties:
-                              Text: ="Sales owner  *"
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Color: =Theme.Color.TextMuted
+                              Caption: ="Sales owner  *"
+                              PickLabel: ="＋  Choose a sales owner"
+                              HasValue: =Len(gTxSales.Mail) > 0
+                              Display: =gTxSales.DisplayName
                               Width: =Parent.Width
-                              Height: =18
-                        - btnTxSalesPick:
-                            Control: Classic/Button@2.2.0
-                            Properties:
-                              Visible: =Len(gTxSales.Mail) = 0
-                              Text: ="＋  Choose a sales owner"
-                              Align: =Align.Left
-                              Fill: =Theme.Color.Bg
-                              Color: =Theme.Color.TextMuted
-                              BorderColor: =Theme.Color.Border
-                              BorderThickness: =1
-                              Font: =Theme.Font
-                              Size: =Theme.Size.Small
-                              Width: =Parent.Width
-                              Height: =36
-                              OnSelect: |
-                                =Set(gTxPicker, "Sales");
-                                 Reset(cmpTxPeople);
-                                 Set(gTxPeopleQuery, "")
-                        - chipTxSales:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              Visible: =Len(gTxSales.Mail) > 0
-                              LayoutDirection: =LayoutDirection.Horizontal
-                              LayoutAlignItems: =LayoutAlignItems.Center
-                              LayoutGap: =6
-                              Width: =Parent.Width
-                              Height: =36
-                            Children:
-                              - lblTxSalesChip:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =If(Len(gTxSales.Mail) > 0, gTxSales.DisplayName, "— none selected —")
-                                    Font: =Theme.Font
-                                    Size: =Theme.Size.Small
-                                    Color: |
-                                      =If(Len(gTxSales.Mail) > 0, Theme.Color.TextPrimary, Theme.Color.TextMuted)
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =1
-                                    LayoutMinWidth: =60
-                                    Height: =36
-                              - icoTxSalesClear:
-                                  Control: Classic/Icon@2.5.0
-                                  Properties:
-                                    Icon: =Icon.Cancel
-                                    Color: =Theme.Color.TextMuted
-                                    FillPortions: =0
-                                    LayoutMinWidth: =16
-                                    Height: =16
-                                    Width: =16
-                                    OnSelect: |
-                                      =Set(gTxSales, { DisplayName: "", Mail: "" });
-                                       Reset(cmpTxPeople);
-                                       Set(gTxPicker, "")
+                              Height: =62
+                              OnPick: |
+                                =Set( gTxPicker, "Sales" );
+                                 Reset( cmpTxPeople );
+                                 Set( gTxPeopleQuery, "" )
+                              OnClear: |
+                                =Set( gTxSales, { DisplayName: "", Mail: "" } )
             - colTxMissing:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
