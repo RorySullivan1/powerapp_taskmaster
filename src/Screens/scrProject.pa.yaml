@@ -507,28 +507,44 @@ Screens:
                                      // differently-shaped tables is a type conflict. They exist
                                      // only to make both arms a Set.
                                      //
-                                     // RemoveIf is NOT delegable: it pulls matching rows up
-                                     // to the data row limit and deletes them one by one, so
-                                     // a project with more children than that limit needs a
-                                     // second press to finish.
-                                     IfError( Set( gPrDelScrapI,
-                                                   RemoveIf( taskmaster_issues,
-                                                             issue_project_id.Id = gSelProject.ID ) ),
-                                              Set( gPrDelErr, FirstError.Message ) );
-                                     IfError( Set( gPrDelScrapX,
-                                                   RemoveIf( taskmaster_transactions,
-                                                             transaction_project_id.Id = gSelProject.ID ) ),
-                                              Set( gPrDelErr, FirstError.Message ) );
-                                     IfError( Set( gPrDelScrapT,
-                                                   RemoveIf( taskmaster_tasks,
-                                                             task_project_id.Id = gSelProject.ID ) ),
-                                              Set( gPrDelErr, FirstError.Message ) );
-                                     If( Len(gPrDelErr) = 0,
+                                     // RemoveIf is NOT delegable: it pulls matching rows up to the
+                                     // data row limit and deletes them one by one. A partial pass
+                                     // raises NO error, so without the count first the parent
+                                     // would be removed on top of surviving children — and a child
+                                     // holding a required lookup to a deleted project cannot be
+                                     // edited or deleted by anything afterwards. Count, then refuse
+                                     // rather than half-do it. Same shape as the archive cascade.
+                                     Set( gPrDelBlock, false );
+                                     With( { nI: CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gSelProject.ID) ),
+                                             nX: CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gSelProject.ID) ),
+                                             nT: CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gSelProject.ID) ) },
+                                         If( nI >= 500 || nX >= 500 || nT >= 500,
+                                             Set( gPrDelBlock, true ),
+                                             IfError( Set( gPrDelScrapI,
+                                                           RemoveIf( taskmaster_issues,
+                                                                     issue_project_id.Id = gSelProject.ID ) ),
+                                                      Set( gPrDelErr, FirstError.Message ) );
+                                             IfError( Set( gPrDelScrapX,
+                                                           RemoveIf( taskmaster_transactions,
+                                                                     transaction_project_id.Id = gSelProject.ID ) ),
+                                                      Set( gPrDelErr, FirstError.Message ) );
+                                             IfError( Set( gPrDelScrapT,
+                                                           RemoveIf( taskmaster_tasks,
+                                                                     task_project_id.Id = gSelProject.ID ) ),
+                                                      Set( gPrDelErr, FirstError.Message ) ) ) );
+                                     If( Len(gPrDelErr) = 0 && !gPrDelBlock,
                                          IfError( Set( gPrDelScrapP,
                                                        Remove( taskmaster_projects, gSelProject ) ),
                                                   Set( gPrDelErr, FirstError.Message ) ) );
-                                     If( Len(gPrDelErr) > 0,
-                                         Notify( "Couldn't delete the project: " & gPrDelErr,
+                                     If( gPrDelBlock,
+                                         Notify( "This project has too many attached items to delete in one pass. Nothing was deleted — ask for the cleanup workflow.",
+                                                 NotificationType.Error ),
+                                         Len(gPrDelErr) > 0,
+                                         // Say that the children may be gone. There is no
+                                         // transaction here: by the time the parent fails, the
+                                         // child removals have already committed.
+                                         Notify( "Couldn't finish deleting the project: " & gPrDelErr
+                                                   & " Some attached items may already have been removed — reopen the project to check.",
                                                  NotificationType.Error ),
                                          Set( gSelProject, Blank() );
                                          Set( gEditProject, Blank() );
@@ -797,7 +813,14 @@ Screens:
                                         Control: Label@2.5.1
                                         Properties:
                                           Text: |
-                                            ="Transactions   " & CountRows(galTransactions.AllItems) & " loaded"
+                                            =
+                                             // Counted from the QUERY, not galTransactions.AllItems:
+                                             // a gallery bound to a data source loads pages as the
+                                             // user scrolls, so AllItems is "what is on screen so
+                                             // far", not the total. Scoped to one project, so the
+                                             // count is bounded.
+                                             "Transactions   " & CountRows( Filter( taskmaster_transactions,
+                                                                                    transaction_project_id.Id = gSelProject.ID ) )
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.H3
                                           FontWeight: =FontWeight.Semibold
@@ -999,8 +1022,14 @@ Screens:
                                   Control: Label@2.5.1
                                   Properties:
                                     Text: |
-                                      ="Issues   " & CountRows( Filter(galIssues.AllItems, issue_status.Value = "Open") )
-                                       & " open of " & CountRows(galIssues.AllItems)
+                                      =
+                                       // Counted from the QUERY, not galIssues.AllItems — a gallery
+                                       // bound to a data source loads pages as the user scrolls,
+                                       // so AllItems undercounts until it is scrolled to the end.
+                                       With( { rows: Filter( taskmaster_issues,
+                                                             issue_project_id.Id = gSelProject.ID ) },
+                                             "Issues   " & CountRows( Filter(rows, issue_status.Value = "Open") )
+                                             & " open of " & CountRows(rows) )
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.H3
                                     FontWeight: =FontWeight.Semibold

@@ -1175,10 +1175,13 @@ Screens:
                     If( gEditMode = "Edit", gEditTask, Defaults(taskmaster_tasks) ),
                     // Mirrors the PARENT's phase so cross-project queries can exclude
                     // archived work with a delegable `= false`. Written on every save, not
-                    // just on insert, so a row whose project was archived while this editor
-                    // was open cannot come back live. `gSelProject` is the project this
-                    // screen was opened from, so no extra query is needed.
-                    { task_project_archived: Coalesce(gSelProject.project_phase.Value, "") = "Archived",
+                    // just on insert. Read LIVE from the list, not from `gSelProject`: that
+                    // global is a gallery snapshot taken when the project was opened, so a
+                    // project archived since then would stamp `false` here and the row would
+                    // stay in scope forever. One delegable LookUp on ID.
+                    { task_project_archived:
+                          Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
+                                            project_phase.Value ), "" ) = "Archived",
                     task_name:        Trim(txtTkName.Text),
                     task_project_id:  { Id: gTkProject.Id, Value: gTkProject.Value },
                     task_description: txtTkDesc.Text,

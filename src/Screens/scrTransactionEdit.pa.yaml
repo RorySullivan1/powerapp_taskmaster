@@ -238,6 +238,10 @@ Screens:
                             Control: Classic/TextInput@2.3.2
                             Properties:
                               Default: =If(gEditMode = "Edit", gEditTransaction.transaction_notional, Blank())
+                              # Restricts typing to digits. Without it `Value(.Text)` on a
+                              # non-numeric entry is blank, and the save writes blank into an
+                              # optional Currency column with nothing on screen to point at.
+                              Format: =TextFormat.Number
                               HintText: ="e.g. 25000000"
                               Align: =Align.Right
                               Width: =Parent.Width
@@ -421,8 +425,12 @@ Screens:
                              If( Len(gTxSales.Mail) = 0,         "sales owner   ", "" ) &
                              If( IsBlank(dtpTxDate.SelectedDate),
                                  "a valid trade date   ", "" ) &
-                             If( false,
-                                 "a numeric notional   ", "" ) )
+                             // transaction_notional is optional, so an EMPTY box is fine; only
+                             // text that will not parse is an error, and that is silent
+                             // otherwise — Value() returns blank and blank saves as blank.
+                             If( Len(Trim(numTxNotional.Text)) > 0
+                              && IsBlank(Value(numTxNotional.Text)),
+                                 "a numeric notional (that entry is not a number)   ", "" ) )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.Danger
@@ -509,11 +517,14 @@ Screens:
                         Patch( taskmaster_transactions,
                                If( gEditMode = "Edit", gEditTransaction, Defaults(taskmaster_transactions) ),
                                // Mirrors the PARENT's phase so cross-project queries can exclude archived
-                               // work with a delegable `= false`. Written on EVERY save, not just on insert,
-                               // so a row whose project was archived while this editor sat open cannot come
-                               // back live. gSelProject is the project this screen was opened from, so this
-                               // costs no extra query.
-                               { transaction_project_archived: Coalesce(gSelProject.project_phase.Value, "") = "Archived",
+                               // work with a delegable `= false`. Written on EVERY save, not just on insert.
+                               // Read LIVE from the list, not from gSelProject: that global is a gallery
+                               // snapshot taken when the project was opened, so a project archived since
+                               // then would stamp `false` here and the row would stay in scope forever.
+                               // One delegable LookUp on ID.
+                               { transaction_project_archived:
+                                     Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
+                                                       project_phase.Value ), "" ) = "Archived",
                                transaction_name:        Trim(txtTxName.Text),
                                  transaction_project_id:  { Id: gTxProject.Id, Value: gTxProject.Value },
                                  transaction_client_name: { Id: gTxClient.Id,  Value: gTxClient.Value },
