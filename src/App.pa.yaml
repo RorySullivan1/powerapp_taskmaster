@@ -101,9 +101,22 @@ App:
       );
 
       // --- Live-work sets (perf stage 1, 2026-08-12) ------------------------------
-      // ONE definition of "not archived", instead of the same Or-chain hand-copied into
-      // seven Filters across five screens. Any of those copies could have drifted from
-      // the others silently — a missing stage in one chain just makes rows vanish from
+      // THERE ARE TWO SEPARATE "IS THIS LIVE" AXES AND THEY ARE NOT THE SAME QUESTION.
+      // An earlier draft of this block conflated them; the names below keep them apart.
+      //
+      //  1. PROJECT ARCHIVING — `project_phase = "Archived"`, set on scrProjectEdit.
+      //     This is what "archived" means in this app. It CASCADES IN INTENT but NOT in
+      //     data: a task, transaction or issue does not carry its parent's phase, so
+      //     none of the child sets below can express "belongs to a live project".
+      //     `ArchivedProjects` is the set the screens test membership against.
+      //  2. A CHILD'S OWN LIFECYCLE — `task_stage = "Archived"`, `issue_status =
+      //     "Closed"`. A task you shelved individually inside a live project. Real, and
+      //     separately useful (the C3 rollup depends on it — StageWeights omits Archived
+      //     so a shelved task can't drag a project down), but NOT project archiving.
+      //
+      // The value of naming them here is ONE definition instead of the same Or-chain
+      // hand-copied into seven Filters across five screens. Any of those copies could
+      // have drifted silently — a missing stage in one chain just makes rows vanish from
       // one screen, with nothing to see and nothing to catch it.
       //
       // WHY A NAMED FORMULA AND NOT A COLLECTION IN OnStart. Named formulas "can't use
@@ -129,24 +142,38 @@ App:
           project_phase.Value = "Planning" || project_phase.Value = "Active"
        || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" );
 
-      // Six live stages; "Archived" is the seventh and is the one left out. Matches
-      // StageWeights above, which omits Archived for the same reason.
-      ActiveTasks = Filter( taskmaster_tasks,
+      // AXIS 2, NOT AXIS 1. Six live stages; "Archived" is the seventh and is the one
+      // left out. Matches StageWeights above, which omits Archived for the same reason.
+      // Says NOTHING about whether the parent project is archived.
+      UnarchivedTasks = Filter( taskmaster_tasks,
           task_stage.Value = "Not Started"  || task_stage.Value = "Planning"
        || task_stage.Value = "Drafting"     || task_stage.Value = "Under Review"
        || task_stage.Value = "Finalizing"   || task_stage.Value = "Complete" );
 
-      // Issues have no "Archived" — the lifecycle ends at Closed, so "live" means
-      // not-Closed. Named for what it is rather than forced into the Active* pattern.
+      // AXIS 2 AGAIN, and not even archiving. Issues have no "Archived" — the lifecycle
+      // ends at Closed, so this is simply the not-Closed set.
       OpenIssues = Filter( taskmaster_issues,
           issue_status.Value = "Open"    || issue_status.Value = "Review"
        || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" );
 
-      // NO ActiveTransactions. taskmaster_transactions has NO status, stage or archived
-      // column at all — a transaction is only reachable through its project, so "live
-      // transactions" cannot be expressed here. Excluding the children of an archived
-      // project needs a join or an `in` over a set, neither of which delegates; that is
-      // stage 3 and it costs a denormalised flag on the child lists.
+      // AXIS 1, and the ONLY set that answers "is this project archived". Screens that
+      // load children ACROSS projects collect this once and test membership locally.
+      //
+      // WHY MEMBERSHIP-TESTED LOCALLY AND NOT FILTERED SERVER-SIDE: a child row carries
+      // only `*_project_id`, never the parent's phase, so "parent is not archived" needs
+      // a join — and neither a join nor `in` over a set delegates to SharePoint. The
+      // alternative is denormalising an archived flag onto all three child lists and
+      // cascading it on every phase change; that is a schema change plus a bulk write,
+      // and it is NOT needed here because every cross-project child query is ALREADY
+      // narrow (my tasks, my issues) or capped (FirstN 50). Local is correct and free.
+      //
+      // NOT a named formula used directly in a predicate: a named formula over a data
+      // source re-queries, and evaluating one inside a per-row RemoveIf could issue a
+      // call per row. The screens ClearCollect it ONCE, then test against the local copy.
+      ArchivedProjects = Filter( taskmaster_projects, project_phase.Value = "Archived" );
+
+      // NO transaction set on either axis. taskmaster_transactions has NO status, stage
+      // or archived column at all, so a transaction's liveness is ENTIRELY its project's.
 
       // --- Person-column claims prefix --------------------------------------------
       // A SharePoint Person column is patched as an expanded-user record whose Claims

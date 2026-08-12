@@ -28,8 +28,18 @@ Screens:
                 Filter( taskmaster_projects,
                     ( project_manager.Email = gUserEmail || project_supporter.Email = gUserEmail )
                  && ( project_phase.Value = "Planning" || project_phase.Value = "Active"
-                   || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" ) ) )
+                   || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" ) ) ),
+            // THE PROJECT-LEVEL EXCLUSION. Collected in the same Concurrent so it costs
+            // no extra wall-clock, then applied LOCALLY below. Archiving is a PROJECT
+            // state; a task or issue does not carry its parent's phase, so this cannot
+            // be a server-side predicate without a join, and joins do not delegate.
+            ClearCollect( colArchivedProjects, ArchivedProjects )
         );
+        // colMyProjects needs no removal — it filters project_phase directly, because
+        // a PROJECT does carry its own phase. Only the child set needs the membership
+        // test. See the note on scrHome.
+        RemoveIf( colMyTasks,
+                  !IsBlank( LookUp(colArchivedProjects, ID = task_project_id.Id) ) );
         Set( gRptOpen, Filter(colMyTasks, task_stage.Value <> "Complete") );
         Set( gRptOnTrack,
              If( CountRows(gRptOpen) = 0, 0,

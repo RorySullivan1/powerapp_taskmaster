@@ -49,8 +49,21 @@ Screens:
                     // Assigned to me, full stop — see the note on the other copy.
                     issue_assignee.Email = gUserEmail
                  && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
-                   || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) )
+                   || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) ),
+            // THE PROJECT-LEVEL EXCLUSION. Collected in the same Concurrent so it costs
+            // no extra wall-clock, then applied LOCALLY below. Archiving is a PROJECT
+            // state; a task or issue does not carry its parent's phase, so this cannot
+            // be a server-side predicate without a join, and joins do not delegate.
+            ClearCollect( colArchivedProjects, ArchivedProjects )
         );
+        // Applied AFTER Concurrent, and entirely in memory — both collections are
+        // already local, so these are not queries. LookUp against the local copy, not
+        // against `ArchivedProjects` directly: a named formula over a data source
+        // re-queries, and one inside a per-row predicate could mean a call per row.
+        RemoveIf( colMyTasks,
+                  !IsBlank( LookUp(colArchivedProjects, ID = task_project_id.Id) ) );
+        RemoveIf( colMyIssues,
+                  !IsBlank( LookUp(colArchivedProjects, ID = issue_project_id.Id) ) );
         Set( gMyOpen,
              CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
         Set( gMyOverdue,
@@ -99,8 +112,18 @@ Screens:
                           // not what I happened to raise.
                           issue_assignee.Email = gUserEmail
                        && ( issue_status.Value = "Open"    || issue_status.Value = "Review"
-                         || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) )
+                         || issue_status.Value = "Waiting" || issue_status.Value = "Blocked" ) ) ),
+                  // THE PROJECT-LEVEL EXCLUSION. Collected in the same Concurrent so it costs
+                  // no extra wall-clock, then applied LOCALLY below. Archiving is a PROJECT
+                  // state; a task or issue does not carry its parent's phase, so this cannot
+                  // be a server-side predicate without a join, and joins do not delegate.
+                  ClearCollect( colArchivedProjects, ArchivedProjects )
               );
+              // Same two removals as OnVisible — see the note there.
+              RemoveIf( colMyTasks,
+                        !IsBlank( LookUp(colArchivedProjects, ID = task_project_id.Id) ) );
+              RemoveIf( colMyIssues,
+                        !IsBlank( LookUp(colArchivedProjects, ID = issue_project_id.Id) ) );
               Set( gMyOpen, CountRows(Filter(colMyTasks, task_stage.Value <> "Complete")) );
               Set( gMyOverdue,
                    CountRows( Filter( colMyTasks,

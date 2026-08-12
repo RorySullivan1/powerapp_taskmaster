@@ -328,9 +328,29 @@
     Data Row Limit (max 2000); this is a MULTI-USER app so a launch snapshot goes stale and every
     save site would need write-through; and MS warns OnStart both slows launch and can race
     ("a screen can render and become interactive before App.OnStart finishes").
-  - **STAGE 1 TRANCHE A SHIPPED 2026-08-12** — `ActiveProjects`, `ActiveTasks`, `OpenIssues`
-    declared in `App.Formulas`; **exactly ONE consumer converted (`scrProjects`' Active branch)
-    as a deliberate canary.** No `ActiveTransactions`: that list has no status column at all.
+  - **CORRECTED 2026-08-12 — I HAD CROSSED TWO AXES, and the user caught it.** (1) PROJECT
+    archiving is `project_phase = "Archived"`; (2) a CHILD'S OWN lifecycle is `task_stage =
+    "Archived"` / `issue_status = "Closed"`. **My first draft filtered children on axis 2 while
+    presenting it as axis 1.** Both are real — the C3 rollup genuinely depends on axis 2, and
+    StageWeights omits Archived for that reason — but **archiving happens at the PROJECT level
+    and does not live in the child row at all.** `ActiveTasks` renamed `UnarchivedTasks` and both
+    child sets are now documented as axis 2 explicitly.
+  - **STAGE 1 SHIPPED 2026-08-12** — `ActiveProjects`, `UnarchivedTasks`, `OpenIssues`,
+    `ArchivedProjects` in `App.Formulas`; `scrProjects`' Active branch as the delegation canary;
+    and the real ask implemented on the THREE cross-project child loads (`scrHome` OnVisible +
+    Refresh, `scrReports`): collect `ArchivedProjects` in the same `Concurrent`, then `RemoveIf`
+    the children **locally**. No `ActiveTransactions` on either axis — that list has no status
+    column at all, so a transaction's liveness is ENTIRELY its project's.
+  - **NO SCHEMA CHANGE WAS NEEDED, and that was the whole finding.** The denormalised-flag plan
+    (stage 3) exists to make the exclusion delegable server-side — but **every cross-project child
+    query is already narrow** (user-scoped "my tasks"/"my issues", or `FirstN 50` in a picker) and
+    every other child query is scoped to ONE project, where you WANT its children. A local
+    membership test over an already-local collection is correct and free. **Stage 3 is now
+    unnecessary unless Monitor proves otherwise.**
+  - **STILL LEAKING, deliberately not changed:** `scrIssueEdit`'s picker (lines ~795/801) can
+    still offer a task or transaction belonging to an archived project when linking an issue.
+    `FirstN 50` runs BEFORE any local removal, so filtering after would return fewer than 50 rows
+    rather than the right 50. Low-value edge case; flagged rather than bodged.
   - **BLOCKING ON A BINARY:** does `Filter(ActiveProjects, StartsWith(...))` still delegate?
     Nested Filter over a named formula is the one unproven step, and **a delegation failure here
     is SILENT — it truncates at 500 rows rather than erroring**, so the signal is the BLUE
