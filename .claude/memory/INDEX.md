@@ -2,7 +2,9 @@
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **Phase: BUILT — now editing and refining.** 11 screens, 9 components and the App object
-  exist in Studio, the lists are added, `App.Formulas` is in. Work is fixing and refining, not creating.
+  exist in Studio, the lists are added, `App.OnStart` + `App.Formulas` are in. Work is fixing and
+  refining, not creating. **THE PUBLISHED APP RENDERS PROPERLY as of 2026-08-12 (user confirmed)** —
+  the squished-and-black era is over; `gTheme` resolves in the player.
 - **LANDED 2026-08-12 (user confirmed): `cmpLookupField`, `cmpPicker`, and all five re-pasted
   `scr*Edit` screens are IN STUDIO**, along with the four code-review batches. **THERE ARE NO
   ORPHANED CONTROLS — the user DELETES a screen before pasting it back** (confirmed 2026-08-12),
@@ -351,8 +353,9 @@
   renders black while Studio is perfect. **From now on a hand-off is not done at "it works in
   Studio" — record SAVED + PUBLISHED separately**, because "landed" has silently meant only the
   first for the entire project.
-- **SQUISHED AND BLACK AND NO APP BAR = `Theme` IS BLANK IN THE PUBLISHED APP (root-caused
-  2026-08-12, after I got it wrong twice).** ONE cause, every symptom, because blank coerces to 0
+- **CLOSED 2026-08-12 — the published app renders properly (user confirmed).** Kept because the
+  diagnostic is the reusable part. **SQUISHED AND BLACK AND NO APP BAR = the theme record IS BLANK
+  IN THE PUBLISHED APP (root-caused 2026-08-12, after I got it wrong twice).** ONE cause, every symptom, because blank coerces to 0
   and to black: 11/11 screens `Fill: =Theme.Color.Bg` -> black; 66 controls positioned off
   `Theme.Space.*` -> 0 -> stacked at the origin; and **all 4 `cmpAppBar` instances take
   `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)` -> 0 -> the bar VANISHES.**
