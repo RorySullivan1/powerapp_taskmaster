@@ -19,14 +19,19 @@ formula bar by hand. Two things about that channel bite:
 stays in the repo, which is the authoritative source; Studio only needs the
 code. Use it when the full paste has failed, or pre-emptively.
 
-    python3 tools/formula_bar_body.py            # code + comments
-    python3 tools/formula_bar_body.py --bare     # code only
+    python3 tools/formula_bar_body.py onstart --bare   # App.OnStart, code only
+    python3 tools/formula_bar_body.py formulas --bare  # App.Formulas, code only
 """
 import pathlib
 import re
 import sys
 
 SRC = pathlib.Path(__file__).resolve().parent.parent / "src" / "App.pa.yaml"
+
+# The App object has TWO formula-bar properties now. OnStart carries the constants
+# (Theme and friends); Formulas keeps only the data-source filters, which must stay
+# lazy to delegate. Both cross the gap the same way and both need the same care.
+BLOCKS = {"formulas": "    Formulas: |-\n", "onstart": "    OnStart: |-\n"}
 
 
 def strip_line_comment(line: str) -> str:
@@ -45,12 +50,14 @@ def strip_line_comment(line: str) -> str:
 
 def main() -> int:
     bare = "--bare" in sys.argv
+    which = next((a for a in sys.argv[1:] if a in BLOCKS), "onstart")
+    marker = BLOCKS[which]
     text = SRC.read_text()
-    if "Formulas: |-\n" not in text:
-        print("App.Formulas block not found", file=sys.stderr)
+    if marker not in text:
+        print(f"App.{which} block not found", file=sys.stderr)
         return 1
 
-    body = text.split("Formulas: |-\n", 1)[1]
+    body = text.split(marker, 1)[1]
     lines = []
     for raw in body.split("\n"):
         if raw.strip() and not raw.startswith("      "):
@@ -67,11 +74,16 @@ def main() -> int:
 
     out = "\n".join(lines).rstrip() + "\n"
 
-    decls = re.findall(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=", out, re.M)
+    if which == "onstart":
+        names = re.findall(r"Set\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,", out)
+        label = "globals Set"
+    else:
+        names = re.findall(r"^([A-Za-z_][A-Za-z0-9_]*)\s*=", out, re.M)
+        label = "named formulas"
     print(out)
-    print(f"--- {len(decls)} named formulas: {', '.join(decls)}", file=sys.stderr)
-    print(f"--- {len(out.splitlines())} lines, {'no comments' if bare else 'with comments'}",
-          file=sys.stderr)
+    print(f"--- {len(names)} {label}: {', '.join(names)}", file=sys.stderr)
+    print(f"--- App.{which}: {len(out.splitlines())} lines, "
+          f"{'no comments' if bare else 'with comments'}", file=sys.stderr)
     if not bare and any("//" in l for l in lines):
         print("--- NOTE: contains // comments. EXPAND the formula bar before pasting, or the\n"
               "    newlines collapse and the first comment swallows everything after it.\n"

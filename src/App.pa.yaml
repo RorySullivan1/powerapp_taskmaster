@@ -10,21 +10,41 @@
 # the whole formula were commented out.
 App:
   Properties:
-    Formulas: |-
+    # =========================================================================
+    # OnStart — THE CONSTANTS, ACTIVELY SET.
+    #
+    # These were named formulas in `Formulas` until 2026-08-12. They are here now
+    # because `Theme` was NOT RESOLVING IN THE PUBLISHED APP: every screen went
+    # black (`Fill: =Theme.Color.Bg` -> blank -> black), every control collapsed to
+    # the origin (`Theme.Space.*` -> blank -> 0) and the app bar vanished outright
+    # (its `Height` IS `Theme.Space.HeaderH`). Setting the same record in a control
+    # worked immediately. Studio was fine throughout, so nothing in the source ever
+    # looked wrong — the evidence came from the running app, not from reading.
+    #
+    # THE NAMES ARE DELIBERATELY UNCHANGED, AND THAT IS THE POINT. `Set(Theme, …)` makes
+    # `Theme` a global with the same identifier, so all 939 `Theme.*` references
+    # across 11 screens and 9 components keep resolving exactly as they did. This
+    # is a change of DEFINITION SITE, not a rename — zero screens were touched.
+    #
+    # ORDER IS IMPERATIVE HERE, unlike Formulas. Theme goes first because it is what
+    # everything else is measured against; nothing below depends on anything above,
+    # so the rest is alphabetical-ish by convenience.
+    #
+    # THE KNOWN COST, stated honestly: OnStart is non-blocking, so a screen CAN
+    # render before it finishes. That risk is about long OnStarts that call data —
+    # every statement here is a literal, evaluated without a network round trip, so
+    # the window is vanishingly small. It is not zero. If a screen ever flashes
+    # unstyled on launch, this is why, and the fix is App.StartScreen, not moving
+    # these back.
+    #
+    # WHAT STAYS IN Formulas AND MUST NOT MOVE HERE: the three data-source filters.
+    # `Set(ActiveProjects, Filter(...))` would capture a TABLE VALUE, and filtering a
+    # variable does not delegate — it would silently cap every cross-project query at
+    # the data row limit, undoing the whole archived-exclusion design.
+    # =========================================================================
+    OnStart: |-
       =
-      // --- Identity ---------------------------------------------------------------
-      // Lowercased to match the Person-column Claims convention (schema.md).
-      // NOTE: this named formula INLINES into the server-side predicates on scrHome /
-      // scrReports (task_lead.Email = gUserEmail). User() inside a Filter has
-      // historically tripped the delegation analyser. If either Filter shows a blue
-      // underline on first paste, the grounded fallback is to delete this line and
-      // instead put  Set(gUserEmail, Lower(User().Email))  in App.OnStart.
-      gUserEmail = Lower(User().Email);
-
-      // --- Theme ------------------------------------------------------------------
-      // One record, referenced as Theme.Color.* / Theme.Size.* / Theme.Space.*.
-      // The single styling channel for the whole app (distillation T7/T16).
-      Theme = {
+       Set( Theme, {
           Color: {
               Primary:      RGBA(0,  90, 158, 1),   // EQD desk blue
               PrimaryDark:  RGBA(0,  60, 110, 1),
@@ -42,7 +62,51 @@ App:
           Size: { H1: 28, H2: 20, H3: 16, Body: 14, Small: 12 },
           Space: { Gutter: 24, Gap: 16, HeaderH: 64, NavW: 240, RowH: 52 },
           Font: Font.'Segoe UI'
-      };
+      } );
+
+       Set( NavMenu, Table(
+          { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
+          { Key: 2, Title: "Reports",   Icon: Icon.DetailList,     NeedsLicence: true  },
+          { Key: 3, Title: "Projects",  Icon: Icon.Document, NeedsLicence: false },
+          { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false }
+      ) );
+
+       Set( StageWeights, Table(
+          { Stage: "Not Started",  Weight: 0   },
+          { Stage: "Planning",     Weight: 10  },
+          { Stage: "Drafting",     Weight: 35  },
+          { Stage: "Finalizing",   Weight: 85  },
+          { Stage: "Complete",     Weight: 100 }
+          // "Under Review" (was 60) and "Archived" were REMOVED from task_stage on
+          // 2026-08-12 — review is signalled by ISSUES, and archiving by the PROJECT.
+          // The surviving weights are UNCHANGED on purpose: re-spacing them would move
+          // every project's stored project_perc_completion without a single task
+          // changing, so historical numbers would stop being comparable. The cost is a
+          // visible 35 -> 85 jump at Drafting -> Finalizing. Say so and re-space
+          // deliberately if that gap is wrong; do not drift into it.
+      ) );
+
+       Set( ClaimPrefix, "i:0#.f|membership|" );
+
+       Set( gHasPowerBiLicence, false );
+
+       Set( gUserEmail, Lower(User().Email) )
+    Formulas: |-
+      =
+      // --- Identity ---------------------------------------------------------------
+      // Lowercased to match the Person-column Claims convention (schema.md).
+      // NOTE: this named formula INLINES into the server-side predicates on scrHome /
+      // scrReports (task_lead.Email = gUserEmail). User() inside a Filter has
+      // historically tripped the delegation analyser. If either Filter shows a blue
+      // underline on first paste, the grounded fallback is to delete this line and
+      // instead put  Set(gUserEmail, Lower(User().Email))  in App.OnStart.
+      // gUserEmail MOVED TO OnStart 2026-08-12, with the other constants.
+
+      // --- Theme ------------------------------------------------------------------
+      // One record, referenced as Theme.Color.* / Theme.Size.* / Theme.Space.*.
+      // The single styling channel for the whole app (distillation T7/T16).
+      // Theme MOVED TO OnStart 2026-08-12 — see the note there. It did not resolve
+      // in the published app, and every screen reads it.
 
       // --- Navigation model (native, licence-independent — Q2 decision) -----------
       // Screens are NOT stored here. An earlier version had `Screen: scrHome` in each
@@ -59,12 +123,7 @@ App:
       //   1 scrHome · 2 scrReports · 3 scrProjects · 4 scrReference
       //   scrAdmin was DELETED 2026-08-11 and its reference-data galleries moved to
       //   scrReference, so there is no fifth entry and key 4 is the Switch default.
-      NavMenu = Table(
-          { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
-          { Key: 2, Title: "Reports",   Icon: Icon.DetailList,     NeedsLicence: true  },
-          { Key: 3, Title: "Projects",  Icon: Icon.Document, NeedsLicence: false },
-          { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false }
-      );
+      // NavMenu MOVED TO OnStart 2026-08-12, with the other constants.
 
       // --- Power BI licence gate (Q2) ---------------------------------------------
       // DECIDED 2026-08-03 — SOFT GATE. An unlicensed user sees the Reports entry
@@ -80,7 +139,7 @@ App:
       // To supply a signal later, replace this line only — nav and the Reports screen
       // both read it, so nothing else changes. A lookup/config allow-list column or an
       // Entra group check are the two obvious sources.
-      gHasPowerBiLicence = false;   // soft gate; see above before changing
+      // gHasPowerBiLicence MOVED TO OnStart 2026-08-12, with the other constants.
 
       // --- Task-stage weights (C3: project completion is a WEIGHTED rollup) --------
       // Golden source for these numbers: schema/schema.yaml -> rollups:
@@ -89,20 +148,7 @@ App:
       //
       // A named formula is a VALUE, so the weights live here; the write-back is a
       // side effect and therefore lives in a behaviour property (snippet below).
-      StageWeights = Table(
-          { Stage: "Not Started",  Weight: 0   },
-          { Stage: "Planning",     Weight: 10  },
-          { Stage: "Drafting",     Weight: 35  },
-          { Stage: "Finalizing",   Weight: 85  },
-          { Stage: "Complete",     Weight: 100 }
-          // "Under Review" (was 60) and "Archived" were REMOVED from task_stage on
-          // 2026-08-12 — review is signalled by ISSUES, and archiving by the PROJECT.
-          // The surviving weights are UNCHANGED on purpose: re-spacing them would move
-          // every project's stored project_perc_completion without a single task
-          // changing, so historical numbers would stop being comparable. The cost is a
-          // visible 35 -> 85 jump at Drafting -> Finalizing. Say so and re-space
-          // deliberately if that gap is wrong; do not drift into it.
-      );
+      // StageWeights MOVED TO OnStart 2026-08-12, with the other constants.
 
       // --- Live-work sets (perf stage 1, 2026-08-12) ------------------------------
       // THERE ARE TWO SEPARATE "IS THIS LIVE" AXES AND THEY ARE NOT THE SAME QUESTION.
@@ -211,7 +257,7 @@ App:
       // COMMUNITY-CONFIRMED shape, not first-party — same risk class as the managed-
       // metadata write (docs/managed-metadata-picker.md §2). If a Person write fails on
       // first paste, this line and the record shape around it are the first suspects.
-      ClaimPrefix = "i:0#.f|membership|";
+      // ClaimPrefix MOVED TO OnStart 2026-08-12, with the other constants.
 
       // --- NO FX TABLE HERE, DELIBERATELY (Q14 decided 2026-08-03) ----------------
       // An `FxToUsd` table briefly lived here so the transaction form could normalise
