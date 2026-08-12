@@ -42,21 +42,19 @@ Screens:
       #    lost to a blank Choice — these counts miss nothing.
       OnVisible: |
         =Concurrent(
+            // FILTERED OVER A NAMED FORMULA, and the composition FOLDS into a single
+            // server query — verified in Live Monitor 2026-08-12 (one getRows of
+            // already-filtered rows, not a repeated walk). That is what lets the
+            // archived-exclusion rule live in exactly ONE place, App.Formulas, instead
+            // of being hand-copied into every cross-project query.
+            // `LiveTasks` = task_project_archived = false. `OpenIssues` carries BOTH
+            // axes — the project being live and the issue's own status being Open.
             ClearCollect( colMyTasks,
-                Filter( taskmaster_tasks,
-                    // EXCLUDED AT THE SOURCE. `*_project_archived` is a denormalised mirror of the
-                    // parent's phase, maintained by scrProjectEdit's save — so "belongs to a live
-                    // project" is a delegable `= false` and the archived rows NEVER REACH THE APP.
-                    // This replaced a collect-then-RemoveIf, which fetched them and only then
-                    // dropped them: the data row limit still applied to the fetch, so past it
-                    // archived work silently reappeared.
-                    task_project_archived = false
-                 && ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ) ),
+                Filter( LiveTasks,
+                    task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
             ClearCollect( colMyIssues,
-                Filter( taskmaster_issues,
-                    // Assigned to me, full stop — see the note on the other copy.
-                    issue_project_archived = false
-                 && issue_assignee.Email = gUserEmail && issue_status.Value = "Open" ) )
+                // Assigned to me, full stop — see the note on the other copy.
+                Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
         );
         Set( gMyOpen,
              CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
@@ -90,21 +88,18 @@ Screens:
               =Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
               Concurrent(
                   ClearCollect( colMyTasks,
-                      Filter( taskmaster_tasks,
-                          // See OnVisible — excluded at the source, not in memory.
-                          task_project_archived = false
-                       && ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ) ),
+                      // See OnVisible — LiveTasks holds the archived exclusion.
+                      Filter( LiveTasks,
+                          task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
                   ClearCollect( colMyIssues,
-                      Filter( taskmaster_issues,
-                          // ASSIGNED TO ME, full stop. The second arm was
-                          // `|| issue_owner.Email = gUserEmail`, and issue_owner is
-                          // retired. It was NOT replaced with `'Created By'`: that
-                          // column is not indexed, so an Or-arm on it would drop
-                          // delegation for the WHOLE filter and silently truncate this
-                          // list at 500 rows. "My issues" is now what I must act on,
-                          // not what I happened to raise.
-                          issue_project_archived = false
-                       && issue_assignee.Email = gUserEmail && issue_status.Value = "Open" ) )
+                      // ASSIGNED TO ME, full stop. The second arm was
+                      // `|| issue_owner.Email = gUserEmail`, and issue_owner is
+                      // retired. It was NOT replaced with `'Created By'`: that
+                      // column is not indexed, so an Or-arm on it would drop
+                      // delegation for the WHOLE filter and silently truncate this
+                      // list at 500 rows. "My issues" is now what I must act on,
+                      // not what I happened to raise.
+                      Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
               );
               Set( gMyOpen, CountRows(Filter(colMyTasks, task_stage.Value <> "Complete")) );
               Set( gMyOverdue,

@@ -18,16 +18,16 @@ Screens:
       # list. Org-wide analytics stay in Power BI, which imports the lists whole.
       OnVisible: |
         =Concurrent(
+            // Both filter over a NAMED FORMULA; the composition folds into one server
+            // query (Live Monitor, 2026-08-12). LiveTasks holds the archived exclusion
+            // and ActiveProjects holds the four-live-phase chain that used to be
+            // written out here — the last hand-copy of it in the app.
             ClearCollect( colMyTasks,
-                Filter( taskmaster_tasks,
-                    // Excluded at the source; see scrHome's OnVisible.
-                    task_project_archived = false
-                 && ( task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ) ),
+                Filter( LiveTasks,
+                    task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
             ClearCollect( colMyProjects,
-                Filter( taskmaster_projects,
-                    ( project_manager.Email = gUserEmail || project_supporter.Email = gUserEmail )
-                 && ( project_phase.Value = "Planning" || project_phase.Value = "Active"
-                   || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" ) ) )
+                Filter( ActiveProjects,
+                    project_manager.Email = gUserEmail || project_supporter.Email = gUserEmail ) )
         );
         Set( gRptOpen, Filter(colMyTasks, task_stage.Value <> "Complete") );
         Set( gRptOnTrack,

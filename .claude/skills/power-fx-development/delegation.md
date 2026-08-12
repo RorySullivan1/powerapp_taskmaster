@@ -130,12 +130,18 @@ loud: anything non-delegable then returns a single record, which is impossible t
 correct on a small list — that is the entire danger — so "it works" is not an answer to a
 delegation question, and neither is a screenshot of the gallery.
 
-### The open case in this repo
+### Settled in this repo, 2026-08-12
 
-**Nesting a `Filter` over a named formula that is itself a `Filter`** —
-`Filter(ActiveProjects, StartsWith(project_name, …))` on `scrProjects`. Both halves delegate
-alone (Or-of-equals on a Choice; `StartsWith` on an indexed Text column). Whether Power Fx
-folds the pair into ONE server query is not documented either way, and it decides whether
-`ActiveProjects` / `LiveTasks` / `LiveTransactions` / `LiveIssues` / `OpenIssues` become the
-app's single definition of "live" or get deleted as unusable. One `getRows` = adopt them
-everywhere; repeated `getRows` = keep the predicates inlined per screen and delete them.
+**Nesting a `Filter` over a named formula that is itself a `Filter` DOES fold into one server
+query.** Verified by Live Monitor on `Filter(ActiveProjects, StartsWith(project_name, …))` —
+one `getRows` of already-filtered rows. So a named formula is a safe place to put a shared
+predicate, and every cross-project query in the app now starts from one.
+
+Two caveats the verification does **not** cover:
+
+- It proved **one** level of composition. A named formula defined over another named formula
+  is two, and is not evidence-backed here — write the predicate out rather than layering.
+- It says nothing about which queries *should* use a shared set. A query already scoped to one
+  parent usually should not: it is bounded anyway, and the filter can hide rows the caller
+  needs. The worst version is a maintenance routine that must read *every* child, including
+  the ones it is about to change — filtering there makes it skip exactly its own work.

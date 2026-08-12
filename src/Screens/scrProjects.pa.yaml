@@ -93,32 +93,19 @@ Screens:
                           && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    selFilter.Selected.Id = 2,
-                   // THE CANARY FOR PERF STAGE 1 — this is the only site converted so
-                   // far, deliberately. `ActiveProjects` is a named formula in
-                   // App.Formulas holding the four-live-phase Filter that used to be
-                   // written out here; the rule now has ONE definition instead of the
-                   // copy-per-screen it had.
+                   // `ActiveProjects` is the named formula in App.Formulas holding the
+                   // four-live-phase chain that used to be written out here. Filtering
+                   // over it FOLDS into one server query — verified in Live Monitor on
+                   // 2026-08-12 (a single getRows of already-filtered rows, not the
+                   // repeated walk a client-side filter produces).
                    //
-                   // HOW TO TEST THIS — AND IT IS NOT "DOES THE GALLERY LOOK RIGHT".
-                   // A non-delegable query looks perfect on a small list; that is the
-                   // whole danger. It is also NOT the blue underline: MS Learn states
-                   // plainly that "not every nondelegable case shows this warning", so
-                   // its absence proves nothing here.
+                   // That result is what let every cross-project query in the app move
+                   // onto a named formula, so the archived/live rules have ONE definition
+                   // instead of a copy per screen. This branch was the canary and is now
+                   // just the first consumer.
                    //
-                   // Use LIVE MONITOR (Studio > Advanced tools > Monitor), which
-                   // Microsoft documents for exactly this. Play the app, open this
-                   // screen with the Active filter, and read the `getRows` events:
-                   //   ONE getRows returning filtered rows  -> it folded. Adopt the
-                   //     named formulas everywhere and delete the inlined predicates.
-                   //   REPEATED getRows walking the list    -> it did not. Revert this
-                   //     branch to the inline Or-chain (git 72e19c4) and DELETE
-                   //     ActiveProjects / LiveTasks / LiveTransactions / LiveIssues /
-                   //     OpenIssues, which would then be permanently unusable.
-                   // Set Data row limit = 1 first if you want the failure to be loud.
-                   //
-                   // This is the ONLY nesting site in the app. Everything else writes
-                   // its predicates inline, deliberately, until this question is
-                   // answered — so a wrong answer costs one branch, not nine.
+                   // The other two branches stay on the raw list ON PURPOSE: branch 3 IS
+                   // the archived view, and the default branch means All.
                    Sort( Filter( ActiveProjects,
                              StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),

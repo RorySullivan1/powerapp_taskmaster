@@ -112,8 +112,8 @@ App:
       //     This is what "archived" means in this app, and it CASCADES IN DATA as of
       //     2026-08-12: scrProjectEdit's save writes `*_project_archived` onto every
       //     child, so each child list can answer "is my project archived" WITHOUT a
-      //     join. That denormalised column is the whole reason `LiveTasks` /
-      //     `LiveTransactions` / `LiveIssues` below can exist and delegate.
+      //     join. That denormalised column is the whole reason `LiveTasks` and
+      //     `OpenIssues` below can exist and delegate.
       //  2. A CHILD'S OWN LIFECYCLE. For ISSUES this is `issue_status` and it is real.
       //     For TASKS IT NO LONGER EXISTS: "Archived" was removed from task_stage on
       //     2026-08-12 precisely because conflating the two axes was the bug. A task
@@ -140,9 +140,13 @@ App:
       // Choice values in schema/schema.yaml — a value added there and missed here
       // disappears from the app with nothing to see and nothing to catch it.
       //
-      // NOT YET PROVEN: whether a screen-level `Filter(ActiveProjects, …)` still folds
-      // into ONE server query. Nested Filter over a named formula is the single
-      // unverified step in stage 1, which is why only one screen is converted so far.
+      // PROVEN 2026-08-12: a screen-level `Filter(ActiveProjects, …)` FOLDS into ONE
+      // server query. Verified in Live Monitor — a single `getRows` returning
+      // already-filtered rows, not the repeated walk a client-side filter produces.
+      // The blue underline could not have answered this ("not every nondelegable case
+      // shows this warning" — MS Learn), and neither could the gallery looking right.
+      // That result is what makes these definitions usable at all: every cross-project
+      // query now filters over one of them instead of restating the rule.
       ActiveProjects = Filter( taskmaster_projects,
           project_phase.Value = "Planning" || project_phase.Value = "Active"
        || project_phase.Value = "Blocked"  || project_phase.Value = "Complete" );
@@ -161,6 +165,10 @@ App:
       // which delegates more cheaply than the four-way Or-chain it replaced.
       // Both predicates delegate and compose: an issue is live when its PROJECT is
       // live, and open when its OWN status says so. Two different axes, one filter.
+      // Written out rather than layered over a `LiveIssues`: that would nest a named
+      // formula inside a named formula, and what Live Monitor proved on 2026-08-12 is
+      // that ONE level of composition folds. Two is a reasonable inference and nothing
+      // more, and the failure mode here is a silently truncated home queue.
       OpenIssues = Filter( taskmaster_issues,
           issue_project_archived = false && issue_status.Value = "Open" );
 
@@ -175,14 +183,21 @@ App:
       // the collection itself grew for the life of the app. THE AIM IS TO KEEP THE
       // ROWS IN SCOPE UNDER 2000, and only a server-side predicate does that.
       //
-      // These are the sets any CROSS-PROJECT query should start from. A query scoped
-      // to ONE project does not use them: if you have opened an archived project you
-      // want to see its work, and one project's children are bounded anyway.
+      // These are the sets any CROSS-PROJECT query starts from. A query scoped to ONE
+      // project does NOT use them, and that is not an oversight — if you have opened an
+      // archived project you want to see its work, and one project's children are
+      // bounded anyway. The cascade in scrProjectEdit is the sharpest case: it must
+      // read EVERY child, including the ones it is about to flag, so it filters the raw
+      // list on purpose.
       LiveTasks = Filter( taskmaster_tasks, task_project_archived = false );
 
-      LiveTransactions = Filter( taskmaster_transactions, transaction_project_archived = false );
-
-      LiveIssues = Filter( taskmaster_issues, issue_project_archived = false );
+      // NO LiveTransactions AND NO LiveIssues, deliberately. Both existed for one day
+      // with zero consumers: every transaction query in the app is scoped to a single
+      // project, and the only cross-project issue query wants OPEN issues, which
+      // `OpenIssues` already covers. A named formula nobody calls is not free — it is a
+      // second place for the rule to drift from the schema, unnoticed because nothing
+      // exercises it. Add one when a query actually needs it; do not keep a definition
+      // alive on speculation.
 
       // --- Person-column claims prefix --------------------------------------------
       // A SharePoint Person column is patched as an expanded-user record whose Claims
