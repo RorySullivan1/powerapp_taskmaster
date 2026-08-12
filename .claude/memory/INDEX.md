@@ -333,6 +333,13 @@
 - [2026-08-12] **REJECTED: moving `Theme` from `App.Formulas` to `App.OnStart`.** It is the intuitive fix for "the theme never lands" and it would make things WORSE, for a documented reason. A named formula's "value is always available — there is no timing dependency, no OnStart that must run first before the value is set, no time in which the formula's value is incorrect" (MS Learn, object-app#formulas-property). **`OnStart` is the opposite**: it is non-blocking by default, and "a screen can render and become interactive before App.OnStart finishes running" — so a `Set(gTheme, …)` there produces exactly the intermittent squished-and-black being diagnosed, only harder to reproduce. It would also cost a rename of every `Theme.*` reference in 11 screens and 9 components. **The symptom is a TRANSFER failure, not a placement problem** — src/App.pa.yaml
 
 ## Threads          (open items; remove when closed)
+- **THE RECORDS TRACK "IN STUDIO", NEVER "PUBLISHED" — and those are different apps.** 24 landings
+  logged as in-Studio/landed, zero publishes, across the whole project. **Studio runs the latest
+  SAVED version; end users run the last PUBLISHED one**, so the player can be arbitrarily far
+  behind everything this ledger calls "landed". That gap is the likeliest reason the published app
+  renders black while Studio is perfect. **From now on a hand-off is not done at "it works in
+  Studio" — record SAVED + PUBLISHED separately**, because "landed" has silently meant only the
+  first for the entire project.
 - **SQUISHED AND BLACK AND NO APP BAR = `Theme` IS BLANK IN THE PUBLISHED APP (root-caused
   2026-08-12, after I got it wrong twice).** ONE cause, every symptom, because blank coerces to 0
   and to black: 11/11 screens `Fill: =Theme.Color.Bg` -> black; 66 controls positioned off
