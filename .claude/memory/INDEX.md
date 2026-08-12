@@ -3,12 +3,13 @@
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **Phase: BUILT — now editing and refining.** 11 screens, 9 components and the App object
   exist in Studio, the lists are added, `App.Formulas` is in. Work is fixing and refining, not creating.
-- **STUDIO HAND-OFF BACKLOG (repo is ahead of Studio):** create `cmpLookupField` (5 properties) and
-  `cmpPicker` (9 properties: `Title`/`Results`/`AllowCreate` Input, `Query`/`Picked` Output,
-  `OnSearch`/`OnConfirm`/`OnCancel`/`OnCreateNew` Event); re-paste all five `scr*Edit` screens;
-  then DELETE in Studio: `cmpPeoplePicker`, `cmpRecordPicker` and the four batch-4 components
-  (`cmpUiKit`, `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`). Orphaned controls left behind by
-  the `cmpLookupField` rollout (61) must be deleted by hand on the four screens.
+- **LANDED 2026-08-12 (user confirmed): `cmpLookupField`, `cmpPicker`, and all five re-pasted
+  `scr*Edit` screens are IN STUDIO.** So are the four code-review batches, the picker merge and the
+  zero-results state. **UNCONFIRMED, assume NOT done:** the Studio-side DELETIONS —
+  `cmpPeoplePicker`, `cmpRecordPicker`, the four batch-4 components (`cmpUiKit`,
+  `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`), and the 61 controls orphaned by the
+  `cmpLookupField` rollout. Deletions are hand work in Studio with no repo trace, so **the size win
+  is not real until they happen** — ask, don't assume.
 - **Repo restructured 2026-08-05 to plain source**: `src/App.pa.yaml`, `src/Screens/*.pa.yaml`,
   `src/Components/*.pa.yaml`. 22/22 valid. Component definitions are WHOLE files again — the
   contract/body split, the skeleton variants, the `.msapp` packing and the `studio/` tree are all
@@ -317,10 +318,11 @@
 - **Ask the human for a `GridLayout` container's OWN code view** — one that has had its columns
   and rows configured in the Studio pane. That is the only missing piece before a grid can be
   authored here rather than merely filled.
-- **`cmpPicker` is authored but NOT in Studio, and it supersedes two components that ARE.** Order
-  matters: create `cmpPicker` and hand-type its NINE properties FIRST, re-paste the five `scr*Edit`
-  screens, confirm they work, and only THEN delete `cmpPeoplePicker` / `cmpRecordPicker` — deleting
-  a component that still has instances breaks the screens that hold them.
+- **The Studio DELETIONS are outstanding and invisible from here.** `cmpPeoplePicker`,
+  `cmpRecordPicker` and the four batch-4 components are superseded and instance-free but still ship
+  inside the `.msapp` and load at app start; 61 controls orphaned by the `cmpLookupField` rollout
+  sit on four screens. Now safe to do — `cmpPicker` has landed, so nothing holds an instance of the
+  old two. **Deleting from the repo does not shrink the running app**; only the Studio delete does.
 - **`scrIssueEdit` still saves with guarded follow-up Patches** (the pattern folded out of
   `scrTaskEdit` on 2026-08-10). Same fold available if its save also feels slow;
   `scrTransactionEdit` already writes in a single Patch and needs nothing.
@@ -438,3 +440,4 @@
 - 2026-08-10 2015 | task save optimised 12 round trips -> 1 on a typical edit: 8 optional Patches folded into the main one, C3 rollup skipped unless the stage moved, project write skipped when unchanged, Concurrent on the two rollup reads | sessions/2026-08-10-1746-consolidate-task-editor.md
 - 2026-08-11 1325 | scrProject task-list overlap root-caused: `Parent.Width` is the OUTER width, so every child of a padded container overflowed by its padding; 12 widths + 1 height fixed, cardInfo fact values -> 12pt | sessions/2026-08-11-1325-scrproject-padding-overflow.md
 - 2026-08-12 | cmpPeoplePicker + cmpRecordPicker merged into cmpPicker on a generic {Key, Primary, Secondary} row (Key is TEXT: Mail for a person, Text(ID) for a record); 9 screen instances collapsed to 5, one Reset target per screen; zero-results state added; AccessibleLabel (classic-only failure) and SetFocus (component/container restriction) both reverted after Studio rejected them | INDEX Decisions 2026-08-12
+- 2026-08-12 | cmpPicker + cmpLookupField + all five re-pasted scr*Edit screens LANDED in Studio; both reverted properties confirmed by that landing (AccessibleLabel is modern-only, SetFocus cannot target a control inside a Component/Container); Studio-side deletions still outstanding | INDEX Decisions 2026-08-12
