@@ -77,6 +77,24 @@ Screens:
                   { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
         // NO gIssOwner SEED. The business-owner field is gone; who raised the issue
         // is SharePoint's `Created By`, read straight off gEditIssue and never staged.
+        // OPTION SETS FOR THE TWO ASSOCIATION DROPDOWNS. Collected here, AFTER
+        // gIssProject is seeded above — they depend on it.
+        // Delegable: `=` on an indexed Lookup FK. The "(none)" row is Collected first
+        // so it sorts to the top, and it is what makes Id 0 a selectable "unlink"
+        // instead of needing a separate clear button.
+        // ForAll(... As alias, {record literal}) narrows each row to {Id, Label}; a
+        // literal cannot be Collected alongside a raw SharePoint row, whose schema is
+        // far wider, so both halves are projected to the same two columns.
+        ClearCollect( colIssTaskOpts, { Id: 0, Label: "(none)" } );
+        Collect( colIssTaskOpts,
+                 ForAll( Filter( taskmaster_tasks,
+                                 task_project_id.Id = gIssProject.Id ) As t,
+                         { Id: t.ID, Label: t.task_name } ) );
+        ClearCollect( colIssTxOpts, { Id: 0, Label: "(none)" } );
+        Collect( colIssTxOpts,
+                 ForAll( Filter( taskmaster_transactions,
+                                 transaction_project_id.Id = gIssProject.Id ) As x,
+                         { Id: x.ID, Label: x.transaction_name } ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
@@ -84,6 +102,8 @@ Screens:
         Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose );
+        // A combo box re-reads DefaultSelectedItems ONLY on Reset.
+        Reset( cboIssTask ); Reset( cboIssTx );
         // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the
         // strip shows the previous record's pick while the save writes this one.
         // The component gained OnReset on 2026-08-11; these are its consumers.
@@ -367,22 +387,45 @@ Screens:
                         LayoutGridRowEnd: =10
                         Height: =62
                       Children:
-                        - fldTask:
-                            Control: CanvasComponent
-                            ComponentName: cmpLookupField
+                        - lblIssTaskCap:
+                            Control: Label@2.5.1
                             Properties:
-                              Caption: ="Related task"
-                              PickLabel: ="＋  Choose a task"
-                              HasValue: =gIssTask.Id > 0
-                              Display: =gIssTask.Value
+                              Text: ="Related task"
+                              Font: =Theme.Font
+                              Size: =12
+                              Color: =Theme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
                               Width: =Parent.Width
-                              Height: =62
-                              OnPick: |
-                                =Set( gIssPicker, "Task" );
-                                 Reset( cmpIssPick );
-                                 Set( gIssQuery, "" )
-                              OnClear: |
-                                =Set( gIssTask, { Id: 0, Value: "" } )
+                              Height: =18
+                        - cboIssTask:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              # SCOPED TO THIS PROJECT — that is the whole change. An issue
+                              # belongs to a project, so the only tasks and transactions it can
+                              # sensibly reference are that project's. The old search picker
+                              # offered EVERY row in the tenant and made you type two characters
+                              # to find out.
+                              # A bounded set does not need a search dialog: `colIss*Opts` is
+                              # collected once in OnVisible and the list is just shown.
+                              Items: =colIssTaskOpts
+                              ItemDisplayText: =ThisItem.Label
+                              # Always resolves to a row, including the "(none)" one at Id 0,
+                              # so the box is never blank-with-no-explanation.
+                              DefaultSelectedItems: =Filter( colIssTaskOpts, Id = gIssTask.Id )
+                              SelectMultiple: =false
+                              IsSearchable: =true
+                              InputTextPlaceholder: ="Select…"
+                              Width: =Parent.Width
+                              Height: =36
+                              # Id 0 IS the clear. It replaces cmpLookupField's ✕ — the save
+                              # already treats `.Id > 0` as "linked", so selecting "(none)"
+                              # writes Blank() to the column exactly as the ✕ used to.
+                              OnChange: |
+                                =Set( gIssTask,
+                                      { Id:    cboIssTask.Selected.Id,
+                                        Value: If( cboIssTask.Selected.Id = 0, "", cboIssTask.Selected.Label ) } )
                   - lblIssTargetCap:
                       Control: Label@2.5.1
                       Properties:
@@ -430,22 +473,45 @@ Screens:
                         LayoutGridRowEnd: =10
                         Height: =62
                       Children:
-                        - fldTx:
-                            Control: CanvasComponent
-                            ComponentName: cmpLookupField
+                        - lblIssTxCap:
+                            Control: Label@2.5.1
                             Properties:
-                              Caption: ="Related transaction"
-                              PickLabel: ="＋  Choose a transaction"
-                              HasValue: =gIssTx.Id > 0
-                              Display: =gIssTx.Value
+                              Text: ="Related transaction"
+                              Font: =Theme.Font
+                              Size: =12
+                              Color: =Theme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
                               Width: =Parent.Width
-                              Height: =62
-                              OnPick: |
-                                =Set( gIssPicker, "Tx" );
-                                 Reset( cmpIssPick );
-                                 Set( gIssQuery, "" )
-                              OnClear: |
-                                =Set( gIssTx, { Id: 0, Value: "" } )
+                              Height: =18
+                        - cboIssTx:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              # SCOPED TO THIS PROJECT — that is the whole change. An issue
+                              # belongs to a project, so the only tasks and transactions it can
+                              # sensibly reference are that project's. The old search picker
+                              # offered EVERY row in the tenant and made you type two characters
+                              # to find out.
+                              # A bounded set does not need a search dialog: `colIss*Opts` is
+                              # collected once in OnVisible and the list is just shown.
+                              Items: =colIssTxOpts
+                              ItemDisplayText: =ThisItem.Label
+                              # Always resolves to a row, including the "(none)" one at Id 0,
+                              # so the box is never blank-with-no-explanation.
+                              DefaultSelectedItems: =Filter( colIssTxOpts, Id = gIssTx.Id )
+                              SelectMultiple: =false
+                              IsSearchable: =true
+                              InputTextPlaceholder: ="Select…"
+                              Width: =Parent.Width
+                              Height: =36
+                              # Id 0 IS the clear. It replaces cmpLookupField's ✕ — the save
+                              # already treats `.Id > 0` as "linked", so selecting "(none)"
+                              # writes Blank() to the column exactly as the ✕ used to.
+                              OnChange: |
+                                =Set( gIssTx,
+                                      { Id:    cboIssTx.Selected.Id,
+                                        Value: If( cboIssTx.Selected.Id = 0, "", cboIssTx.Selected.Label ) } )
                   - lblIssCloseCap:
                       Control: Label@2.5.1
                       Properties:
@@ -786,11 +852,9 @@ Screens:
             Y: =0
             Width: =Parent.Width
             Height: =Parent.Height
-            Title: |
-              =Switch( gIssPicker,
-                       "Assignee", "Select assignee",
-                       "Task",     "Select task",
-                       "Tx",       "Select transaction" )
+            # ONE state now. "Task" and "Tx" became project-scoped dropdowns on
+            # 2026-08-12 — a bounded list does not need a search dialog.
+            Title: ="Select assignee"
             # Queries run HERE — AccessAppScope false. Bound to gIssQuery, which
             # OnSearch sets, never to the instance's own Query output.
             # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
@@ -799,25 +863,11 @@ Screens:
               ForAll( Office365Users.SearchUserV2({ searchTerm: gIssQuery, top: 25 }).value As u,
               { Key:       u.Mail,
               Primary:   u.DisplayName,
-              Secondary: u.Mail } ),
-              gIssPicker = "Task" && Len(gIssQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_tasks,
-              StartsWith(task_name, gIssQuery) ), 50 ) As t,
-              { Key:       Text(t.ID),
-              Primary:   t.task_name,
-              Secondary: Coalesce(t.task_stage.Value, "") } ),
-              gIssPicker = "Tx" && Len(gIssQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_transactions,
-              StartsWith(transaction_name, gIssQuery) ), 50 ) As x,
-              { Key:       Text(x.ID),
-              Primary:   x.transaction_name,
-              Secondary: Coalesce(x.transaction_currency.Value, "") } ) )
+              Secondary: u.Mail } ) )
             OnSearch: =Set( gIssQuery, cmpIssPick.Query )
             AllowCreate: =false
             OnConfirm: |
-              =Switch( gIssPicker,
-              "Assignee", Set( gIssAssignee, { DisplayName: cmpIssPick.Picked.Primary, Mail: cmpIssPick.Picked.Secondary } ),
-              "Task",     Set( gIssTask,     { Id: Value(cmpIssPick.Picked.Key), Value: cmpIssPick.Picked.Primary } ),
-              "Tx",       Set( gIssTx,       { Id: Value(cmpIssPick.Picked.Key), Value: cmpIssPick.Picked.Primary } ) );
-              Set( gIssPicker, "" )
+              =Set( gIssAssignee,
+                    { DisplayName: cmpIssPick.Picked.Primary, Mail: cmpIssPick.Picked.Secondary } );
+               Set( gIssPicker, "" )
             OnCancel: =Set( gIssPicker, "" )
