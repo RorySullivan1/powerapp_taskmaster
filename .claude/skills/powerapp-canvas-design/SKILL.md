@@ -163,10 +163,14 @@ All colour, size and spacing goes through the `Theme` named formula
 - Because layout formulas freeze (§4), `Theme.Space.*` only ever applies **at paste time**.
   Colours and sizes stay live; positions do not.
 
-## "Fine in Studio, broken when published" is a DISPLAY SETTING, not a formula (2026-08-12)
+## Scale-to-fit vs Lock-aspect-ratio: Studio and the player DIVERGE (2026-08-12)
 
-Reported as *"all screens squished and black in the published app, Studio is fine."* Nothing in
-the source was wrong. MS Learn documents the two surfaces diverging under exactly one
+> **This section is about geometry only.** It was first written as the answer to a
+> squished-and-black report and that was WRONG — see the next section for the real cause and the
+> one-question test that separates them. Keep this for what it is: a real divergence worth
+> configuring correctly, which explains distortion and nothing else.
+
+MS Learn documents the two surfaces diverging under exactly one
 configuration — *Change screen size and orientation of canvas apps*:
 
 | Scale to fit | Lock aspect ratio | Behaviour |
@@ -196,10 +200,39 @@ Decide from the SOURCE, not from taste. Count the absolute placements:
 Turning both off on a fixed-canvas app does not make it responsive. It removes the scaling that
 was hiding the absolute positioning, and the layout falls apart at every size but one.
 
-### Do not diagnose this from the symptom
+## "Squished and black" is `Theme` RESOLVING BLANK — and here is the one-control test
 
-"Squished and black" is also what a failed `App.Formulas` paste looks like, because `Theme` then
-resolves blank and blank coerces to 0. **The discriminator is one question: does STUDIO look
-right too?** If Studio is broken, it is the formula. If only the published app is broken, it is
-the display setting, and no amount of reading the source will show it — the setting is not in the
-source at all.
+Root-caused 2026-08-12 after a wrong turn through the display settings above. When `Theme` is not
+available, **one cause produces every symptom at once**, because a blank coerces to 0 and to black:
+
+| Symptom | Mechanism |
+|---|---|
+| Screens are black | `Fill: =Theme.Color.Bg` → blank → black |
+| Everything is squished into the corner | every `X`/`Y`/`Height` off `Theme.Space.*` → 0 |
+| **The app bar is simply GONE** | its `Height` is `Theme.Space.HeaderH` → 0 |
+
+**THE TEST IS THE APP BAR.** Its height is Theme-derived, so it is a pure probe: no display
+setting, aspect ratio or window size can make a control vanish. Distortion stretches things; it
+never deletes them. So:
+
+- **App bar missing** → `Theme` is blank. It is `App.Formulas`, full stop.
+- **App bar present but the layout is distorted** → geometry. Now read the table above.
+
+Ask for that one observation before theorising. "Squished and black" is ambiguous; "the app bar
+isn't there" is not.
+
+### Why it can be blank in the PUBLISHED app while Studio is perfect
+
+Studio always runs the latest **saved** version; the player runs the last **published** one. If
+the published version predates the `App.Formulas` paste — or captured a moment when it was
+mid-edit — `Theme` genuinely does not exist for end users while the author sees nothing wrong.
+**Republish first; it costs a minute and tests the whole hypothesis.** If a republish does not fix
+it, `App.Formulas` did not actually commit: check App checker, and paste the comment-free body
+from `tools/formula_bar_body.py --bare`.
+
+### The architectural tell that makes this readable
+
+In this repo **screens paint with `Theme`; components paint with LITERALS** — `AccessAppScope:
+false` forced every component onto hardcoded RGBA. So with `Theme` blank, any component internals
+that do render still show their real colours against a black screen. Component-coloured content on
+black is not two bugs; it is one, seen through both halves of that split.
