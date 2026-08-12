@@ -1,7 +1,26 @@
-# THREE required columns and no Person, so this is genuinely small: a business key, a type path,
-# a description.
-# SharePoint does not enforce that, so the save checks for a duplicate BEFORE writing — a
-# delegable `=` on an indexed Text column.
+# =============================================================================
+# scrProductEdit  —  create / edit ONE product. Compact by instruction.
+#
+# REACHABLE FROM EXACTLY TWO PLACES, like scrClientEdit:
+#   1. scrReference ▸ Products        — maintenance
+#   2. cmpPicker ▸ "＋ New"          — quick creation mid-flow
+# Not in gNavMenu. A product is reference data, not a destination.
+#
+# THREE required columns and no Person, so this is genuinely small: a business
+# key, a type path, a description. See scrClientEdit for the return contract and
+# for why quick-create is a screen rather than a "+" inside the picker dialog.
+#
+# product_uid IS A BUSINESS KEY (ISIN / Ticker / internal ID) and schema.yaml
+# calls it unique. SharePoint does not enforce that, so the save checks for a
+# duplicate BEFORE writing — a delegable `=` on an indexed Text column. Without
+# it the app would happily create a second row for the same instrument and every
+# lookup pointing at it would then be ambiguous.
+#
+# BAND ARITHMETIC (1366x768):
+#      0 ..  64   header (absolute)
+#     64 .. 700   bodyRoot, vertical auto-layout, 24 padding
+#    700 .. 768   actionBar (opaque, absolute)
+# =============================================================================
 Screens:
   scrProductEdit:
     Properties:
@@ -106,8 +125,8 @@ Screens:
                   LayoutMinHeight: =18
                   Width: =Parent.Width - 48
                   Height: =18
-            # WRAPPED IN A COL — a component instance cannot carry FillPortions or
-            # LayoutMinHeight; the wrapper holds the auto-layout contract.
+            # WRAPPED IN A COL — a component instance cannot carry FillPortions
+            # or LayoutMinHeight; the wrapper holds the auto-layout contract.
             - colPdType:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -220,19 +239,29 @@ Screens:
             # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
             OnSelect: |
               =If( gSaving,
-              // A disabled button cannot fire OnSelect and cannot say why; the Text says
-              // "Saving…" instead, and the guard below is what actually blocks the duplicate.
+              // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+              // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+              // double-tap ran the whole handler twice and Defaults() built a SECOND new
+              // record. `Set` applies immediately within a behaviour chain, so the flag is
+              // already true by the time the second tap is evaluated.
+              // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+              // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+              // instead, and the guard below is what actually blocks the duplicate.
               false,
               Set( gSaving, true );
               If( Len(lblPdMissing.Text) > 0,
               Notify( "Can't save yet — this product still needs: " & lblPdMissing.Text,
               NotificationType.Error ),
-              // Left holding the last successful save, gPdSaved makes the IsBlank(.ID) guard
-              // below pass on a PREVIOUS record — so a write that fails with an empty error
-              // message reported success and handed the caller's form the WRONG record.
+              // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last
+              // successful save, gPdSaved makes the IsBlank(.ID) guard below pass on a
+              // PREVIOUS record — so a write that fails with an empty error message
+              // reported success and handed the caller's form the WRONG record.
+              // scrTaskEdit has always blanked its equivalent; these two did not.
               Set( gPdSaved, Blank() );
               Set( gPdErr, "" );
-              // Delegable: `=` on an indexed Text column.
+              // product_uid is a business key and SharePoint does not enforce
+              // uniqueness, so check first. Delegable: `=` on an indexed Text
+              // column. On an EDIT the row itself is excluded by ID.
               Set( gPdClash,
               LookUp( taskmaster_products,
               product_uid = Trim(txtPdUid.Text) && ID <> If(gPdMode = "Edit", gEditProduct.ID, 0) ) );

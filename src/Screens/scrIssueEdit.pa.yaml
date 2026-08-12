@@ -21,8 +21,9 @@ Screens:
         Set( gIssProject,
               If( gEditMode = "Edit",
                   { Id: gEditIssue.issue_project_id.Id,
-                    // NOT redundant.
-                    // it away.
+                    // NOT redundant. The lookup column's live display field is the target's ID,
+                    // so `.Value` is a NUMBER — see schema.yaml on this column. Resolving the
+                    // name app-side is the fix from 2026-08-09; do not "optimise" it away.
                     Value: LookUp(taskmaster_projects, ID = gEditIssue.issue_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
@@ -79,10 +80,12 @@ Screens:
         Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose );
-        // A combo box re-reads DefaultSelectedItems ONLY on Reset.
+        // A combo box re-reads DefaultSelectedItems ONLY on Reset. cboIssStatus is
+        // one of these now too — it stopped being a cmpSelection strip on 2026-08-12.
         Reset( cboIssTask ); Reset( cboIssTx ); Reset( cboIssStatus );
-        // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the strip shows
-        // the previous record's pick while the save writes this one.
+        // cmpSelection re-reads its DefaultId ONLY on Reset, so without these the
+        // strip shows the previous record's pick while the save writes this one.
+        // The component gained OnReset on 2026-08-11; these two are its consumers.
         Reset( selIssType );
         Reset( selIssImpact )
     Children:
@@ -519,10 +522,22 @@ Screens:
                                  Set( gIssQuery, "" )
                               OnClear: |
                                 =Set( gIssAssignee, { DisplayName: "", Mail: "" } )
-                  # `Created` and `Created By` are stamped by SharePoint on insert, cannot be
-                  # patched from the app at all (schema.yaml `system_columns` says so in as many
-                  # words), and need no column, no picker, no write and no clearing arm.
-                  # The best field is the one you don't have.
+                  # ---------------------------------------------------------------
+                  # PROVENANCE — READ ONLY, and read ONLY from SharePoint's own
+                  # system columns. This slot used to hold a "Business owner"
+                  # people-picker writing `issue_owner`, plus a hidden `issue_date_open`
+                  # the save stamped with Now(). Both were app-written, so both were
+                  # editable, wrong-able and duplicable — and neither was what anyone
+                  # actually wanted from them: who raised this, and when.
+                  #
+                  # `Created` and `Created By` are stamped by SharePoint on insert,
+                  # cannot be patched from the app at all (schema.yaml `system_columns`
+                  # says so in as many words), and need no column, no picker, no write
+                  # and no clearing arm. The best field is the one you don't have.
+                  #
+                  # THE COLUMN NAME HAS A SPACE, so it is quoted: `'Created By'`. That
+                  # is the one token here that a failed paste would point at.
+                  # ---------------------------------------------------------------
                   - colIssOpened:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -589,9 +604,10 @@ Screens:
                         Text: |
                           =Trim(
                              If( Len(Trim(txtIssName.Text)) = 0, "summary   ", "" ) &
-                             // The project is DERIVED and has no field on this form, but a
-                             // blank one would still be rejected by SharePoint — and silently,
-                             // since there is nothing on screen to point at.
+                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on
+                             // this form, but a blank one would still be rejected by SharePoint —
+                             // and silently, since there is nothing on screen to point at. Same
+                             // guard scrTaskEdit keeps for the same reason.
                              If( gIssProject.Id <= 0,            "a parent project (not set — reopen from the project screen)   ", "" ) &
                              If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) &
                              // issue_status is required:true and the save writes it
@@ -653,35 +669,55 @@ Screens:
                   Text: |
                     =If( gSaving, "Saving…",
                          If(gEditMode = "Edit", "Save issue", "Create issue") )
-                  # A disabled button cannot fire OnSelect, so a record missing a required field
-                  # gave a click that did nothing at all.
+                  # ALWAYS ENABLED — see scrTaskEdit btnTkSave. A disabled button cannot fire
+                  # OnSelect, so a record missing a required field gave a click that did
+                  # nothing at all. The requirement moved into OnSelect, where it can speak.
                   FillPortions: =0
                   LayoutMinWidth: =200
                   Width: =200
                   Height: =48
-                  # Every column, required and optional, is in a single Patch; the optionals are
-                  # If(condition, value, Blank()) inside the record.
-                  # Folding also killed the unlink bug at the root: three of those follow-ups
-                  # had no clearing arm, so a cleared task/transaction/owner never saved.
-                  # Two reasons it is not `IsBlank(gIssSaved)`: Errors() returns a TABLE (so
-                  # IsError(Errors(...)) never fires), and what a failed Patch leaves in the Set
-                  # target is not something a one-way gap can verify.
-                  # The types of all values that might be returned by IfError must be
-                  # compatible" — and MS Learn adds that *currently* ALL arguments must be
-                  # compatible, not just the ones that could be returned.
-                  # `Patch` returns a record and `Notify` returns a boolean, so the obvious
-                  # `IfError(Patch(…), Notify(…))` — which the docs themselves show — is
-                  # rejected today with "expecting a record".
+                  # ONE WRITE. Every column, required and optional, is in a single Patch;
+                  # the optionals are If(condition, value, Blank()) inside the record.
+                  # It used to be one Patch plus FIVE guarded follow-ups against the row
+                  # just written — six serial round trips to save one issue. Folding also
+                  # killed the unlink bug at the root: three of those follow-ups had no
+                  # clearing arm, so a cleared task/transaction/owner never saved.
+                  #
+                  # The gate is gIssErr, captured in IfError's fallback: FirstError is
+                  # only in scope THERE, so the message is stashed and acted on
+                  # afterwards. Two reasons it is not `IsBlank(gIssSaved)`: Errors()
+                  # returns a TABLE (so IsError(Errors(...)) never fires), and what a
+                  # failed Patch leaves in the Set target is not something a one-way gap
+                  # can verify. Each IfError argument is a SINGLE statement — no ";"
+                  # chains inside a function argument.
+                  #
+                  # EVERY IfError ARGUMENT IS A `Set(...)`, AND THAT IS LOAD-BEARING.
+                  # "IfError returns the value of one of its arguments. The types of all
+                  # values that might be returned by IfError must be compatible" — and
+                  # MS Learn adds that *currently* ALL arguments must be compatible, not
+                  # just the ones that could be returned. `Patch` returns a record and
+                  # `Notify` returns a boolean, so the obvious `IfError(Patch(…),
+                  # Notify(…))` — which the docs themselves show — is rejected today with
+                  # "expecting a record". Wrapping the Patch in a Set makes both sides a
+                  # Set and it types. Failures are therefore accumulated into gIssWarn
+                  # and reported in ONE banner after the guarded block, which also beats
+                  # up to five separate toasts.
                   OnSelect: |
                     =If( gSaving,
-                    // A disabled button cannot fire OnSelect and cannot say why; the Text says
-                    // "Saving…" instead, and the guard below is what actually blocks the
-                    // duplicate.
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
                     false,
                     Set( gSaving, true );
                     If( Len(lblIssMissing.Text) > 0,
-                    // These are required in schema.yaml — SharePoint would reject the write
-                    // regardless; this only decides whether the user is told.
+                    // The requirement that used to disable the button, moved here so a blocked
+                    // save names the field. These are required in schema.yaml — SharePoint would
+                    // reject the write regardless; this only decides whether the user is told.
                     Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
                     NotificationType.Error ),
                     Set( gIssSaved, Blank() );
@@ -702,7 +738,7 @@ Screens:
                                      issue_project_id:  { Id: gIssProject.Id, Value: gIssProject.Value },
                                      issue_assignee:
                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                           Claims:      ClaimPrefix & Lower(gIssAssignee.Mail),
+                                           Claims:      gClaimPrefix & Lower(gIssAssignee.Mail),
                                            DisplayName: gIssAssignee.DisplayName,
                                            Email:       gIssAssignee.Mail,
                                            Department: "", JobTitle: "", Picture: "" },
@@ -744,7 +780,13 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
-      # Declared LAST so the dialog paints above the footer.
+      # =====================================================================
+      # PICKER — ONE cmpPicker instance for the two person fields AND the two
+      # record lookups. Declared LAST so the dialog paints above the footer.
+      # gIssPicker names the field being filled and selects the row kind.
+      # AllowCreate is false throughout: an issue links to things that already
+      # exist. See scrTaskEdit's instance for the full contract commentary.
+      # =====================================================================
       - cmpIssPick:
           Control: CanvasComponent
           ComponentName: cmpPicker

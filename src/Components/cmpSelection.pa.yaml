@@ -33,12 +33,19 @@ ComponentDefinitions:
       Width: =360
       Fill: =RGBA(0, 0, 0, 0)
       Selected: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
-      # A gallery re-reads its `Default` only on Reset, and `galSel.Default` is the seed from
-      # `DefaultId` — so an instance bound to per-record state kept showing the PREVIOUS
-      # record's pick while the screen's global (and therefore the save) held the new one.
-      # The mechanism was recorded then ("cmpSelection is un-resettable because it HAS NO
-      # OnReset, not because components can't be reset") but the three live per-record instances
-      # were never checked.
+      # WITHOUT THIS THE STRIP LIES. A gallery re-reads its `Default` only on
+      # Reset, and `galSel.Default` is the seed from `DefaultId` — so an instance
+      # bound to per-record state kept showing the PREVIOUS record's pick while
+      # the screen's global (and therefore the save) held the new one. Open issue
+      # A as Blocked, back, open issue B as Open: the strip said Blocked and the
+      # save wrote Open.
+      #
+      # This is the same defect that made scrTask unusable and got that screen
+      # deleted on 2026-08-10 — a display that disagrees with the write. The
+      # mechanism was recorded then ("cmpSelection is un-resettable because it
+      # HAS NO OnReset, not because components can't be reset") but the three
+      # live per-record instances were never checked. Fixed at the source, so
+      # every consumer gets it: the screen just calls Reset(<instance>).
       OnReset: =Reset( galSel )
     Children:
       - galSel:
@@ -60,8 +67,9 @@ ComponentDefinitions:
                 Properties:
                   Text: =ThisItem.Label
                   Font: =Font.'Segoe UI'
-                  # Tunable per instance: a 7-option stage strip needs smaller text than a
-                  # 2-option Yes/No, and this is a component so it cannot read gTheme.Size.*.
+                  # Tunable per instance: a 7-option stage strip needs smaller text
+                  # than a 2-option Yes/No, and this is a component so it cannot read
+                  # gTheme.Size.*. Default 11.
                   Size: =cmpSelection.FontSize
                   Fill: =If(ThisItem.IsSelected, RGBA(0, 90, 158, 1), RGBA(255, 255, 255, 1))
                   Color: =If(ThisItem.IsSelected, RGBA(255, 255, 255, 1), RGBA(32, 38, 45, 1))

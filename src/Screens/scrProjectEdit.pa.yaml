@@ -23,7 +23,9 @@ Screens:
                   { DisplayName: Coalesce(gEditProject.project_supporter.DisplayName, ""),
                     Mail:        Coalesce(gEditProject.project_supporter.Email, "") },
                   { DisplayName: "", Mail: "" } ) );
-        // It is a required column, so btnPrSave gates on it and lblPrMissing names it.
+        // Phase starts EMPTY on New — the user picks it, rather than being given a
+        // default they might not notice and save by accident. It is a required column,
+        // so btnPrSave gates on it and lblPrMissing names it.
         Set( gPrPhase,    If( gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, ""), "" ) );
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
         ClearCollect( colMapRegion,   mapping_regions );
@@ -44,26 +46,33 @@ Screens:
         Set( gNtEditSid, 0 ); Set( gNxEditSid, 0 );
         Set( gNtName, "" ); Set( gNtTarget, Blank() );
         Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
-        // Do not seed a value the list does not have.
+        // Modal field state. Every default below is a REAL member of the matching
+        // Choice column in schema/schema.yaml — task_priority, transaction_currency,
+        // issue_status, issue_impact. Do not seed a value the list does not have.
         Set( gNtPriority, "Moderate" );
         Set( gNtLead,     { DisplayName: "", Mail: "" } );
         Set( gNxCcy,      "USD" );
         Set( gNxSales,    { DisplayName: "", Mail: "" } );
         Set( gNxClient,   { Id: 0, Value: "" } );
         Set( gNxProduct,  { Id: 0, Value: "" } );
-        // Text inputs re-read their Default only on Reset; the date pickers re-read DefaultDate
-        // the same way.
+        // Text inputs re-read their Default only on Reset; the date pickers re-read
+        // DefaultDate the same way. Missing these was how an Edit used to open with
+        // blank dates and then write Blank() over the stored ones.
         Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
         Reset( dtpPrStart ); Reset( dtpPrTarget );
         Set( gPrPicker, "" ); Set( gPrQuery, "" ); Reset( cmpPrPick );
         Reset( txtNtName ); Reset( dtpNtTarget );
         Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
-        // The SAME rule applies to every combo box: DefaultSelectedItems is re-read only on
-        // Reset.
-        // Without these six, opening project B after project A leaves A's phase/priority
-        // showing while gPrPhase already holds B's — and re-picking the displayed value fires
-        // no OnChange, so the correction can't be made by hand either.
+        // The SAME rule applies to every combo box: DefaultSelectedItems is
+        // re-read only on Reset. Without these six, opening project B after project A
+        // leaves A's phase/priority showing while gPrPhase already holds B's — and
+        // re-picking the displayed value fires no OnChange, so the correction can't
+        // be made by hand either.
         Reset( cboPrPhase ); Reset( cboPrPriority );
+        // The pickers DO need resetting. A component's inner combo boxes read their
+        // DefaultSelectedItems once, so clearing gPrRegionPath above is not enough on
+        // its own — the previous project's selection stays on screen. Reset() on the
+        // INSTANCE fires the component's OnReset, which is the only way in from here.
         // Must come after the Set()s above, so DefaultPath is already cleared.
         Reset( pickPrRegion ); Reset( pickPrType );
         Reset( cboPrCov );
@@ -117,8 +126,12 @@ Screens:
             X: =Parent.Width - 24 - gTheme.Space.Gutter
             Y: =(gTheme.Space.HeaderH - 24) / 2
             OnSelect: =Back()
-      # Same anchor expression as frmPrScroll, so whatever the paste freezes, the two freeze
-      # together.
+      # =======================================================================
+      # FORM BAND  ·  64 .. Parent.Height - 88
+      # =======================================================================
+      # An opaque sheet behind the scrolling column, so the form reads as one
+      # surface against the grey canvas. Same anchor expression as frmPrScroll,
+      # so whatever the paste freezes, the two freeze together.
       - formSheet:
           Control: Rectangle@2.3.0
           Properties:
@@ -495,8 +508,9 @@ Screens:
                   Color: =gTheme.Color.Primary
                   Width: =Parent.Width - 48
                   Height: =24
-            # Height is fixed at 64: a canvas component cannot size itself to its content — see
-            # the component's header.
+            # Region and Project type are 3-level vocabularies, so each gets a
+            # cmpNestedSelect. Height is fixed at 64: a canvas component cannot
+            # size itself to its content — see the component's header.
             - pickPrRegion:
                 Control: CanvasComponent
                 ComponentName: cmpNestedSelect
@@ -1016,10 +1030,14 @@ Screens:
             - lblPrMissing:
                 Control: Label@2.5.1
                 Properties:
+                  # ONE SOURCE OF TRUTH FOR "what is still missing", and it is this Text.
                   # It used to carry a literal `"Still required:   " &` prefix, which made
-                  # `Len(Self.Text)` ALWAYS non-zero — so the emptiness of this label could not
-                  # be tested and `btnPrSave` had to restate the whole condition in a
-                  # DisplayMode formula.
+                  # `Len(Self.Text)` ALWAYS non-zero — so the emptiness of this label could
+                  # not be tested and `btnPrSave` had to restate the whole condition in a
+                  # DisplayMode formula. Two copies of one rule is how they drift. The
+                  # prefix now lives in the Notify that btnPrSave raises, and both the
+                  # Visible below and the save gate read this one string.
+                  # Same shape as lblTxMissing / lblIssMissing / lblTkMissing.
                   Visible: =Len(Self.Text) > 0
                   Text: |
                     =Trim(
@@ -1063,16 +1081,26 @@ Screens:
                      If( gEditMode = "Edit", "Save project", "Create project" ) &
                      If( CountRows(colNewTasks) + CountRows(colNewTransactions) > 0,
                          " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) ) & " item(s)", "" ) )
-                  # It read `If(<four required fields>, Edit, Disabled)`, and A DISABLED BUTTON
-                  # CANNOT FIRE OnSelect, so a project missing one of them produced a click that
-                  # did nothing and said nothing: no Notify, no error, no clue which field.
+                  # ALWAYS ENABLED — the DisplayMode gate is GONE. It read
+                  # `If(<four required fields>, Edit, Disabled)`, and A DISABLED BUTTON
+                  # CANNOT FIRE OnSelect, so a project missing one of them produced a
+                  # click that did nothing and said nothing: no Notify, no error, no clue
+                  # which field. That is the defect reported on 2026-08-10 as "I clicked
+                  # Save and nothing happened"; it was fixed on the other three editors
+                  # then and this button was missed. The requirement is not relaxed — it
+                  # moved into OnSelect, where it can NAME the missing field.
                   Width: =300
                   Height: =48
                   OnSelect: |
                     =If( gSaving,
-                    // A disabled button cannot fire OnSelect and cannot say why; the Text says
-                    // "Saving…" instead, and the guard below is what actually blocks the
-                    // duplicate.
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
                     false,
                     Len(lblPrMissing.Text) > 0,
                     Notify( "Can't save yet — this project still needs: " & lblPrMissing.Text,
@@ -1095,8 +1123,11 @@ Screens:
                     // so the rollup was skipped and project_perc_completion never got
                     // its initial 0 — the one thing the guard exists to guarantee.
                     Set( gPrInsert, gEditMode = "New" || IsBlank(gEditProject.ID) );
-                    // An insert never crosses — a new project is not archived and has no
-                    // children yet.
+                    // DOES THIS SAVE CROSS THE ARCHIVED BOUNDARY? Captured HERE, for the
+                    // same reason as gPrInsert: step 4 re-reads gEditProject from the
+                    // server, after which the OLD phase is gone and the comparison is
+                    // impossible. An insert never crosses — a new project is not archived
+                    // and has no children yet.
                     Set( gPrWasArchived, !gPrInsert && gEditProject.project_phase.Value = "Archived" );
                     Set( gPrNowArchived, gPrPhase = "Archived" );
                     Set( gPrArcFlip, !gPrInsert && gPrWasArchived <> gPrNowArchived );
@@ -1115,6 +1146,7 @@ Screens:
                     // the row just written — up to nine serial round trips to fix a typo.
                     // The base record is now chosen by If() and every column, required and
                     // optional, is in the single record. Same fold scrTaskEdit took on
+                    // 2026-08-10, and the same rationale: the follow-ups' per-field error
                     // attribution is replaced by SharePoint's own error, which names the
                     // offending column.
                     //
@@ -1134,7 +1166,7 @@ Screens:
                                   project_priority:    { Value: gPrPriority },
                                   project_manager:
                                       { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                        Claims:      ClaimPrefix & Lower(gPrManager.Mail),
+                                        Claims:      gClaimPrefix & Lower(gPrManager.Mail),
                                         DisplayName: gPrManager.DisplayName,
                                         Email:       gPrManager.Mail,
                                         Department: "", JobTitle: "", Picture: "" },
@@ -1160,7 +1192,7 @@ Screens:
                                   project_requestor:
                                       If( Len(gPrRequestor.Mail) > 0,
                                           { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                            Claims:      ClaimPrefix & Lower(gPrRequestor.Mail),
+                                            Claims:      gClaimPrefix & Lower(gPrRequestor.Mail),
                                             DisplayName: gPrRequestor.DisplayName,
                                             Email:       gPrRequestor.Mail,
                                             Department: "", JobTitle: "", Picture: "" },
@@ -1168,19 +1200,20 @@ Screens:
                                   project_supporter:
                                       If( Len(gPrSupporter.Mail) > 0,
                                           { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                            Claims:      ClaimPrefix & Lower(gPrSupporter.Mail),
+                                            Claims:      gClaimPrefix & Lower(gPrSupporter.Mail),
                                             DisplayName: gPrSupporter.DisplayName,
                                             Email:       gPrSupporter.Mail,
                                             Department: "", JobTitle: "", Picture: "" },
                                           Blank() ) } ) ),
                         Set( gPrErr, FirstError.Message ) );
-                    // TRUST THE RECORD, NEVER THE MESSAGE.
-                    // A write can fail and still leave FirstError.Message empty, and the old
-                    // code read that empty message as success: it then set gEditProject to a
-                    // BLANK gPrSaved and flipped gEditMode to "Edit".
-                    // After that txtPrName.Default reads gEditProject.project_name — blank, so
-                    // the name appears to clear — and every later save patches a record that
-                    // does not exist, so it fails no matter what is typed back in.
+                    // TRUST THE RECORD, NEVER THE MESSAGE. A write can fail and
+                    // still leave FirstError.Message empty, and the old code read
+                    // that empty message as success: it then set gEditProject to a
+                    // BLANK gPrSaved and flipped gEditMode to "Edit". After that
+                    // txtPrName.Default reads gEditProject.project_name — blank, so
+                    // the name appears to clear — and every later save patches a
+                    // record that does not exist, so it fails no matter what is
+                    // typed back in. If there is no ID, nothing was written.
                     If( IsBlank(gPrSaved.ID) && Len(gPrErr) = 0,
                         Set( gPrErr, "SharePoint returned no record and no error message, so nothing was saved. Check the required columns on taskmaster_projects." ) );
                     If( Len(gPrErr) > 0,
@@ -1188,10 +1221,17 @@ Screens:
                                   & gPrErr,
                                 NotificationType.Error ) );
                     If( Len(gPrErr) = 0 && !IsBlank(gPrSaved.ID),
-                        // It records the outcome as TEXT, not by collecting into two different
-                        // collections, because IfError currently requires ALL its arguments to
-                        // be type-compatible — a record from Patch against two differently-
-                        // shaped tables from Collect is rejected.
+                        // --- 3. children ------------------------------------------
+                        // IfError's third argument is the value returned when NOTHING
+                        // errored, which is how each row records success or failure
+                        // without a second pass over the data.
+                        //
+                        // It records the outcome as TEXT, not by collecting into two
+                        // different collections, because IfError currently requires ALL
+                        // its arguments to be type-compatible — a record from Patch
+                        // against two differently-shaped tables from Collect is rejected.
+                        // Text(Patch(…).ID) forces the success arm to text so all three
+                        // arms match; an empty Message means the row was written.
                         Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
                         ForAll( colNewTasks As t,
                             Collect( colChildResult,
@@ -1199,10 +1239,10 @@ Screens:
                                   Message:
                                     IfError( Text(
                                         Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
-                                               // Almost always false — you cannot add children
-                                               // to an archived project — but a project
-                                               // archived in the SAME save would otherwise
-                                               // leave them live.
+                                               // Inherits the parent's archived state. Almost
+                                               // always false — you cannot add children to an
+                                               // archived project — but a project archived in
+                                               // the SAME save would otherwise leave them live.
                                                { task_project_archived: gPrNowArchived },
                                             { task_name:       t.t_name,
                                               task_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
@@ -1211,7 +1251,7 @@ Screens:
                                               task_priority:   { Value: t.t_priority },
                                               task_lead:
                                                   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                    Claims:      ClaimPrefix & Lower(t.t_leadMail),
+                                                    Claims:      gClaimPrefix & Lower(t.t_leadMail),
                                                     DisplayName: t.t_leadName,
                                                     Email:       t.t_leadMail,
                                                     Department: "", JobTitle: "", Picture: "" },
@@ -1226,10 +1266,10 @@ Screens:
                                   Message:
                                     IfError( Text(
                                         Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
-                                               // Almost always false — you cannot add children
-                                               // to an archived project — but a project
-                                               // archived in the SAME save would otherwise
-                                               // leave them live.
+                                               // Inherits the parent's archived state. Almost
+                                               // always false — you cannot add children to an
+                                               // archived project — but a project archived in
+                                               // the SAME save would otherwise leave them live.
                                                { transaction_project_archived: gPrNowArchived },
                                             { transaction_name:        x.x_name,
                                               transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
@@ -1237,7 +1277,7 @@ Screens:
                                               transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
                                               transaction_sales:
                                                   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                    Claims:      ClaimPrefix & Lower(x.x_salesMail),
+                                                    Claims:      gClaimPrefix & Lower(x.x_salesMail),
                                                     DisplayName: x.x_salesName,
                                                     Email:       x.x_salesMail,
                                                     Department: "", JobTitle: "", Picture: "" },
@@ -1270,30 +1310,43 @@ Screens:
                         If( IsBlank(gEditProject.ID), Set( gEditProject, gPrSaved ) );
                         Set( gEditMode, "Edit" );
                         Set( gSelProject, gEditProject );
+                        // --- 5. C3 rollup, read back from the server ---------------
+                        // SKIPPED ENTIRELY unless gPrRollup said so at the top of this
+                        // handler. It ran on EVERY save, and it costs a Filter over up to
+                        // 500 task rows plus a write — spent in full to rename a project
+                        // or move its target date, neither of which a stage-weighted
+                        // average can possibly depend on. scrTaskEdit has had this guard
+                        // since 2026-08-10; this screen was missed.
                         // A NEW project always runs it, and that is load-bearing: the main
-                        // Patch above never writes project_perc_completion, so with no tasks
-                        // staged this is the only thing that lands the initial 0.
+                        // Patch above never writes project_perc_completion, so with no
+                        // tasks staged this is the only thing that lands the initial 0.
                         If( gPrRollup,
                         With( { pid: gPrSaved.ID },
                             With( { scored:
                                       AddColumns(
                                           Filter( taskmaster_tasks,
                                               task_project_id.Id = pid ),
-                                          wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) },
+                                          wgt, Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ) },
                                 If( CountRows(scored) >= 500,
                                     Notify("Project saved. It has too many tasks to compute completion accurately, so it was left unchanged.",
                                            NotificationType.Warning),
-                                    // Don't spend a write on a number that has not moved — the
-                                    // second half of scrTaskEdit's guard.
-                                    // gEditProject was re-read from the server four lines up,
-                                    // so it carries the stored value; if that read fell back to
-                                    // the thin gPrSaved the comparison is against a blank and
-                                    // the write happens, which is the safe direction to be
-                                    // wrong in.
+                                    // Don't spend a write on a number that has not moved —
+                                    // the second half of scrTaskEdit's guard. gEditProject was
+                                    // re-read from the server four lines up, so it carries the
+                                    // stored value; if that read fell back to the thin gPrSaved
+                                    // the comparison is against a blank and the write happens,
+                                    // which is the safe direction to be wrong in.
                                     With( { newPc: If( CountRows(scored) = 0, 0,
                                                        RoundDown(Average(scored, wgt), 0) ) },
-                                        // -1 can never equal a real percentage, so the first
-                                        // write always happens.
+                                        // Coalesce to -1, NOT a bare compare. A just-inserted
+                                        // row has project_perc_completion NULL, and newPc is 0
+                                        // for a project with no tasks — so a bare `0 <> Blank()`
+                                        // may be FALSE, skipping the write and leaving NULL.
+                                        // That defeats the initial-0 guarantee, and it is not
+                                        // cosmetic: Power BI's AVERAGE drops blanks from the
+                                        // denominator instead of counting a 0, so portfolio
+                                        // completion reads HIGH. -1 can never equal a real
+                                        // percentage, so the first write always happens.
                                         If( newPc <> Coalesce(gEditProject.project_perc_completion, -1),
                                     IfError(
                                         Set( gSelProject,
@@ -1351,14 +1404,12 @@ Screens:
                                     NotificationType.Error ) )
                     );
                     Set( gSaving, false ) )
-      # ----
-      # MODAL — ADD A
-      # TASK        card 700 x 540, body scrolls, buttons pinned
-      # ----
-      # Declared last so
-      # it floats above everything (z-order is positional).
-      # Every part shares the card's anchor expressions, so the body and the button row cannot
-      # drift apart the way the old action bar did.
+      # =======================================================================
+      # MODAL — ADD A TASK        card 700 x 540, body scrolls, buttons pinned
+      # =======================================================================
+      # Declared last so it floats above everything (z-order is positional).
+      # Every part shares the card's anchor expressions, so the body and the
+      # button row cannot drift apart the way the old action bar did.
       - mdNtScrim:
           Control: Rectangle@2.3.0
           Properties:
@@ -1931,7 +1982,19 @@ Screens:
                Set( gNxCcy, "USD" );
                Set( gNxEditSid, 0 ); Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
                Set( gNxOpen, false )
-      # Declared LAST, after both modals, so the dialog paints above them.
+      # =====================================================================
+      # PICKER — ONE cmpPicker instance, SEVEN states: three person fields on
+      # the project form, the task lead and sales owner inside the STAGED CHILD
+      # modals, and the staged transaction's client and product. Declared LAST,
+      # after both modals, so the dialog paints above them.
+      #
+      # AllowCreate is FALSE throughout on purpose: + New would navigate away,
+      # and this screen's OnVisible clears colNewTasks / colNewTransactions, so
+      # a return would destroy staged children — a much worse loss than the
+      # cleared inputs fixed on scrTaskEdit. Creating a client mid-project is
+      # available from the transaction editor, or from scrReference.
+      # See scrTaskEdit's instance for the full contract commentary.
+      # =====================================================================
       - cmpPrPick:
           Control: CanvasComponent
           ComponentName: cmpPicker

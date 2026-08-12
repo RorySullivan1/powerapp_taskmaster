@@ -8,6 +8,7 @@
 # _EDIT-NOTES.md (seed globals in OnVisible and write from them; normalised picker
 # records; overlay galleries declared last; required fields in one Patch).
 #
+# CURRENCY — read this before adding any total to this screen (Q14, 2026-08-03).
 # This form writes the NATIVE notional and its currency, and nothing else. It does
 # NOT convert to USD: conversion happens in the report layer, against a proper FX
 # dimension in Power BI. A write-time rate freezes whatever number the app happened
@@ -31,8 +32,9 @@ Screens:
          Set( gTxProject,
               If( gEditMode = "Edit",
                   { Id: gEditTransaction.transaction_project_id.Id,
-                    // NOT redundant.
-                    // it away.
+                    // NOT redundant. The lookup column's live display field is the target's ID,
+                    // so `.Value` is a NUMBER — see schema.yaml on this column. Resolving the
+                    // name app-side is the fix from 2026-08-09; do not "optimise" it away.
                     Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
@@ -49,23 +51,25 @@ Screens:
               If( gEditMode = "Edit",
                   { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
                     Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
-                  // The sales owner of a transaction is usually somebody else — defaulting to
-                  // whoever is entering it writes a wrong name silently, and transaction_sales
-                  // is required so the empty state is caught by lblTxMissing rather than
-                  // slipping through.
+                  // NOT User(). The sales owner of a transaction is usually somebody
+                  // else — defaulting to whoever is entering it writes a wrong name
+                  // silently, and transaction_sales is required so the empty state is
+                  // caught by lblTxMissing rather than slipping through.
                   { DisplayName: "", Mail: "" } ) );
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
         Reset( txtTxName );
         Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
-        // transaction_date is REQUIRED, so an unseeded picker did not merely lose the date — it
-        // blocked the save outright on every edit.
+        // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
+        // date — it blocked the save outright on every edit.
         Reset( dtpTxDate );
-        // cmpSelection re-reads its DefaultId ONLY on Reset, so without this the strip shows
-        // the PREVIOUS record's currency while the save writes this one.
-        // INSIDE the resume guard on purpose: returning from ＋ New must not re-seed the strip
-        // from the stored record, which would discard a currency the user picked before
-        // stepping out to create a client.
+        // cmpSelection re-reads its DefaultId ONLY on Reset, so without this the
+        // strip shows the PREVIOUS record's currency while the save writes this
+        // one. The component gained OnReset on 2026-08-11; this is its consumer.
+        //
+        // INSIDE the resume guard on purpose: returning from ＋ New must not
+        // re-seed the strip from the stored record, which would discard a
+        // currency the user picked before stepping out to create a client.
         Reset( selTxCurrency ) )
     Children:
       - HeaderBar:
@@ -404,9 +408,10 @@ Screens:
                         Text: |
                           =Trim(
                              If( Len(Trim(txtTxName.Text)) = 0,  "label   ",   "" ) &
-                             // The project is DERIVED and has no field on this form, but a
-                             // blank one would still be rejected by SharePoint — and silently,
-                             // since there is nothing on screen to point at.
+                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on
+                             // this form, but a blank one would still be rejected by SharePoint —
+                             // and silently, since there is nothing on screen to point at. Same
+                             // guard scrTaskEdit keeps for the same reason.
                              If( gTxProject.Id <= 0,             "a parent project (not set — reopen from the project screen)   ", "" ) &
                              If( gTxClient.Id  <= 0,             "client   ",  "" ) &
                              If( gTxProduct.Id <= 0,             "product   ", "" ) &
@@ -470,25 +475,32 @@ Screens:
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =48
-                  # Every column this form owns is required, so a single Patch covers it — no
-                  # guarded second pass is needed.
+                  # Every column this form owns is required, so a single Patch covers it
+                  # — no guarded second pass is needed. transaction_notional_usd is NOT
+                  # written: it has no app-side writer by decision (Q14).
                   OnSelect: |
                     =If( gSaving,
-                    // A disabled button cannot fire OnSelect and cannot say why; the Text says
-                    // "Saving…" instead, and the guard below is what actually blocks the
-                    // duplicate.
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
                     false,
                     Set( gSaving, true );
                     If( Len(lblTxMissing.Text) > 0,
-                    // All six are required in schema.yaml — SharePoint would reject the write
-                    // regardless; this only decides whether the user is told.
+                    // The requirement that used to disable the button, moved here so a blocked
+                    // save names the field. All six are required in schema.yaml — SharePoint would
+                    // reject the write regardless; this only decides whether the user is told.
                     Notify( "Can't save yet — this still needs: " & lblTxMissing.Text,
                     NotificationType.Error ),
                     Set( gTxErr, "" );
                     IfError(
-                        // The Set wrapper is not decoration: IfError requires all its arguments
-                        // to be type-compatible today, and a bare Patch (record) against a Set
-                        // fallback is rejected.
+                        // The Set wrapper is not decoration: IfError requires all its
+                        // arguments to be type-compatible today, and a bare Patch (record)
+                        // against a Set fallback is rejected. Both sides are a Set now.
                         Set( gTxSaved,
                         Patch( taskmaster_transactions,
                                If( gEditMode = "Edit", gEditTransaction, Defaults(taskmaster_transactions) ),
@@ -504,7 +516,7 @@ Screens:
                                  transaction_product_id:  { Id: gTxProduct.Id, Value: gTxProduct.Value },
                                  transaction_sales:
                                      { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                       Claims:      ClaimPrefix & Lower(gTxSales.Mail),
+                                       Claims:      gClaimPrefix & Lower(gTxSales.Mail),
                                        DisplayName: gTxSales.DisplayName,
                                        Email:       gTxSales.Mail,
                                        Department: "", JobTitle: "", Picture: "" },
@@ -536,7 +548,12 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
-      # Declared LAST so the dialog paints above the footer.
+      # =====================================================================
+      # PICKER — ONE cmpPicker instance for the sales owner AND both lookups.
+      # Declared LAST so the dialog paints above the footer. gTxPicker names
+      # the field and selects the row kind.
+      # See scrTaskEdit's instance for the full contract commentary.
+      # =====================================================================
       - cmpTxPick:
           Control: CanvasComponent
           ComponentName: cmpPicker

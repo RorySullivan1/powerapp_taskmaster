@@ -1,7 +1,35 @@
-# A task is always created against a project, so `gTkProject` is derived in OnVisible (from the
-# task on Edit, from gSelProject on New) and never asked for.
-# Every auto-layout child sets FillPortions EXPLICITLY; it defaults to 1 at every nesting level
-# and one unset child silently steals space from its siblings.
+# scrTaskEdit — REWORKED 2026-08-07.  Tabs removed, layout moved to containers.
+#
+# WHAT CHANGED, and why each one is not just cosmetic:
+#
+#  - NO TAB LIST.  Output was a second tab; it is now an optional SECTION behind a
+#    toggle.  On an existing task the toggle opens already on when the task has an
+#    output format, so the record itself says whether the section is relevant.
+#    Switching it OFF on an edit CLEARS every output field on save — otherwise the
+#    section would hide values that are still stored.
+#
+#  - PROJECT IS GONE FROM THE FORM.  A task is always created against a project, so
+#    `gTkProject` is derived in OnVisible (from the task on Edit, from gSelProject on
+#    New) and never asked for.  It is still WRITTEN, and it still drives the C3
+#    rollup at the end of Save.
+#
+#  - COMPLETION DATE IS DERIVED, NOT ENTERED.  Picking Complete stamps it; anything
+#    else clears it.  (The "Archived keeps whatever was there" arm went with the stage
+#    itself on 2026-08-12 — task_stage no longer has an Archived value.)  It is shown
+#    read-only so the value is visible without being editable.
+#
+#  - STAGE / HEALTH / PRIORITY are combo boxes whose text colour follows the value.
+#    `Color` is the current modern combo box's text colour (it was `FontColor` before
+#    the revision).
+#
+#  - DUE DATE flags itself.  A date picker has no grounded colour property, so the
+#    CAPTION carries the warning — a Label's Color is beyond doubt.
+#
+# LAYOUT IS CONTAINERS.  Every auto-layout child sets FillPortions EXPLICITLY; it
+# defaults to 1 at every nesting level and one unset child silently steals space from
+# its siblings.  The action bar and the picker panel stay absolute: the bar is a fixed
+# footer on the screen, and the panel has to float ABOVE the form rather than sit in
+# its flow.
 Screens:
   scrTaskEdit:
     Properties:
@@ -13,8 +41,9 @@ Screens:
          Set( gTkProject,
               If( gEditMode = "Edit",
                   { Id: gEditTask.task_project_id.Id,
-                    // NOT redundant.
-                    // it away.
+                    // NOT redundant. The lookup column's live display field is the target's ID,
+                    // so `.Value` is a NUMBER — see schema.yaml on this column. Resolving the
+                    // name app-side is the fix from 2026-08-09; do not "optimise" it away.
                     Value: LookUp(taskmaster_projects, ID = gEditTask.task_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
@@ -49,14 +78,14 @@ Screens:
         Reset( cmpTkPick );
         Set( gTkQuery, "" );
         Reset( txtTkApprovalId );
-        // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without these the
-        // previous task's stage/health/priority survive into the next one.
+        // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without these
+        // the previous task's stage/health/priority survive into the next one.
         Reset( cboTkStage ); Reset( cboTkStatus ); Reset( cboTkPriority );
         Reset( cboTkLanguage ); Reset( cboTkFormat ); Reset( cboTkBranding ); Reset( cboTkClientStage );
         Reset( tglTkOutput ); Reset( tglTkClient );
-        // A date picker re-reads DefaultDate ONLY on Reset.
-        // Without these the seeds never take on a second visit and the Patch writes Blank()
-        // over the stored dates.
+        // A date picker re-reads DefaultDate ONLY on Reset. Without these the seeds
+        // never take on a second visit and the Patch writes Blank() over the stored
+        // dates. The completion date is derived on save and has no picker at all.
         Reset( dtpTkStart ); Reset( dtpTkTarget )
         )
     Children:
@@ -841,7 +870,9 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              # Seeded via Default; re-read on Reset in OnVisible.
+                              # Approvals live in a SEPARATE portal (out of scope). This is a plain
+                              # free-text pointer to that approval task's id — no lookup, no picker,
+                              # no results gallery. Seeded via Default; re-read on Reset in OnVisible.
                               - txtTkApprovalId:
                                   Control: ModernTextInput@1.1.1
                                   Properties:
@@ -1095,6 +1126,7 @@ Screens:
                   # It used to read `If(Len(lblTkMissing.Text) = 0, Edit, Disabled)`, and a
                   # DISABLED BUTTON CANNOT FIRE OnSelect, so a task missing a required
                   # field produced a click that did NOTHING: no Notify, no Back(), no
+                  # error. Reported 2026-08-10 as "I clicked Save task and nothing
                   # happened". The gate could only ever trip on an EDIT — in New mode
                   # gTkLead defaults to User() and gTkProject to gSelProject, so both are
                   # always populated. The requirement is still enforced, one line down in
@@ -1105,14 +1137,21 @@ Screens:
                   Height: =48
                   OnSelect: |
                     =If( gSaving,
-                    // A disabled button cannot fire OnSelect and cannot say why; the Text says
-                    // "Saving…" instead, and the guard below is what actually blocks the
-                    // duplicate.
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
+                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
+                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
+                    // record. `Set` applies immediately within a behaviour chain, so the flag is
+                    // already true by the time the second tap is evaluated.
+                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
+                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
+                    // instead, and the guard below is what actually blocks the duplicate.
                     false,
                     Set( gSaving, true );
                     If( Len(lblTkMissing.Text) > 0,
-                    // All three are `required: true` in schema.yaml, so SharePoint would reject
-                    // the write anyway — this only decides whether the user is TOLD.
+                    // The requirement that used to disable the button. Enforced HERE so a
+                    // blocked save says which field is blocking it. All three are
+                    // `required: true` in schema.yaml, so SharePoint would reject the
+                    // write anyway — this only decides whether the user is TOLD.
                     Notify( "Can't save yet — this task still needs: " & lblTkMissing.Text,
                     NotificationType.Error ),
                     Set( gTkSaved, Blank() );
@@ -1134,11 +1173,12 @@ Screens:
                     task_stage:       { Value: gTkStage },
                     task_status:      { Value: gTkStatus },
                     task_priority:    { Value: gTkPriority },
-                    task_lead: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      ClaimPrefix & Lower(gTkLead.Mail),   DisplayName: gTkLead.DisplayName,   Email:       gTkLead.Mail,   Department: "", JobTitle: "", Picture: "" },
+                    task_lead: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gTkLead.Mail),   DisplayName: gTkLead.DisplayName,   Email:       gTkLead.Mail,   Department: "", JobTitle: "", Picture: "" },
                     task_date_start:  dtpTkStart.SelectedDate,
                     task_date_target: dtpTkTarget.SelectedDate,
                     // DERIVED, not entered. Complete stamps it and keeps the original on a
                     // re-save; anything else CLEARS it. The "Archived" arm that used to
+                    // preserve the date is gone with the stage itself (2026-08-12).
                     //
                     // THE NEW BRANCH IS SEPARATE, AND THAT IS THE WHOLE POINT.
                     // `gEditTask` IS NEVER CLEARED ON NEW — this screen only ever reads it
@@ -1146,6 +1186,7 @@ Screens:
                     // This was the one that did not, so a task CREATED straight after editing
                     // a completed task inherited that task's completion date: Coalesce found
                     // the stale value and kept it instead of stamping Now(). Same defect
+                    // class as `project_date_complete` on scrProjectEdit, fixed 2026-08-11 —
                     // and fixed the same way, by splitting insert from update explicitly
                     // rather than trusting a Coalesce to notice.
                     task_date_completion:
@@ -1156,7 +1197,7 @@ Screens:
                     Blank() ),
                     task_supporter:
                     If( Len(gTkSupporter.Mail) > 0,
-                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      ClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" },
+                    { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" },
                     Blank() ),
                     task_output_approval_id:
                     If( tglTkOutput.Value && Len(Trim(txtTkApprovalId.Text)) > 0,
@@ -1178,26 +1219,32 @@ Screens:
                     Set( gTkErr, FirstError.Message ) );
                     // Trust the RECORD, never the message — a write can fail and still leave
                     // FirstError.Message empty, and reading that as success is what corrupted
+                    // scrProjectEdit's state on 2026-08-06.
                     If( IsBlank(gTkSaved.ID) && Len(gTkErr) = 0,
                     Set( gTkErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                     If( Len(gTkErr) > 0,
                     Notify("Couldn't save the task: " & gTkErr, NotificationType.Error) );
                     If( Len(gTkErr) = 0 && !IsBlank(gTkSaved.ID),
-                    // The rollup is a weighted average over task STAGES, so editing a
-                    // description, a date, a priority or any output field cannot change it —
-                    // and computing it costs a LookUp, a fetch of up to 500 task rows and a
-                    // write.
+                    // --- C3: rewrite the parent project's weighted completion ---------
+                    // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average
+                    // over task STAGES, so editing a description, a date, a priority or any
+                    // output field cannot change it — and computing it costs a LookUp, a fetch of
+                    // up to 500 task rows and a write. On New there is no previous stage, so the
+                    // test is false and it always runs.
                     If( !(gEditMode = "Edit" && gTkStage = gEditTask.task_stage.Value),
-                    // They have to be Sets — Concurrent takes behaviour formulas, so a With()
-                    // scope cannot carry the results out.
+                    // The two reads are independent, so issue them together instead of in
+                    // series. They have to be Sets — Concurrent takes behaviour formulas, so a
+                    // With() scope cannot carry the results out.
                     Concurrent(
                     Set( gTkRollupProj, LookUp(taskmaster_projects, ID = gTkProject.Id) ),
                     Set( gTkRollupScored,
                     AddColumns(
                     // Delegable: `=` on an indexed Lookup FK, and nothing else needed.
+                    // The six-stage Or-chain that used to sit here is gone — task_stage
+                    // has no "Archived" value to exclude any more.
                     Filter( taskmaster_tasks,
                     task_project_id.Id = gTkProject.Id ),
-                    wgt, Coalesce(LookUp(StageWeights, Stage = task_stage.Value, Weight), 0) ) ) );
+                    wgt, Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ) ) );
                     If( IsBlank(gTkRollupProj),
                     Notify("Task saved. Parent project not found, so completion was left unchanged.",
                     NotificationType.Warning),
@@ -1205,7 +1252,8 @@ Screens:
                     Notify("Task saved. This project has too many tasks to compute completion accurately, so it was left unchanged.",
                     NotificationType.Warning),
                     With( { newPc: If( CountRows(gTkRollupScored) = 0, 0, RoundDown(Average(gTkRollupScored, wgt), 0) ) },
-                    // Don't spend a write on a number that has not moved.
+                    // Don't spend a write on a number that has not moved. Most stage changes
+                    // inside a big project leave the rounded average where it was.
                     If( newPc <> gTkRollupProj.project_perc_completion,
                     IfError(
                     Set( gSelProject,
@@ -1217,7 +1265,20 @@ Screens:
                     Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
                     Back() ) );
                     Set( gSaving, false ) )
-      # Declared LAST so the dialog paints above the fixed footer.
+      # =====================================================================
+      # PICKER — ONE cmpPicker instance for BOTH person fields AND both
+      # lookups. Declared LAST so the dialog paints above the fixed footer.
+      #
+      # Was two instances of two near-identical components. gTkPicker already
+      # named the field being filled; now it also selects which KIND of row the
+      # one dialog lists, so Visible, Title, Results and OnConfirm all branch on
+      # the same global and there is one Reset target instead of two.
+      #
+      # Screen-sized and absolute. A component clips its children to its own
+      # bounds, so a field-sized instance could not paint a dialog over the
+      # form — which is why the person BOX stays on the screen (the cmpLookupField
+      # rows) and only the dialog lives in here.
+      # =====================================================================
       - cmpTkPick:
           Control: CanvasComponent
           ComponentName: cmpPicker
@@ -1235,7 +1296,7 @@ Screens:
                        "Product",   "Select product" )
             # THE QUERIES RUN HERE, NOT IN THE COMPONENT. With AccessAppScope
             # false it cannot reach Office365Users or a list any more than it can
-            # reach Theme, so it takes rows in.
+            # reach gTheme, so it takes rows in.
             #
             # Bound to gTkQuery, which OnSearch sets — NOT to cmpTkPick.Query
             # directly. Feeding an instance's own output into its own input is a
