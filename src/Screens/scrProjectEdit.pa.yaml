@@ -1233,19 +1233,22 @@ Screens:
             - lblPrMissing:
                 Control: Label@2.5.1
                 Properties:
-                  Visible: |
-                    =Len(Trim(txtPrName.Text)) = 0
-                     || Len(gPrManager.Mail) = 0
-                     || Len(gPrPhase) = 0
-                     || ( gEditMode = "New" && ( Len(gPrRegionPath) = 0 || Len(gPrTypePath) = 0 ) )
+                  # ONE SOURCE OF TRUTH FOR "what is still missing", and it is this Text.
+                  # It used to carry a literal `"Still required:   " &` prefix, which made
+                  # `Len(Self.Text)` ALWAYS non-zero — so the emptiness of this label could
+                  # not be tested and `btnPrSave` had to restate the whole condition in a
+                  # DisplayMode formula. Two copies of one rule is how they drift. The
+                  # prefix now lives in the Notify that btnPrSave raises, and both the
+                  # Visible below and the save gate read this one string.
+                  # Same shape as lblTxMissing / lblIssMissing / lblTkMissing.
+                  Visible: =Len(Self.Text) > 0
                   # Deliberately flat: one Trim over an &-chain, no With and no inline
                   # record. The nested version was correct but fragile to hand-edit —
                   # a single `&` mistyped as `,` turns it into Trim(a, b) and Studio
                   # reports "expected 1 argument, not 2", which reads like a bug in the
                   # formula rather than a typo. Nothing here takes more than one argument.
                   Text: |
-                    ="Still required:   " &
-                     Trim(
+                    =Trim(
                        If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
                        If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
                        If( Len(gPrPhase) = 0,             "phase   ", "" ) &
@@ -1286,12 +1289,14 @@ Screens:
                      If( gEditMode = "Edit", "Save project", "Create project" ) &
                      If( CountRows(colNewTasks) + CountRows(colNewTransactions) > 0,
                          " + " & ( CountRows(colNewTasks) + CountRows(colNewTransactions) ) & " item(s)", "" ) )
-                  DisplayMode: |
-                    =If( Len(Trim(txtPrName.Text)) > 0
-                         && Len(gPrManager.Mail) > 0
-                         && Len(gPrPhase) > 0
-                         && ( gEditMode = "Edit" || ( Len(gPrRegionPath) > 0 && Len(gPrTypePath) > 0 ) ),
-                         DisplayMode.Edit, DisplayMode.Disabled )
+                  # ALWAYS ENABLED — the DisplayMode gate is GONE. It read
+                  # `If(<four required fields>, Edit, Disabled)`, and A DISABLED BUTTON
+                  # CANNOT FIRE OnSelect, so a project missing one of them produced a
+                  # click that did nothing and said nothing: no Notify, no error, no clue
+                  # which field. That is the defect reported on 2026-08-10 as "I clicked
+                  # Save and nothing happened"; it was fixed on the other three editors
+                  # then and this button was missed. The requirement is not relaxed — it
+                  # moved into OnSelect, where it can NAME the missing field.
                   Width: =300
                   Height: =48
                   OnSelect: |
@@ -1305,7 +1310,22 @@ Screens:
                     // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
                     // instead, and the guard below is what actually blocks the duplicate.
                     false,
+                    Len(lblPrMissing.Text) > 0,
+                    // The requirement that used to disable the button. Enforced HERE so a
+                    // blocked save says which field is blocking it. lblPrMissing owns the
+                    // list; this reads it rather than restating the rule.
+                    Notify( "Can't save yet — this project still needs: " & lblPrMissing.Text,
+                    NotificationType.Error ),
                     Set( gSaving, true );
+                    // WHETHER THE C3 ROLLUP NEEDS TO RUN, DECIDED NOW AND NOT AT STEP 5.
+                    // The rollup is a weighted average over child task STAGES, so only two
+                    // things can move it: a brand new project, or child tasks staged in
+                    // THIS save. Neither can be tested where the rollup actually runs —
+                    // by then `Set(gEditMode,"Edit")` has already fired, and step 4's
+                    // RemoveIf has stripped the successful rows out of colNewTasks, so a
+                    // count taken there would see only the FAILURES and read exactly
+                    // backwards. Capture it here, before either mutation.
+                    Set( gPrRollup, gEditMode <> "Edit" || CountRows(colNewTasks) > 0 );
                     Set( gPrSaved, Blank() );
                     Set( gPrErr, "" );
                     Set( gPrWarn, "" );
@@ -1491,6 +1511,16 @@ Screens:
                         Set( gEditMode, "Edit" );
                         Set( gSelProject, gEditProject );
                         // --- 5. C3 rollup, read back from the server ---------------
+                        // SKIPPED ENTIRELY unless gPrRollup said so at the top of this
+                        // handler. It ran on EVERY save, and it costs a Filter over up to
+                        // 500 task rows plus a write — spent in full to rename a project
+                        // or move its target date, neither of which a stage-weighted
+                        // average can possibly depend on. scrTaskEdit has had this guard
+                        // since 2026-08-10; this screen was missed.
+                        // A NEW project always runs it, and that is load-bearing: the main
+                        // Patch above never writes project_perc_completion, so with no
+                        // tasks staged this is the only thing that lands the initial 0.
+                        If( gPrRollup,
                         With( { pid: gPrSaved.ID },
                             With( { scored:
                                       AddColumns(
@@ -1503,12 +1533,19 @@ Screens:
                                 If( CountRows(scored) >= 500,
                                     Notify("Project saved. It has too many tasks to compute completion accurately, so it was left unchanged.",
                                            NotificationType.Warning),
+                                    // Don't spend a write on a number that has not moved —
+                                    // the second half of scrTaskEdit's guard. gEditProject was
+                                    // re-read from the server four lines up, so it carries the
+                                    // stored value; if that read fell back to the thin gPrSaved
+                                    // the comparison is against a blank and the write happens,
+                                    // which is the safe direction to be wrong in.
+                                    With( { newPc: If( CountRows(scored) = 0, 0,
+                                                       RoundDown(Average(scored, wgt), 0) ) },
+                                        If( newPc <> gEditProject.project_perc_completion,
                                     IfError(
                                         Set( gSelProject,
                                             Patch( taskmaster_projects, gPrSaved,
-                                                   { project_perc_completion:
-                                                         If( CountRows(scored) = 0, 0,
-                                                             RoundDown(Average(scored, wgt), 0) ) } ) ), Set( gPrWarn, gPrWarn & "Project saved, but the completion rollup didn't update: " & FirstError.Message & "   " )) ) ) );
+                                                   { project_perc_completion: newPc } ) ), Set( gPrWarn, gPrWarn & "Project saved, but the completion rollup didn't update: " & FirstError.Message & "   " )) ) ) ) ) ) );
                         // One banner for every optional column that didn't stick, rather
                         // than up to seven. gPrWarn is appended to by each guarded Patch's
                         // IfError fallback — the only place FirstError is in scope.
