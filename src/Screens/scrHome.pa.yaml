@@ -393,18 +393,6 @@ Screens:
                               LayoutMinHeight: =34
                               Width: =Parent.Width - 32
                               Height: =34
-                        - lblIssMineSub:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="open and assigned to you"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextMuted
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =0
-                              LayoutMinHeight: =16
-                              Width: =Parent.Width - 32
-                              Height: =16
             # ---- Work lists ------------------------------------------------
             - rowLists:
                 Control: GroupContainer@1.5.0
@@ -1062,17 +1050,20 @@ Screens:
                         LayoutGap: =8
                         PaddingTop: =12
                         PaddingBottom: =12
-                        PaddingLeft: =12
-                        PaddingRight: =12
+                        # NO SIDE PADDING, and that is what makes the 100 floor real:
+                        # padding eats the inner width first, so 12 a side would leave
+                        # 76px for a 100px ring at the floor and clip it there instead.
+                        PaddingLeft: =0
+                        PaddingRight: =0
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         # NARROW ON PURPOSE. This panel is the LAST child of rowCharts,
                         # so it is the one that falls off the right edge when the four
                         # minimum widths plus the gaps exceed the window:
-                        # 300 + 170 + 170 + 150 + 48 = 838.
+                        # 300 + 170 + 170 + 100 + 48 = 788.
                         FillPortions: =0
-                        LayoutMinWidth: =150
+                        LayoutMinWidth: =100
                         Width: =150
                         Height: =Parent.Height
                       Children:
@@ -1113,7 +1104,7 @@ Screens:
                               VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =0
                               LayoutMinHeight: =52
-                              Width: =Parent.Width - 24
+                              Width: =Parent.Width - 8
                               Height: =52
       - cmpToastHome:
           Control: CanvasComponent
