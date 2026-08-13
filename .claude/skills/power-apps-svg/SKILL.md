@@ -167,15 +167,23 @@ A multi-slice donut is then the single-ring trick once per slice, walked round b
 total. **`stroke-dashoffset` counts backwards**: 25 puts the start of a circumference-100 circle
 at 12 o'clock, so each slice offsets by `25 - cum`. Negative offsets are valid — do not clamp them.
 
+Scale the viewBox so the circumference is **1000** user units (`r='159.155'`) and every
+number is a whole one — see the rule below.
+
 ```power
-Concat( Filter(arcs, pct > 0),
-    "<circle cx='20' cy='20' r='15.9155' fill='none' stroke='" & c & "' stroke-width='4.5'" &
-    " stroke-dasharray='" & Text(pct, "[$-en-US]0.##", "en-US") & " " &
-                            Text(100 - pct, "[$-en-US]0.##", "en-US") & "'" &
-    " stroke-dashoffset='" & Text(25 - cum, "[$-en-US]0.##", "en-US") & "'/>" )
+Concat( Filter(arcs, u > 0),
+    "<circle cx='200' cy='200' r='159.155' fill='none' stroke='" & c & "' stroke-width='45'" &
+    " stroke-dasharray='" & u & " " & (1000 - u) & "'" &
+    " stroke-dashoffset='" & Mod(1250 - uc, 1000) & "'/>" )
 ```
 
-### 3. Categories: WRITE THEM OUT, don't `GroupBy`
+**Keep the offset positive.** `250 - uc` goes negative past the first slice, and a negative
+`stroke-dashoffset` is an error in SVG 1.1 — a renderer that clamps it to 0 stacks every later
+slice at the same start angle and leaves the track showing through as a phantom category. The
+dash pattern repeats every circumference, so `Mod(1250 - uc, 1000)` is the same angle, always
+positive.
+
+### 3. Categories: WRITE THEM OUT, don't `GroupBy` — and add an "Other"
 
 `GroupBy` only produces a group where a row exists, so it drops empty categories, can reorder run
 to run, and therefore **recolours a category between two refreshes**. Author the category table as
@@ -187,20 +195,39 @@ AddColumns(
     n, CountRows( Filter(colMyTasks, task_stage.Value = cat.k) ) )
 ```
 
-That is an **allow-list, and it fails closed** — a value added to the SharePoint column and not
-added here is silently absent from the chart, and the slices stop summing to the row count. Add a
-`"Not set"` category whenever the source column is optional, or the total is wrong rather than
-merely incomplete.
+That is an **allow-list, and it fails closed**. Give it an `"Other"` row that counts everything
+matching none of the named values, so the total is always the real row count and a live vocabulary
+that has drifted shows up as a labelled slice instead of silently wrong proportions:
 
-## THE DECIMAL SEPARATOR WILL BREAK YOUR CHART
+```power
+n, If( cat.k = "Other",
+       CountRows( Filter(src, !(col.Value = "A" || col.Value = "B")) ),
+       CountRows( Filter(src, col.Value = cat.k) ) )
+```
 
-Interpolating a fraction directly writes it with the **viewer's** decimal separator.
-`stroke-dasharray='33,3 66,7'` is not a number pair — the slice vanishes, for users in
-comma-decimal locales and nowhere else, and never on the machine that authored it.
+Without it, a column whose real values differ from the ones you typed produces `tot = Max(1, 0)`
+— and then **one matching row renders as 100% of the ring**. Add a `"Not set"` row too whenever
+the source column is optional.
 
-**Every interpolated fraction goes through `Text(v, "[$-en-US]0.#", "en-US")`.** The format
-placeholder pins how the format string is *read*; the third argument pins the *output*. Whole
-numbers are safe and can be interpolated bare.
+## NEVER INTERPOLATE A FRACTION — SCALE THE viewBox INSTEAD
+
+A bare fraction is written with the **viewer's** decimal separator, and
+`stroke-dasharray='33,3 66,7'` is not a number pair — it fails for comma-decimal locales and
+nowhere else, never on the machine that authored it.
+
+`Text(v, "[$-en-US]0.#", "en-US")` is the documented cure and it is **the wrong trade here**. It
+puts a construct into an attribute that Power Fx may not render, and *an attribute Power Fx
+cannot render comes out empty*. Empty attributes do not degrade — they delete the geometry:
+
+| Attribute | Empty value does | Looks like |
+|---|---|---|
+| `width=''` / `x=''` on a `<rect>` | nothing is drawn | bars missing, only the track showing |
+| `stroke-dasharray=''` on a `<circle>` | no dashing at all | a **solid ring in the last slice's colour** |
+
+**So make every coordinate a whole number.** Scale the viewBox up until integer precision is
+enough (×10 gives a donut a tenth of a percent) and let `Round(v, 0)` do the rest. Whole numbers
+carry no separator in any locale, and there is nothing left for `Text` to fail at. Reserve `Text`
+for *label text*, where a wrong separator is cosmetic and an empty string is visible.
 
 ## What SVG charting can and cannot do
 
@@ -213,6 +240,7 @@ numbers are safe and can be interpolated bare.
 | Text that fits its box | **No.** Power Fx cannot measure text — budget by character count and truncate (`Left(nm, 14) & "…"`), or the label overruns |
 | Live redraw as data changes | **Yes, if the formula is declarative.** Read the collection in the `Image` property; a chart fed from imperative `Set`s goes stale until something re-runs them |
 | Non-ASCII in labels | **Only with `data:image/svg+xml;charset=utf-8,`** — a data URI defaults to US-ASCII and mangles accented text |
+| Fractional coordinates | **Avoid.** Scale the viewBox and use integers — see the rule above |
 | Hundreds of points | Watch it. The string is rebuilt on every dependency change; cap rows and keep per-row markup short |
 
 ## Watch Out
