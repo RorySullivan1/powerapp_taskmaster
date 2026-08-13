@@ -159,11 +159,10 @@ lists:
       # phase picker, so nothing in the app maintains them any more. A flow that sets the
       # phase without setting the child flags leaves the children visible.
       #
-      # LEGACY VALUES: "Under Review" and "Blocked" are no longer produced by the app but
-      # existing rows may still hold them, so they stay in the column and in
-      # ActiveProjects. Dropping them from SharePoint would orphan those rows.
-      # PENDING IN SHAREPOINT: add "Stalled"; set the column default to "Not Started".
-      - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase — DERIVED by the app, see the note above", values: ["Not Started", Planning, Active, Stalled, Complete, Archived, "Under Review", Blocked] }
+      # THESE SIX ARE THE WHOLE VOCABULARY (user-confirmed 2026-08-13). "Under Review"
+      # and "Blocked" are gone from the column, so nothing in the app enumerates them.
+      # PENDING IN SHAREPOINT: set the column default to "Not Started".
+      - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase — DERIVED by the app, see the note above", values: ["Not Started", Planning, Active, Stalled, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
       - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below" }
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
