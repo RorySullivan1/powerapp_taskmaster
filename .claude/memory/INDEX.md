@@ -49,6 +49,10 @@ not know them will author something broken:
 - **Six superseded COMPONENTS to delete in Studio** — `cmpPeoplePicker`, `cmpRecordPicker`,
   `cmpUiKit`, `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`. Instance-free but still
   shipping inside the `.msapp`.
+- **UNDER TEST: does a layout formula survive a code-view paste?** `tests/scrProbe-layout-freeze.pa.yaml`,
+  not yet run. The skill's cited MS Learn quote is about DRAGGING; the leap to pasting was never
+  grounded. **Do not rewrite the design skill, the validator NOTE or the absolute-arithmetic
+  comments until the result is recorded in `tests/README.md`.**
 - **Three auto-layout containers have BOTH children unpinned** (`colIssType` among them) —
   unpinned children split space evenly and ignore declared heights.
 - **The Choice columns that replaced Managed Metadata (2026-08-10) have no recorded internal

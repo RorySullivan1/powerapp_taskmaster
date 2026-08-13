@@ -59,6 +59,9 @@ The repo houses the app's source and nothing else — one file per unit, in pa-y
   schema, and `studio-enums.json` (the grounded control/icon tokens).
 - **`docs/`** — project docs and design notes; `build-history.md` is a closed historical record
   of how the app was built and every defect diagnosed along the way.
+- **`tests/`** — throwaway **probe screens** that settle a claim about Studio behaviour by
+  pasting it. NOT app source: nothing in `src/` may reference one, and the validator scans
+  `src/` only. `tests/README.md` holds the rules a probe must follow and the recorded results.
 - **`.claude/`** — the asset set (skills, the pre-paste agent, context briefs, memory, hooks).
 
 ## Reference & output contract
