@@ -29,7 +29,8 @@ Screens:
         // A new project opens on "Not Started", matching the column default — the
         // phase is required, and an empty combo box makes the user set something
         // they have no opinion about yet.
-        Set( gPrPhase,    If( gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, ""), "Not Started" ) );
+        // NO gPrPhase SEED. The phase is DERIVED on scrProject, not chosen here — this
+        // screen no longer offers a control for it.
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
         ClearCollect( colMapRegion,   mapping_regions );
         ClearCollect( colMapActivity, mapping_activitytype );
@@ -66,12 +67,11 @@ Screens:
         Set( gPrPicker, "" ); Set( gPrQuery, "" ); Reset( cmpPrPick );
         Reset( txtNtName ); Reset( dtpNtTarget );
         Reset( txtNxName ); Reset( dtpNxDate ); Reset( numNxNotional );
-        // The SAME rule applies to every combo box: DefaultSelectedItems is
-        // re-read only on Reset. Without these six, opening project B after project A
-        // leaves A's phase/priority showing while gPrPhase already holds B's — and
-        // re-picking the displayed value fires no OnChange, so the correction can't
-        // be made by hand either.
-        Reset( cboPrPhase ); Reset( cboPrPriority );
+        // The SAME rule applies to every combo box: DefaultSelectedItems is re-read
+        // only on Reset. Without this, opening project B after project A leaves A's
+        // priority showing while gPrPriority already holds B's — and re-picking the
+        // displayed value fires no OnChange, so the correction cannot be made by hand.
+        Reset( cboPrPriority );
         // The pickers DO need resetting. A component's inner combo boxes read their
         // DefaultSelectedItems once, so clearing gPrRegionPath above is not enough on
         // its own — the previous project's selection stays on screen. Reset() on the
@@ -208,36 +208,6 @@ Screens:
                         LayoutGridRowEnd: =10
                         Width: =Parent.Width
                         Height: =36
-                  - lblPrPhaseCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Phase  *"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =3
-                        Width: =Parent.Width
-                        Height: =18
-                  - cboPrPhase:
-                      Control: ModernCombobox@1.1.1
-                      Properties:
-                        Items: |
-                          =["Not Started", "Planning", "Under Review", "Active", "Blocked", "Complete", "Archived"]
-                        ItemDisplayText: =ThisItem.Value
-                        InputTextPlaceholder: ="Select a phase"
-                        SelectMultiple: =false
-                        IsSearchable: =false
-                        DefaultSelectedItems: =Filter( [gPrPhase], !IsBlank(Value) )
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =4
-                        LayoutGridRowEnd: =10
-                        Width: =Parent.Width
-                        Height: =36
-                        OnChange: =Set(gPrPhase, cboPrPhase.Selected.Value)
                   - lblPrPriorityCap:
                       Control: Label@2.5.1
                       Properties:
@@ -1062,7 +1032,6 @@ Screens:
                     =Trim(
                        If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
                        If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
-                       If( Len(gPrPhase) = 0,             "phase   ", "" ) &
                        If( gEditMode = "New" && Len(gPrRegionPath) = 0, "Region   ", "" ) &
                        If( gEditMode = "New" && Len(gPrTypePath) = 0,   "Project type   ", "" ) )
                   Font: =gTheme.Font
@@ -1147,9 +1116,10 @@ Screens:
                     // server, after which the OLD phase is gone and the comparison is
                     // impossible. An insert never crosses — a new project is not archived
                     // and has no children yet.
-                    Set( gPrWasArchived, !gPrInsert && gEditProject.project_phase.Value = "Archived" );
-                    Set( gPrNowArchived, gPrPhase = "Archived" );
-                    Set( gPrArcFlip, !gPrInsert && gPrWasArchived <> gPrNowArchived );
+                    // NO ARCHIVE BOOKKEEPING. Archiving left the app with the phase
+                    // control: an external flow sets project_phase = "Archived", and that
+                    // flow OWNS the three *_project_archived child flags too. Nothing here
+                    // maintains them any more.
                     Set( gPrRollup, gPrInsert || CountRows(colNewTasks) > 0 );
                     Set( gPrSaved, Blank() );
                     Set( gPrErr, "" );
@@ -1181,7 +1151,14 @@ Screens:
                                 { project_name:        Trim(txtPrName.Text),
                                   project_description: txtPrDesc.Text,
                                   project_pathway:     txtPrPathway.Text,
-                                  project_phase:       { Value: gPrPhase },
+                                  // INSERT sets the starting phase; an EDIT writes back what
+                                  // is already stored. The field cannot simply be omitted —
+                                  // this is one Patch for both paths, and a field named in a
+                                  // Patch is written — so the edit path rewrites the same
+                                  // value rather than clobbering a derived one.
+                                  project_phase:
+                                      { Value: If( gPrInsert, "Not Started",
+                                                   Coalesce(gEditProject.project_phase.Value, "Not Started") ) },
                                   project_priority:    { Value: gPrPriority },
                                   project_manager:
                                       { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
@@ -1202,12 +1179,11 @@ Screens:
                                       If( Len(gPrCov) > 0, { Value: gPrCov }, Blank() ),
                                   project_date_start:    dtpPrStart.SelectedDate,
                                   project_date_target:   dtpPrTarget.SelectedDate,
+                                  // Written by the Mark complete button on scrProject, which is
+                                  // the only thing that can set the Complete phase. This screen
+                                  // only preserves what is there.
                                   project_date_complete:
-                                      If( gPrInsert,
-                                          If( gPrPhase = "Complete", Now(), Blank() ),
-                                          If( gPrPhase = "Complete",
-                                              Coalesce(gEditProject.project_date_complete, Now()),
-                                              gEditProject.project_date_complete ) ),
+                                      If( gPrInsert, Blank(), gEditProject.project_date_complete ),
                                   project_requestor:
                                       If( Len(gPrRequestor.Mail) > 0,
                                           { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
@@ -1258,11 +1234,10 @@ Screens:
                                   Message:
                                     IfError( Text(
                                         Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
-                                               // Inherits the parent's archived state. Almost
-                                               // always false — you cannot add children to an
-                                               // archived project — but a project archived in
-                                               // the SAME save would otherwise leave them live.
-                                               { task_project_archived: gPrNowArchived },
+                                               // A child staged on this screen belongs to a
+                                               // project being created or edited here, and this
+                                               // screen cannot archive one.
+                                               { task_project_archived: false },
                                             { task_name:       t.t_name,
                                               task_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
                                               task_stage:      { Value: t.t_stage },
@@ -1285,11 +1260,10 @@ Screens:
                                   Message:
                                     IfError( Text(
                                         Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
-                                               // Inherits the parent's archived state. Almost
-                                               // always false — you cannot add children to an
-                                               // archived project — but a project archived in
-                                               // the SAME save would otherwise leave them live.
-                                               { transaction_project_archived: gPrNowArchived },
+                                               // A child staged on this screen belongs to a
+                                               // project being created or edited here, and this
+                                               // screen cannot archive one.
+                                               { transaction_project_archived: false },
                                             { transaction_name:        x.x_name,
                                               transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
                                               transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
@@ -1371,47 +1345,19 @@ Screens:
                                         Set( gSelProject,
                                             Patch( taskmaster_projects, gPrSaved,
                                                    { project_perc_completion: newPc } ) ), Set( gPrWarn, gPrWarn & "Project saved, but the completion rollup didn't update: " & FirstError.Message & "   " )) ) ) ) ) ) );
-                        // --- 6. CASCADE THE ARCHIVED FLAG TO THE CHILDREN --------
-                        // `*_project_archived` is a denormalised mirror of this project's
-                        // phase, and it exists so every cross-project query can exclude
-                        // archived work with a delegable `= false` instead of a join. This
-                        // is the ONE place the app writes project_phase, so it is the one
-                        // place the mirror can be kept true.
+                        // --- 6. NO ARCHIVE CASCADE ANY MORE ----------------------
+                        // This used to mirror the project's phase onto every child's
+                        // `*_project_archived` flag, because that flag is what lets a
+                        // cross-project query exclude archived work with a delegable
+                        // `= false` instead of a join. It ran here because this screen was
+                        // the only place the app wrote project_phase.
                         //
-                        // ONLY ON A FLIP. Rewriting every child on every project save
-                        // would be a ForAll over hundreds of rows to change nothing.
-                        //
-                        // ForAll + Patch DOES NOT DELEGATE — it pulls up to the data row
-                        // limit and writes one row at a time. A project with more children
-                        // than that limit would be PARTIALLY cascaded, which is worse than
-                        // not at all: the leftovers keep the old flag and quietly stay in
-                        // (or out of) every query. So each list is counted FIRST and the
-                        // whole cascade refuses rather than half-doing it — the same
-                        // shape as the >= 500 refusal in the rollup above.
-                        If( gPrArcFlip,
-                            With( { nT: CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gPrSaved.ID) ),
-                                    nX: CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gPrSaved.ID) ),
-                                    nI: CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gPrSaved.ID) ) },
-                                If( nT >= 500 || nX >= 500 || nI >= 500,
-                                    Set( gPrWarn, gPrWarn & "Project saved, but it has too many attached items to re-flag them all in one pass, so they were left as they were. Ask for the cleanup workflow to re-sync them.   " ),
-                                    IfError(
-                                        Set( gPrScrap,
-                                            ForAll( Filter(taskmaster_tasks, task_project_id.Id = gPrSaved.ID) As t,
-                                                    Patch( taskmaster_tasks, t,
-                                                           { task_project_archived: gPrNowArchived } ) ) ),
-                                        Set( gPrWarn, gPrWarn & "Project saved, but its tasks kept the old archived flag: " & FirstError.Message & "   " ) );
-                                    IfError(
-                                        Set( gPrScrap2,
-                                            ForAll( Filter(taskmaster_transactions, transaction_project_id.Id = gPrSaved.ID) As x,
-                                                    Patch( taskmaster_transactions, x,
-                                                           { transaction_project_archived: gPrNowArchived } ) ) ),
-                                        Set( gPrWarn, gPrWarn & "Project saved, but its transactions kept the old archived flag: " & FirstError.Message & "   " ) );
-                                    IfError(
-                                        Set( gPrScrap3,
-                                            ForAll( Filter(taskmaster_issues, issue_project_id.Id = gPrSaved.ID) As i,
-                                                    Patch( taskmaster_issues, i,
-                                                           { issue_project_archived: gPrNowArchived } ) ) ),
-                                        Set( gPrWarn, gPrWarn & "Project saved, but its issues kept the old archived flag: " & FirstError.Message & "   " ) ) ) ) );
+                        // The phase control is gone, so the app can no longer archive
+                        // anything and this could never fire. THE EXTERNAL CLEANUP FLOW NOW
+                        // OWNS BOTH HALVES: setting project_phase = "Archived" AND setting
+                        // task_project_archived / transaction_project_archived /
+                        // issue_project_archived on every child. A flow that does the first
+                        // without the second leaves the children in every query.
                         If( Len(gPrWarn) > 0,
                             Notify( "Project saved, but: " & gPrWarn, NotificationType.Warning ) );
                         If( IsEmpty(colChildErrors),

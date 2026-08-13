@@ -80,10 +80,14 @@ App:
     Formulas: |-
       =
       // Enumerate the live phases — `<> "Archived"` is a Text <> and does not delegate.
+      // "Under Review" and "Blocked" are LEGACY: the app no longer produces them, but
+      // existing rows still hold them and an allow-list fails CLOSED, so leaving them
+      // out would make those projects vanish rather than error.
       ActiveProjects = Filter( taskmaster_projects,
           project_phase.Value = "Not Started"  || project_phase.Value = "Planning"
-       || project_phase.Value = "Under Review" || project_phase.Value = "Active"
-       || project_phase.Value = "Blocked"      || project_phase.Value = "Complete" );
+       || project_phase.Value = "Active"       || project_phase.Value = "Stalled"
+       || project_phase.Value = "Complete"     || project_phase.Value = "Under Review"
+       || project_phase.Value = "Blocked" );
 
       // Two axes at once: the project is live, and the issue's own status is Open.
       OpenIssues = Filter( taskmaster_issues,

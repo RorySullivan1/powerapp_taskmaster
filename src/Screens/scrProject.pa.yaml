@@ -8,6 +8,47 @@ Screens:
         =ClearCollect( colProjectTasks,
             Filter( taskmaster_tasks,
                 task_project_id.Id = gSelProject.ID ) );
+        // PHASE IS DERIVED HERE, not chosen by anyone. scrProjectEdit has no phase
+        // control; this screen recomputes on open and writes back only on a change.
+        //   any OPEN issue                        -> Stalled
+        //   any started task, or any transaction  -> Active
+        //   any child at all, no started task     -> Planning
+        //   nothing attached                      -> Not Started
+        // Counted from the QUERY, not from a gallery — a gallery pages as the user
+        // scrolls, so its AllItems would make the phase depend on how far someone had
+        // scrolled. colProjectTasks is a full ClearCollect, so it is safe to count.
+        Set( gPrjOpenIss,
+             CountRows( Filter( taskmaster_issues,
+                                issue_project_id.Id = gSelProject.ID
+                             && issue_status.Value = "Open" ) ) );
+        Set( gPrjOpenTasks,
+             CountRows( Filter( colProjectTasks, task_stage.Value <> "Complete" ) ) );
+        Set( gPrjDerived,
+             With( { nT: CountRows(colProjectTasks),
+                     nStarted: CountRows( Filter(colProjectTasks, task_stage.Value <> "Not Started") ),
+                     nX: CountRows( Filter( taskmaster_transactions,
+                                            transaction_project_id.Id = gSelProject.ID ) ),
+                     nI: CountRows( Filter( taskmaster_issues,
+                                            issue_project_id.Id = gSelProject.ID ) ) },
+                 If( gPrjOpenIss > 0,          "Stalled",
+                     nStarted > 0 || nX > 0,   "Active",
+                     nT + nX + nI > 0,         "Planning",
+                                               "Not Started" ) ) );
+        // COMPLETE AND ARCHIVED ARE TERMINAL. Complete is reachable only through the
+        // Mark complete button, and Archived only through the external cleanup flow —
+        // the derivation must never drag a project back out of either.
+        If( Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
+         && Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
+         && gPrjDerived <> Coalesce(gSelProject.project_phase.Value, ""),
+            IfError( Set( gPrjPhaseScrap,
+                          Patch( taskmaster_projects,
+                                 LookUp(taskmaster_projects, ID = gSelProject.ID),
+                                 { project_phase: { Value: gPrjDerived } } ) ),
+                     // A failed re-phase is not worth interrupting a read-only screen
+                     // for: the next open retries it, and nothing downstream is wrong
+                     // in the meantime except a stale label.
+                     Set( gPrjPhaseErr, FirstError.Message ) );
+            Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
         // NO gProjArchived. It counted this project's individually-archived TASKS, and
         // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
         // ever return 0 and the "N archived (hidden)" caption it fed could never show.
@@ -460,9 +501,9 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =12
                         FillPortions: =0
-                        LayoutMinWidth: =44
-                        Width: =44
-                        Height: =110
+                        LayoutMinWidth: =190
+                        Width: =190
+                        Height: =140
                       Children:
                         - icoEditProject:
                             Control: Classic/Icon@2.5.0
@@ -564,6 +605,72 @@ Screens:
                                                  NotificationType.Success );
                                          Navigate( scrProjects, ScreenTransition.UnCover ) );
                                      Set( gPrDelArm, false ) )
+                        # THE ONLY WAY A PROJECT REACHES "Complete". Every other phase is
+                        # derived on this screen's OnVisible; this button is the one place a
+                        # human decides, and it writes the completion date with it.
+                        - btnPrjComplete:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Visible: |
+                                =Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
+                              # DISABLED until nothing is outstanding. A disabled button cannot
+                              # say why, so lblPrjCompleteWhy below spells out what is blocking
+                              # it — the two always appear together.
+                              DisplayMode: |
+                                =If( gPrjOpenIss = 0 && gPrjOpenTasks = 0,
+                                     DisplayMode.Edit, DisplayMode.Disabled )
+                              Text: ="✓  Mark complete"
+                              Fill: =gTheme.Color.Success
+                              Color: =gTheme.Color.OnPrimary
+                              BorderColor: =gTheme.Color.Success
+                              BorderThickness: =0
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Body
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnSelect: |
+                                =Set( gPrjCompErr, "" );
+                                 IfError(
+                                     Set( gPrjCompSaved,
+                                          Patch( taskmaster_projects,
+                                                 LookUp(taskmaster_projects, ID = gSelProject.ID),
+                                                 { project_phase:         { Value: "Complete" },
+                                                   project_date_complete: Now() } ) ),
+                                     Set( gPrjCompErr, FirstError.Message ) );
+                                 // Trust the RECORD, never the message — a write can fail and
+                                 // still leave FirstError.Message empty.
+                                 If( IsBlank(gPrjCompSaved.ID) && Len(gPrjCompErr) = 0,
+                                     Set( gPrjCompErr, "SharePoint returned no record and no error message." ) );
+                                 If( Len(gPrjCompErr) > 0,
+                                     Notify( "Couldn't mark it complete: " & gPrjCompErr,
+                                             NotificationType.Error ),
+                                     Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) );
+                                     Notify( "Project marked complete.", NotificationType.Success ) )
+                        - lblPrjCompleteWhy:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: |
+                                =Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
+                                 && (gPrjOpenIss > 0 || gPrjOpenTasks > 0)
+                              Text: |
+                                =Trim(
+                                   "Blocked by "
+                                   & If( gPrjOpenTasks > 0,
+                                         gPrjOpenTasks & If(gPrjOpenTasks = 1, " open task", " open tasks"), "" )
+                                   & If( gPrjOpenTasks > 0 && gPrjOpenIss > 0, " and ", "" )
+                                   & If( gPrjOpenIss > 0,
+                                         gPrjOpenIss & If(gPrjOpenIss = 1, " open issue", " open issues"), "" ) )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
                         - lblDelArmed:
                             Control: Label@2.5.1
                             Properties:
