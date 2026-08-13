@@ -135,12 +135,19 @@ Screens:
       # `project_coverage` is NOT indexed in the golden source. Equality on it
       # delegates, but SharePoint refuses an unindexed filter once the list passes
       # 5,000 items — index it before the projects list gets near that.
+      #
+      # THE COVERAGE TEST IS Coalesce'd. Before OnVisible has run, or if Choices()
+      # returns nothing, `cboPrjCoverage.Selected.Value` is BLANK — which is not equal
+      # to "All coverage", so the old form fell through to a branch that filtered
+      # `project_coverage.Value = <blank>`. Treating an absent selection as "All"
+      # keeps that degenerate predicate out of the query entirely.
       - galProjects:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: |
-              =If( tglShowComplete.Value && cboPrjCoverage.Selected.Value = "All coverage",
+              =If( tglShowComplete.Value
+                && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                    Sort( Filter( ActiveProjects,
                              StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
@@ -149,7 +156,7 @@ Screens:
                              project_coverage.Value = cboPrjCoverage.Selected.Value
                           && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
-                   cboPrjCoverage.Selected.Value = "All coverage",
+                   Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                    Sort( Filter( ActiveProjects,
                              ( project_phase.Value = "Not Started"
                             || project_phase.Value = "Planning"
