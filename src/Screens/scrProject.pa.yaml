@@ -680,9 +680,19 @@ Screens:
                                   Control: Gallery@2.15.0
                                   Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                                   Properties:
+                                    # ONE composite sort key, not two chained Sorts: Power Fx
+                                    # does not guarantee a stable sort, so a second Sort could
+                                    # undo the first. priority * 100000 dominates, the day count
+                                    # breaks ties within a priority, and +50000 keeps an overdue
+                                    # (negative) count positive. No target date sorts last inside
+                                    # its own priority band rather than first.
                                     Items: |
                                       =Sort( colProjectTasks,
-                                             Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) )
+                                             Switch( task_priority.Value,
+                                                     "Critical", 1, "High", 2,
+                                                     "Moderate", 3, "Low", 4, 5 ) * 100000
+                                             + If( IsBlank(task_date_target), 99999,
+                                                   DateDiff(Today(), task_date_target, TimeUnit.Days) + 50000 ) )
                                     WrapCount: =1
                                     TemplateSize: =52
                                     TemplatePadding: =0
@@ -694,50 +704,130 @@ Screens:
                                     Width: =Parent.Width - 32
                                     Height: =Parent.Height - 80
                                   Children:
+                                    # AUTO-LAYOUT ROW. The columns carry no X, so they cannot
+                                    # overlap at any TemplateWidth — which the previous
+                                    # percentage arithmetic did once the panel narrowed.
+                                    - rowTaskBody:
+                                        Control: GroupContainer@1.5.0
+                                        Variant: AutoLayout
+                                        Properties:
+                                          LayoutDirection: =LayoutDirection.Horizontal
+                                          LayoutAlignItems: =LayoutAlignItems.Center
+                                          LayoutGap: =10
+                                          PaddingLeft: =8
+                                          PaddingRight: =8
+                                          X: =0
+                                          Y: =0
+                                          Width: =Parent.TemplateWidth
+                                          Height: =Parent.TemplateHeight - 1
+                                        Children:
+                                          # LIFECYCLE glyph, bound to task_stage — the same
+                                          # progression the project rows use. task_status is a
+                                          # separate RAG health column and is NOT what this shows.
+                                          - icoTaskStage:
+                                              Control: Image@2.2.3
+                                              Properties:
+                                                ImagePosition: =ImagePosition.Fit
+                                                FillPortions: =0
+                                                LayoutMinWidth: =24
+                                                Width: =24
+                                                Height: =24
+                                                Image: |
+                                                  =With(
+                                                      { g: Switch( Coalesce(ThisItem.task_stage.Value, ""),
+                                                            "Not Started",
+                                                                "<circle cx='18' cy='18' r='13' fill='none' stroke='#B9C0C8' stroke-width='2.5'/>",
+                                                            "Planning",
+                                                                "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'/>"
+                                                              & "<circle cx='12.5' cy='18' r='1.7' fill='#6E7882'/>"
+                                                              & "<circle cx='18'   cy='18' r='1.7' fill='#6E7882'/>"
+                                                              & "<circle cx='23.5' cy='18' r='1.7' fill='#6E7882'/>",
+                                                            "Drafting",
+                                                                "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
+                                                              & "<circle cx='18' cy='18' r='5' fill='#005A9E'/>",
+                                                            "Finalizing",
+                                                                "<circle cx='18' cy='18' r='13' fill='none' stroke='#D69828' stroke-width='3'/>"
+                                                              & "<circle cx='18' cy='18' r='9' fill='#D69828'/>",
+                                                            "Complete",
+                                                                "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                                              & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                                              & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                                                "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                                              & " stroke-dasharray='4 3'/>"
+                                                              & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                                              & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
+                                                      "data:image/svg+xml," & EncodeUrl(
+                                                          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                                                  )
+                                          - cellTaskName:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: =ThisItem.task_name
+                                                Font: =gTheme.Font
+                                                Size: =gTheme.Size.Body
+                                                Color: =gTheme.Color.TextPrimary
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =3
+                                                LayoutMinWidth: =140
+                                                Height: =44
+                                          - cellTaskWho:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: =Coalesce(ThisItem.task_lead.DisplayName, "Unassigned")
+                                                Font: =gTheme.Font
+                                                Size: =gTheme.Size.Small
+                                                Color: =gTheme.Color.TextMuted
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =2
+                                                LayoutMinWidth: =110
+                                                Height: =44
+                                          - cellTaskPriority:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: =Coalesce(ThisItem.task_priority.Value, "—")
+                                                Font: =gTheme.Font
+                                                FontWeight: =FontWeight.Semibold
+                                                Size: =gTheme.Size.Small
+                                                Color: |
+                                                  =Switch( ThisItem.task_priority.Value,
+                                                           "Critical", gTheme.Color.Danger,
+                                                           "High",     gTheme.Color.Warning,
+                                                           "Moderate", gTheme.Color.Primary,
+                                                                       gTheme.Color.TextMuted )
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =1
+                                                LayoutMinWidth: =70
+                                                Height: =44
+                                          - cellTaskDue:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: |
+                                                  =If( IsBlank(ThisItem.task_date_target), "-",
+                                                       With( { d: DateDiff(Today(), ThisItem.task_date_target, TimeUnit.Days) },
+                                                             If( d < 0,  Abs(d) & "d overdue",
+                                                                 d = 0,  "due today",
+                                                                 d = 1,  "1d left",
+                                                                         d & "d left" ) ) )
+                                                Font: =gTheme.Font
+                                                Size: =gTheme.Size.Small
+                                                Color: |
+                                                  =If( !IsBlank(ThisItem.task_date_target)
+                                                    && ThisItem.task_date_target < Today()
+                                                    && ThisItem.task_stage.Value <> "Complete",
+                                                       gTheme.Color.Danger, gTheme.Color.TextMuted )
+                                                Align: =Align.Right
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =2
+                                                LayoutMinWidth: =96
+                                                Height: =44
                                     - rowTasksLine:
                                         Control: Rectangle@2.3.0
                                         Properties:
                                           Fill: =gTheme.Color.Border
                                           X: =0
-                                          Y: =51
+                                          Y: =Parent.TemplateHeight - 1
                                           Width: =Parent.TemplateWidth
                                           Height: =1
-                                    - cellTaskStage:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =ThisItem.task_stage.Value
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          Color: =gTheme.Color.TextMuted
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          X: =Parent.TemplateWidth * 0.0 + 8
-                                          Y: =0
-                                          Width: =Parent.TemplateWidth * 0.2 - 16
-                                          Height: =51
-                                    - cellTaskName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =ThisItem.task_name
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Body
-                                          Color: =gTheme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          X: =Parent.TemplateWidth * 0.2 + 8
-                                          Y: =0
-                                          Width: =Parent.TemplateWidth * 0.5 - 16
-                                          Height: =51
-                                    - cellTaskWho:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =Coalesce(ThisItem.task_lead.DisplayName, "Unassigned")
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          Color: =gTheme.Color.TextMuted
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          X: =Parent.TemplateWidth * 0.7 + 8
-                                          Y: =0
-                                          Width: =Parent.TemplateWidth * 0.3 - 16
-                                          Height: =51
                                     - galTasksHit:
                                         Control: Classic/Button@2.2.0
                                         Properties:
@@ -892,50 +982,114 @@ Screens:
                                     Width: =Parent.Width - 32
                                     Height: =Parent.Height - 80
                                   Children:
+                                    # AUTO-LAYOUT ROW — the columns carry no X, so they cannot
+                                    # overlap however narrow the panel gets.
+                                    - rowTxBody:
+                                        Control: GroupContainer@1.5.0
+                                        Variant: AutoLayout
+                                        Properties:
+                                          LayoutDirection: =LayoutDirection.Horizontal
+                                          LayoutAlignItems: =LayoutAlignItems.Center
+                                          LayoutGap: =10
+                                          PaddingLeft: =8
+                                          PaddingRight: =8
+                                          X: =0
+                                          Y: =0
+                                          Width: =Parent.TemplateWidth
+                                          Height: =Parent.TemplateHeight - 1
+                                        Children:
+                                          # DERIVED, NOT STORED. taskmaster_transactions has no
+                                          # status column — the only lifecycle signal on the row is
+                                          # transaction_date, so this reads booked / today /
+                                          # scheduled off it. If a real status column is ever added,
+                                          # bind the Switch to that instead of to the date.
+                                          - icoTxState:
+                                              Control: Image@2.2.3
+                                              Properties:
+                                                ImagePosition: =ImagePosition.Fit
+                                                FillPortions: =0
+                                                LayoutMinWidth: =24
+                                                Width: =24
+                                                Height: =24
+                                                Image: |
+                                                  =With(
+                                                      { g: If( IsBlank(ThisItem.transaction_date),
+                                                                   "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                                                 & " stroke-dasharray='4 3'/>"
+                                                                 & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                                                 & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>",
+                                                               ThisItem.transaction_date < Today(),
+                                                                   "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                                                 & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                                                 & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                                               ThisItem.transaction_date = Today(),
+                                                                   "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
+                                                                 & "<circle cx='18' cy='18' r='7' fill='#005A9E'/>",
+                                                                   "<circle cx='18' cy='18' r='13' fill='none' stroke='#D69828' stroke-width='2.5'/>"
+                                                                 & "<path d='M18 11 L18 18 L23 21' fill='none' stroke='#D69828'"
+                                                                 & " stroke-width='2.5' stroke-linecap='round'/>" ) },
+                                                      "data:image/svg+xml," & EncodeUrl(
+                                                          "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                                                  )
+                                          - cellTxName:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: =ThisItem.transaction_name
+                                                Font: =gTheme.Font
+                                                Size: =gTheme.Size.Body
+                                                Color: =gTheme.Color.TextPrimary
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =3
+                                                LayoutMinWidth: =140
+                                                Height: =44
+                                          - cellTxClient:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: =Coalesce(ThisItem.transaction_client_name.Value, "—")
+                                                Font: =gTheme.Font
+                                                Size: =gTheme.Size.Small
+                                                Color: =gTheme.Color.TextMuted
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =2
+                                                LayoutMinWidth: =110
+                                                Height: =44
+                                          - cellTxNotional:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: |
+                                                  =If( IsBlank(ThisItem.transaction_notional), "-",
+                                                       Coalesce(ThisItem.transaction_currency.Value, "") & " " &
+                                                       Text(ThisItem.transaction_notional, "[$-en-US]#,##0") )
+                                                Font: =gTheme.Font
+                                                Size: =gTheme.Size.Small
+                                                Color: =gTheme.Color.TextMuted
+                                                Align: =Align.Right
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =2
+                                                LayoutMinWidth: =120
+                                                Height: =44
+                                          - cellTxDate:
+                                              Control: Label@2.5.1
+                                              Properties:
+                                                Text: |
+                                                  =If( IsBlank(ThisItem.transaction_date), "-",
+                                                       Text(ThisItem.transaction_date, "dd mmm yyyy") )
+                                                Font: =gTheme.Font
+                                                Size: =gTheme.Size.Small
+                                                Color: =gTheme.Color.TextMuted
+                                                Align: =Align.Right
+                                                VerticalAlign: =VerticalAlign.Middle
+                                                FillPortions: =2
+                                                LayoutMinWidth: =104
+                                                Height: =44
                                     - rowTxLine:
                                         Control: Rectangle@2.3.0
                                         Properties:
                                           Fill: =gTheme.Color.Border
                                           X: =0
-                                          Y: =51
+                                          Y: =Parent.TemplateHeight - 1
                                           Width: =Parent.TemplateWidth
                                           Height: =1
-                                    - cellTxName:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =ThisItem.transaction_name
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Body
-                                          Color: =gTheme.Color.TextPrimary
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          X: =Parent.TemplateWidth * 0.0 + 8
-                                          Y: =0
-                                          Width: =Parent.TemplateWidth * 0.5 - 16
-                                          Height: =51
-                                    - cellTxClient:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =Coalesce(ThisItem.transaction_client_name.Value, "—")
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          Color: =gTheme.Color.TextMuted
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          X: =Parent.TemplateWidth * 0.5 + 8
-                                          Y: =0
-                                          Width: =Parent.TemplateWidth * 0.3 - 16
-                                          Height: =51
-                                    - cellTxDate:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =Text(ThisItem.transaction_date, "dd mmm yyyy")
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          Color: =gTheme.Color.TextMuted
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          X: =Parent.TemplateWidth * 0.8 + 8
-                                          Y: =0
-                                          Width: =Parent.TemplateWidth * 0.2 - 16
-                                          Height: =51
                                     - galTransactionsHit:
                                         Control: Classic/Button@2.2.0
                                         Properties:
@@ -1160,10 +1314,21 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
+                              # Was sorted on `Created` — a SYSTEM COLUMN the canvas connector
+                              # does not surface on this list, so that sort key never resolved.
+                              # Now impact, then days until due, on one composite key: Power Fx
+                              # does not guarantee a stable sort, so chaining two Sorts could
+                              # undo the first. The sort runs LOCALLY (an expression, not a
+                              # column), which is acceptable only because this query is already
+                              # scoped to a single project.
                               Items: |
                                 =Sort( Filter( taskmaster_issues,
                                                issue_project_id.Id = gSelProject.ID ),
-                                       Created, SortOrder.Descending )
+                                       Switch( issue_impact.Value,
+                                               "Critical", 1, "High", 2,
+                                               "Moderate", 3, "Low", 4, 5 ) * 100000
+                                       + If( IsBlank(issue_date_target), 99999,
+                                             DateDiff(Today(), issue_date_target, TimeUnit.Days) + 50000 ) )
                               WrapCount: =1
                               TemplateSize: =44
                               TemplatePadding: =0
@@ -1175,84 +1340,144 @@ Screens:
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 108
                             Children:
+                              - rowIssBody:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =8
+                                    PaddingLeft: =6
+                                    PaddingRight: =6
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight - 1
+                                  Children:
+                                    # STATUS: open, or which way it closed.
+                                    - icoIssStatus:
+                                        Control: Image@2.2.3
+                                        Properties:
+                                          ImagePosition: =ImagePosition.Fit
+                                          FillPortions: =0
+                                          LayoutMinWidth: =22
+                                          Width: =22
+                                          Height: =22
+                                          Image: |
+                                            =With(
+                                                { g: Switch( Coalesce(ThisItem.issue_status.Value, ""),
+                                                      "Open",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
+                                                        & "<circle cx='18' cy='18' r='7' fill='#005A9E'/>",
+                                                      "Closed - Resolved",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                                        & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                                        & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                                      "Closed - Unresolved",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#C53A3A'/>"
+                                                        & "<path d='M12 12 L24 24 M24 12 L12 24' stroke='#FFFFFF'"
+                                                        & " stroke-width='3.5' stroke-linecap='round'/>",
+                                                      "Closed - No Change",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#6E7882'/>"
+                                                        & "<rect x='10' y='16' width='16' height='4' rx='2' fill='#FFFFFF'/>",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                                        & " stroke-dasharray='4 3'/>"
+                                                        & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
+                                                "data:image/svg+xml," & EncodeUrl(
+                                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                                            )
+                                    # IMPACT: signal bars, so severity is read from HEIGHT and
+                                    # count rather than from colour alone. This is the sort key,
+                                    # which is why it sits beside the status mark.
+                                    - icoIssImpact:
+                                        Control: Image@2.2.3
+                                        Properties:
+                                          ImagePosition: =ImagePosition.Fit
+                                          FillPortions: =0
+                                          LayoutMinWidth: =22
+                                          Width: =22
+                                          Height: =22
+                                          Image: |
+                                            =With(
+                                                { n: Switch( Coalesce(ThisItem.issue_impact.Value, ""),
+                                                             "Critical", 4, "High", 3, "Moderate", 2, "Low", 1, 0 ),
+                                                  c: Switch( Coalesce(ThisItem.issue_impact.Value, ""),
+                                                             "Critical", "#C53A3A", "High", "#D69828",
+                                                             "Moderate", "#005A9E", "Low", "#6E7882", "#D5DAE0" ) },
+                                                "data:image/svg+xml," & EncodeUrl(
+                                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>"
+                                                  & "<rect x='4'  y='24' width='6' height='8'  rx='1.5' fill='" & If(n >= 1, c, "#E1E5EB") & "'/>"
+                                                  & "<rect x='12' y='19' width='6' height='13' rx='1.5' fill='" & If(n >= 2, c, "#E1E5EB") & "'/>"
+                                                  & "<rect x='20' y='13' width='6' height='19' rx='1.5' fill='" & If(n >= 3, c, "#E1E5EB") & "'/>"
+                                                  & "<rect x='28' y='6'  width='6' height='26' rx='1.5' fill='" & If(n >= 4, c, "#E1E5EB") & "'/>"
+                                                  & "</svg>" )
+                                            )
+                                    - cellIssName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.issue_name
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Body
+                                          Color: =gTheme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =3
+                                          LayoutMinWidth: =130
+                                          Height: =38
+                                    - cellIssLinked:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            =Coalesce( ThisItem.issue_task_name.Value,
+                                                       ThisItem.issue_transaction_name.Value, "—" )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =2
+                                          LayoutMinWidth: =100
+                                          Height: =38
+                                    - cellIssType:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =Coalesce(ThisItem.issue_type.Value, "—")
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =80
+                                          Height: =38
+                                    - cellIssDue:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            =If( IsBlank(ThisItem.issue_date_target), "-",
+                                                 With( { d: DateDiff(Today(), ThisItem.issue_date_target, TimeUnit.Days) },
+                                                       If( d < 0,  Abs(d) & "d overdue",
+                                                           d = 0,  "due today",
+                                                           d = 1,  "1d left",
+                                                                   d & "d left" ) ) )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: |
+                                            =If( !IsBlank(ThisItem.issue_date_target)
+                                              && ThisItem.issue_date_target < Today()
+                                              && ThisItem.issue_status.Value = "Open",
+                                                 gTheme.Color.Danger, gTheme.Color.TextMuted )
+                                          Align: =Align.Right
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =2
+                                          LayoutMinWidth: =96
+                                          Height: =38
                               - rowIssLine:
                                   Control: Rectangle@2.3.0
                                   Properties:
                                     Fill: =gTheme.Color.Border
                                     X: =0
-                                    Y: =43
+                                    Y: =Parent.TemplateHeight - 1
                                     Width: =Parent.TemplateWidth
                                     Height: =1
-                              - cellIss0:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =ThisItem.issue_name
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Body
-                                    Color: =gTheme.Color.TextPrimary
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    X: =Parent.TemplateWidth * 0.0
-                                    Y: =0
-                                    Width: =Parent.TemplateWidth * 0.2857 - 8
-                                    Height: =43
-                              - cellIss1:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =Coalesce( ThisItem.issue_task_name.Value,
-                                      ThisItem.issue_transaction_name.Value, "—" )
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    X: =Parent.TemplateWidth * 0.2857
-                                    Y: =0
-                                    Width: =Parent.TemplateWidth * 0.2857 - 8
-                                    Height: =43
-                              - cellIss2:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =Switch( Coalesce(ThisItem.issue_status.Value, "—"),
-                                               "Closed - Resolved",   "Resolved",
-                                               "Closed - Unresolved", "Unresolved",
-                                               "Closed - No Change",  "No change",
-                                               Coalesce(ThisItem.issue_status.Value, "—") )
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    X: =Parent.TemplateWidth * 0.5714
-                                    Y: =0
-                                    Width: =Parent.TemplateWidth * 0.1429 - 8
-                                    Height: =43
-                              - cellIss3:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =Coalesce(ThisItem.issue_type.Value, "—")
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    X: =Parent.TemplateWidth * 0.7143
-                                    Y: =0
-                                    Width: =Parent.TemplateWidth * 0.1429 - 8
-                                    Height: =43
-                              - cellIss4:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =Coalesce(ThisItem.issue_impact.Value, "—")
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    X: =Parent.TemplateWidth * 0.8571
-                                    Y: =0
-                                    Width: =Parent.TemplateWidth * 0.1429 - 8
-                                    Height: =43
                               - galIssuesHit:
                                   Control: Classic/Button@2.2.0
                                   Properties:
