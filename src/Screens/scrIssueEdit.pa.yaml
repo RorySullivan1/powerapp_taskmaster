@@ -73,15 +73,24 @@ Screens:
             Collect( colIssTaskOpts, { Id: gIssTask.Id, Label: gIssTask.Value } ) );
         If( gIssTx.Id > 0 && IsBlank( LookUp(colIssTxOpts, Id = gIssTx.Id) ),
             Collect( colIssTxOpts, { Id: gIssTx.Id, Label: gIssTx.Value } ) );
-        // TYPE OPTIONS COME FROM THE COLUMN, not a literal list. A hard-coded
-        // vocabulary drifts from SharePoint silently — project_phase carried two
+        // ALL THREE CHOICE VOCABULARIES COME FROM THE COLUMNS, not literal lists. A
+        // hard-coded list drifts from SharePoint silently — project_phase carried two
         // values the app never enumerated, and those projects simply vanished.
-        // "(none)" is Collected FIRST so it leads the list: an optional Choice has to
-        // be clearable and {Value: ""} is not a legal write, so the blank has to be a
-        // real option rather than an empty selection.
+        //
+        // status is REQUIRED, so it gets no blank row. type and impact are optional,
+        // and "(none)" is Collected FIRST so it leads each list: an optional Choice has
+        // to be clearable and {Value: ""} is not a legal write, so the blank has to be
+        // a real option rather than an empty selection.
+        ClearCollect( colIssStatusOpts,
+                      ForAll( Choices([@taskmaster_issues].issue_status) As c,
+                              { Value: c.Value } ) );
         ClearCollect( colIssTypeOpts, { Value: "(none)" } );
         Collect( colIssTypeOpts,
                  ForAll( Choices([@taskmaster_issues].issue_type) As c,
+                         { Value: c.Value } ) );
+        ClearCollect( colIssImpactOpts, { Value: "(none)" } );
+        Collect( colIssImpactOpts,
+                 ForAll( Choices([@taskmaster_issues].issue_impact) As c,
                          { Value: c.Value } ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
@@ -215,8 +224,11 @@ Screens:
                         - cboIssStatus:
                             Control: ModernCombobox@1.1.1
                             Properties:
-                              Items: |
-                                =["Open", "Closed - Resolved", "Closed - Unresolved", "Closed - No Change"]
+                              # From Choices() on the column. NOTE the coupling: "Open" is a
+                              # literal in App.Formulas (OpenIssues), in scrProject's status
+                              # glyph and in its open-count. A status value added in SharePoint
+                              # appears HERE automatically but is invisible to those three.
+                              Items: =colIssStatusOpts
                               ItemDisplayText: =ThisItem.Value
                               DefaultSelectedItems: =Filter( [gIssStatus], !IsBlank(Value) )
                               SelectMultiple: =false
@@ -342,8 +354,10 @@ Screens:
                         - cboIssImpact:
                             Control: ModernCombobox@1.1.1
                             Properties:
-                              Items: |
-                                =["(none)", "Low", "Moderate", "High", "Critical"]
+                              # From Choices() on the column. NOTE the coupling: scrProject's
+                              # issues gallery sorts on impact via a Switch that ranks these four
+                              # names; a value added in SharePoint appears here and sorts last.
+                              Items: =colIssImpactOpts
                               ItemDisplayText: =ThisItem.Value
                               DefaultSelectedItems: =Filter( [gIssImpact], !IsBlank(Value) )
                               SelectMultiple: =false
