@@ -5,6 +5,11 @@
   exist in Studio, the lists are added, `App.OnStart` + `App.Formulas` are in. Work is fixing and
   refining, not creating. **THE PUBLISHED APP RENDERS PROPERLY as of 2026-08-12 (user confirmed)** —
   the squished-and-black era is over; `gTheme` resolves in the player.
+- **HOVER-FIX PASTE IN PROGRESS 2026-08-12.** Landed so far: `App.OnStart` (carries the new
+  `gTheme.Color.Hover` / `.Press` tokens) and `cmpAppBar`. Remaining: `cmpPicker`,
+  `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then every screen except `scrHome`.
+  **`App.OnStart` MUST land before any screen** — the screens read the two new tokens, and a
+  missing token is blank, which coerces to black.
 - **LANDED 2026-08-12 (user confirmed): `cmpLookupField`, `cmpPicker`, and all five re-pasted
   `scr*Edit` screens are IN STUDIO**, along with the four code-review batches. **THERE ARE NO
   ORPHANED CONTROLS — the user DELETES a screen before pasting it back** (confirmed 2026-08-12),
