@@ -5,13 +5,14 @@
 #     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
 #    88 .. 148   hdrProjects   = HeaderH + Gutter, height 60
 #   164 .. 204   rowFilters    = off hdrProjects,  height 40
-#   209 .. 744   galProjects   = rowFilters bottom + 5, fills to the bottom gutter
+#   210 .. 744   galProjects   = absolute 210, fills to the bottom gutter
 #
-# The stack is RELATIVE: each band is anchored to the one above it rather than to a
-# re-derived sum, so a height change in the header moves everything below it and the
-# numbers above stay true. Layout formulas survive a paste and keep recomputing
-# (tests/README.md) — what breaks the link is dragging a control in Studio, so change
-# geometry here or in the formula bar, never with the mouse.
+# The bands above galProjects are RELATIVE — each anchored to the one above it, so a
+# height change in the header moves them together. The gallery itself is an ABSOLUTE
+# 210 and its Height subtracts the same number, so the two have to be edited together.
+# Layout formulas survive a paste and keep recomputing (tests/README.md) — what breaks
+# the link is dragging a control in Studio, so change geometry here or in the formula
+# bar, never with the mouse.
 #
 # Horizontal placement is auto-layout, not arithmetic: the filter row and each gallery
 # row are containers whose children carry NO X. Columns therefore cannot overlap at any
@@ -199,11 +200,9 @@ Screens:
             TemplateSize: =72
             TemplatePadding: =0
             X: =gTheme.Space.Gutter
-            Y: =rowFilters.Y + rowFilters.Height + 5
+            Y: =210
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: |
-              =Parent.Height - (rowFilters.Y + rowFilters.Height + 5)
-               - gTheme.Space.Gutter
+            Height: =Parent.Height - 210 - gTheme.Space.Gutter
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
             # ONE auto-layout row per record. The columns carry NO X, so they cannot
