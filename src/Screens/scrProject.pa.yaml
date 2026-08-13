@@ -1136,6 +1136,11 @@ Screens:
                         - lblTxTotal:
                             Control: Label@2.5.1
                             Properties:
+                              # Sums what the gallery has LOADED, not the whole query — a gallery
+                              # bound to a data source pages as the user scrolls. Accepted: a
+                              # project holds well under a page of transactions. Do not "fix" it
+                              # by widening the query; Sum does not delegate to SharePoint either
+                              # way, so the only real fix is collecting the rows in OnVisible.
                               Text: |
                                 =With( { rows: galTransactions.AllItems },
                                     With( { u: Sum(Filter(rows, transaction_currency.Value = "USD"), Coalesce(transaction_notional, 0)),
