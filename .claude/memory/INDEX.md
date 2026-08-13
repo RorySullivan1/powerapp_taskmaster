@@ -11,9 +11,10 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`, `gHasPowerBiLicence`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **Hover-fix paste in progress.** Landed: `App.OnStart`, `cmpAppBar`. Remaining: `cmpPicker`,
+- **Paste in progress.** Landed: `App.OnStart`, `cmpAppBar`. Remaining: `cmpPicker`,
   `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then every screen but `scrHome`.
-  `scrProject` / `scrIssueEdit` / `scrTransactionEdit` also carry unlanded LOGIC fixes.
+  `scrProject` / `scrIssueEdit` / `scrTransactionEdit` / the five picker screens also
+  carry unlanded LOGIC fixes, so those pastes are not cosmetic.
 - **SharePoint matches `schema/schema.yaml`** — archived columns and the Choice-value edits
   are applied. **No orphaned controls: the user DELETES a screen before pasting it back.**
 - Six superseded components still ship inside the `.msapp` — see Threads.
@@ -34,6 +35,7 @@ not know them will author something broken:
 - [2026-08-09] The three `*_project_id` lookups DISPLAY the numeric ID, not the name. Screens resolve it app-side with `LookUp(taskmaster_projects, ...)`. **Two reviewers have flagged that as waste by trusting the schema comment** — ARCHIVE
 - [2026-08-03] `Sort(If(...))` does NOT fold — the Sort must sit INSIDE each branch — ARCHIVE
 - [2026-08-03] Person writes use the expanded-user shape with `gClaimPrefix & Lower(mail)` and the `'@odata.type'` tag — ARCHIVE
+- [2026-08-13] `StartsWith(col, "")` is TRUE for every row, so a default page and a search are ONE branch — `FirstN` picks the cap. This is what let cmpPicker open with rows in it without a second query path — INDEX Decisions
 - [2026-08-12] A gallery bound to a DATA SOURCE pages as the user scrolls, so `.AllItems` is what is on screen, not the total. Count from the query — INDEX Decisions
 - [2026-08-12] A global's type unifies across every `Set`; one name holding differently-shaped records is a type conflict — INDEX Decisions
 - [2026-08-06] Modern controls are ON in this tenant — ARCHIVE
@@ -62,4 +64,5 @@ not know them will author something broken:
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-13 | cmpPicker opens on the first 10 records (current user for person fields); record branches un-gated from query length | INDEX Decisions 2026-08-13
 - 2026-08-13 | INDEX pruned 620 lines/231KB to ~80; full prior contents archived verbatim | sessions/ARCHIVE-2026.md
