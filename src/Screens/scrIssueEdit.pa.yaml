@@ -828,12 +828,18 @@ Screens:
             # Queries run HERE — AccessAppScope false. Bound to gIssQuery, which
             # OnSearch sets, never to the instance's own Query output.
             # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
+            # There is no "first 10 people" to open on, so the default row is the
+            # current user — one tap to assign an issue to yourself.
             Results: |
               =If( gIssPicker = "Assignee" && Len(gIssQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gIssQuery, top: 25 }).value As u,
               { Key:       u.Mail,
               Primary:   u.DisplayName,
-              Secondary: u.Mail } ) )
+              Secondary: u.Mail } ),
+              gIssPicker = "Assignee",
+              Table( { Key:       User().Email,
+              Primary:   User().FullName,
+              Secondary: User().Email } ) )
             OnSearch: =Set( gIssQuery, cmpIssPick.Query )
             AllowCreate: =false
             OnConfirm: |

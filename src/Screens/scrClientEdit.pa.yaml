@@ -369,12 +369,17 @@ Screens:
             # fills, not to the instance's own Query output, which would be a
             # same-instance cycle. Key is the person's Mail; Primary/Secondary are
             # the display name and the address the row shows.
+            # There is no "first 10 people" to open on, so the default row is the
+            # current user — one tap to make yourself the sales owner.
             Results: |
               =If( Len(gClQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gClQuery, top: 25 }).value As u,
               { Key:       u.Mail,
               Primary:   u.DisplayName,
-              Secondary: u.Mail } ) )
+              Secondary: u.Mail } ),
+              Table( { Key:       User().Email,
+              Primary:   User().FullName,
+              Secondary: User().Email } ) )
             OnSearch: =Set( gClQuery, cmpClPick.Query )
             AllowCreate: =false
             OnConfirm: |

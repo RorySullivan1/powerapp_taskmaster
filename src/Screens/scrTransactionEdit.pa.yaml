@@ -594,21 +594,29 @@ Screens:
             # Queries run HERE — AccessAppScope false. Bound to gTxQuery, which
             # OnSearch sets, never to the instance's own Query output.
             # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
+            # The record branches carry no query-length gate — see scrTaskEdit's
+            # instance for why one branch serves both the default page and the search.
             Results: |
               =If( gTxPicker = "Sales" && Len(gTxQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gTxQuery, top: 25 }).value As u,
               { Key:       u.Mail,
               Primary:   u.DisplayName,
               Secondary: u.Mail } ),
-              gTxPicker = "Client" && Len(gTxQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_clients,
-              StartsWith(client_name, gTxQuery) ), 50 ) As c,
+              gTxPicker = "Sales",
+              Table( { Key:       User().Email,
+              Primary:   User().FullName,
+              Secondary: User().Email } ),
+              gTxPicker = "Client",
+              ForAll( FirstN( Sort( Filter( taskmaster_clients,
+              StartsWith(client_name, gTxQuery) ), client_name ),
+              If( Len(gTxQuery) >= 2, 50, 10 ) ) As c,
               { Key:       Text(c.ID),
               Primary:   c.client_name,
               Secondary: Coalesce(c.client_type.Value, "") } ),
-              gTxPicker = "Product" && Len(gTxQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_products,
-              StartsWith(product_uid, gTxQuery) ), 50 ) As p,
+              gTxPicker = "Product",
+              ForAll( FirstN( Sort( Filter( taskmaster_products,
+              StartsWith(product_uid, gTxQuery) ), product_uid ),
+              If( Len(gTxQuery) >= 2, 50, 10 ) ) As p,
               { Key:       Text(p.ID),
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )

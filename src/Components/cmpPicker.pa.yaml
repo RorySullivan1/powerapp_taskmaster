@@ -12,6 +12,10 @@
 # Call Reset(<instance>) when opening: one instance serves every field on a screen, so
 # without it the dialog opens on the previous field's highlight and the check commits it.
 # Search is DEBOUNCED — canvas has no keypress or Enter event on a text input at all.
+#
+# THE DIALOG OPENS WITH ROWS ALREADY IN IT. `Results` is never gated on a query here;
+# each screen returns a default page when nothing is typed. So pkHint is shown by
+# CountRows(Results) = 0 alone — gating it on query length would cover those rows.
 ComponentDefinitions:
   cmpPicker:
     DefinitionType: CanvasComponent
@@ -25,7 +29,7 @@ ComponentDefinitions:
         Default: ="Select"
       Results:
         PropertyKind: Input
-        Description: Rows to list. Schema {Key:Text, Primary:Text, Secondary:Text}. Key is Text(ID) for a record and Mail for a person. The SCREEN runs the query.
+        Description: Rows to list. Schema {Key:Text, Primary:Text, Secondary:Text}. Key is Text(ID) for a record and Mail for a person. The SCREEN runs the query, and supplies a default page with no query typed — the first 10 records, or the current user for a person field.
         DataType: Table
         Default: |
           =Table( { Key: "1", Primary: "Example", Secondary: "example detail" } )
@@ -151,7 +155,7 @@ ComponentDefinitions:
       - txtPkSearch:
           Control: ModernTextInput@1.1.1
           Properties:
-            Placeholder: ="Type at least 2 characters…"
+            Placeholder: ="Search, or pick from the list below…"
             AccessibleLabel: ="Search"
             # Delayed: OnChange fires once the user STOPS TYPING, not per
             # keystroke. Never FocusOut — that fires only on losing focus, which
@@ -269,10 +273,10 @@ ComponentDefinitions:
           Control: Label@2.5.1
           Properties:
             Visible: |
-              =Len(Coalesce(pkQuery, "")) < 2 || CountRows(cmpPicker.Results) = 0
+              =CountRows(cmpPicker.Results) = 0
             Text: |
               =If( Len(Coalesce(pkQuery, "")) = 0,
-                   "Start typing to search — results appear as you pause.",
+                   "Nothing to show yet — type to search.",
                    Len(Coalesce(pkQuery, "")) < 2,
                    "Type at least two characters.",
                    "No matches for """ & pkQuery & """." )

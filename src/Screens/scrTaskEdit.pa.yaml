@@ -1334,22 +1334,34 @@ Screens:
             # record. That single change is what let the two pickers become one.
             # Each branch repeats the >= 2 guard and there is NO else branch, so
             # an unmatched state yields blank of the right shape.
-            # FirstN caps the record pages at 50: Filter delegates, ForAll does not.
+            # FirstN caps the record pages: Filter delegates, ForAll does not.
+            # THE RECORD BRANCHES ARE NOT GATED ON QUERY LENGTH — StartsWith(col, "")
+            # is true for every row, so one branch serves both the default page and
+            # the search. FirstN is what makes it 10 with nothing typed and 50 with a
+            # query. Sort is INSIDE the Filter, on an indexed column, so it folds.
+            # The directory branches keep the >= 2 gate: there is no "first 10 people"
+            # to show, so their default is the current user — one tap to self-assign.
             Results: |
               =If( (gTkPicker = "Lead" || gTkPicker = "Supporter") && Len(gTkQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gTkQuery, top: 25 }).value As u,
               { Key:       u.Mail,
               Primary:   u.DisplayName,
               Secondary: u.Mail } ),
-              gTkPicker = "Client" && Len(gTkQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_clients,
-              StartsWith(client_name, gTkQuery) ), 50 ) As c,
+              gTkPicker = "Lead" || gTkPicker = "Supporter",
+              Table( { Key:       User().Email,
+              Primary:   User().FullName,
+              Secondary: User().Email } ),
+              gTkPicker = "Client",
+              ForAll( FirstN( Sort( Filter( taskmaster_clients,
+              StartsWith(client_name, gTkQuery) ), client_name ),
+              If( Len(gTkQuery) >= 2, 50, 10 ) ) As c,
               { Key:       Text(c.ID),
               Primary:   c.client_name,
               Secondary: Coalesce(c.client_type.Value, "") } ),
-              gTkPicker = "Product" && Len(gTkQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_products,
-              StartsWith(product_uid, gTkQuery) ), 50 ) As p,
+              gTkPicker = "Product",
+              ForAll( FirstN( Sort( Filter( taskmaster_products,
+              StartsWith(product_uid, gTkQuery) ), product_uid ),
+              If( Len(gTkQuery) >= 2, 50, 10 ) ) As p,
               { Key:       Text(p.ID),
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )

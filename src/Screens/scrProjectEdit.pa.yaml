@@ -2031,6 +2031,8 @@ Screens:
             # Queries run HERE — AccessAppScope false. Bound to gPrQuery, which
             # OnSearch sets, never to the instance's own Query output.
             # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
+            # The record branches carry no query-length gate — see scrTaskEdit's
+            # instance for why one branch serves both the default page and the search.
             Results: |
               =If( (gPrPicker = "Manager" || gPrPicker = "Requestor" || gPrPicker = "Supporter"
               || gPrPicker = "NtLead" || gPrPicker = "NxSales") && Len(gPrQuery) >= 2,
@@ -2038,15 +2040,22 @@ Screens:
               { Key:       u.Mail,
               Primary:   u.DisplayName,
               Secondary: u.Mail } ),
-              gPrPicker = "NxClient" && Len(gPrQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_clients,
-              StartsWith(client_name, gPrQuery) ), 50 ) As c,
+              gPrPicker = "Manager" || gPrPicker = "Requestor" || gPrPicker = "Supporter"
+              || gPrPicker = "NtLead" || gPrPicker = "NxSales",
+              Table( { Key:       User().Email,
+              Primary:   User().FullName,
+              Secondary: User().Email } ),
+              gPrPicker = "NxClient",
+              ForAll( FirstN( Sort( Filter( taskmaster_clients,
+              StartsWith(client_name, gPrQuery) ), client_name ),
+              If( Len(gPrQuery) >= 2, 50, 10 ) ) As c,
               { Key:       Text(c.ID),
               Primary:   c.client_name,
               Secondary: Coalesce(c.client_type.Value, "") } ),
-              gPrPicker = "NxProduct" && Len(gPrQuery) >= 2,
-              ForAll( FirstN( Filter( taskmaster_products,
-              StartsWith(product_uid, gPrQuery) ), 50 ) As p,
+              gPrPicker = "NxProduct",
+              ForAll( FirstN( Sort( Filter( taskmaster_products,
+              StartsWith(product_uid, gPrQuery) ), product_uid ),
+              If( Len(gPrQuery) >= 2, 50, 10 ) ) As p,
               { Key:       Text(p.ID),
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )
