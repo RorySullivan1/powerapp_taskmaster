@@ -1,37 +1,38 @@
 # =============================================================================
-# scrHome  —  personalised landing (screen-map §1). PHASE-2 DATA: header + nav
-# + component instances bound to LIVE queries. OnVisible pulls my-tasks and
-# my-issues delegably, then derives every figure locally. Column tokens resolve
-# to schema/schema.yaml (the golden source).
+# scrHome  —  personal dashboard. Four read-only metric cards, two work lists,
+# and a chart band. Column tokens resolve to schema/schema.yaml.
 #
-# NOT RUNNABLE until the lists exist: a SharePoint data source can't be added
-# to the app before its list is provisioned, so paste this only after
-# taskmaster_tasks / taskmaster_issues are live and added as data sources.
+# EVERYTHING BELOW THE APP BAR IS ONE AUTO-LAYOUT TREE. No child carries an X or
+# a Y, so nothing can collide at any window width and nothing here can be moved
+# by a stray drag in Studio.
 #
-# Component INSTANCES use v3.0 dialect: `Control: CanvasComponent` +
-# `ComponentName:` + `Properties:` (base props X/Y/W/H AND custom props;
-# instances have NO Children). The referenced components must exist in the app.
+# BAND HEIGHTS (bodyRoot is Parent.Height for every direct child):
+#     60   wrapHdr     section header + Refresh
+#     96   rowCards    four metric cards
+#     ...  rowLists    fills — my tasks | my issues
+#    200   rowCharts   timeline + two pies + the completion ring
+#   rowLists.Height = Parent.Height - 452, where 452 = 48 padding + 48 gaps
+#   + 60 + 96 + 200. Change a band height and change that number with it.
+#
+# Component INSTANCES use the v3.0 dialect: `Control: CanvasComponent` +
+# `ComponentName:` + `Properties:` (base props AND custom props; no Children).
+# An instance cannot take FillPortions/LayoutMinWidth, so every instance inside
+# an auto-layout container sits in a pinned GroupContainer wrapper.
 # Screens read gTheme; components cannot, so components use literal colours.
 #
-# Demo UI-state globals (no schema, no OnStart — blank is falsy):
-#   gToastMsg / gToastTone  — feed the toast; gConfirmOpen — the confirm modal.
-# DIALECT: modern structured .pa.yaml; gallery `Variant` still round-trip-gated.
+# NOT RUNNABLE until the lists exist: a SharePoint data source can't be added to
+# the app before its list is provisioned.
 # =============================================================================
 Screens:
   scrHome:
     Properties:
       Fill: =gTheme.Color.Bg
-      # ---- PHASE-2 DATA: one delegable pull, then local derivation ----------
-      # The pattern (power-fx-development): narrow SERVER-side to a bounded set,
-      # then aggregate LOCALLY — Sum/CountRows/Average never delegate to SharePoint.
-      # Everything inside these two Filters delegates: Person `.Email =`, Choice
-      # `.Value =`, and And/Or over them. `task_supporter` is a single Person (C1),
-      # so "mine" is fully server-side.
-      # THERE IS NO STAGE PREDICATE ANY MORE. It enumerated the six non-archived
-      # stages; task_stage lost "Archived" on 2026-08-12, so the chain selected
-      # everything. Archiving is a PROJECT state now, and it is applied BELOW, in
-      # a delegable `task_project_archived = false` — a denormalised mirror of the
-      # parent's phase, so the archived rows never reach the app at all.
+      # ---- One delegable pull per list, then local derivation ----------------
+      # Narrow SERVER-side to a bounded set, then aggregate LOCALLY — Sum,
+      # CountRows and Average never delegate to SharePoint.
+      # Everything inside these Filters delegates: Person `.Email =`, Choice
+      # `.Value =`, Lookup `.Id =`, and And/Or over them. `project_manager`,
+      # `task_lead` and `issue_assignee` are all single Person and all indexed.
       #
       # TWO LIMITS TO KNOW:
       #  * A delegable Filter still returns at most the DATA ROW LIMIT into a
@@ -48,143 +49,1077 @@ Screens:
         // manual refresh. Declarative properties like gTheme self-heal; these cannot.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
         Concurrent(
+            ClearCollect( colMyProjects,
+                Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
             ClearCollect( colMyTasks,
-                Filter( LiveTasks,
-                    task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
+                Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
             ClearCollect( colMyIssues,
+                // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email =
+                // gUserEmail`: issue_owner is not indexed, so an Or-arm on it drops
+                // delegation for the WHOLE filter and silently truncates at 500 rows.
+                // issue_assignee is the resolver; issue_owner only records who raised it.
                 Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
         );
-        Set( gMyOpen,
+        Set( gPrjLed,
+             CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
+        Set( gPrjLedOverdue,
+             CountRows( Filter( colMyProjects,
+                 project_phase.Value <> "Complete"
+              && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
+        Set( gTaskLed,
              CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
-        Set( gMyOverdue,
+        Set( gTaskLedOverdue,
              CountRows( Filter( colMyTasks,
                  task_stage.Value <> "Complete"
               && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
-        Set( gMyIssuesOpen, CountRows(colMyIssues) );
+        // ONE DELEGABLE QUERY PER PROJECT, not one query over a set. There is no
+        // "issue_project_manager" to filter on, and `issue_project_id.Id in
+        // colMyProjects.ID` does NOT delegate — it would cap at the data row limit and
+        // undercount without saying so. ForAll runs each arm server-side instead; the
+        // cost is one round trip per project managed, so this grows with how many
+        // projects one person owns, not with the size of the issues list.
+        Set( gIssLed,
+             Coalesce( Sum( ForAll( colMyProjects As p,
+                                    CountRows( Filter( OpenIssues,
+                                                       issue_project_id.Id = p.ID ) ) ),
+                            Value ),
+                       0 ) );
+        Set( gIssMine, CountRows(colMyIssues) );
         Set( gMyPercent,
              If( CountRows(colMyTasks) = 0, 0,
                  RoundDown( Average( AddColumns( colMyTasks, wgt,
                      Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) )
     Children:
-      - hdrMyWork:
-          Control: CanvasComponent
-          ComponentName: cmpSectionHeader
+      - bodyRoot:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
           Properties:
-            X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter
-            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: =60
-            Title: ="My work"
-            Subtitle: ="Tasks you lead or support, plus issues assigned to you"
-            ShowAction: =true
-            ActionLabel: ="Refresh"
-            OnAction: |
-              =Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
-              Concurrent(
-                  ClearCollect( colMyTasks,
-                      Filter( LiveTasks,
-                          task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
-                  ClearCollect( colMyIssues,
-                      // ASSIGNED TO ME, full stop. Do not add back
-                      // `|| issue_owner.Email = gUserEmail`: issue_owner is not
-                      // indexed, so an Or-arm on it drops delegation for the WHOLE
-                      // filter and silently truncates this list at 500 rows.
-                      // "My issues" is what I must act on, not what I raised.
-                      Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
-              );
-              Set( gMyOpen, CountRows(Filter(colMyTasks, task_stage.Value <> "Complete")) );
-              Set( gMyOverdue,
-                   CountRows( Filter( colMyTasks,
-                       task_stage.Value <> "Complete"
-                    && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
-              Set( gMyIssuesOpen, CountRows(colMyIssues) );
-              Set( gMyPercent,
-                   If( CountRows(colMyTasks) = 0, 0,
-                       RoundDown( Average( AddColumns( colMyTasks, wgt,
-                           Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-              Set(gToastShow, false);
-              Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
-      - cardOpen:
-          Control: CanvasComponent
-          ComponentName: cmpStatusCard
-          Properties:
-            X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =(Parent.Width - (gTheme.Space.Gutter * 2) - (gTheme.Space.Gap * 2)) / 3
-            Height: =120
-            Title: ="Open tasks"
-            Value: =Text(gMyOpen)
-            Caption: ="tasks you lead or support"
-            Trend: =0
-            Accent: =gTheme.Color.Primary
-            OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
-      - cardOverdue:
-          Control: CanvasComponent
-          ComponentName: cmpStatusCard
-          Properties:
-            X: =gTheme.Space.Gutter + ((Parent.Width - (gTheme.Space.Gutter * 2) - (gTheme.Space.Gap * 2)) / 3) + gTheme.Space.Gap
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =(Parent.Width - (gTheme.Space.Gutter * 2) - (gTheme.Space.Gap * 2)) / 3
-            Height: =120
-            Title: ="Overdue"
-            Value: =Text(gMyOverdue)
-            Caption: ="past their due date"
-            Trend: =0
-            Accent: =gTheme.Color.Danger
-            OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
-      - cardIssues:
-          Control: CanvasComponent
-          ComponentName: cmpStatusCard
-          Properties:
-            X: =gTheme.Space.Gutter + 2 * (((Parent.Width - (gTheme.Space.Gutter * 2) - (gTheme.Space.Gap * 2)) / 3) + gTheme.Space.Gap)
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =(Parent.Width - (gTheme.Space.Gutter * 2) - (gTheme.Space.Gap * 2)) / 3
-            Height: =120
-            Title: ="Open issues"
-            Value: =Text(gMyIssuesOpen)
-            Caption: ="assigned to you"
-            Trend: =0
-            Accent: =gTheme.Color.Warning
-            OnSelect: =Navigate(scrProjects, ScreenTransition.Fade)
-      - ringHome:
-          Control: CanvasComponent
-          ComponentName: cmpKpiRing
-          Properties:
-            X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 120 + gTheme.Space.Gutter
-            Width: =140
-            Height: =140
-            Percent: =gMyPercent
-            Label: =gMyPercent & "%"
-            AccentHex: ="#005A9E"
-            TrackHex: ="#E1E5EB"
-      - lblRing:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Your weighted completion across " & CountRows(colMyTasks) & " task(s)"
-            Color: =gTheme.Color.TextMuted
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            X: =gTheme.Space.Gutter + 140 + gTheme.Space.Gap
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 120 + gTheme.Space.Gutter + 56
-            Width: =260
-            Height: =24
-            VerticalAlign: =VerticalAlign.Middle
-      - btnArchive:
-          Control: Classic/Button@2.2.0
-          Properties:
-            Text: ="Archive a project…"
-            Fill: =gTheme.Color.Surface
-            Color: =gTheme.Color.Danger
-            BorderColor: =gTheme.Color.Danger
-            BorderThickness: =1
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            Height: =40
-            Width: =200
-            X: =gTheme.Space.Gutter + 140 + gTheme.Space.Gap
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 120 + gTheme.Space.Gutter + 90
-            OnSelect: =Set(gConfirmOpen, true)
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Start
+            LayoutGap: =gTheme.Space.Gap
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =gTheme.Space.Gutter
+            PaddingBottom: =gTheme.Space.Gutter
+            PaddingLeft: =gTheme.Space.Gutter
+            PaddingRight: =gTheme.Space.Gutter
+            X: =0
+            Y: =gTheme.Space.HeaderH
+            Width: =Parent.Width
+            Height: =Parent.Height - gTheme.Space.HeaderH
+          Children:
+            # ---- Header + Refresh ------------------------------------------
+            - wrapHdr:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =0
+                  FillPortions: =0
+                  LayoutMinHeight: =60
+                  Width: =Parent.Width - 48
+                  Height: =60
+                Children:
+                  - hdrMyWork:
+                      Control: CanvasComponent
+                      ComponentName: cmpSectionHeader
+                      Properties:
+                        Width: =Parent.Width
+                        Height: =60
+                        Title: ="My work"
+                        Subtitle: ="Everything you lead or own, across every open project"
+                        ShowAction: =true
+                        ActionLabel: ="Refresh"
+                        # THIS BLOCK MUST STAY IDENTICAL TO OnVisible ABOVE. There is no
+                        # shared function to call: a divergence shows up as the dashboard
+                        # reading one set of numbers on open and a different set after a
+                        # Refresh, with nothing to say which is right.
+                        OnAction: |
+                          =Refresh(taskmaster_projects); Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
+                          Concurrent(
+                              ClearCollect( colMyProjects,
+                                  Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
+                              ClearCollect( colMyTasks,
+                                  Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
+                              ClearCollect( colMyIssues,
+                                  Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
+                          );
+                          Set( gPrjLed,
+                               CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
+                          Set( gPrjLedOverdue,
+                               CountRows( Filter( colMyProjects,
+                                   project_phase.Value <> "Complete"
+                                && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
+                          Set( gTaskLed,
+                               CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
+                          Set( gTaskLedOverdue,
+                               CountRows( Filter( colMyTasks,
+                                   task_stage.Value <> "Complete"
+                                && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
+                          Set( gIssLed,
+                               Coalesce( Sum( ForAll( colMyProjects As p,
+                                                      CountRows( Filter( OpenIssues,
+                                                                         issue_project_id.Id = p.ID ) ) ),
+                                              Value ),
+                                         0 ) );
+                          Set( gIssMine, CountRows(colMyIssues) );
+                          Set( gMyPercent,
+                               If( CountRows(colMyTasks) = 0, 0,
+                                   RoundDown( Average( AddColumns( colMyTasks, wgt,
+                                       Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
+                          Set(gToastShow, false);
+                          Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
+            # ---- Metric cards ----------------------------------------------
+            # PLAIN CONTAINERS, NOT cmpStatusCard. The component carries a
+            # full-bleed transparent button with a hover wash, so it reads as
+            # tappable; these four are deliberately inert.
+            - rowCards:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =gTheme.Space.Gap
+                  FillPortions: =0
+                  LayoutMinHeight: =96
+                  Width: =Parent.Width - 48
+                  Height: =96
+                Children:
+                  - cardPrjLed:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblPrjLedCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Projects led"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - lblPrjLedVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gPrjLed)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        - lblPrjLedSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              # A percentage of nothing is not 0%, it is undefined —
+                              # say so rather than print a reassuring zero.
+                              Text: |
+                                =If( gPrjLed = 0, "none open",
+                                     RoundDown(gPrjLedOverdue / gPrjLed * 100, 0) & "% overdue" )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: |
+                                =If(gPrjLedOverdue > 0, gTheme.Color.Danger, gTheme.Color.TextMuted)
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                  - cardTaskLed:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblTaskLedCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Tasks led"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - lblTaskLedVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gTaskLed)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        - lblTaskLedSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( gTaskLed = 0, "none open",
+                                     RoundDown(gTaskLedOverdue / gTaskLed * 100, 0) & "% overdue" )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: |
+                                =If(gTaskLedOverdue > 0, gTheme.Color.Danger, gTheme.Color.TextMuted)
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                  - cardIssLed:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblIssLedCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Issues on my projects"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - lblIssLedVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gIssLed)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        - lblIssLedSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="open, anyone's to fix"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                  - cardIssMine:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblIssMineCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Issues I own"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - lblIssMineVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gIssMine)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        - lblIssMineSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="open and assigned to you"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+            # ---- Work lists ------------------------------------------------
+            - rowLists:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =gTheme.Space.Gap
+                  FillPortions: =1
+                  LayoutMinHeight: =240
+                  Width: =Parent.Width - 48
+                  Height: =Parent.Height - 452
+                Children:
+                  - secMyTasks:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =340
+                        Height: =Parent.Height
+                      Children:
+                        - lblMyTasksTitle:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks I lead   " & gTaskLed
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =28
+                              Width: =Parent.Width - 32
+                              Height: =28
+                        - lblMyTasksEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(galMyTasks.AllItems)
+                              Text: ="Nothing open — no task on any live project has you as its lead."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - galMyTasks:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              # colMyTasks is a LOCAL collection, so `<>` and the
+                              # composite sort cost nothing — neither has to delegate.
+                              #
+                              # ONE composite sort key, not two chained Sorts: Power Fx
+                              # does not guarantee a stable sort, so a second Sort could
+                              # undo the first. priority * 100000 dominates, the day count
+                              # breaks ties within a priority, and +50000 keeps an overdue
+                              # (negative) count positive. No target date sorts last inside
+                              # its own priority band rather than first.
+                              Items: |
+                                =Sort( Filter(colMyTasks, task_stage.Value <> "Complete"),
+                                       Switch( task_priority.Value,
+                                               "Critical", 1, "High", 2,
+                                               "Moderate", 3, "Low", 4, 5 ) * 100000
+                                       + If( IsBlank(task_date_target), 99999,
+                                             DateDiff(Today(), task_date_target, TimeUnit.Days) + 50000 ) )
+                              WrapCount: =1
+                              TemplateSize: =48
+                              TemplatePadding: =0
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              ShowScrollbar: =true
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 76
+                            Children:
+                              - rowMyTaskBody:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =10
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight - 1
+                                  Children:
+                                    # INLINE SVG, NOT A COMPONENT. A canvas component
+                                    # cannot be placed inside a gallery template — Studio
+                                    # refuses the paste.
+                                    #
+                                    # LIFECYCLE glyph, bound to task_stage — the same
+                                    # progression scrProject and scrProjects use.
+                                    # task_status is a separate RAG health column and is
+                                    # NOT what this shows.
+                                    #
+                                    # HEX TEXT, not gTheme.Color.*: these drop straight
+                                    # into the SVG string and Power Fx has no Color-to-hex
+                                    # conversion. Primary #005A9E · Success #31825D ·
+                                    # Warning #D69828 · TextMuted #6E7882.
+                                    - icoMyTaskStage:
+                                        Control: Image@2.2.3
+                                        Properties:
+                                          ImagePosition: =ImagePosition.Fit
+                                          FillPortions: =0
+                                          LayoutMinWidth: =22
+                                          Width: =22
+                                          Height: =22
+                                          Image: |
+                                            =With(
+                                                { g: Switch( Coalesce(ThisItem.task_stage.Value, ""),
+                                                      "Not Started",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#B9C0C8' stroke-width='2.5'/>",
+                                                      "Planning",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'/>"
+                                                        & "<circle cx='12.5' cy='18' r='1.7' fill='#6E7882'/>"
+                                                        & "<circle cx='18'   cy='18' r='1.7' fill='#6E7882'/>"
+                                                        & "<circle cx='23.5' cy='18' r='1.7' fill='#6E7882'/>",
+                                                      "Drafting",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
+                                                        & "<circle cx='18' cy='18' r='5' fill='#005A9E'/>",
+                                                      "Finalizing",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#D69828' stroke-width='3'/>"
+                                                        & "<circle cx='18' cy='18' r='9' fill='#D69828'/>",
+                                                      "Complete",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                                        & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                                        & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                                        & " stroke-dasharray='4 3'/>"
+                                                        & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
+                                                "data:image/svg+xml," & EncodeUrl(
+                                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                                            )
+                                    - cellMyTaskPriority:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          # Colour-coded, but the value is also SPELLED
+                                          # OUT — colour alone would carry the whole
+                                          # meaning for a reader who cannot see it.
+                                          Text: =Coalesce(ThisItem.task_priority.Value, "—")
+                                          Font: =gTheme.Font
+                                          FontWeight: =FontWeight.Semibold
+                                          Size: =gTheme.Size.Small
+                                          Color: |
+                                            =Switch( ThisItem.task_priority.Value,
+                                                     "Critical", gTheme.Color.Danger,
+                                                     "High",     gTheme.Color.Warning,
+                                                     "Moderate", gTheme.Color.Primary,
+                                                                 gTheme.Color.TextMuted )
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =70
+                                          Height: =40
+                                    - cellMyTaskName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.task_name
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Body
+                                          Color: =gTheme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =3
+                                          LayoutMinWidth: =130
+                                          Height: =40
+                                    - cellMyTaskProject:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          # RESOLVED APP-SIDE. task_project_id is a Lookup
+                                          # and the canvas connector DISPLAYS ITS NUMERIC
+                                          # ID, not project_name — the lookup's `show:`
+                                          # column is not what comes back. One delegable
+                                          # ID lookup per visible row.
+                                          Text: |
+                                            =Coalesce( LookUp( taskmaster_projects,
+                                                               ID = ThisItem.task_project_id.Id,
+                                                               project_name ),
+                                                       "—" )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          Align: =Align.Right
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =2
+                                          LayoutMinWidth: =110
+                                          Height: =40
+                              # Absolute siblings of the row container, not children of
+                              # it: both must span the whole template, and the hit button
+                              # must be LAST so it is on top.
+                              - rowMyTaskLine:
+                                  Control: Rectangle@2.3.0
+                                  Properties:
+                                    Fill: =gTheme.Color.Border
+                                    X: =0
+                                    Y: =Parent.TemplateHeight - 1
+                                    Width: =Parent.TemplateWidth
+                                    Height: =1
+                              - galMyTasksHit:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    # The row's action lives HERE, not on the gallery's
+                                    # OnSelect: a gallery's own OnSelect does not reliably
+                                    # fire when the click lands on a child control, so
+                                    # without a transparent full-template button declared
+                                    # LAST the rows look right and do nothing.
+                                    Text: =""
+                                    Fill: =RGBA(0, 0, 0, 0)
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderThickness: =0
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight
+                                    # GOES TO THE PROJECT, not the task. A LookUp can MISS
+                                    # — the project may have been archived or deleted
+                                    # since the collection was taken — and scrProject
+                                    # derives a phase and can Patch it, so opening it on a
+                                    # blank record would write against nothing.
+                                    OnSelect: |
+                                      =Select(Parent);
+                                      Set( gSelProject,
+                                           LookUp(taskmaster_projects, ID = ThisItem.task_project_id.Id) );
+                                      If( IsBlank(gSelProject.ID),
+                                          Notify( "That task's project is no longer available. Refresh the dashboard.",
+                                                  NotificationType.Error ),
+                                          Navigate( scrProject, ScreenTransition.Cover ) )
+                  - secMyIssues:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =340
+                        Height: =Parent.Height
+                      Children:
+                        - lblMyIssuesTitle:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open issues I own   " & gIssMine
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =28
+                              Width: =Parent.Width - 32
+                              Height: =28
+                        - lblMyIssuesEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(galMyIssues.AllItems)
+                              Text: ="Nothing open — no issue on any live project is assigned to you."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - galMyIssues:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              # Same composite key as the task list, on impact rather than
+                              # priority. colMyIssues is already Open-only — OpenIssues
+                              # filters issue_status server-side.
+                              Items: |
+                                =Sort( colMyIssues,
+                                       Switch( issue_impact.Value,
+                                               "Critical", 1, "High", 2,
+                                               "Moderate", 3, "Low", 4, 5 ) * 100000
+                                       + If( IsBlank(issue_date_target), 99999,
+                                             DateDiff(Today(), issue_date_target, TimeUnit.Days) + 50000 ) )
+                              WrapCount: =1
+                              TemplateSize: =48
+                              TemplatePadding: =0
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              ShowScrollbar: =true
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 76
+                            Children:
+                              - rowMyIssueBody:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =10
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight - 1
+                                  Children:
+                                    # EVERY VALUE OF issue_status NEEDS A CASE HERE. This
+                                    # list is Open-only today, so the closed glyphs are
+                                    # unreachable — they exist so that widening the filter
+                                    # does not silently render every row identically.
+                                    - icoMyIssueStatus:
+                                        Control: Image@2.2.3
+                                        Properties:
+                                          ImagePosition: =ImagePosition.Fit
+                                          FillPortions: =0
+                                          LayoutMinWidth: =22
+                                          Width: =22
+                                          Height: =22
+                                          Image: |
+                                            =With(
+                                                { g: Switch( Coalesce(ThisItem.issue_status.Value, ""),
+                                                      "Open",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#D69828' stroke-width='3'/>"
+                                                        & "<circle cx='18' cy='18' r='5' fill='#D69828'/>",
+                                                      "Closed - Resolved",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                                        & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                                        & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                                      "Closed - Unresolved",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#C53A3A'/>"
+                                                        & "<path d='M12.5 12.5 L23.5 23.5 M23.5 12.5 L12.5 23.5' fill='none'"
+                                                        & " stroke='#FFFFFF' stroke-width='3.2' stroke-linecap='round'/>",
+                                                      "Closed - No Change",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#6E7882'/>"
+                                                        & "<rect x='11' y='16.25' width='14' height='3.5' rx='1.75' fill='#FFFFFF'/>",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                                        & " stroke-dasharray='4 3'/>"
+                                                        & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
+                                                "data:image/svg+xml," & EncodeUrl(
+                                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                                            )
+                                    - cellMyIssueImpact:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          # issue_impact is OPTIONAL in the golden source,
+                                          # so a blank is normal, not a fault — a dash, not
+                                          # an empty cell.
+                                          Text: =Coalesce(ThisItem.issue_impact.Value, "—")
+                                          Font: =gTheme.Font
+                                          FontWeight: =FontWeight.Semibold
+                                          Size: =gTheme.Size.Small
+                                          Color: |
+                                            =Switch( ThisItem.issue_impact.Value,
+                                                     "Critical", gTheme.Color.Danger,
+                                                     "High",     gTheme.Color.Warning,
+                                                     "Moderate", gTheme.Color.Primary,
+                                                                 gTheme.Color.TextMuted )
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =70
+                                          Height: =40
+                                    - cellMyIssueName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.issue_name
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Body
+                                          Color: =gTheme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =3
+                                          LayoutMinWidth: =130
+                                          Height: =40
+                                    - cellMyIssueProject:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            =Coalesce( LookUp( taskmaster_projects,
+                                                               ID = ThisItem.issue_project_id.Id,
+                                                               project_name ),
+                                                       "—" )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          Align: =Align.Right
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =2
+                                          LayoutMinWidth: =110
+                                          Height: =40
+                              - rowMyIssueLine:
+                                  Control: Rectangle@2.3.0
+                                  Properties:
+                                    Fill: =gTheme.Color.Border
+                                    X: =0
+                                    Y: =Parent.TemplateHeight - 1
+                                    Width: =Parent.TemplateWidth
+                                    Height: =1
+                              - galMyIssuesHit:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Text: =""
+                                    Fill: =RGBA(0, 0, 0, 0)
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderThickness: =0
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight
+                                    # GOES TO THE PROJECT, not the issue.
+                                    OnSelect: |
+                                      =Select(Parent);
+                                      Set( gSelProject,
+                                           LookUp(taskmaster_projects, ID = ThisItem.issue_project_id.Id) );
+                                      If( IsBlank(gSelProject.ID),
+                                          Notify( "That issue's project is no longer available. Refresh the dashboard.",
+                                                  NotificationType.Error ),
+                                          Navigate( scrProject, ScreenTransition.Cover ) )
+            # ---- Charts band -----------------------------------------------
+            # THREE PLACEHOLDERS AND ONE REAL VISUAL. The sketches are static SVG
+            # data URIs drawn in the muted palette so they read as unfinished at a
+            # glance; each panel's title is the visual it is standing in for.
+            # Replace the Image with a bound chart — do not add a data binding to
+            # the sketch itself.
+            - rowCharts:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =gTheme.Space.Gap
+                  FillPortions: =0
+                  LayoutMinHeight: =200
+                  Width: =Parent.Width - 48
+                  Height: =200
+                Children:
+                  - pnlTimeline:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =3
+                        LayoutMinWidth: =300
+                        Height: =Parent.Height
+                      Children:
+                        - lblTimelineTitle:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Timeline"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - imgTimelineStub:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =90
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 76
+                              Image: |
+                                ="data:image/svg+xml," & EncodeUrl(
+                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 96'>"
+                                  & "<line x1='8' y1='84' x2='232' y2='84' stroke='#E1E5EB' stroke-width='2'/>"
+                                  & "<line x1='60' y1='8' x2='60' y2='84' stroke='#EEF1F5' stroke-width='1'/>"
+                                  & "<line x1='120' y1='8' x2='120' y2='84' stroke='#EEF1F5' stroke-width='1'/>"
+                                  & "<line x1='180' y1='8' x2='180' y2='84' stroke='#EEF1F5' stroke-width='1'/>"
+                                  & "<rect x='16' y='14' width='118' height='11' rx='5.5' fill='#C6CDD5'/>"
+                                  & "<rect x='52' y='34' width='150' height='11' rx='5.5' fill='#D7DCE3'/>"
+                                  & "<rect x='34' y='54' width='84'  height='11' rx='5.5' fill='#C6CDD5'/>"
+                                  & "</svg>" )
+                        - lblTimelineStub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Placeholder — project timeline"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width - 32
+                              Height: =18
+                  - pnlPieTasks:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =12
+                        PaddingRight: =12
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =170
+                        Height: =Parent.Height
+                      Children:
+                        - lblPieTasksTitle:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Tasks by stage"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 24
+                              Height: =24
+                        - imgPieTasksStub:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =90
+                              Width: =Parent.Width - 24
+                              Height: =Parent.Height - 76
+                              Image: |
+                                ="data:image/svg+xml," & EncodeUrl(
+                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>"
+                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#E1E5EB' stroke-width='6'/>"
+                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#C6CDD5' stroke-width='6'"
+                                  & " stroke-dasharray='42 58' transform='rotate(-90 18 18)'/>"
+                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#D7DCE3' stroke-width='6'"
+                                  & " stroke-dasharray='23 77' transform='rotate(61 18 18)'/>"
+                                  & "</svg>" )
+                        - lblPieTasksStub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Placeholder"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width - 24
+                              Height: =18
+                  - pnlPieIssues:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =12
+                        PaddingRight: =12
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =170
+                        Height: =Parent.Height
+                      Children:
+                        - lblPieIssuesTitle:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Issues by impact"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 24
+                              Height: =24
+                        - imgPieIssuesStub:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =90
+                              Width: =Parent.Width - 24
+                              Height: =Parent.Height - 76
+                              Image: |
+                                ="data:image/svg+xml," & EncodeUrl(
+                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>"
+                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#E1E5EB' stroke-width='6'/>"
+                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#C6CDD5' stroke-width='6'"
+                                  & " stroke-dasharray='28 72' transform='rotate(-90 18 18)'/>"
+                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#D7DCE3' stroke-width='6'"
+                                  & " stroke-dasharray='34 66' transform='rotate(11 18 18)'/>"
+                                  & "</svg>" )
+                        - lblPieIssuesStub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Placeholder"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width - 24
+                              Height: =18
+                  # THE ONE REAL VISUAL in this band — the licence-free completion
+                  # ring. It is WRAPPED because FillPortions and LayoutMinWidth are
+                  # proven on GroupContainer but NOT on a CanvasComponent instance,
+                  # and the contract check rejects them there. Without a pinned
+                  # wrapper the ring defaults to FillPortions 1 and stretches.
+                  - pnlRing:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =12
+                        PaddingRight: =12
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =0
+                        LayoutMinWidth: =190
+                        Width: =190
+                        Height: =Parent.Height
+                      Children:
+                        - wrapRing:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Vertical
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =0
+                              FillPortions: =0
+                              LayoutMinHeight: =120
+                              Width: =120
+                              Height: =120
+                            Children:
+                              - ringHome:
+                                  Control: CanvasComponent
+                                  ComponentName: cmpKpiRing
+                                  Properties:
+                                    Width: =120
+                                    Height: =120
+                                    Percent: =gMyPercent
+                                    Label: =gMyPercent & "%"
+                                    AccentHex: ="#005A9E"
+                                    TrackHex: ="#E1E5EB"
+                        - lblRing:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Weighted completion across " & CountRows(colMyTasks) & " task(s) you lead"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width - 24
+                              Height: =36
       - cmpToastHome:
           Control: CanvasComponent
           ComponentName: cmpToast
@@ -199,34 +1134,6 @@ Screens:
             Tone: =gToastTone
             Duration: =3000
             OnDismiss: =Set(gToastShow, false)
-      # Confirm modal (full-screen; declared LAST so it layers on top).
-      - cmpConfirmHome:
-          Control: CanvasComponent
-          ComponentName: cmpConfirmDialog
-          Properties:
-            # VISIBLE IS LOAD-BEARING. This instance is full-screen and declared
-            # last, so with Visible defaulting to true it sits on top of scrHome
-            # and swallows EVERY click — nav, buttons, gallery rows. A transparent
-            # fill doesn't help: the component still hit-tests. `IsOpen` only
-            # drives what's drawn INSIDE the component; it cannot stop the
-            # component's own area from intercepting input.
-            Visible: =gConfirmOpen
-            X: =0
-            Y: =0
-            Width: =Parent.Width
-            Height: =Parent.Height
-            IsOpen: =gConfirmOpen
-            Title: ="Archive this project?"
-            Message: ="It will be hidden from active lists. You can restore it from Admin."
-            ConfirmLabel: ="Archive"
-            CancelLabel: ="Cancel"
-            Destructive: =true
-            OnConfirm: |
-              =Set(gConfirmOpen, false);
-               Set(gToastShow, false);
-               Set(gToastMsg, "Archive is wired on the project detail screen");
-               Set(gToastTone, "Info"); Set(gToastShow, true)
-            OnCancel: =Set(gConfirmOpen, false)
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #

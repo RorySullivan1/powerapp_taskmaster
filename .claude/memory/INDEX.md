@@ -12,9 +12,10 @@
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`, `gHasPowerBiLicence`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
 - **Paste in progress.** Landed: `App.OnStart`, `cmpAppBar`. Remaining: `cmpPicker`,
-  `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then every
-  screen but `scrHome`. `scrProjects` is a full rework; `scrProject` / `scrIssueEdit` /
-  `scrTransactionEdit` / the picker screens carry LOGIC fixes, so none of it is cosmetic.
+  `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then EVERY screen — `scrHome` was the
+  last one not on the queue and it is now a full rework. `scrProjects` is a full rework;
+  `scrProject` / `scrIssueEdit` / `scrTransactionEdit` / the picker screens carry LOGIC
+  fixes, so none of it is cosmetic.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -46,6 +47,7 @@ not know them will author something broken:
 - [2026-08-13] **A CHOICE VALUE THE APP DOES NOT ENUMERATE IS INVISIBLE, NOT BROKEN.** `project_phase` had `Under Review` and `Not Started` live in SharePoint while `schema.yaml` listed neither, so `ActiveProjects` — which enumerates phases because `<> "Archived"` will not delegate — silently dropped every Under Review project from every screen in the app. **An Or-of-equals allow-list fails CLOSED and says nothing.** Any value added to that column must be added to the named formula, to scrProjects' four branches, to scrProjectEdit's picker and to the status-glyph Switch in the same pass. The glyph is the only one of those that fails loudly — an unlisted phase renders "?" — INDEX Decisions
 - [2026-08-13] **MIXING PROPORTIONAL AND EDGE-PINNED ANCHORING IS THE COLLISION BUG.** `scrProjects` had `rowDue` at `X = TW*0.54, Width = TW*0.26` beside `rowPercent` pinned to the right edge with a FIXED 160px. Both are individually reasonable; together they converge as the container narrows — clear at 1318, overlapping below ~850. **Collision arithmetic run at ONE width proves nothing; the question is always "at which width does this first collide".** Fixed by making the row an auto-layout container: children carry no X, so overlap is structurally impossible. Every column is `FillPortions` + `LayoutMinWidth`, because a child of an auto-layout container is flexible by default and a declared `Width` alone is advisory — INDEX Decisions
 - [2026-08-13] `StartsWith(col, "")` is TRUE for every row, so a default page and a search are ONE branch — `FirstN` picks the cap. This is what let cmpPicker open with rows in it without a second query path — INDEX Decisions
+- [2026-08-13] **THERE IS NO DELEGABLE SINGLE QUERY FOR "CHILDREN OF THE PROJECTS I MANAGE".** No `issue_project_manager` column exists, and `issue_project_id.Id in colMyProjects.ID` does NOT delegate — it caps at the data row limit and UNDERCOUNTS SILENTLY. The shape that works is one delegable round trip PER PARENT: `Sum( ForAll(colMyProjects As p, CountRows(Filter(OpenIssues, issue_project_id.Id = p.ID))), Value )`. MS Learn: "if the result of the formula is a single value, the resulting table is a single-column table" — the column is `Value`. **Cost scales with how many projects one person manages, not with the size of the child list** — the trade to check before reusing this — INDEX Decisions
 - [2026-08-12] A gallery bound to a DATA SOURCE pages as the user scrolls, so `.AllItems` is what is on screen, not the total. Count from the query — INDEX Decisions
 - [2026-08-12] A global's type unifies across every `Set`; one name holding differently-shaped records is a type conflict — INDEX Decisions
 - [2026-08-06] Modern controls are ON in this tenant — ARCHIVE
@@ -56,6 +58,13 @@ not know them will author something broken:
 - [2026-08-12] COMMENTS ARE NOT A CHANGELOG (now enforced in CLAUDE.md): git holds history, `.claude/memory/` holds reasoning, comments hold constraints — ARCHIVE
 
 ## Threads          (open items; remove when closed)
+- **`cmpStatusCard` and `cmpConfirmDialog` now have NO consumer in `src/`** — scrHome's
+  rebuild dropped both (inert cards are plain containers; the archive button and its
+  confirm modal are gone). Files kept; Studio housekeeping candidates.
+- **ASSUMED, not confirmed: "issues I own" = `issue_assignee`**, not `issue_owner`.
+  issue_owner is the un-indexed who-raised-it stamp and an Or-arm on it kills delegation.
+- **scrHome's three chart placeholders need a real implementation** — timeline, tasks by
+  stage, issues by impact. No charting control is grounded for this dialect.
 - **The records track "IN STUDIO", never "PUBLISHED" — different apps.** Studio runs the latest
   SAVED version, end users the last PUBLISHED one. Record both, separately.
 - **Six superseded COMPONENTS to delete in Studio** — `cmpPeoplePicker`, `cmpRecordPicker`,
@@ -98,3 +107,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-13 | cmpPicker opens on the first 10 records (current user for person fields); record branches un-gated from query length | INDEX Decisions 2026-08-13
 - 2026-08-13 | INDEX pruned 620 lines/231KB to ~80; full prior contents archived verbatim | sessions/ARCHIVE-2026.md
 - 2026-08-13 | project_phase derived in-app + Mark-complete button; cmpSelection root cause (Selected not an Output property); scrProject galleries rebuilt; scrProjects reworked | sessions/2026-08-13-1724-project-phase-derivation-and-selection-fix.md
+- 2026-08-13 | scrHome rebuilt as a dashboard: four inert cards, my-tasks/my-issues galleries routing to the parent project, chart placeholders + the KPI ring; archive button and confirm modal removed | sessions/2026-08-13-1739-scrhome-dashboard.md
