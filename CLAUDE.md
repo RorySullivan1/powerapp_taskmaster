@@ -32,7 +32,7 @@ Task-scoped **skills** (`.claude/skills/`) and the isolated **`pre-paste-review`
 by hand. Coverage, **by category**:
 - **Canvas app (generic)** — the four `powerapp-canvas-*` skills: **controls** (grounded tokens
   and output properties), **development** (pa-yaml v3.0 + Power Fx rules), **design** (geometry,
-  overlap, containers, paste-freezing) and **project-management** (records, provisioning,
+  overlap, containers, direct-manipulation vs paste) and **project-management** (records, provisioning,
   hand-off). The **`powerapp-canvas-developer`** agent builds end to end across all four.
 - **Canvas app (this repo)** — Power Fx authoring + delegation, reusable components/HtmlText, and review.
 - **SharePoint backend** — list/schema architecture and declarative column/view formatting.
@@ -48,8 +48,11 @@ surfaces each by its `description:`.
 
 ## Repo layout
 The repo houses the app's source and nothing else — one file per unit, in pa-yaml v3.0.
-- **`src/App.pa.yaml`** — the App object: the named formulas (`Theme`, `NavMenu`, `ClaimPrefix`,
-  `StageWeights`, `gUserEmail`, `gHasPowerBiLicence`) that every screen reads.
+- **`src/App.pa.yaml`** — the App object, two formula-bar properties. **`OnStart`** sets the
+  constants every screen reads (`gTheme`, `gNavMenu`, `gStageWeights`, `gClaimPrefix`,
+  `gUserEmail`, `gHasPowerBiLicence`); **`Formulas`** holds only the three data-source filters
+  (`ActiveProjects`, `OpenIssues`, `LiveTasks`), which must stay named formulas or they stop
+  delegating.
 - **`src/Screens/`** — one file per screen, 11 of them.
 - **`src/Components/`** — one file per component, 11 of them. A component is a **whole
   definition** here: its custom properties and its controls live in the same file.
