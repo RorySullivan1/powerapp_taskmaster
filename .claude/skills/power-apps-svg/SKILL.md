@@ -121,6 +121,100 @@ A dot that recolours by status (encode any data-sourced label with `EncodeHTML`)
     Switch(ThisItem.Health, "Green","#107C10","Amber","#986F0B","Red","#C42B1C","#605E5C") & "'/></svg>")
 ```
 
+## Data-driven charts — N elements from a table
+
+Everything above draws **one** value. A real chart draws **one element per row**, and the whole
+difference is `Concat`.
+
+**`Concat( Table, Formula, Separator )`** evaluates *Formula* for every record and joins the
+results into one string — so it is the SVG element generator. `Filter` it to skip empty rows.
+
+```power
+Concat( Filter(bars, v > 0),
+    "<rect x='" & x & "' y='" & y & "' width='" & w & "' height='10' fill='" & c & "'/>" )
+```
+
+Three problems come with it, and each has exactly one right answer.
+
+### 1. A row needs a POSITION (for its y-coordinate)
+
+Power Fx has no row number. `Sequence` + `Index` is the only way:
+
+```power
+ForAll( Sequence(CountRows(src)) As s,
+    With( { r: Index(src, s.Value) }, { idx: s.Value, nm: r.Name, v: r.Value } ) )
+```
+
+Take the count from the same table `Index` reads. **`Index` ERRORS when out of range — it does
+not return blank** — so any other count is a live error. `Sequence(0)` is a documented empty
+table, so an empty source collapses safely to nothing.
+
+### 2. A part-to-whole chart needs a RUNNING TOTAL
+
+There is no scan/accumulate function. Each row sums the rows before it, and the outer scope must
+be named with `As` or the inner `Filter` shadows it:
+
+```power
+AddColumns( cats As r,
+    pct, r.n / tot * 100,
+    cum, Coalesce( Sum( Filter(cats, i < r.i), n ), 0 ) / tot * 100 )
+```
+
+`Sum` of an empty table is *blank*, so `Coalesce(…, 0)` is required on the first row, not optional.
+Guard the denominator with `Max(1, Sum(…))`.
+
+A multi-slice donut is then the single-ring trick once per slice, walked round by the running
+total. **`stroke-dashoffset` counts backwards**: 25 puts the start of a circumference-100 circle
+at 12 o'clock, so each slice offsets by `25 - cum`. Negative offsets are valid — do not clamp them.
+
+```power
+Concat( Filter(arcs, pct > 0),
+    "<circle cx='20' cy='20' r='15.9155' fill='none' stroke='" & c & "' stroke-width='4.5'" &
+    " stroke-dasharray='" & Text(pct, "[$-en-US]0.##", "en-US") & " " &
+                            Text(100 - pct, "[$-en-US]0.##", "en-US") & "'" &
+    " stroke-dashoffset='" & Text(25 - cum, "[$-en-US]0.##", "en-US") & "'/>" )
+```
+
+### 3. Categories: WRITE THEM OUT, don't `GroupBy`
+
+`GroupBy` only produces a group where a row exists, so it drops empty categories, can reorder run
+to run, and therefore **recolours a category between two refreshes**. Author the category table as
+a literal with a fixed index and a fixed colour, and count into it:
+
+```power
+AddColumns(
+    Table( { i: 1, k: "Not Started", c: "#B9C0C8" }, { i: 2, k: "Planning", c: "#6E7882" } ) As cat,
+    n, CountRows( Filter(colMyTasks, task_stage.Value = cat.k) ) )
+```
+
+That is an **allow-list, and it fails closed** — a value added to the SharePoint column and not
+added here is silently absent from the chart, and the slices stop summing to the row count. Add a
+`"Not set"` category whenever the source column is optional, or the total is wrong rather than
+merely incomplete.
+
+## THE DECIMAL SEPARATOR WILL BREAK YOUR CHART
+
+Interpolating a fraction directly writes it with the **viewer's** decimal separator.
+`stroke-dasharray='33,3 66,7'` is not a number pair — the slice vanishes, for users in
+comma-decimal locales and nowhere else, and never on the machine that authored it.
+
+**Every interpolated fraction goes through `Text(v, "[$-en-US]0.#", "en-US")`.** The format
+placeholder pins how the format string is *read*; the third argument pins the *output*. Whole
+numbers are safe and can be interpolated bare.
+
+## What SVG charting can and cannot do
+
+| Want | Verdict |
+|---|---|
+| Donut / pie, stacked or grouped bars, sparkline, gauge, Gantt, heat grid, scatter | **Yes** — all are `Concat` over a table |
+| Axis ticks, gridlines, in-chart legend, data labels | **Yes** — draw them; a legend must live *inside* the SVG |
+| Hover tooltip, click a slice, drill-down, zoom, pan, select | **No.** An Image is ONE control with one hit area. Overlay a transparent Button for a whole-chart click, or put a gallery beside it |
+| Animation, transitions | **No.** SMIL/CSS animation does not survive the data URI |
+| Text that fits its box | **No.** Power Fx cannot measure text — budget by character count and truncate (`Left(nm, 14) & "…"`), or the label overruns |
+| Live redraw as data changes | **Yes, if the formula is declarative.** Read the collection in the `Image` property; a chart fed from imperative `Set`s goes stale until something re-runs them |
+| Non-ASCII in labels | **Only with `data:image/svg+xml;charset=utf-8,`** — a data URI defaults to US-ASCII and mangles accented text |
+| Hundreds of points | Watch it. The string is rebuilt on every dependency change; cap rows and keep per-row markup short |
+
 ## Watch Out
 
 1. **Forgetting `EncodeUrl` (or `xmlns`).** Without `EncodeUrl` the URI breaks on `#`, `<`,

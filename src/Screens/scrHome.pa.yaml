@@ -832,11 +832,18 @@ Screens:
                                                   NotificationType.Error ),
                                           Navigate( scrProject, ScreenTransition.Cover ) )
             # ---- Charts band -----------------------------------------------
-            # THREE PLACEHOLDERS AND ONE REAL VISUAL. The sketches are static SVG
-            # data URIs drawn in the muted palette so they read as unfinished at a
-            # glance; each panel's title is the visual it is standing in for.
-            # Replace the Image with a bound chart — do not add a data binding to
-            # the sketch itself.
+            # FOUR SVG VISUALS, all drawn in Power Fx and handed to an Image control
+            # as a data URI. Read `.claude/skills/power-apps-svg` before editing one.
+            #
+            # THE CHART FORMULAS ARE DECLARATIVE ON PURPOSE. They read colMyTasks /
+            # colMyIssues / colMyProjects directly rather than a pre-computed global,
+            # so Refresh redraws them with no second copy of the maths to keep in step.
+            #
+            # EVERY INTERPOLATED FRACTION GOES THROUGH Text(x, "[$-en-US]0.#", "en-US").
+            # A bare number lands in the SVG using the VIEWER'S decimal separator, and
+            # `stroke-dasharray='33,3 66,7'` is not a number pair — the slice silently
+            # disappears for users in a comma-decimal locale and nowhere else. Whole
+            # numbers are safe and are interpolated directly.
             - rowCharts:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -863,7 +870,7 @@ Screens:
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
-                        FillPortions: =3
+                        FillPortions: =2
                         LayoutMinWidth: =300
                         Height: =Parent.Height
                       Children:
@@ -880,38 +887,89 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        - imgTimelineStub:
+                        - imgTimeline:
                             Control: Image@2.2.3
                             Properties:
                               ImagePosition: =ImagePosition.Fit
                               FillPortions: =1
                               LayoutMinHeight: =90
                               Width: =Parent.Width - 32
-                              Height: =Parent.Height - 76
+                              Height: =Parent.Height - 48
+                              # GANTT of the projects you lead, soonest target first.
+                              #
+                              # `Sequence(CountRows(src))` + `Index(src, Value)` is how a row
+                              # gets a POSITION, which is what a y-coordinate needs and what
+                              # Power Fx has no other way to give it. The count comes from the
+                              # same table Index reads, so Index can never be out of range —
+                              # it ERRORS out of range, it does not return blank. Sequence(0)
+                              # on an empty source is a documented empty table, so the whole
+                              # thing collapses to the empty-state text below.
+                              #
+                              # FIVE ROWS. The viewBox grows with the row count, so a taller
+                              # chart renders SMALLER inside a fixed panel — the cap is what
+                              # keeps the bars legible, not a data limit.
                               Image: |
-                                ="data:image/svg+xml," & EncodeUrl(
-                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 96'>"
-                                  & "<line x1='8' y1='84' x2='232' y2='84' stroke='#E1E5EB' stroke-width='2'/>"
-                                  & "<line x1='60' y1='8' x2='60' y2='84' stroke='#EEF1F5' stroke-width='1'/>"
-                                  & "<line x1='120' y1='8' x2='120' y2='84' stroke='#EEF1F5' stroke-width='1'/>"
-                                  & "<line x1='180' y1='8' x2='180' y2='84' stroke='#EEF1F5' stroke-width='1'/>"
-                                  & "<rect x='16' y='14' width='118' height='11' rx='5.5' fill='#C6CDD5'/>"
-                                  & "<rect x='52' y='34' width='150' height='11' rx='5.5' fill='#D7DCE3'/>"
-                                  & "<rect x='34' y='54' width='84'  height='11' rx='5.5' fill='#C6CDD5'/>"
-                                  & "</svg>" )
-                        - lblTimelineStub:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Placeholder — project timeline"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextMuted
-                              Align: =Align.Center
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =0
-                              LayoutMinHeight: =18
-                              Width: =Parent.Width - 32
-                              Height: =18
+                                =With(
+                                    { src: FirstN( Sort( Filter( colMyProjects,
+                                                                 project_phase.Value <> "Complete"
+                                                              && !IsBlank(project_date_target) ),
+                                                         project_date_target ), 5 ) },
+                                    // src is sorted ASCENDING, so First and Last ARE the date range.
+                                    // Min/Max over a date column would come back as a number.
+                                    With(
+                                        { t0: If( IsEmpty(src) || First(src).project_date_target >= Today(),
+                                                  Today(), First(src).project_date_target ),
+                                          t1: If( IsEmpty(src), DateAdd(Today(), 30, TimeUnit.Days),
+                                                  Last(src).project_date_target ) },
+                                        With(
+                                            { rows: ForAll( Sequence(CountRows(src)) As s,
+                                                        With( { r: Index(src, s.Value) },
+                                                            { idx: s.Value,
+                                                              nm:  r.project_name,
+                                                              d0:  Coalesce(r.project_date_start, Today()),
+                                                              d1:  r.project_date_target } ) ),
+                                              n:  CountRows(src),
+                                              sp: Max( 7, DateDiff(t0, t1, TimeUnit.Days) ) },
+                                            // charset IS load-bearing here: project names are the only
+                                            // user-supplied text in any of these charts, and a data URI
+                                            // defaults to US-ASCII, which mangles any accented name.
+                                            "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 "
+                                              & (16 + Max(1, n) * 20 + 6) & "'>"
+                                              & "<text x='92' y='9' font-size='7' font-family='Segoe UI, sans-serif'"
+                                              & " fill='#6E7882'>" & Text(t0, "[$-en-US]d mmm") & "</text>"
+                                              & "<text x='316' y='9' text-anchor='end' font-size='7'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                              & Text(t1, "[$-en-US]d mmm") & "</text>"
+                                              & Concat( rows,
+                                                    "<text x='0' y='" & (16 + (idx - 1) * 20 + 13) & "' font-size='8.5'"
+                                                  & " font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                                  & EncodeHTML( If(Len(nm) > 15, Left(nm, 14) & "…", nm) ) & "</text>"
+                                                  & "<rect x='92' y='" & (16 + (idx - 1) * 20 + 5)
+                                                  & "' width='224' height='10' rx='5' fill='#F2F4F7'/>"
+                                                  & "<rect x='"
+                                                  & Text( 92 + Max(0, DateDiff(t0, d0, TimeUnit.Days)) / sp * 224,
+                                                          "[$-en-US]0.#", "en-US" )
+                                                  & "' y='" & (16 + (idx - 1) * 20 + 5) & "' width='"
+                                                  & Text( Max( 3, ( DateDiff(t0, d1, TimeUnit.Days)
+                                                                  - Max(0, DateDiff(t0, d0, TimeUnit.Days)) ) / sp * 224 ),
+                                                          "[$-en-US]0.#", "en-US" )
+                                                  & "' height='10' rx='5' fill='"
+                                                  & If(d1 < Today(), "#C53A3A", "#005A9E") & "'/>" )
+                                              & If( n = 0,
+                                                    "<text x='160' y='36' text-anchor='middle' font-size='9'"
+                                                  & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                                  & "No dated projects you lead</text>",
+                                                    // TODAY marker, drawn last so it sits over the bars.
+                                                    "<line x1='"
+                                                  & Text(92 + DateDiff(t0, Today(), TimeUnit.Days) / sp * 224,
+                                                         "[$-en-US]0.#", "en-US")
+                                                  & "' y1='12' x2='"
+                                                  & Text(92 + DateDiff(t0, Today(), TimeUnit.Days) / sp * 224,
+                                                         "[$-en-US]0.#", "en-US")
+                                                  & "' y2='" & (16 + n * 20 + 2)
+                                                  & "' stroke='#C53A3A' stroke-width='0.8' stroke-dasharray='2 2'/>" )
+                                              & "</svg>" ) ) ) )
                   - pnlPieTasks:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -927,7 +985,7 @@ Screens:
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         FillPortions: =1
-                        LayoutMinWidth: =170
+                        LayoutMinWidth: =200
                         Height: =Parent.Height
                       Children:
                         - lblPieTasksTitle:
@@ -944,36 +1002,71 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 24
                               Height: =24
-                        - imgPieTasksStub:
+                        - imgPieTasks:
                             Control: Image@2.2.3
                             Properties:
                               ImagePosition: =ImagePosition.Fit
                               FillPortions: =1
                               LayoutMinHeight: =90
                               Width: =Parent.Width - 24
-                              Height: =Parent.Height - 76
+                              Height: =Parent.Height - 48
+                              # DONUT + LEGEND IN ONE SVG. The legend has to live inside the
+                              # picture: an Image is a single control, so there is nothing to
+                              # hover and no per-slice click, and a five-row legend built from
+                              # real controls would cost more than the chart.
+                              #
+                              # THE CATEGORY TABLE IS WRITTEN OUT, not derived with GroupBy.
+                              # A group only exists when a row has that value, so GroupBy would
+                              # drop empty stages, reorder the slices run to run, and change the
+                              # colour of a stage between two refreshes. Written out, the
+                              # vocabulary and the ordering are fixed. IT IS AN ALLOW-LIST AND
+                              # IT FAILS CLOSED — a stage added to the SharePoint column and not
+                              # added here is simply absent from the ring, and the totals stop
+                              # summing to the row count.
+                              #
+                              # `cum` is the running total, which Power Fx has no primitive for:
+                              # each row sums the rows with a LOWER index, named through `As r`
+                              # so the inner Filter's scope cannot shadow the outer one.
                               Image: |
-                                ="data:image/svg+xml," & EncodeUrl(
-                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>"
-                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#E1E5EB' stroke-width='6'/>"
-                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#C6CDD5' stroke-width='6'"
-                                  & " stroke-dasharray='42 58' transform='rotate(-90 18 18)'/>"
-                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#D7DCE3' stroke-width='6'"
-                                  & " stroke-dasharray='23 77' transform='rotate(61 18 18)'/>"
-                                  & "</svg>" )
-                        - lblPieTasksStub:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Placeholder"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextMuted
-                              Align: =Align.Center
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =0
-                              LayoutMinHeight: =18
-                              Width: =Parent.Width - 24
-                              Height: =18
+                                =With(
+                                    { cats: AddColumns(
+                                                Table( { i: 1, k: "Not Started", c: "#B9C0C8" },
+                                                       { i: 2, k: "Planning",    c: "#6E7882" },
+                                                       { i: 3, k: "Drafting",    c: "#005A9E" },
+                                                       { i: 4, k: "Finalizing",  c: "#D69828" },
+                                                       { i: 5, k: "Complete",    c: "#31825D" } ) As cat,
+                                                n, CountRows( Filter(colMyTasks, task_stage.Value = cat.k) ) ) },
+                                    With( { tot: Max(1, Sum(cats, n)) },
+                                        With(
+                                            { arcs: AddColumns( cats As r,
+                                                        pct, r.n / tot * 100,
+                                                        cum, Coalesce( Sum( Filter(cats, i < r.i), n ), 0 ) / tot * 100 ) },
+                                            "data:image/svg+xml," & EncodeUrl(
+                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 104 40'>"
+                                              & "<circle cx='20' cy='20' r='15.9155' fill='none' stroke='#EEF1F5'"
+                                              & " stroke-width='4.5'/>"
+                                              // stroke-dashoffset counts BACKWARDS: 25 puts the start of a
+                                              // circumference-100 circle at 12 o'clock, and subtracting the
+                                              // running total walks each slice round from there.
+                                              & Concat( Filter(arcs, pct > 0),
+                                                    "<circle cx='20' cy='20' r='15.9155' fill='none' stroke='" & c
+                                                  & "' stroke-width='4.5' stroke-dasharray='"
+                                                  & Text(pct, "[$-en-US]0.##", "en-US") & " "
+                                                  & Text(100 - pct, "[$-en-US]0.##", "en-US")
+                                                  & "' stroke-dashoffset='"
+                                                  & Text(25 - cum, "[$-en-US]0.##", "en-US") & "'/>" )
+                                              & "<text x='20' y='21.5' text-anchor='middle' font-size='9'"
+                                              & " font-weight='600' font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                              & CountRows(colMyTasks) & "</text>"
+                                              & "<text x='20' y='26.5' text-anchor='middle' font-size='3.4'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#6E7882'>TASKS</text>"
+                                              & Concat( arcs,
+                                                    "<rect x='46' y='" & Text(i * 7 - 3.2, "[$-en-US]0.#", "en-US")
+                                                  & "' width='4.2' height='4.2' rx='1' fill='" & c & "'/>"
+                                                  & "<text x='52.5' y='" & (i * 7) & "' font-size='4.4'"
+                                                  & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                                  & EncodeHTML(k) & "  " & n & "</text>" )
+                                              & "</svg>" ) ) ) )
                   - pnlPieIssues:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -989,7 +1082,7 @@ Screens:
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         FillPortions: =1
-                        LayoutMinWidth: =170
+                        LayoutMinWidth: =200
                         Height: =Parent.Height
                       Children:
                         - lblPieIssuesTitle:
@@ -1006,36 +1099,57 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 24
                               Height: =24
-                        - imgPieIssuesStub:
+                        - imgPieIssues:
                             Control: Image@2.2.3
                             Properties:
                               ImagePosition: =ImagePosition.Fit
                               FillPortions: =1
                               LayoutMinHeight: =90
                               Width: =Parent.Width - 24
-                              Height: =Parent.Height - 76
+                              Height: =Parent.Height - 48
+                              # Same construction as imgPieTasks — read the notes there.
+                              # `issue_impact` is OPTIONAL in the golden source, so "Not set"
+                              # is a REAL category here, not a fallback: without it the slices
+                              # would not account for every issue and the ring would understate
+                              # the total it prints in the middle.
                               Image: |
-                                ="data:image/svg+xml," & EncodeUrl(
-                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>"
-                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#E1E5EB' stroke-width='6'/>"
-                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#C6CDD5' stroke-width='6'"
-                                  & " stroke-dasharray='28 72' transform='rotate(-90 18 18)'/>"
-                                  & "<circle cx='18' cy='18' r='15.9155' fill='none' stroke='#D7DCE3' stroke-width='6'"
-                                  & " stroke-dasharray='34 66' transform='rotate(11 18 18)'/>"
-                                  & "</svg>" )
-                        - lblPieIssuesStub:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Placeholder"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextMuted
-                              Align: =Align.Center
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =0
-                              LayoutMinHeight: =18
-                              Width: =Parent.Width - 24
-                              Height: =18
+                                =With(
+                                    { cats: AddColumns(
+                                                Table( { i: 1, k: "Critical", c: "#C53A3A" },
+                                                       { i: 2, k: "High",     c: "#D69828" },
+                                                       { i: 3, k: "Moderate", c: "#005A9E" },
+                                                       { i: 4, k: "Low",      c: "#6E7882" },
+                                                       { i: 5, k: "Not set",  c: "#B9C0C8" } ) As cat,
+                                                n, CountRows( Filter( colMyIssues,
+                                                         Coalesce(issue_impact.Value, "Not set") = cat.k ) ) ) },
+                                    With( { tot: Max(1, Sum(cats, n)) },
+                                        With(
+                                            { arcs: AddColumns( cats As r,
+                                                        pct, r.n / tot * 100,
+                                                        cum, Coalesce( Sum( Filter(cats, i < r.i), n ), 0 ) / tot * 100 ) },
+                                            "data:image/svg+xml," & EncodeUrl(
+                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 104 40'>"
+                                              & "<circle cx='20' cy='20' r='15.9155' fill='none' stroke='#EEF1F5'"
+                                              & " stroke-width='4.5'/>"
+                                              & Concat( Filter(arcs, pct > 0),
+                                                    "<circle cx='20' cy='20' r='15.9155' fill='none' stroke='" & c
+                                                  & "' stroke-width='4.5' stroke-dasharray='"
+                                                  & Text(pct, "[$-en-US]0.##", "en-US") & " "
+                                                  & Text(100 - pct, "[$-en-US]0.##", "en-US")
+                                                  & "' stroke-dashoffset='"
+                                                  & Text(25 - cum, "[$-en-US]0.##", "en-US") & "'/>" )
+                                              & "<text x='20' y='21.5' text-anchor='middle' font-size='9'"
+                                              & " font-weight='600' font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                              & CountRows(colMyIssues) & "</text>"
+                                              & "<text x='20' y='26.5' text-anchor='middle' font-size='3.4'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#6E7882'>ISSUES</text>"
+                                              & Concat( arcs,
+                                                    "<rect x='46' y='" & Text(i * 7 - 3.2, "[$-en-US]0.#", "en-US")
+                                                  & "' width='4.2' height='4.2' rx='1' fill='" & c & "'/>"
+                                                  & "<text x='52.5' y='" & (i * 7) & "' font-size='4.4'"
+                                                  & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                                  & EncodeHTML(k) & "  " & n & "</text>" )
+                                              & "</svg>" ) ) ) )
                   # THE ONE REAL VISUAL in this band — the licence-free completion
                   # ring. It is WRAPPED because FillPortions and LayoutMinWidth are
                   # proven on GroupContainer but NOT on a CanvasComponent instance,
