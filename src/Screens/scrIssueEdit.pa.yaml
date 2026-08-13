@@ -274,7 +274,7 @@ Screens:
                         LayoutGridRowStart: =3
                         LayoutGridRowEnd: =10
                         Height: =96
-                  - colIssType:
+                  - colIssImpact:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
@@ -282,6 +282,56 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =8
                         LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblIssImpactCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Impact"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        # Same move off cmpSelection as cboIssType, and it matters more here:
+                        # the issues gallery on scrProject SORTS by impact, so a value that
+                        # silently fails to land reorders the list rather than just missing a
+                        # field.
+                        - cboIssImpact:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              # From Choices() on the column. NOTE the coupling: scrProject's
+                              # issues gallery sorts on impact via a Switch that ranks these four
+                              # names; a value added in SharePoint appears here and sorts last.
+                              Items: =colIssImpactOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gIssImpact], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              Width: =Parent.Width
+                              Height: =40
+                              OnChange: =Set(gIssImpact, cboIssImpact.Selected.Value)
+            - gridIss3:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =120
+                Children:
+                  - colIssType:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =1
                         LayoutGridColumnEnd: =2
                         LayoutGridRowStart: =1
                         LayoutGridRowEnd: =10
@@ -317,55 +367,6 @@ Screens:
                               Width: =Parent.Width
                               Height: =40
                               OnChange: =Set(gIssType, cboIssType.Selected.Value)
-            - gridIss3:
-                Control: GroupContainer@1.5.0
-                Variant: GridLayout
-                Properties:
-                  LayoutGridColumns: =2
-                  LayoutGridRows: =10
-                  Width: =Parent.Width - 48
-                  Height: =120
-                Children:
-                  - colIssImpact:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =1
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =10
-                        Height: =62
-                      Children:
-                        - lblIssImpactCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Impact"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        # Same move as cboIssType above, and it matters more here: the issues
-                        # gallery on scrProject SORTS by impact, so a value that silently fails
-                        # to land reorders the list rather than just missing a field.
-                        - cboIssImpact:
-                            Control: ModernCombobox@1.1.1
-                            Properties:
-                              # From Choices() on the column. NOTE the coupling: scrProject's
-                              # issues gallery sorts on impact via a Switch that ranks these four
-                              # names; a value added in SharePoint appears here and sorts last.
-                              Items: =colIssImpactOpts
-                              ItemDisplayText: =ThisItem.Value
-                              DefaultSelectedItems: =Filter( [gIssImpact], !IsBlank(Value) )
-                              SelectMultiple: =false
-                              IsSearchable: =false
-                              InputTextPlaceholder: ="Select…"
-                              Width: =Parent.Width
-                              Height: =40
-                              OnChange: =Set(gIssImpact, cboIssImpact.Selected.Value)
             - gridIss4:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
