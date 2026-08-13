@@ -4,14 +4,20 @@
 # VERTICAL BANDS (tablet 768). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
 #     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
 #    88 .. 148   hdrProjects   = HeaderH + Gutter, height 60
-#   164 .. 204   filter row    = +60 +Gap,         height 40
-#   220 .. 744   galProjects   = +40 +Gap,         height = 768 - 220 - Gutter
+#   164 .. 204   rowFilters    = off hdrProjects,  height 40
+#   220 .. 744   galProjects   = off rowFilters,   fills to the bottom gutter
 #
-# If Studio shows anything else here, the layout has drifted. The stack is absolute
-# gTheme arithmetic rather than control-relative — a style choice, not a constraint:
-# layout formulas do survive a paste (tests/README.md), so a relative version would
-# work. Absolute is kept because these numbers can be checked against the table above
-# by eye.
+# The stack is RELATIVE: each band is anchored to the one above it rather than to a
+# re-derived sum, so a height change in the header moves everything below it and the
+# numbers above stay true. Layout formulas survive a paste and keep recomputing
+# (tests/README.md) — what breaks the link is dragging a control in Studio, so change
+# geometry here or in the formula bar, never with the mouse.
+#
+# Horizontal placement is auto-layout, not arithmetic: the filter row and each gallery
+# row are containers whose children carry NO X. Columns therefore cannot overlap at any
+# width. They previously could — `rowDue` was anchored proportionally while
+# `rowPercent` was pinned to the right edge with a fixed width, and the two only
+# cleared each other above about 850px of TemplateWidth.
 Screens:
   scrProjects:
     Properties:
@@ -48,57 +54,74 @@ Screens:
                Set( gSelProject, Blank() );
                Navigate( scrProjectEdit, ScreenTransition.Cover )
       # ---- Filter row -------------------------------------------------------
-      - cboPrjCoverage:
-          Control: ModernCombobox@1.1.1
+      # ONE auto-layout row. The controls carry no X at all, so the chain of
+      # hand-added offsets that used to place them cannot drift, and the search box
+      # takes whatever width the other three leave.
+      - rowFilters:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
           Properties:
-            Items: =colPrjCoverage
-            ItemDisplayText: =ThisItem.Value
-            DefaultSelectedItems: |
-              =Table( { Value: "All coverage" } )
-            SelectMultiple: =false
-            IsSearchable: =false
-            InputTextPlaceholder: ="Coverage"
+            LayoutDirection: =LayoutDirection.Horizontal
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =gTheme.Space.Gap
             X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =260
+            Y: =hdrProjects.Y + hdrProjects.Height + gTheme.Space.Gap
+            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
             Height: =40
-      - txtProjSearch:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Type: =TextInputType.Search
-            Placeholder: ="Search projects…"
-            TriggerOutput: =TriggerOutput.Delayed
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            X: =gTheme.Space.Gutter + 260 + gTheme.Space.Gap
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =340
-            Height: =40
-      # A Classic/Toggle, not a check box: the check-box token is not grounded for
-      # this dialect and an unverified control fails the WHOLE screen paste. Same
-      # control the two scrTaskEdit section switches already use.
-      - tglShowComplete:
-          Control: Classic/Toggle@2.1.0
-          Properties:
-            Default: =false
-            FalseText: =""
-            TrueText: =""
-            X: =gTheme.Space.Gutter + 260 + gTheme.Space.Gap + 340 + gTheme.Space.Gap
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 5
-            Width: =60
-            Height: =30
-      - lblShowComplete:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Show completed"
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            Color: =gTheme.Color.TextPrimary
-            VerticalAlign: =VerticalAlign.Middle
-            X: =gTheme.Space.Gutter + 260 + gTheme.Space.Gap + 340 + gTheme.Space.Gap + 60 + 8
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =180
-            Height: =40
+          Children:
+            # FillPortions 0 + LayoutMinWidth on everything except the search box:
+            # a child of an auto-layout container is FLEXIBLE by default and its
+            # declared Width is only advisory until that is turned off.
+            - cboPrjCoverage:
+                Control: ModernCombobox@1.1.1
+                Properties:
+                  Items: =colPrjCoverage
+                  ItemDisplayText: =ThisItem.Value
+                  DefaultSelectedItems: |
+                    =Table( { Value: "All coverage" } )
+                  SelectMultiple: =false
+                  IsSearchable: =false
+                  InputTextPlaceholder: ="Coverage"
+                  FillPortions: =0
+                  LayoutMinWidth: =240
+                  Width: =240
+                  Height: =40
+            - txtProjSearch:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Type: =TextInputType.Search
+                  Placeholder: ="Search projects…"
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FillPortions: =1
+                  LayoutMinWidth: =220
+                  Height: =40
+            # A Classic/Toggle, not a check box: the check-box token is not grounded
+            # for this dialect and an unverified control fails the WHOLE screen paste.
+            # Same control the two scrTaskEdit section switches already use.
+            - tglShowComplete:
+                Control: Classic/Toggle@2.1.0
+                Properties:
+                  Default: =false
+                  FalseText: =""
+                  TrueText: =""
+                  FillPortions: =0
+                  LayoutMinWidth: =60
+                  Width: =60
+                  Height: =30
+            - lblShowComplete:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Show completed"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  Color: =gTheme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinWidth: =150
+                  Width: =150
+                  Height: =40
       # ---- Gallery ----------------------------------------------------------
       # FOUR BRANCHES, each INDEPENDENTLY delegable, and the Sort sits INSIDE each
       # one — `Sort(If(...))` would not fold, because If is not a delegable
@@ -142,166 +165,208 @@ Screens:
                           && project_coverage.Value = cboPrjCoverage.Selected.Value
                           && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ) )
+            # EXPLICIT single column. Left unset, a wrapping gallery divides
+            # TemplateWidth between columns, and every proportional child inside the
+            # row shrinks with it — which is how the columns came to overlap.
+            WrapCount: =1
             TemplateSize: =72
             TemplatePadding: =0
-            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
             X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap
+            Y: =rowFilters.Y + rowFilters.Height + gTheme.Space.Gap
+            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
+            Height: |
+              =Parent.Height - (rowFilters.Y + rowFilters.Height + gTheme.Space.Gap)
+               - gTheme.Space.Gutter
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
-            # INLINE SVG, NOT A COMPONENT. A canvas component cannot be placed inside
-            # a gallery template — Studio refuses the paste. The glyph therefore lives
-            # here as an Image data URI, same technique as cmpKpiRing.
+            # ONE auto-layout row per record. The columns carry NO X, so they cannot
+            # collide at any TemplateWidth — which the previous absolute version did:
+            # `rowDue` was anchored proportionally while `rowPercent` was pinned to the
+            # right edge with a fixed width, and the two only cleared each other above
+            # about 850px.
             #
-            # SHAPE CARRIES THE MEANING, colour only reinforces it: an empty ring, a
-            # ring of dots, a ring with a filled core, a barred disc and a tick are all
-            # distinguishable in greyscale and to a red-green colour-blind reader. The
-            # set also reads as a progression — empty, thinking, working, done.
-            #
-            # HEX TEXT, not gTheme.Color.*: these drop straight into the SVG string,
-            # and Power Fx has no Color-to-hex conversion. They mirror the palette —
-            # Primary #005A9E · Success #31825D · Danger #C53A3A · TextMuted #6E7882.
-            #
-            # NO "Archived" CASE. Archived projects never reach this gallery, so one
-            # would land on the "?" glyph — the right answer if it ever appears, since
-            # it means something is showing work that should be hidden.
-            - rowStatus:
-                Control: Image@2.2.3
+            # Every column is FillPortions + LayoutMinWidth. A child of an auto-layout
+            # container is FLEXIBLE by default and its declared Width is advisory until
+            # that is turned off, so a fixed Width alone would silently do nothing.
+            - rowBody:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
                 Properties:
-                  ImagePosition: =ImagePosition.Fit
-                  X: =16
-                  Y: =22
-                  Width: =28
-                  Height: =28
-                  Image: |
-                    =With(
-                        { g: Switch( Coalesce(ThisItem.project_phase.Value, ""),
-                              "Not Started",
-                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#B9C0C8' stroke-width='2.5'/>",
-                              "Planning",
-                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'/>"
-                                & "<circle cx='12.5' cy='18' r='1.7' fill='#6E7882'/>"
-                                & "<circle cx='18'   cy='18' r='1.7' fill='#6E7882'/>"
-                                & "<circle cx='23.5' cy='18' r='1.7' fill='#6E7882'/>",
-                              "Active",
-                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
-                                & "<circle cx='18' cy='18' r='7' fill='#005A9E'/>",
-                              "Blocked",
-                                  "<circle cx='18' cy='18' r='14.5' fill='#C53A3A'/>"
-                                & "<rect x='9' y='16' width='18' height='4' rx='2' fill='#FFFFFF'/>",
-                              "Complete",
-                                  "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
-                                & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
-                                & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
-                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
-                                & " stroke-dasharray='4 3'/>"
-                                & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
-                                & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
-                        "data:image/svg+xml," & EncodeUrl(
-                            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
-                    )
-            - rowName:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =ThisItem.project_name
-                  Font: =gTheme.Font
-                  FontWeight: =FontWeight.Semibold
-                  Size: =gTheme.Size.H3
-                  Color: =gTheme.Color.TextPrimary
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =56
-                  Y: =12
-                  Width: =Parent.TemplateWidth * 0.30
-                  Height: =26
-            - rowLead:
-                Control: Label@2.5.1
-                Properties:
-                  Text: |
-                    =Coalesce(ThisItem.project_manager.DisplayName, "Unassigned")
-                  Font: =gTheme.Font
-                  Size: =gTheme.Size.Small
-                  Color: =gTheme.Color.TextMuted
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =56
-                  Y: =38
-                  Width: =Parent.TemplateWidth * 0.30
-                  Height: =20
-            - rowPriority:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =Coalesce(ThisItem.project_priority.Value, "—")
-                  Font: =gTheme.Font
-                  FontWeight: =FontWeight.Semibold
-                  Size: =gTheme.Size.Small
-                  # Colour-coded, but the value is also SPELLED OUT — colour alone
-                  # would carry the whole meaning for a reader who cannot see it.
-                  Color: |
-                    =Switch( ThisItem.project_priority.Value,
-                             "Critical", gTheme.Color.Danger,
-                             "High",     gTheme.Color.Warning,
-                             "Moderate", gTheme.Color.Primary,
-                                         gTheme.Color.TextMuted )
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =Parent.TemplateWidth * 0.40
-                  Y: =26
-                  Width: =Parent.TemplateWidth * 0.12
-                  Height: =20
-            - rowDue:
-                Control: Label@2.5.1
-                Properties:
-                  # No target date is "-", not a blank cell: an empty column reads as
-                  # a rendering fault, a dash reads as "nobody set one".
-                  Text: |
-                    =If( IsBlank(ThisItem.project_date_target), "-",
-                         Text(ThisItem.project_date_target, "dd mmm yyyy") & "   ·   " &
-                         With( { d: DateDiff(Today(), ThisItem.project_date_target, TimeUnit.Days) },
-                               If( d < 0,  Abs(d) & " days overdue",
-                                   d = 0,  "due today",
-                                   d = 1,  "1 day left",
-                                           d & " days left" ) ) )
-                  Font: =gTheme.Font
-                  Size: =gTheme.Size.Small
-                  # Only overdue on work that is still open — a completed project
-                  # past its target is history, not a problem to flag.
-                  Color: |
-                    =If( !IsBlank(ThisItem.project_date_target)
-                      && ThisItem.project_date_target < Today()
-                      && ThisItem.project_phase.Value <> "Complete",
-                         gTheme.Color.Danger, gTheme.Color.TextMuted )
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =Parent.TemplateWidth * 0.54
-                  Y: =26
-                  Width: =Parent.TemplateWidth * 0.26
-                  Height: =20
-            - rowPercent:
-                Control: Label@2.5.1
-                Properties:
-                  Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
-                  Font: =gTheme.Font
-                  Size: =gTheme.Size.Small
-                  Color: =gTheme.Color.TextMuted
-                  Align: =Align.Right
-                  VerticalAlign: =VerticalAlign.Middle
-                  X: =Parent.TemplateWidth - 160 - 16
-                  Y: =26
-                  Width: =160
-                  Height: =20
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =16
+                  PaddingLeft: =16
+                  PaddingRight: =16
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight - 1
+                Children:
+                  # INLINE SVG, NOT A COMPONENT. A canvas component cannot be placed
+                  # inside a gallery template — Studio refuses the paste. Same technique
+                  # as cmpKpiRing.
+                  #
+                  # SHAPE CARRIES THE MEANING, colour only reinforces it: an empty ring,
+                  # a ring of dots, a ring with a filled core, a barred disc and a tick
+                  # are all distinguishable in greyscale and to a red-green colour-blind
+                  # reader. The set reads as a progression — empty, thinking, working, done.
+                  #
+                  # HEX TEXT, not gTheme.Color.*: these drop straight into the SVG string
+                  # and Power Fx has no Color-to-hex conversion. They mirror the palette —
+                  # Primary #005A9E · Success #31825D · Danger #C53A3A · TextMuted #6E7882.
+                  #
+                  # NO "Archived" CASE. Archived projects never reach this gallery, so one
+                  # would land on the "?" glyph — the right answer if it ever appears,
+                  # since it means something is showing work that should be hidden.
+                  - rowStatus:
+                      Control: Image@2.2.3
+                      Properties:
+                        ImagePosition: =ImagePosition.Fit
+                        FillPortions: =0
+                        LayoutMinWidth: =28
+                        Width: =28
+                        Height: =28
+                        Image: |
+                          =With(
+                              { g: Switch( Coalesce(ThisItem.project_phase.Value, ""),
+                                    "Not Started",
+                                        "<circle cx='18' cy='18' r='13' fill='none' stroke='#B9C0C8' stroke-width='2.5'/>",
+                                    "Planning",
+                                        "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'/>"
+                                      & "<circle cx='12.5' cy='18' r='1.7' fill='#6E7882'/>"
+                                      & "<circle cx='18'   cy='18' r='1.7' fill='#6E7882'/>"
+                                      & "<circle cx='23.5' cy='18' r='1.7' fill='#6E7882'/>",
+                                    "Active",
+                                        "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
+                                      & "<circle cx='18' cy='18' r='7' fill='#005A9E'/>",
+                                    "Blocked",
+                                        "<circle cx='18' cy='18' r='14.5' fill='#C53A3A'/>"
+                                      & "<rect x='9' y='16' width='18' height='4' rx='2' fill='#FFFFFF'/>",
+                                    "Complete",
+                                        "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                      & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                      & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                        "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                      & " stroke-dasharray='4 3'/>"
+                                      & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                      & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
+                              "data:image/svg+xml," & EncodeUrl(
+                                  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                          )
+                  # Name over lead, so the two identity fields read as one block.
+                  # BOTH children are pinned: unpinned children of a vertical container
+                  # split the height evenly and ignore the 26/20 declared here.
+                  - colNameLead:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        FillPortions: =3
+                        LayoutMinWidth: =200
+                        Height: =48
+                      Children:
+                        - rowName:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =ThisItem.project_name
+                              Font: =gTheme.Font
+                              FontWeight: =FontWeight.Semibold
+                              Size: =gTheme.Size.H3
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =26
+                              Width: =Parent.Width
+                              Height: =26
+                        - rowLead:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =Coalesce(ThisItem.project_manager.DisplayName, "Unassigned")
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =20
+                              Width: =Parent.Width
+                              Height: =20
+                  - rowPriority:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =Coalesce(ThisItem.project_priority.Value, "—")
+                        Font: =gTheme.Font
+                        FontWeight: =FontWeight.Semibold
+                        Size: =gTheme.Size.Small
+                        # Colour-coded, but the value is also SPELLED OUT — colour alone
+                        # would carry the whole meaning for a reader who cannot see it.
+                        Color: |
+                          =Switch( ThisItem.project_priority.Value,
+                                   "Critical", gTheme.Color.Danger,
+                                   "High",     gTheme.Color.Warning,
+                                   "Moderate", gTheme.Color.Primary,
+                                               gTheme.Color.TextMuted )
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =84
+                        Height: =20
+                  - rowDue:
+                      Control: Label@2.5.1
+                      Properties:
+                        # No target date is "-", not a blank cell: an empty column reads
+                        # as a rendering fault, a dash reads as "nobody set one".
+                        Text: |
+                          =If( IsBlank(ThisItem.project_date_target), "-",
+                               Text(ThisItem.project_date_target, "dd mmm yyyy") & "   ·   " &
+                               With( { d: DateDiff(Today(), ThisItem.project_date_target, TimeUnit.Days) },
+                                     If( d < 0,  Abs(d) & " days overdue",
+                                         d = 0,  "due today",
+                                         d = 1,  "1 day left",
+                                                 d & " days left" ) ) )
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        # Only overdue on work that is still open — a completed project
+                        # past its target is history, not a problem to flag.
+                        Color: |
+                          =If( !IsBlank(ThisItem.project_date_target)
+                            && ThisItem.project_date_target < Today()
+                            && ThisItem.project_phase.Value <> "Complete",
+                               gTheme.Color.Danger, gTheme.Color.TextMuted )
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =2
+                        LayoutMinWidth: =190
+                        Height: =20
+                  - rowPercent:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        Align: =Align.Right
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =104
+                        Height: =20
+            # Absolute siblings of the row container, not children of it: both must
+            # span the whole template, and the hit button must be LAST so it is on top.
             - rowLine:
                 Control: Rectangle@2.3.0
                 Properties:
                   Fill: =gTheme.Color.Border
                   X: =0
-                  Y: =71
+                  Y: =Parent.TemplateHeight - 1
                   Width: =Parent.TemplateWidth
                   Height: =1
             - galProjectsHit:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
-                  # OnSelect does not reliably fire when the click lands on a child control, so
-                  # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing.
+                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's
+                  # own OnSelect does not reliably fire when the click lands on a child
+                  # control, so without a transparent full-template button declared LAST
+                  # the rows look right and do nothing.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   HoverFill: =gTheme.Color.Hover
@@ -329,10 +394,10 @@ Screens:
             Align: =Align.Center
             VerticalAlign: =VerticalAlign.Middle
             Visible: =IsEmpty(galProjects.AllItems)
-            X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap
-            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
+            X: =galProjects.X
+            Y: =galProjects.Y
+            Width: =galProjects.Width
+            Height: =galProjects.Height
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #
