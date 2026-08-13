@@ -8,8 +8,10 @@
 # component CANNOT return a blank Label unless Items is empty. Blank across several
 # consumers at once means the output formula itself is missing in Studio.
 #
-# The three hand-typed formulas, verbatim:
-#   Selected  (Output, Record)  =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
+# The three hand-typed formulas, verbatim. Set them with the COMPONENT selected inside
+# the component editor — on an INSTANCE the component's own controls are out of scope and
+# Studio refuses the reference:
+#   Selected  (Output, Record)  =galSel.Selected
 #   OnReset   (Behaviour)       =Reset( galSel )
 #   galSel.Default              =LookUp(cmpSelection.Items, Id = cmpSelection.DefaultId)
 ComponentDefinitions:
@@ -46,7 +48,17 @@ ComponentDefinitions:
       Height: =40
       Width: =360
       Fill: =RGBA(0, 0, 0, 0)
-      Selected: =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
+      # EXACTLY the documented shape: MS Learn's own walkthrough sets an output property
+      # to `Gallery1.Selected.Item`. It used to read
+      #   =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
+      # and Studio rejected that — an OUTPUT property reading the component's own INPUT
+      # (`cmpSelection.Items`) is the circular-reference case in the canvas-component
+      # limitations, and the rejection reads as "controls in a component cannot be
+      # referenced", which points at the wrong half of the expression.
+      #
+      # The fallback is not needed: galSel carries a Default, so a gallery with a
+      # Default always has a Selected.
+      Selected: =galSel.Selected
       # WITHOUT THIS THE STRIP LIES. A gallery re-reads its `Default` only on
       # Reset, and `galSel.Default` is the seed from `DefaultId` — so an instance
       # bound to per-record state kept showing the PREVIOUS record's pick while
