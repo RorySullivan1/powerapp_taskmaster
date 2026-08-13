@@ -79,9 +79,11 @@ depends on without touching the control.
    are live. The light blue bar is chained off it and should slide right too.
 3. **Read the readout label.** It recomputes live regardless, so any value that
    disagrees with its `(expect …)` is a control that froze while the label did not.
-4. **Positive control:** *now* drag the green bar and re-check its formula bar. If
-   dragging turns `=Parent.Width - 400` into a number, the instrument can see
-   freezing — which is what makes a negative result in steps 1–3 mean anything.
+4. **Optional, and not load-bearing:** *now* nudge the green bar and re-check its
+   formula bar, to see direct manipulation replace the formula with a number.
+   Step 2 already settles the question on its own — a control that moves when its
+   input changes is running a formula — so treat this as a demonstration rather
+   than the control the conclusion rests on.
 
 ### Result — 2026-08-13, run by the user in Studio
 
@@ -92,12 +94,22 @@ depends on without touching the control.
   so the formulas were **live after the paste** — not constants that happened to
   equal the right number. Backward reference, forward reference, `Parent`
   arithmetic and the container's own `Width` all held.
-- Step 4, the positive control: dragging behaved as MS Learn documents. **So the
-  instrument could see freezing, and did not see it on paste.** That is what makes
-  this a real negative rather than an inconclusive one.
+- **Step 2 is the whole finding, and it is positive evidence rather than absence of
+  it.** A constant cannot change when its input changes. Something that recomputes
+  is a formula. The planned positive control was designed for a weaker version of
+  this test — one that could only read numbers off the screen — and the conclusion
+  does not depend on it.
+- **Step 4 is NOT claimed.** The user's report was that *manually setting a property
+  yields a literal*, which is a different and broader statement than "dragging
+  freezes": direct manipulation of any kind — drag, resize handle, the position/size
+  boxes in the properties pane — writes back a number, because a number is what the
+  gesture produces. The formula bar is the one place that keeps what you type. That
+  covers what was observed; a clean drag-specific trial was not run and is not needed.
 
 **The rule was wrong, and it was wrong in a specific, repeatable way: an inference
-was written down in the voice of its citation.** The MS Learn quote said *dragging*;
+was written down in the voice of its citation.** (And in writing up this very
+result I did it again — asserting step 4 confirmed the drag behaviour when the
+user had reported something adjacent. Corrected the same day, by the user.) The MS Learn quote said *dragging*;
 the skill said *pasting* and kept the quote directly beneath it, so every later
 reader — including several sessions of me — checked the citation, saw a real
 Microsoft sentence, and moved on. A false claim with a true quote attached to it is

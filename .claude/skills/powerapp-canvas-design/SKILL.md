@@ -8,7 +8,8 @@ description: >
   a modal", "why is my Y value hardcoded after pasting", "nothing on this screen is
   clickable", "design the header / nav". Covers: vertical band planning and the collision
   arithmetic that must be done at author time, auto-layout containers vs absolute positioning,
-  overlay and modal patterns, scrolling, why dragging (not pasting) freezes X/Y/Width/Height, hit
+  overlay and modal patterns, scrolling, why direct manipulation (not pasting) replaces an
+  X/Y/Width/Height formula with a constant, hit
   testing and z-order, and Theme-driven spacing and type. Boundaries: which control to place
   is powerapp-canvas-controls; the formulas in its properties are powerapp-canvas-development;
   reusable component contracts are power-apps-components; SVG visuals are power-apps-svg.
@@ -67,7 +68,7 @@ First child = bottom, last = top. There is no `ZIndex`.
   `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)` — full-screen only while open,
   when swallowing the click is the point.
 
-## 4. DRAGGING freezes a layout formula. Pasting does not.
+## 4. DIRECT MANIPULATION writes back a constant. Pasting does not.
 
 > *"After you write formulas for the X, Y, Width and Height properties of a control, your
 > formulas will be overwritten with constant values if you subsequently drag the control in
@@ -78,7 +79,12 @@ FREEZE on paste" and treated the two as the same event. They are not, and the di
 settled by experiment — `tests/scrProbe-layout-freeze.pa.yaml`, run in Studio 2026-08-13.
 Formulas came through a code-view paste **live**: `Parent` arithmetic, references to a control
 declared earlier, references to one declared later, and a container's own `Width` all kept
-recomputing afterwards. Dragging, tested in the same session as a control, froze on contact.
+recomputing afterwards. Changing an input moved the controls, which a constant cannot do.
+
+Dragging is not the special case — it is one instance of **direct manipulation**, and so are the
+resize handles and the position/size boxes in the properties pane. All of them write back a
+number, because a number is what the gesture produces. The formula bar is the one place that
+keeps what you type.
 
 So:
 
@@ -86,8 +92,9 @@ So:
   survives and stays live.
 - **The landed app IS responsive**, to the extent it is authored to be. `Parent.Width - 48`
   stays `Parent.Width - 48`.
-- **Once a property is a formula, stop dragging that control.** This is the real hazard, and it
-  is invisible: the drag silently rewrites your formula to the number it happened to be at.
+- **Once a property is a formula, set it only through the formula bar.** This is the real hazard,
+  and it is invisible: a nudge or a spinner silently replaces the formula with the number it
+  happened to be at.
 - A wrong position is still fixed **in the formula bar**. Re-pasting is fine too — it does not
   re-freeze anything.
 

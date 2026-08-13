@@ -150,8 +150,10 @@ First-party, from *Create responsive layouts in canvas apps*:
 **That says DRAGGING, and this section used to read it as pasting.** The two were settled apart
 by experiment — `tests/scrProbe-layout-freeze.pa.yaml`, run in Studio 2026-08-13. Layout formulas
 cross the gap **live**: `Parent` arithmetic, references to a control declared earlier, references
-to one declared later, and a container's own `Width` all kept recomputing after the paste. A drag,
-run as the control in the same session, froze on contact.
+to one declared later, and a container's own `Width` all kept recomputing after the paste.
+Dragging is not the special case either — any **direct manipulation** (drag, resize handle, the
+position/size boxes in the properties pane) writes back a number. The formula bar keeps what you
+type.
 
 What follows from the corrected reading:
 
@@ -162,8 +164,8 @@ What follows from the corrected reading:
    avoids it.
 2. **The landed app is responsive to the extent it is authored to be.** `Width: =Parent.Width - 48`
    stays that formula, and a `Theme.Space.*` change propagates on the next OnStart run.
-3. **Tell the human not to DRAG a control whose geometry is a formula.** That is the one action
-   that silently replaces the formula with the number it happened to be at.
+3. **Tell the human to change such a control only through the FORMULA BAR.** Any direct
+   manipulation silently replaces the formula with the number it happened to be at.
 
 **Authoring rule:** plain integers are still fine where a value is static anyway — they are
 simpler to read and to check against the band table. Use a formula wherever the relationship is
