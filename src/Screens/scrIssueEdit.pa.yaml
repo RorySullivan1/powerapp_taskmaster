@@ -82,8 +82,9 @@ Screens:
         // to be clearable and {Value: ""} is not a legal write, so the blank has to be
         // a real option rather than an empty selection.
         ClearCollect( colIssStatusOpts,
-                      ForAll( Choices([@taskmaster_issues].issue_status) As c,
-                              { Value: c.Value } ) );
+                      With( { ch: Choices([@taskmaster_issues].issue_status) },
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         //
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY: Sequence() numbers the rows and Index() reads the
@@ -109,12 +110,11 @@ Screens:
         Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
         // Re-read DefaultDate; see the note on the pickers themselves.
         Reset( dtpIssTarget ); Reset( dtpIssClose );
-        // A combo box re-reads DefaultSelectedItems ONLY on Reset. cboIssStatus is
-        // one of these now too — it stopped being a cmpSelection strip on 2026-08-12.
-        Reset( cboIssTask ); Reset( cboIssTx ); Reset( cboIssStatus );
+        // A combo box re-reads DefaultSelectedItems ONLY on Reset.
+        Reset( cboIssTask ); Reset( cboIssTx );
         // cmpSelection re-reads its DefaultId ONLY on Reset — it gained OnReset for
         // exactly this on 2026-08-11.
-        Reset( selIssType ); Reset( selIssImpact )
+        Reset( selIssStatus ); Reset( selIssType ); Reset( selIssImpact )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -233,26 +233,25 @@ Screens:
                               LayoutMinHeight: =18
                               Width: =Parent.Width
                               Height: =18
-                        - cboIssStatus:
-                            Control: ModernCombobox@1.1.1
+                        # FontSize 10, not the default 11: three of the four values are
+                        # "Closed - …" phrases sharing a half-width cell, so this strip is the
+                        # tightest one in the app. The labels cannot be shortened — OnChange
+                        # writes Selected.Label straight into the Choice, so each has to be the
+                        # column's value verbatim.
+                        - selIssStatus:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
                             Properties:
+                              FontSize: =10
+                              Width: =Parent.Width
+                              Height: =40
                               # From Choices() on the column. NOTE the coupling: "Open" is a
                               # literal in App.Formulas (OpenIssues), in scrProject's status
                               # glyph and in its open-count. A status value added in SharePoint
                               # appears HERE automatically but is invisible to those three.
                               Items: =colIssStatusOpts
-                              ItemDisplayText: =ThisItem.Value
-                              DefaultSelectedItems: =Filter( [gIssStatus], !IsBlank(Value) )
-                              SelectMultiple: =false
-                              IsSearchable: =false
-                              InputTextPlaceholder: ="Select…"
-                              Color: |
-                                =If( gIssStatus = "Open", gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
-                              FillPortions: =0
-                              LayoutMinHeight: =40
-                              Width: =Parent.Width
-                              Height: =40
-                              OnChange: =Set(gIssStatus, cboIssStatus.Selected.Value)
+                              DefaultId: =Coalesce( LookUp(colIssStatusOpts, Label = gIssStatus, Id), 1 )
+                              OnChange: =Set(gIssStatus, selIssStatus.Selected.Label)
             - gridIss2:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
@@ -308,10 +307,6 @@ Screens:
                               Color: =gTheme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        # Same move off cmpSelection as cboIssType, and it matters more here:
-                        # the issues gallery on scrProject SORTS by impact, so a value that
-                        # silently fails to land reorders the list rather than just missing a
-                        # field.
                         - selIssImpact:
                             Control: CanvasComponent
                             ComponentName: cmpSelection
@@ -356,13 +351,8 @@ Screens:
                               Color: =gTheme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        # A COMBO BOX, not a cmpSelection strip. The strip raises OnChange with
-                        # `Select(Parent); cmpSelection.OnChange()`, so the consumer reads
-                        # `Selected` in the same behaviour chain that just changed it — the value
-                        # can still be the PREVIOUS pick, which lands as a type that was never
-                        # chosen or none at all. cboIssStatus was moved off the strip for the same
-                        # reason on 2026-08-12 and has been correct since; these two were the
-                        # last consumers left on it.
+                        # "(none)" is a real option, not a placeholder: the column is optional,
+                        # and {Value: ""} is not a legal write, so the blank has to be selectable.
                         - selIssType:
                             Control: CanvasComponent
                             ComponentName: cmpSelection
