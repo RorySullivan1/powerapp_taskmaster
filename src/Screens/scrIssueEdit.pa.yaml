@@ -84,14 +84,24 @@ Screens:
         ClearCollect( colIssStatusOpts,
                       ForAll( Choices([@taskmaster_issues].issue_status) As c,
                               { Value: c.Value } ) );
-        ClearCollect( colIssTypeOpts, { Value: "(none)" } );
-        Collect( colIssTypeOpts,
-                 ForAll( Choices([@taskmaster_issues].issue_type) As c,
-                         { Value: c.Value } ) );
-        ClearCollect( colIssImpactOpts, { Value: "(none)" } );
-        Collect( colIssImpactOpts,
-                 ForAll( Choices([@taskmaster_issues].issue_impact) As c,
-                         { Value: c.Value } ) );
+        //
+        // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
+        // synthesised POSITIONALLY: Sequence() numbers the rows and Index() reads the
+        // nth choice back out. Row 1 is "(none)", so the real choices start at Id 2.
+        // The Ids mean nothing beyond "which row" — never hard-code one, look it up by
+        // Label, which is what each DefaultId does.
+        ClearCollect( colIssTypeOpts,
+                      With( { ch: Choices([@taskmaster_issues].issue_type) },
+                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
+                                    { Id:    n.Value,
+                                      Label: If( n.Value = 1, "(none)",
+                                                 Index(ch, n.Value - 1).Value ) } ) ) );
+        ClearCollect( colIssImpactOpts,
+                      With( { ch: Choices([@taskmaster_issues].issue_impact) },
+                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
+                                    { Id:    n.Value,
+                                      Label: If( n.Value = 1, "(none)",
+                                                 Index(ch, n.Value - 1).Value ) } ) ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
@@ -102,7 +112,9 @@ Screens:
         // A combo box re-reads DefaultSelectedItems ONLY on Reset. cboIssStatus is
         // one of these now too — it stopped being a cmpSelection strip on 2026-08-12.
         Reset( cboIssTask ); Reset( cboIssTx ); Reset( cboIssStatus );
-        Reset( cboIssType ); Reset( cboIssImpact )
+        // cmpSelection re-reads its DefaultId ONLY on Reset — it gained OnReset for
+        // exactly this on 2026-08-11.
+        Reset( selIssType ); Reset( selIssImpact )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -300,21 +312,19 @@ Screens:
                         # the issues gallery on scrProject SORTS by impact, so a value that
                         # silently fails to land reorders the list rather than just missing a
                         # field.
-                        - cboIssImpact:
-                            Control: ModernCombobox@1.1.1
+                        - selIssImpact:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
                             Properties:
-                              # From Choices() on the column. NOTE the coupling: scrProject's
-                              # issues gallery sorts on impact via a Switch that ranks these four
-                              # names; a value added in SharePoint appears here and sorts last.
-                              Items: =colIssImpactOpts
-                              ItemDisplayText: =ThisItem.Value
-                              DefaultSelectedItems: =Filter( [gIssImpact], !IsBlank(Value) )
-                              SelectMultiple: =false
-                              IsSearchable: =false
-                              InputTextPlaceholder: ="Select…"
+                              FontSize: =11
                               Width: =Parent.Width
                               Height: =40
-                              OnChange: =Set(gIssImpact, cboIssImpact.Selected.Value)
+                              # From Choices() on the column. NOTE the coupling: scrProject's
+                              # issues gallery sorts on impact via a Switch that ranks four known
+                              # names; a value added in SharePoint appears here and sorts last.
+                              Items: =colIssImpactOpts
+                              DefaultId: =Coalesce( LookUp(colIssImpactOpts, Label = gIssImpact, Id), 1 )
+                              OnChange: =Set(gIssImpact, selIssImpact.Selected.Label)
             - gridIss3:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
@@ -353,20 +363,20 @@ Screens:
                         # chosen or none at all. cboIssStatus was moved off the strip for the same
                         # reason on 2026-08-12 and has been correct since; these two were the
                         # last consumers left on it.
-                        - cboIssType:
-                            Control: ModernCombobox@1.1.1
+                        - selIssType:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
                             Properties:
-                              # Built in OnVisible from Choices() on the column itself, so a value
-                              # added in SharePoint appears here with no app change.
-                              Items: =colIssTypeOpts
-                              ItemDisplayText: =ThisItem.Value
-                              DefaultSelectedItems: =Filter( [gIssType], !IsBlank(Value) )
-                              SelectMultiple: =false
-                              IsSearchable: =false
-                              InputTextPlaceholder: ="Select…"
+                              FontSize: =11
                               Width: =Parent.Width
                               Height: =40
-                              OnChange: =Set(gIssType, cboIssType.Selected.Value)
+                              # Built in OnVisible from Choices() on the column, so a value added
+                              # in SharePoint appears here with no app change.
+                              Items: =colIssTypeOpts
+                              # BY LABEL, not a hard-coded Id: the Ids are positional and depend
+                              # on the order SharePoint returns, so nothing may assume one.
+                              DefaultId: =Coalesce( LookUp(colIssTypeOpts, Label = gIssType, Id), 1 )
+                              OnChange: =Set(gIssType, selIssType.Selected.Label)
             - gridIss4:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout

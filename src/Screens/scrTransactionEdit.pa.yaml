@@ -31,9 +31,15 @@ Screens:
         // vocabulary drifts from SharePoint silently. Outside the resume guard on
         // purpose: the options do not depend on the record, and the guard exists to
         // protect record state on the way back from "+ New".
+        // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
+        // synthesised POSITIONALLY: Sequence() numbers the rows, Index() reads the nth
+        // choice back out. No "(none)" row — the column is required — so Id 1 is the
+        // first real currency. The Ids mean nothing beyond "which row": DefaultId looks
+        // the current value up by Label rather than assuming a number.
         ClearCollect( colTxCurrencyOpts,
-                      ForAll( Choices([@taskmaster_transactions].transaction_currency) As c,
-                              { Value: c.Value } ) );
+                      With( { ch: Choices([@taskmaster_transactions].transaction_currency) },
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         If( gTxResume,
          Set( gTxResume, false ),
          Set( gTxProject,
@@ -73,13 +79,13 @@ Screens:
         // transaction's notional stays on screen and is written onto the next one.
         Reset( numTxNotional );
         Reset( dtpTxDate );
-        // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without this it
+        // cmpSelection re-reads its DefaultId ONLY on Reset, so without this the strip
         // shows the PREVIOUS record's currency while the save writes this one.
         //
         // INSIDE the resume guard on purpose: returning from ＋ New must not re-seed
         // it from the stored record, which would discard a currency the user picked
         // before stepping out to create a client.
-        Reset( cboTxCurrency ) )
+        Reset( selTxCurrency ) )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -207,19 +213,21 @@ Screens:
                         #
                         # No "(none)" row: unlike issue_type this column is required, so the
                         # empty state is not a legal value. gTxCurrency seeds to USD.
-                        - cboTxCurrency:
-                            Control: ModernCombobox@1.1.1
+                        - selTxCurrency:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
                             Properties:
-                              Items: =colTxCurrencyOpts
-                              ItemDisplayText: =ThisItem.Value
-                              DefaultSelectedItems: =Filter( [gTxCurrency], !IsBlank(Value) )
-                              SelectMultiple: =false
-                              IsSearchable: =false
-                              InputTextPlaceholder: ="Select…"
                               Width: =Parent.Width
                               Height: =40
+                              Items: =colTxCurrencyOpts
+                              # BY LABEL, not a hard-coded Id. The old literal table mapped
+                              # "USD",1 "EUR",2 "GBP",3 "JPY",4 and fell through to 5 for
+                              # everything else, so CHF resolved only because 5 happened to be
+                              # its row. A LookUp cannot go wrong that way.
+                              DefaultId: |
+                                =Coalesce( LookUp(colTxCurrencyOpts, Label = gTxCurrency, Id), 1 )
                               OnChange: |
-                                =Set(gTxCurrency, cboTxCurrency.Selected.Value)
+                                =Set(gTxCurrency, selTxCurrency.Selected.Label)
             - gridTx2:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
