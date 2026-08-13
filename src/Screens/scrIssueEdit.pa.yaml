@@ -73,6 +73,16 @@ Screens:
             Collect( colIssTaskOpts, { Id: gIssTask.Id, Label: gIssTask.Value } ) );
         If( gIssTx.Id > 0 && IsBlank( LookUp(colIssTxOpts, Id = gIssTx.Id) ),
             Collect( colIssTxOpts, { Id: gIssTx.Id, Label: gIssTx.Value } ) );
+        // TYPE OPTIONS COME FROM THE COLUMN, not a literal list. A hard-coded
+        // vocabulary drifts from SharePoint silently — project_phase carried two
+        // values the app never enumerated, and those projects simply vanished.
+        // "(none)" is Collected FIRST so it leads the list: an optional Choice has to
+        // be clearable and {Value: ""} is not a legal write, so the blank has to be a
+        // real option rather than an empty selection.
+        ClearCollect( colIssTypeOpts, { Value: "(none)" } );
+        Collect( colIssTypeOpts,
+                 ForAll( Choices([@taskmaster_issues].issue_type) As c,
+                         { Value: c.Value } ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
         Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
         Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
@@ -281,13 +291,12 @@ Screens:
                         # chosen or none at all. cboIssStatus was moved off the strip for the same
                         # reason on 2026-08-12 and has been correct since; these two were the
                         # last consumers left on it.
-                        # "(none)" is a real option, not a placeholder: an optional Choice must
-                        # be clearable, and {Value: ""} is not a legal write.
                         - cboIssType:
                             Control: ModernCombobox@1.1.1
                             Properties:
-                              Items: |
-                                =["(none)", "Approval", "Process", "Compliance", "Branding", "Technical"]
+                              # Built in OnVisible from Choices() on the column itself, so a value
+                              # added in SharePoint appears here with no app change.
+                              Items: =colIssTypeOpts
                               ItemDisplayText: =ThisItem.Value
                               DefaultSelectedItems: =Filter( [gIssType], !IsBlank(Value) )
                               SelectMultiple: =false
