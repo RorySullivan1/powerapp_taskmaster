@@ -1,0 +1,167 @@
+# PROBE SCREEN — throwaway. Does a layout formula survive a code-view paste?
+#
+# Deliberately self-contained: no gTheme, no data source, no component, every
+# colour a literal. Paste it onto a blank screen named scrProbe and nothing else
+# in the app has to be right for the answer to be trustworthy.
+#
+# Only tokens this app has already landed: Rectangle@2.3.0, Label@2.5.1,
+# ModernTextInput@1.1.1, GroupContainer@1.5.0/AutoLayout.
+#
+# Five probes, each isolating one claim:
+#   P1  Parent arithmetic          Width: =Parent.Width - 400
+#   P2  BACKWARD cross-reference   X off a control declared EARLIER
+#   P3  FORWARD cross-reference    X off a control declared LATER   <- the accused
+#   P4  live input dependency      Width driven by a text box, changeable at RUNTIME
+#   P5  auto-layout container      the container's OWN Width is a formula
+#
+# P4 is the decisive one. A frozen constant and a live formula look identical the
+# instant they land — the only way to tell them apart is to CHANGE what the formula
+# depends on without dragging anything.
+Screens:
+  scrProbe:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblProbeTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Layout-formula paste probe"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =600
+            Height: =28
+      - txtProbeW:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="240"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =16
+            Y: =56
+            Width: =200
+            Height: =40
+      - lblProbeHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="Type a number (try 600) and pause. If the blue bar and the bar to its right MOVE, the formulas are live. If nothing moves, they froze at paste."
+            Font: =Font.'Segoe UI'
+            Size: =14
+            Color: =RGBA(110, 120, 130, 1)
+            VerticalAlign: =VerticalAlign.Middle
+            X: =232
+            Y: =56
+            Width: =1100
+            Height: =40
+      # ---- P4: live input dependency, and P2 chained off it -------------------
+      - probeP4:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =112
+            Width: =Coalesce(Value(txtProbeW.Text), 240)
+            Height: =48
+      - probeP2:
+          Control: Rectangle@2.3.0
+          Properties:
+            # BACKWARD reference: probeP4 is declared above this control.
+            Fill: =RGBA(102, 182, 227, 1)
+            X: =probeP4.X + probeP4.Width + 16
+            Y: =112
+            Width: =120
+            Height: =48
+      # ---- P3: FORWARD reference — probeAnchor is declared AFTER this ---------
+      - probeP3:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(214, 152, 40, 1)
+            X: =probeAnchor.X + probeAnchor.Width + 16
+            Y: =176
+            Width: =120
+            Height: =48
+      - probeAnchor:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =176
+            Width: =240
+            Height: =48
+      # ---- P1: parent arithmetic ---------------------------------------------
+      - probeP1:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =240
+            Width: =Parent.Width - 400
+            Height: =48
+      # ---- P5: an auto-layout container whose OWN Width is a formula ----------
+      - probeP5:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            LayoutDirection: =LayoutDirection.Horizontal
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =8
+            PaddingTop: =8
+            PaddingBottom: =8
+            PaddingLeft: =8
+            PaddingRight: =8
+            Fill: =RGBA(255, 255, 255, 1)
+            BorderColor: =RGBA(225, 229, 235, 1)
+            BorderThickness: =1
+            X: =16
+            Y: =304
+            Width: =Parent.Width - 800
+            Height: =64
+          Children:
+            - probeP5a:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =RGBA(197, 58, 58, 1)
+                  FillPortions: =1
+                  Height: =40
+            - probeP5b:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =RGBA(0, 90, 158, 1)
+                  FillPortions: =2
+                  Height: =40
+      # ---- Readout: the live values, so nothing needs clicking to be seen -----
+      - lblProbeRead:
+          Control: Label@2.5.1
+          Properties:
+            # Char(10) for the line breaks — a literal newline inside a Power Fx
+            # string is not worth gambling a paste on.
+            Text: |
+              ="P4 live input    Width = " & probeP4.Width & Char(10) &
+               "P2 backward ref  X = " & probeP2.X & "   (expect " & (probeP4.X + probeP4.Width + 16) & ")" & Char(10) &
+               "P3 FORWARD ref   X = " & probeP3.X & "   (expect " & (probeAnchor.X + probeAnchor.Width + 16) & ")" & Char(10) &
+               "P1 parent math   Width = " & probeP1.Width & "   (expect " & (Parent.Width - 400) & ")" & Char(10) &
+               "P5 container     Width = " & probeP5.Width & "   (expect " & (Parent.Width - 800) & ")"
+            Font: =Font.'Segoe UI'
+            Size: =14
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =392
+            Width: =1000
+            Height: =160
+      - lblProbeNote:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="A mismatch between a value and its (expect …) on this readout means that ONE control froze — the readout recomputes live even if the control did not."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =560
+            Width: =1000
+            Height: =40
