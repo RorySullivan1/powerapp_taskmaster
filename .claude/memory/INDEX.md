@@ -15,8 +15,8 @@
   `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then every
   screen but `scrHome`. `scrProjects` is a full rework; `scrProject` / `scrIssueEdit` /
   `scrTransactionEdit` / the picker screens carry LOGIC fixes, so none of it is cosmetic.
-- **SharePoint matches `schema/schema.yaml` EXCEPT one pending edit:** `project_phase` needs
-  the new `Not Started` value added and set as the column default. **No orphaned controls: the user DELETES a screen before pasting it back.**
+- **`project_phase` live vocabulary: Not Started · Planning · Under Review · Active · Blocked ·
+  Complete · Archived.** Only pending SharePoint edit: set the column DEFAULT to Not Started. **No orphaned controls: the user DELETES a screen before pasting it back.**
 - Six superseded components still ship inside the `.msapp` — see Threads.
 
 ## Decisions        (append-only; supersede, never delete)
@@ -35,6 +35,7 @@ not know them will author something broken:
 - [2026-08-09] The three `*_project_id` lookups DISPLAY the numeric ID, not the name. Screens resolve it app-side with `LookUp(taskmaster_projects, ...)`. **Two reviewers have flagged that as waste by trusting the schema comment** — ARCHIVE
 - [2026-08-03] `Sort(If(...))` does NOT fold — the Sort must sit INSIDE each branch — ARCHIVE
 - [2026-08-03] Person writes use the expanded-user shape with `gClaimPrefix & Lower(mail)` and the `'@odata.type'` tag — ARCHIVE
+- [2026-08-13] **A CHOICE VALUE THE APP DOES NOT ENUMERATE IS INVISIBLE, NOT BROKEN.** `project_phase` had `Under Review` and `Not Started` live in SharePoint while `schema.yaml` listed neither, so `ActiveProjects` — which enumerates phases because `<> "Archived"` will not delegate — silently dropped every Under Review project from every screen in the app. **An Or-of-equals allow-list fails CLOSED and says nothing.** Any value added to that column must be added to the named formula, to scrProjects' four branches, to scrProjectEdit's picker and to the status-glyph Switch in the same pass. The glyph is the only one of those that fails loudly — an unlisted phase renders "?" — INDEX Decisions
 - [2026-08-13] **MIXING PROPORTIONAL AND EDGE-PINNED ANCHORING IS THE COLLISION BUG.** `scrProjects` had `rowDue` at `X = TW*0.54, Width = TW*0.26` beside `rowPercent` pinned to the right edge with a FIXED 160px. Both are individually reasonable; together they converge as the container narrows — clear at 1318, overlapping below ~850. **Collision arithmetic run at ONE width proves nothing; the question is always "at which width does this first collide".** Fixed by making the row an auto-layout container: children carry no X, so overlap is structurally impossible. Every column is `FillPortions` + `LayoutMinWidth`, because a child of an auto-layout container is flexible by default and a declared `Width` alone is advisory — INDEX Decisions
 - [2026-08-13] `StartsWith(col, "")` is TRUE for every row, so a default page and a search are ONE branch — `FirstN` picks the cap. This is what let cmpPicker open with rows in it without a second query path — INDEX Decisions
 - [2026-08-12] A gallery bound to a DATA SOURCE pages as the user scrolls, so `.AllItems` is what is on screen, not the total. Count from the query — INDEX Decisions
@@ -56,8 +57,8 @@ not know them will author something broken:
   all. The probe only covered references that resolve. If an unresolvable one is what gets
   replaced by a constant, the 2026-08-04 `Y=193` report is fully explained and the rule becomes
   "relative geometry is fine as long as the name survives the paste".
-- **OWED IN SHAREPOINT:** add `Not Started` to `project_phase` and make it the column default.
-  Until then a new project writes a value the list does not accept.
+- **OWED IN SHAREPOINT:** set the `project_phase` column default to `Not Started` (the value
+  itself already exists).
 - **Three auto-layout containers have BOTH children unpinned** (`colIssType` among them) —
   unpinned children split space evenly and ignore declared heights.
 - **The Choice columns that replaced Managed Metadata (2026-08-10) have no recorded internal

@@ -143,12 +143,16 @@ lists:
       - { name: project_type_id,         type: Number,          required: false, indexed: true,  desc: "ID of the mapping_activitytype row when the picked path names one exactly; 0 when it names a branch", maps_to: mapping_activitytype }
       - { name: project_type_path,       type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"Campaign | Email | Newsletter\". Same id+path pair as project_region" }
       - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user" }
-      # CHANGED 2026-08-13 — "Not Started" added and made the default. A project now
-      # begins in a phase that says so, rather than being born mid-Planning.
-      # PENDING IN SHAREPOINT: add the choice value and set the column default.
+      # THE LIVE COLUMN IS THE AUTHORITY ON THIS ONE LIST. "Not Started" and
+      # "Under Review" were already provisioned in SharePoint and were MISSING here —
+      # which meant `ActiveProjects` did not enumerate them, so an Under Review project
+      # was invisible everywhere in the app. Any value added to the column has to be
+      # added to that named formula and to scrProjects' four branches in the same pass,
+      # or it silently disappears rather than erroring.
+      # PENDING IN SHAREPOINT: set the column default to "Not Started".
       # "Archived" stays: it is what drives the *_project_archived cascade onto every
       # child list, so removing it would take the archive mechanism with it.
-      - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase", values: ["Not Started", Planning, Active, Blocked, Complete, Archived] }
+      - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase", values: ["Not Started", Planning, "Under Review", Active, Blocked, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
       - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below" }
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
