@@ -1,3 +1,17 @@
+# IF A CONSUMER READS BLANK FROM `Selected`, CHECK STUDIO BEFORE CHANGING ANY SCREEN.
+# A component crosses the gap in TWO parts: the CONTROLS paste through code view, but
+# every custom property's formula is TYPED BY HAND in the component editor. So this file
+# can be correct while the Studio copy is not, and the failure is silent — the strip
+# renders and highlights normally while `Selected` returns nothing.
+#
+# The tell: `Selected` falls back to `First(cmpSelection.Items)`, so a correctly wired
+# component CANNOT return a blank Label unless Items is empty. Blank across several
+# consumers at once means the output formula itself is missing in Studio.
+#
+# The three hand-typed formulas, verbatim:
+#   Selected  (Output, Record)  =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
+#   OnReset   (Behaviour)       =Reset( galSel )
+#   galSel.Default              =LookUp(cmpSelection.Items, Id = cmpSelection.DefaultId)
 ComponentDefinitions:
   cmpSelection:
     DefinitionType: CanvasComponent
