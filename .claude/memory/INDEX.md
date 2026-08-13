@@ -65,6 +65,13 @@ not know them will author something broken:
   all. The probe only covered references that resolve. If an unresolvable one is what gets
   replaced by a constant, the 2026-08-04 `Y=193` report is fully explained and the rule becomes
   "relative geometry is fine as long as the name survives the paste".
+- **`galProjects.Y` reads 193 in Studio, not the authored 210.** Nothing in the current source
+  can evaluate to 193 and the literal appears nowhere in `src/`; 193 is exactly the PRE-REWORK
+  `SearchBox.Y + Height + Gap`. Working theory: a NAME COLLISION — control names are unique
+  app-wide, so a surviving `galProjects` forces the pasted one to `galProjects_1` and the panel
+  keeps reading the old control. Awaiting a Studio tree search for the name. A rename in source
+  (`galProjects` → e.g. `galPrjList`, plus four `=galProjects.*` refs in `ProjectsEmptyLabel`)
+  is the permanent fix if confirmed.
 - **OWED IN SHAREPOINT:** set the `project_phase` column default to `Not Started` (the value
   itself already exists).
 - **`cmpSelection` is IN USE and WORKING** — issue status, type, impact and transaction
@@ -90,3 +97,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-13 | layout formulas SURVIVE a paste (probe run in Studio); design + transfer skills, validator check, build-history row and src comments all corrected | tests/README.md
 - 2026-08-13 | cmpPicker opens on the first 10 records (current user for person fields); record branches un-gated from query length | INDEX Decisions 2026-08-13
 - 2026-08-13 | INDEX pruned 620 lines/231KB to ~80; full prior contents archived verbatim | sessions/ARCHIVE-2026.md
+- 2026-08-13 | project_phase derived in-app + Mark-complete button; cmpSelection root cause (Selected not an Output property); scrProject galleries rebuilt; scrProjects reworked | sessions/2026-08-13-1724-project-phase-derivation-and-selection-fix.md
