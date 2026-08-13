@@ -60,9 +60,10 @@ not know them will author something broken:
   "relative geometry is fine as long as the name survives the paste".
 - **OWED IN SHAREPOINT:** set the `project_phase` column default to `Not Started` (the value
   itself already exists).
-- **`selTxCurrency` (scrTransactionEdit) is the last `cmpSelection` strip in the app** — same
-  read-your-own-output defect that made issue_type not land, on a REQUIRED column. Convert to a
-  ModernCombobox when that screen is next touched.
+- **`cmpSelection` now has ZERO instances** — all five consumers are comboboxes as of
+  2026-08-13. Its file is deliberately KEPT until the three converted screens have landed: if a
+  paste fails and a conversion has to be reverted, the component source has to still be here.
+  Delete the file and add it to the Studio-deletion list once they are confirmed in Studio.
 - **Three auto-layout containers have BOTH children unpinned** (`colIssType` among them) —
   unpinned children split space evenly and ignore declared heights.
 - **The Choice columns that replaced Managed Metadata (2026-08-10) have no recorded internal

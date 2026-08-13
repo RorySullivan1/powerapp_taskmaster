@@ -27,6 +27,13 @@ Screens:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnTxSave
+        // CURRENCY OPTIONS COME FROM THE COLUMN, not a literal list — a hard-coded
+        // vocabulary drifts from SharePoint silently. Outside the resume guard on
+        // purpose: the options do not depend on the record, and the guard exists to
+        // protect record state on the way back from "+ New".
+        ClearCollect( colTxCurrencyOpts,
+                      ForAll( Choices([@taskmaster_transactions].transaction_currency) As c,
+                              { Value: c.Value } ) );
         If( gTxResume,
          Set( gTxResume, false ),
          Set( gTxProject,
@@ -66,14 +73,13 @@ Screens:
         // transaction's notional stays on screen and is written onto the next one.
         Reset( numTxNotional );
         Reset( dtpTxDate );
-        // cmpSelection re-reads its DefaultId ONLY on Reset, so without this the
-        // strip shows the PREVIOUS record's currency while the save writes this
-        // one. The component gained OnReset on 2026-08-11; this is its consumer.
+        // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without this it
+        // shows the PREVIOUS record's currency while the save writes this one.
         //
-        // INSIDE the resume guard on purpose: returning from ＋ New must not
-        // re-seed the strip from the stored record, which would discard a
-        // currency the user picked before stepping out to create a client.
-        Reset( selTxCurrency ) )
+        // INSIDE the resume guard on purpose: returning from ＋ New must not re-seed
+        // it from the stored record, which would discard a currency the user picked
+        // before stepping out to create a client.
+        Reset( cboTxCurrency ) )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -192,20 +198,28 @@ Screens:
                               Color: =gTheme.Color.TextMuted
                               Width: =Parent.Width
                               Height: =18
-                        - selTxCurrency:
-                            Control: CanvasComponent
-                            ComponentName: cmpSelection
+                        # A COMBO BOX, not a cmpSelection strip. The strip raises OnChange with
+                        # `Select(Parent); cmpSelection.OnChange()`, so the consumer reads
+                        # `Selected` in the same behaviour chain that just changed it and can
+                        # get the PREVIOUS pick. transaction_currency is REQUIRED, so that lands
+                        # as the wrong currency on a real trade rather than as a missing field.
+                        # scrIssueEdit's three pickers moved off the strip for the same reason.
+                        #
+                        # No "(none)" row: unlike issue_type this column is required, so the
+                        # empty state is not a legal value. gTxCurrency seeds to USD.
+                        - cboTxCurrency:
+                            Control: ModernCombobox@1.1.1
                             Properties:
+                              Items: =colTxCurrencyOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gTxCurrency], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
                               Width: =Parent.Width
                               Height: =40
-                              Items: |
-                                =Table( { Id: 1, Label: "USD" }, { Id: 2, Label: "EUR" }, { Id: 3, Label: "GBP" },
-                                        { Id: 4, Label: "JPY" }, { Id: 5, Label: "CHF" } )
-                              DefaultId: |
-                                =Switch( If(gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD"),
-                                         "USD", 1, "EUR", 2, "GBP", 3, "JPY", 4, 5 )
                               OnChange: |
-                                =Set(gTxCurrency, selTxCurrency.Selected.Label)
+                                =Set(gTxCurrency, cboTxCurrency.Selected.Value)
             - gridTx2:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
