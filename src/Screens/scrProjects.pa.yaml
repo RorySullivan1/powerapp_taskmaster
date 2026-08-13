@@ -127,6 +127,14 @@ Screens:
       # one — `Sort(If(...))` would not fold, because If is not a delegable
       # operation, so the sort would run locally over one arbitrary page.
       #
+      # EVERY BRANCH CARRIES ITS OWN PHASE PREDICATE, and the two "show completed"
+      # ones look redundant against ActiveProjects because they enumerate the same
+      # five phases it already filters on. Do not simplify them away. Sorting a
+      # bare `Filter(ActiveProjects, StartsWith(...))` returned "the query is not
+      # valid" from SharePoint, while the identical shape WITH an explicit phase
+      # group did not — so all four branches are deliberately the same shape, and
+      # the one that was different is the one that failed.
+      #
       # The phases are ENUMERATED rather than written as `<> "Complete"`: a Text
       # `<>` does not delegate, and one non-delegable clause silently truncates the
       # whole query at the row limit. ActiveProjects already excludes Archived, so
@@ -149,11 +157,21 @@ Screens:
               =If( tglShowComplete.Value
                 && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                    Sort( Filter( ActiveProjects,
-                             StartsWith(project_name, txtProjSearch.Text) ),
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Blocked"
+                            || project_phase.Value = "Complete" )
+                          && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    tglShowComplete.Value,
                    Sort( Filter( ActiveProjects,
-                             project_coverage.Value = cboPrjCoverage.Selected.Value
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Blocked"
+                            || project_phase.Value = "Complete" )
+                          && project_coverage.Value = cboPrjCoverage.Selected.Value
                           && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
