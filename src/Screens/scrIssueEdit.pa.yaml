@@ -320,53 +320,49 @@ Screens:
                               Items: =colIssImpactOpts
                               DefaultId: =Coalesce( LookUp(colIssImpactOpts, Label = gIssImpact, Id), 1 )
                               OnChange: =Set(gIssImpact, selIssImpact.Selected.Label)
-            - gridIss3:
+            # NO GRID HERE. Type is a full-width row, and a GridLayout child spanning
+            # LayoutGridColumnStart 1 to LayoutGridColumnEnd 2 did NOT render full width
+            # in Studio. The grid's own shape declaration has never been fully grounded
+            # from a code view (see powerapp-canvas-controls), so this sits directly in
+            # the vertical scroll container instead, sized like every other band —
+            # nothing to span, nothing to get wrong.
+            - colIssType:
                 Control: GroupContainer@1.5.0
-                Variant: GridLayout
+                Variant: AutoLayout
                 Properties:
-                  LayoutGridColumns: =2
-                  LayoutGridRows: =10
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =8
                   Width: =Parent.Width - 48
-                  Height: =120
+                  Height: =62
                 Children:
-                  - colIssType:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
+                  - lblIssTypeCap:
+                      Control: Label@2.5.1
                       Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =10
-                        Height: =62
-                      Children:
-                        - lblIssTypeCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Type"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        # "(none)" is a real option, not a placeholder: the column is optional,
-                        # and {Value: ""} is not a legal write, so the blank has to be selectable.
-                        - selIssType:
-                            Control: CanvasComponent
-                            ComponentName: cmpSelection
-                            Properties:
-                              FontSize: =11
-                              Width: =Parent.Width
-                              Height: =40
-                              # Built in OnVisible from Choices() on the column, so a value added
-                              # in SharePoint appears here with no app change.
-                              Items: =colIssTypeOpts
-                              # BY LABEL, not a hard-coded Id: the Ids are positional and depend
-                              # on the order SharePoint returns, so nothing may assume one.
-                              DefaultId: =Coalesce( LookUp(colIssTypeOpts, Label = gIssType, Id), 1 )
-                              OnChange: =Set(gIssType, selIssType.Selected.Label)
+                        Text: ="Type"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width
+                        Height: =18
+                  # "(none)" is a real option, not a placeholder: the column is optional,
+                  # and {Value: ""} is not a legal write, so the blank has to be selectable.
+                  - selIssType:
+                      Control: CanvasComponent
+                      ComponentName: cmpSelection
+                      Properties:
+                        FontSize: =11
+                        Width: =Parent.Width
+                        Height: =40
+                        # Built in OnVisible from Choices() on the column, so a value added
+                        # in SharePoint appears here with no app change.
+                        Items: =colIssTypeOpts
+                        # BY LABEL, not a hard-coded Id: the Ids are positional and depend
+                        # on the order SharePoint returns, so nothing may assume one.
+                        DefaultId: =Coalesce( LookUp(colIssTypeOpts, Label = gIssType, Id), 1 )
+                        OnChange: =Set(gIssType, selIssType.Selected.Label)
             - gridIss4:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
