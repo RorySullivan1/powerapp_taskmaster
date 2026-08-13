@@ -35,6 +35,7 @@ not know them will author something broken:
 - [2026-08-09] The three `*_project_id` lookups DISPLAY the numeric ID, not the name. Screens resolve it app-side with `LookUp(taskmaster_projects, ...)`. **Two reviewers have flagged that as waste by trusting the schema comment** — ARCHIVE
 - [2026-08-03] `Sort(If(...))` does NOT fold — the Sort must sit INSIDE each branch — ARCHIVE
 - [2026-08-03] Person writes use the expanded-user shape with `gClaimPrefix & Lower(mail)` and the `'@odata.type'` tag — ARCHIVE
+- [2026-08-13] **MIXING PROPORTIONAL AND EDGE-PINNED ANCHORING IS THE COLLISION BUG.** `scrProjects` had `rowDue` at `X = TW*0.54, Width = TW*0.26` beside `rowPercent` pinned to the right edge with a FIXED 160px. Both are individually reasonable; together they converge as the container narrows — clear at 1318, overlapping below ~850. **Collision arithmetic run at ONE width proves nothing; the question is always "at which width does this first collide".** Fixed by making the row an auto-layout container: children carry no X, so overlap is structurally impossible. Every column is `FillPortions` + `LayoutMinWidth`, because a child of an auto-layout container is flexible by default and a declared `Width` alone is advisory — INDEX Decisions
 - [2026-08-13] `StartsWith(col, "")` is TRUE for every row, so a default page and a search are ONE branch — `FirstN` picks the cap. This is what let cmpPicker open with rows in it without a second query path — INDEX Decisions
 - [2026-08-12] A gallery bound to a DATA SOURCE pages as the user scrolls, so `.AllItems` is what is on screen, not the total. Count from the query — INDEX Decisions
 - [2026-08-12] A global's type unifies across every `Set`; one name holding differently-shaped records is a type conflict — INDEX Decisions
@@ -72,6 +73,7 @@ not know them will author something broken:
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-13 | scrProjects rebuilt on auto-layout after the columns were found to collide below ~850px TemplateWidth; vertical stack now relative; status SVG inlined (a component cannot go in a gallery) | INDEX Decisions 2026-08-13
 - 2026-08-13 | scrProjects reworked: coverage filter + show-completed toggle + six-column rows; new SVG cmpProjectStatus; project_phase gains "Not Started" as default | INDEX Decisions 2026-08-13
 - 2026-08-13 | layout formulas SURVIVE a paste (probe run in Studio); design + transfer skills, validator check, build-history row and src comments all corrected | tests/README.md
 - 2026-08-13 | cmpPicker opens on the first 10 records (current user for person fields); record branches un-gated from query length | INDEX Decisions 2026-08-13
