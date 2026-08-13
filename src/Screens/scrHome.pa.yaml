@@ -10,9 +10,12 @@
 #     60   wrapHdr     section header + Refresh
 #     96   rowCards    four metric cards
 #     ...  rowLists    fills — my tasks | my issues
-#    200   rowCharts   timeline + two pies + the completion ring
-#   rowLists.Height = Parent.Height - 452, where 452 = 48 padding + 48 gaps
-#   + 60 + 96 + 200. Change a band height and change that number with it.
+#    320   rowCharts   timeline + two pies + the completion ring
+#   rowLists.Height = Parent.Height - 572, where 572 = 48 padding + 48 gaps
+#   + 60 + 96 + 320. Change a band height and change that number with it.
+#   rowCharts is the tall one because the timeline plots up to TEN rows at 20
+#   units each — the viewBox grows with the row count, so a short panel would
+#   render the WHOLE chart smaller rather than clip it.
 #
 # Component INSTANCES use the v3.0 dialect: `Control: CanvasComponent` +
 # `ComponentName:` + `Properties:` (base props AND custom props; no Children).
@@ -104,7 +107,7 @@ Screens:
             FirstN( Sort( Filter( colMyProjects,
                                   project_phase.Value <> "Complete"
                                && !IsBlank(project_date_target) ),
-                          project_date_target ), 5 ) );
+                          project_date_target ), 10 ) );
         Clear( colTimeline );
         Collect( colTimeline,
             ForAll( Sequence( CountRows(colTlSrc) ) As s,
@@ -213,7 +216,7 @@ Screens:
                               FirstN( Sort( Filter( colMyProjects,
                                                     project_phase.Value <> "Complete"
                                                  && !IsBlank(project_date_target) ),
-                                            project_date_target ), 5 ) );
+                                            project_date_target ), 10 ) );
                           Clear( colTimeline );
                           Collect( colTimeline,
                               ForAll( Sequence( CountRows(colTlSrc) ) As s,
@@ -464,9 +467,9 @@ Screens:
                   LayoutAlignItems: =LayoutAlignItems.Start
                   LayoutGap: =gTheme.Space.Gap
                   FillPortions: =1
-                  LayoutMinHeight: =240
+                  LayoutMinHeight: =220
                   Width: =Parent.Width - 48
-                  Height: =Parent.Height - 452
+                  Height: =Parent.Height - 572
                 Children:
                   - secMyTasks:
                       Control: GroupContainer@1.5.0
@@ -917,9 +920,9 @@ Screens:
                   LayoutAlignItems: =LayoutAlignItems.Start
                   LayoutGap: =gTheme.Space.Gap
                   FillPortions: =0
-                  LayoutMinHeight: =200
+                  LayoutMinHeight: =320
                   Width: =Parent.Width - 48
-                  Height: =200
+                  Height: =320
                 Children:
                   - pnlTimeline:
                       Control: GroupContainer@1.5.0
@@ -963,7 +966,7 @@ Screens:
                               # GANTT of the projects you lead, soonest target first, over
                               # colTimeline / gTlStart / gTlEnd / gTlSpan built in OnVisible.
                               #
-                              # FIVE ROWS. The viewBox grows with the row count, so a taller
+                              # TEN ROWS. The viewBox grows with the row count, so a taller
                               # chart renders SMALLER inside a fixed panel — the cap is what
                               # keeps the bars legible, not a data limit.
                               Image: |
@@ -982,7 +985,9 @@ Screens:
                                       & Concat( colTimeline,
                                             "<text x='0' y='" & (16 + (idx - 1) * 20 + 13) & "' font-size='8.5'"
                                           & " font-family='Segoe UI, sans-serif' fill='#20262D'>"
-                                          & EncodeHTML( If(Len(nm) > 15, Left(nm, 14) & "…", nm) ) & "</text>"
+                                          & EncodeHTML( If( Len(Trim(nm)) > 15,
+                                                            Left(Trim(nm), 14) & "..",
+                                                            Trim(nm) ) ) & "</text>"
                                           & "<rect x='92' y='" & (16 + (idx - 1) * 20 + 5)
                                           & "' width='224' height='10' rx='5' fill='#F2F4F7'/>"
                                           & "<rect x='"
