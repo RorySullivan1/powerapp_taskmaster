@@ -1,28 +1,31 @@
-# =============================================================================
-# scrProjects  —  Projects menu (screen-map §3). CORE-SHELL: header + nav +
-# search box + empty gallery placeholder. Phase 2 wires the delegable Items:
-#   Sort(Filter(tmProjects, IsArchived = false), SortOrder)  with StartsWith search.
-# DIALECT: modern structured schema; positional z-order. Header + nav are one
-# component (cmpAppBar), declared LAST so the fly-out floats over the content.
-# =============================================================================
-# VERTICAL BANDS — resolved, so they can be checked against Studio by eye.
-# gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.  Screen height 768 (tablet).
+# Projects browser: coverage filter + search + a "show completed" toggle over a
+# six-column gallery.
 #
-#     0 ..  64   appBar (the blue bar; declared LAST, floats above everything)
-#    88 .. 148   hdrProjects      = HeaderH + Gutter,           height 60
-#   164 .. 204   selFilter | txtProjSearch  = +60 +Gap,         height 40
-#   220 .. 744   galProjects      = +40 +Gap,   height = 768 - 220 - Gutter
+# VERTICAL BANDS (tablet 768). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
+#     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
+#    88 .. 148   hdrProjects   = HeaderH + Gutter, height 60
+#   164 .. 204   filter row    = +60 +Gap,         height 40
+#   220 .. 744   galProjects   = +40 +Gap,         height = 768 - 220 - Gutter
 #
 # If Studio shows anything else here, the layout has drifted. The stack is absolute
 # gTheme arithmetic rather than control-relative — a style choice, not a constraint:
 # layout formulas do survive a paste (tests/README.md), so a relative version would
 # work. Absolute is kept because these numbers can be checked against the table above
 # by eye.
-
 Screens:
   scrProjects:
     Properties:
       Fill: =gTheme.Color.Bg
+      # project_coverage's values are NOT in the golden source — schema.yaml carries
+      # PLACEHOLDERs and says the app must bind Choices() rather than a literal, so
+      # whatever the list actually holds appears here with no app change. The "All
+      # coverage" row is Collected FIRST so it sorts to the top and is what makes an
+      # unfiltered view selectable without a separate clear button.
+      OnVisible: |
+        =ClearCollect( colPrjCoverage, { Value: "All coverage" } );
+         Collect( colPrjCoverage,
+                  ForAll( Choices([@taskmaster_projects].project_coverage) As c,
+                          { Value: c.Value } ) )
     Children:
       - hdrProjects:
           Control: CanvasComponent
@@ -44,18 +47,21 @@ Screens:
                Set( gEditProject, Blank() );
                Set( gSelProject, Blank() );
                Navigate( scrProjectEdit, ScreenTransition.Cover )
-      - selFilter:
-          Control: CanvasComponent
-          ComponentName: cmpSelection
+      # ---- Filter row -------------------------------------------------------
+      - cboPrjCoverage:
+          Control: ModernCombobox@1.1.1
           Properties:
+            Items: =colPrjCoverage
+            ItemDisplayText: =ThisItem.Value
+            DefaultSelectedItems: |
+              =Table( { Value: "All coverage" } )
+            SelectMultiple: =false
+            IsSearchable: =false
+            InputTextPlaceholder: ="Coverage"
             X: =gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =360
+            Width: =260
             Height: =40
-            Items: |
-              =Table({ Id: 1, Label: "All" }, { Id: 2, Label: "Active" }, { Id: 3, Label: "Archived" })
-            DefaultId: =2
-            OnChange: =Reset(txtProjSearch)
       - txtProjSearch:
           Control: ModernTextInput@1.1.1
           Properties:
@@ -64,46 +70,93 @@ Screens:
             TriggerOutput: =TriggerOutput.Delayed
             Font: =gTheme.Font
             Size: =gTheme.Size.Body
-            Height: =40
-            Width: =360
-            X: =gTheme.Space.Gutter + 360 + gTheme.Space.Gap
+            X: =gTheme.Space.Gutter + 260 + gTheme.Space.Gap
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-      # ---- Projects gallery (delegable) -----------------------------------
-      # Each If branch is INDEPENDENTLY delegable, and the Sort sits INSIDE each
-      # branch — `Sort(If(...))` would NOT fold, because If is not a delegable
+            Width: =340
+            Height: =40
+      # A Classic/Toggle, not a check box: the check-box token is not grounded for
+      # this dialect and an unverified control fails the WHOLE screen paste. Same
+      # control the two scrTaskEdit section switches already use.
+      - tglShowComplete:
+          Control: Classic/Toggle@2.1.0
+          Properties:
+            Default: =false
+            FalseText: =""
+            TrueText: =""
+            X: =gTheme.Space.Gutter + 260 + gTheme.Space.Gap + 340 + gTheme.Space.Gap
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 5
+            Width: =60
+            Height: =30
+      - lblShowComplete:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Show completed"
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Color: =gTheme.Color.TextPrimary
+            VerticalAlign: =VerticalAlign.Middle
+            X: =gTheme.Space.Gutter + 260 + gTheme.Space.Gap + 340 + gTheme.Space.Gap + 60 + 8
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
+            Width: =180
+            Height: =40
+      # ---- Gallery ----------------------------------------------------------
+      # FOUR BRANCHES, each INDEPENDENTLY delegable, and the Sort sits INSIDE each
+      # one — `Sort(If(...))` would not fold, because If is not a delegable
       # operation, so the sort would run locally over one arbitrary page.
-      # No IsBlank guard: StartsWith(col, "") is already true for every row, and
-      # IsBlank in a predicate is a delegation risk for no benefit.
+      #
+      # The phases are ENUMERATED rather than written as `<> "Complete"`: a Text
+      # `<>` does not delegate, and one non-delegable clause silently truncates the
+      # whole query at the row limit. ActiveProjects already excludes Archived, so
+      # "show completed" is the difference between three phases and four.
+      #
+      # `project_coverage` is NOT indexed in the golden source. Equality on it
+      # delegates, but SharePoint refuses an unindexed filter once the list passes
+      # 5,000 items — index it before the projects list gets near that.
       - galProjects:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: |
-              =If( selFilter.Selected.Id = 3,
-                   Sort( Filter( taskmaster_projects,
-                             project_phase.Value = "Archived"
-                          && StartsWith(project_name, txtProjSearch.Text) ),
-                         project_name ),
-                   selFilter.Selected.Id = 2,
+              =If( tglShowComplete.Value && cboPrjCoverage.Selected.Value = "All coverage",
                    Sort( Filter( ActiveProjects,
                              StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
-                   Sort( Filter( taskmaster_projects,
-                             StartsWith(project_name, txtProjSearch.Text) ),
+                   tglShowComplete.Value,
+                   Sort( Filter( ActiveProjects,
+                             project_coverage.Value = cboPrjCoverage.Selected.Value
+                          && StartsWith(project_name, txtProjSearch.Text) ),
+                         project_name ),
+                   cboPrjCoverage.Selected.Value = "All coverage",
+                   Sort( Filter( ActiveProjects,
+                             ( project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Blocked" )
+                          && StartsWith(project_name, txtProjSearch.Text) ),
+                         project_name ),
+                   Sort( Filter( ActiveProjects,
+                             ( project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Blocked" )
+                          && project_coverage.Value = cboPrjCoverage.Selected.Value
+                          && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ) )
             TemplateSize: =72
             TemplatePadding: =0
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            # ABSOLUTE, not `txtProjSearch.Y + txtProjSearch.Height + …`. The reference
-            # would survive a paste, but only while the NAME does: a control that lands
-            # suffixed (txtProjSearch -> txtProjSearch_1) breaks it, and this gallery
-            # then jumps to the top of the screen over the filter row. Same arithmetic
-            # as every other screen: header 88, section header 60, gap, filter 40, gap.
             Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
             X: =gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
+            - rowStatus:
+                Control: CanvasComponent
+                ComponentName: cmpProjectStatus
+                Properties:
+                  Status: =Coalesce(ThisItem.project_phase.Value, "")
+                  X: =16
+                  Y: =22
+                  Width: =28
+                  Height: =28
             - rowName:
                 Control: Label@2.5.1
                 Properties:
@@ -112,44 +165,71 @@ Screens:
                   FontWeight: =FontWeight.Semibold
                   Size: =gTheme.Size.H3
                   Color: =gTheme.Color.TextPrimary
-                  X: =gTheme.Space.Gap
-                  Y: =10
-                  Width: =Parent.TemplateWidth * 0.42
-                  Height: =26
                   VerticalAlign: =VerticalAlign.Middle
-            - rowMeta:
+                  X: =56
+                  Y: =12
+                  Width: =Parent.TemplateWidth * 0.30
+                  Height: =26
+            - rowLead:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
-                    =ThisItem.project_phase.Value & "  ·  " & ThisItem.project_priority.Value
-                     & "  ·  " & Coalesce(ThisItem.project_manager.DisplayName, "Unassigned")
+                    =Coalesce(ThisItem.project_manager.DisplayName, "Unassigned")
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
-                  X: =gTheme.Space.Gap
-                  Y: =36
-                  Width: =Parent.TemplateWidth * 0.42
-                  Height: =20
                   VerticalAlign: =VerticalAlign.Middle
-            - rowTarget:
+                  X: =56
+                  Y: =38
+                  Width: =Parent.TemplateWidth * 0.30
+                  Height: =20
+            - rowPriority:
                 Control: Label@2.5.1
                 Properties:
+                  Text: =Coalesce(ThisItem.project_priority.Value, "—")
+                  Font: =gTheme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =gTheme.Size.Small
+                  # Colour-coded, but the value is also SPELLED OUT — colour alone
+                  # would carry the whole meaning for a reader who cannot see it.
+                  Color: |
+                    =Switch( ThisItem.project_priority.Value,
+                             "Critical", gTheme.Color.Danger,
+                             "High",     gTheme.Color.Warning,
+                             "Moderate", gTheme.Color.Primary,
+                                         gTheme.Color.TextMuted )
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =Parent.TemplateWidth * 0.40
+                  Y: =26
+                  Width: =Parent.TemplateWidth * 0.12
+                  Height: =20
+            - rowDue:
+                Control: Label@2.5.1
+                Properties:
+                  # No target date is "-", not a blank cell: an empty column reads as
+                  # a rendering fault, a dash reads as "nobody set one".
                   Text: |
-                    =If( IsBlank(ThisItem.project_date_target), "No target date",
-                         "Target " & Text(ThisItem.project_date_target, "dd mmm yyyy") )
+                    =If( IsBlank(ThisItem.project_date_target), "-",
+                         Text(ThisItem.project_date_target, "dd mmm yyyy") & "   ·   " &
+                         With( { d: DateDiff(Today(), ThisItem.project_date_target, TimeUnit.Days) },
+                               If( d < 0,  Abs(d) & " days overdue",
+                                   d = 0,  "due today",
+                                   d = 1,  "1 day left",
+                                           d & " days left" ) ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
+                  # Only overdue on work that is still open — a completed project
+                  # past its target is history, not a problem to flag.
                   Color: |
                     =If( !IsBlank(ThisItem.project_date_target)
                       && ThisItem.project_date_target < Today()
-                      && ThisItem.project_phase.Value <> "Complete"
-                      && ThisItem.project_phase.Value <> "Archived",
+                      && ThisItem.project_phase.Value <> "Complete",
                          gTheme.Color.Danger, gTheme.Color.TextMuted )
-                  X: =Parent.TemplateWidth * 0.46
-                  Y: =26
-                  Width: =Parent.TemplateWidth * 0.24
-                  Height: =20
                   VerticalAlign: =VerticalAlign.Middle
+                  X: =Parent.TemplateWidth * 0.54
+                  Y: =26
+                  Width: =Parent.TemplateWidth * 0.26
+                  Height: =20
             - rowPercent:
                 Control: Label@2.5.1
                 Properties:
@@ -158,18 +238,26 @@ Screens:
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
                   Align: =Align.Right
-                  X: =Parent.TemplateWidth - 180 - gTheme.Space.Gap
-                  Y: =26
-                  Width: =180
-                  Height: =20
                   VerticalAlign: =VerticalAlign.Middle
+                  X: =Parent.TemplateWidth - 160 - 16
+                  Y: =26
+                  Width: =160
+                  Height: =20
+            - rowLine:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =gTheme.Color.Border
+                  X: =0
+                  Y: =71
+                  Width: =Parent.TemplateWidth
+                  Height: =1
             - galProjectsHit:
                 Control: Classic/Button@2.2.0
                 Properties:
                   # The row's action lives HERE, not on the gallery's OnSelect: a gallery's own
                   # OnSelect does not reliably fire when the click lands on a child control, so
                   # without a transparent full-template button declared LAST the rows look right
-                  # and do nothing. Confirmed in Studio on the nav rail, 2026-08-03.
+                  # and do nothing.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   HoverFill: =gTheme.Color.Hover
@@ -186,9 +274,11 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Text: |
-              =If( IsBlank(txtProjSearch.Text),
-                   "No projects match this filter.",
-                   "No projects start with """ & txtProjSearch.Text & """." )
+              =If( Len(txtProjSearch.Text) > 0,
+                   "No projects start with """ & txtProjSearch.Text & """.",
+                   !tglShowComplete.Value,
+                   "Nothing open here. Turn on Show completed to include finished projects.",
+                   "No projects match this coverage." )
             Font: =gTheme.Font
             Size: =gTheme.Size.Body
             Color: =gTheme.Color.TextMuted

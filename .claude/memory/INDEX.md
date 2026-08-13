@@ -6,15 +6,15 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **BUILT — editing and refining, not creating.** 11 screens, 12 components, the App object.
-  22/22 valid. **The published app renders properly** (user, 2026-08-12).
+- **BUILT — editing and refining, not creating.** 11 screens, 11 components, the App object.
+  23/23 valid. **The published app renders properly** (user, 2026-08-12).
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`, `gHasPowerBiLicence`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
 - **Paste in progress.** Landed: `App.OnStart`, `cmpAppBar`. Remaining: `cmpPicker`,
-  `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then every screen but `scrHome`.
-  `scrProject` / `scrIssueEdit` / `scrTransactionEdit` / the five picker screens also
-  carry unlanded LOGIC fixes, so those pastes are not cosmetic.
+  `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, the NEW `cmpProjectStatus`, then every
+  screen but `scrHome`. `scrProjects` is a full rework; `scrProject` / `scrIssueEdit` /
+  `scrTransactionEdit` / the picker screens carry LOGIC fixes, so none of it is cosmetic.
 - **SharePoint matches `schema/schema.yaml`** — archived columns and the Choice-value edits
   are applied. **No orphaned controls: the user DELETES a screen before pasting it back.**
 - Six superseded components still ship inside the `.msapp` — see Threads.

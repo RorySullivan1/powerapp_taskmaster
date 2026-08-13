@@ -51,7 +51,7 @@ The repo houses the app's source and nothing else — one file per unit, in pa-y
 - **`src/App.pa.yaml`** — the App object: the named formulas (`Theme`, `NavMenu`, `ClaimPrefix`,
   `StageWeights`, `gUserEmail`, `gHasPowerBiLicence`) that every screen reads.
 - **`src/Screens/`** — one file per screen, 11 of them.
-- **`src/Components/`** — one file per component, 12 of them. A component is a **whole
+- **`src/Components/`** — one file per component, 11 of them. A component is a **whole
   definition** here: its custom properties and its controls live in the same file.
 - **`schema/`** — **`schema.yaml` is the GOLDEN SOURCE** for the SharePoint backend (repo
   defines, SharePoint applies); `incoming-lists.md` is provenance.
@@ -110,5 +110,5 @@ or ship fallbacks — no pull/round-trip exists), that
 **transactions are full transaction-level primary** (delegation/indexing critical), that
 **`schema/schema.yaml` is the golden source** (repo defines, SharePoint applies), that **not
 everyone is Power BI-licensed** (native nav + empty state), and that **the app is BUILT** — all
-11 screens, 12 components and the App object are authored here and live in Studio, so the work is
+11 screens, 11 components and the App object are authored here and live in Studio, so the work is
 editing and refining, not creating.
