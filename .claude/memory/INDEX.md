@@ -15,8 +15,8 @@
   `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, the NEW `cmpProjectStatus`, then every
   screen but `scrHome`. `scrProjects` is a full rework; `scrProject` / `scrIssueEdit` /
   `scrTransactionEdit` / the picker screens carry LOGIC fixes, so none of it is cosmetic.
-- **SharePoint matches `schema/schema.yaml`** — archived columns and the Choice-value edits
-  are applied. **No orphaned controls: the user DELETES a screen before pasting it back.**
+- **SharePoint matches `schema/schema.yaml` EXCEPT one pending edit:** `project_phase` needs
+  the new `Not Started` value added and set as the column default. **No orphaned controls: the user DELETES a screen before pasting it back.**
 - Six superseded components still ship inside the `.msapp` — see Threads.
 
 ## Decisions        (append-only; supersede, never delete)
@@ -54,6 +54,8 @@ not know them will author something broken:
   all. The probe only covered references that resolve. If an unresolvable one is what gets
   replaced by a constant, the 2026-08-04 `Y=193` report is fully explained and the rule becomes
   "relative geometry is fine as long as the name survives the paste".
+- **OWED IN SHAREPOINT:** add `Not Started` to `project_phase` and make it the column default.
+  Until then a new project writes a value the list does not accept.
 - **Three auto-layout containers have BOTH children unpinned** (`colIssType` among them) —
   unpinned children split space evenly and ignore declared heights.
 - **The Choice columns that replaced Managed Metadata (2026-08-10) have no recorded internal
@@ -69,6 +71,7 @@ not know them will author something broken:
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-13 | scrProjects reworked: coverage filter + show-completed toggle + six-column rows; new SVG cmpProjectStatus; project_phase gains "Not Started" as default | INDEX Decisions 2026-08-13
 - 2026-08-13 | layout formulas SURVIVE a paste (probe run in Studio); design + transfer skills, validator check, build-history row and src comments all corrected | tests/README.md
 - 2026-08-13 | cmpPicker opens on the first 10 records (current user for person fields); record branches un-gated from query length | INDEX Decisions 2026-08-13
 - 2026-08-13 | INDEX pruned 620 lines/231KB to ~80; full prior contents archived verbatim | sessions/ARCHIVE-2026.md
