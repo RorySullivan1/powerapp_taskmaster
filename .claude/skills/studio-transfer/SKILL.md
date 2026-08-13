@@ -113,10 +113,9 @@ one control, direction chosen by a property.
             LayoutMinHeight: =16
 ```
 
-**Children carry no X/Y** — the container positions them. That matters more here than it looks:
-X/Y are exactly the properties Studio freezes on paste, so **anything inside an auto-layout
-container is immune to that whole failure mode**. It is the one layout that survives the gap
-intact.
+**Children carry no X/Y** — the container positions them. Reach for it because it expresses
+intent (a row, a stack, a gap) and re-flows siblings when a child is inserted, not to dodge any
+paste hazard: layout formulas cross the gap live (see below).
 
 **A SCROLLING COLUMN — every property below confirmed from a second code-view photo:**
 
@@ -148,25 +147,27 @@ First-party, from *Create responsive layouts in canvas apps*:
 > your formulas will be overwritten with constant values if you subsequently drag the control in
 > the canvas editor.
 
-Studio does that positioning as part of a paste, so **every layout formula lands as a frozen
-constant** — the value the formula happened to evaluate to *at the instant of the paste*.
+**That says DRAGGING, and this section used to read it as pasting.** The two were settled apart
+by experiment — `tests/scrProbe-layout-freeze.pa.yaml`, run in Studio 2026-08-13. Layout formulas
+cross the gap **live**: `Parent` arithmetic, references to a control declared earlier, references
+to one declared later, and a container's own `Width` all kept recomputing after the paste. A drag,
+run as the control in the same session, froze on contact.
 
-Three consequences, all of which have already bitten:
+What follows from the corrected reading:
 
-1. **A layout formula that references another control freezes to a transient value.** If the
-   referenced control isn't yet at its final position when the paste evaluates, the wrong number
-   is baked in permanently. `scrProjects`' gallery landed at `Y=193` this way and covered the
-   filter row. **Never position off another control** — the value must be self-contained.
-2. **The landed app is not responsive.** `Width: =Parent.Width - 48` becomes `1318`. Fine for a
-   fixed 1366×768 tablet app, which this is, but it means a Theme change will never propagate to
-   layout: re-pasting is the only way, and re-pasting re-freezes.
-3. **Fixing a frozen value means editing that property in Studio**, not re-pasting — the paste
-   will just freeze it again. Set the number in the formula bar.
+1. **Positioning off another control is allowed** and stays live. The `Y=193` gallery that this
+   section used to blame on freezing was almost certainly the **name suffix**: if a control lands
+   as `txtProjSearch_1`, every reference to `txtProjSearch` in that paste resolves to the old
+   control or to nothing. Deleting a screen before pasting it back — this project's practice —
+   avoids it.
+2. **The landed app is responsive to the extent it is authored to be.** `Width: =Parent.Width - 48`
+   stays that formula, and a `Theme.Space.*` change propagates on the next OnStart run.
+3. **Tell the human not to DRAG a control whose geometry is a formula.** That is the one action
+   that silently replaces the formula with the number it happened to be at.
 
-**Authoring rule:** prefer plain integers for X/Y/Width/Height whenever the value is static
-anyway, so what lands equals what was authored and there is no evaluation-order dependency at
-all. Keep a formula only where genuine responsiveness is wanted, and tell the human not to drag
-that control.
+**Authoring rule:** plain integers are still fine where a value is static anyway — they are
+simpler to read and to check against the band table. Use a formula wherever the relationship is
+the point; it will survive.
 
 ## Refinement: don't re-paste a screen to change a property (2026-08-05)
 
@@ -177,7 +178,6 @@ by hand while its controls paste.
 
 Once a screen exists, **re-pasting it to change a few properties is the wrong move**:
 
-- it re-freezes every `X`/`Y`/`Width`/`Height` formula into the constant it evaluated to,
 - it re-suffixes any control whose name now collides (`galProjects` → `galProjects_1`), and
 - it creates a second control rather than patching the first — paste is never an in-place edit.
 

@@ -41,6 +41,7 @@ not know them will author something broken:
 - [2026-08-06] Modern controls are ON in this tenant — ARCHIVE
 - [2026-08-05] A component is a CONTRACT: custom properties are hand-typed in the editor, and `AccessAppScope: false` means it cannot read `gTheme` or any data source — colours are literals — ARCHIVE
 - [2026-08-12] Layout formulas FREEZE at paste, so cross-control geometry references can land as a constant that was never correct — ARCHIVE
+- [2026-08-13] **SUPERSEDES THE LINE ABOVE — it was FALSE.** A probe in Studio (`tests/README.md`) showed layout formulas cross a paste LIVE, forward references included; **DRAGGING** is what freezes them, which is all the cited MS Learn quote ever said. The inference was written in the voice of its citation, so every later reader checked the quote, saw a real Microsoft sentence, and moved on. **A false claim with a true quote attached is more durable than one with no evidence at all** — INDEX Decisions
 - [2026-08-12] COMMENTS ARE NOT A CHANGELOG (now enforced in CLAUDE.md): git holds history, `.claude/memory/` holds reasoning, comments hold constraints — ARCHIVE
 
 ## Threads          (open items; remove when closed)
@@ -49,10 +50,10 @@ not know them will author something broken:
 - **Six superseded COMPONENTS to delete in Studio** — `cmpPeoplePicker`, `cmpRecordPicker`,
   `cmpUiKit`, `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`. Instance-free but still
   shipping inside the `.msapp`.
-- **UNDER TEST: does a layout formula survive a code-view paste?** `tests/scrProbe-layout-freeze.pa.yaml`,
-  not yet run. The skill's cited MS Learn quote is about DRAGGING; the leap to pasting was never
-  grounded. **Do not rewrite the design skill, the validator NOTE or the absolute-arithmetic
-  comments until the result is recorded in `tests/README.md`.**
+- **UNTESTED follow-up to the freeze probe:** a reference to a name that is NOT in the paste at
+  all. The probe only covered references that resolve. If an unresolvable one is what gets
+  replaced by a constant, the 2026-08-04 `Y=193` report is fully explained and the rule becomes
+  "relative geometry is fine as long as the name survives the paste".
 - **Three auto-layout containers have BOTH children unpinned** (`colIssType` among them) —
   unpinned children split space evenly and ignore declared heights.
 - **The Choice columns that replaced Managed Metadata (2026-08-10) have no recorded internal
@@ -68,5 +69,6 @@ not know them will author something broken:
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-13 | layout formulas SURVIVE a paste (probe run in Studio); design + transfer skills, validator check, build-history row and src comments all corrected | tests/README.md
 - 2026-08-13 | cmpPicker opens on the first 10 records (current user for person fields); record branches un-gated from query length | INDEX Decisions 2026-08-13
 - 2026-08-13 | INDEX pruned 620 lines/231KB to ~80; full prior contents archived verbatim | sessions/ARCHIVE-2026.md

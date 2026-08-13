@@ -279,7 +279,7 @@ A second container layout worth adopting: **CSS-grid** placement. You set the gr
 rows and gap once, and each child names its cell instead of living in a nested row-of-columns.
 **A 2×2 that today costs a row container + two col containers collapses to ONE grid
 container** — which is the whole point: fewer controls, lower load. Responsive like the
-auto-layout container (children keep their cells, no X/Y to freeze).
+auto-layout container (children keep their cells; their X/Y are ignored).
 Insert ▸ **Layout ▸ Grid container**.
 
 ### Grounded 2026-08-10 — the Control token, the Variant, and the four child tokens

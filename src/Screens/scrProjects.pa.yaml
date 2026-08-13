@@ -13,10 +13,11 @@
 #   164 .. 204   selFilter | txtProjSearch  = +60 +Gap,         height 40
 #   220 .. 744   galProjects      = +40 +Gap,   height = 768 - 220 - Gutter
 #
-# If Studio shows anything else here, the layout has drifted — most likely a
-# control positioned off another control's geometry, which is how galProjects
-# once landed at Y=193 and covered the filter row by 11px. Every value in this
-# stack is now absolute gTheme arithmetic for that reason.
+# If Studio shows anything else here, the layout has drifted. The stack is absolute
+# gTheme arithmetic rather than control-relative — a style choice, not a constraint:
+# layout formulas do survive a paste (tests/README.md), so a relative version would
+# work. Absolute is kept because these numbers can be checked against the table above
+# by eye.
 
 Screens:
   scrProjects:
@@ -93,12 +94,11 @@ Screens:
             TemplateSize: =72
             TemplatePadding: =0
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            # ABSOLUTE, not `txtProjSearch.Y + txtProjSearch.Height + …`. A cross-control
-            # geometry reference is fragile across this gap: Studio suffixes a
-            # colliding name on paste (txtProjSearch -> txtProjSearch_1), and if the
-            # reference then fails to resolve the gallery jumps to the top of the
-            # screen and covers the filter and search row. Same arithmetic as every
-            # other screen: header band 88, section header 60, gap, filter row 40, gap.
+            # ABSOLUTE, not `txtProjSearch.Y + txtProjSearch.Height + …`. The reference
+            # would survive a paste, but only while the NAME does: a control that lands
+            # suffixed (txtProjSearch -> txtProjSearch_1) breaks it, and this gallery
+            # then jumps to the top of the screen over the filter row. Same arithmetic
+            # as every other screen: header 88, section header 60, gap, filter 40, gap.
             Height: =Parent.Height - (gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap) - gTheme.Space.Gutter
             X: =gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap

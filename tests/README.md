@@ -31,7 +31,7 @@ adding probes does not move the `22/22` count. Validate one explicitly:
 
 ## `scrProbe-layout-freeze.pa.yaml` — do layout formulas survive a code-view paste?
 
-**Status: NOT YET RUN.**
+**Status: RUN 2026-08-13. THE CLAIM IS FALSE — layout formulas SURVIVE a paste.**
 
 ### The claim under test
 
@@ -83,14 +83,55 @@ depends on without touching the control.
    dragging turns `=Parent.Width - 400` into a number, the instrument can see
    freezing — which is what makes a negative result in steps 1–3 mean anything.
 
-### Result
+### Result — 2026-08-13, run by the user in Studio
 
-*(fill in: date, what each probe did, and which way the claim went)*
+**All four steps ran. Every layout formula survived the paste, as a formula.**
 
-### What changes if formulas survive
+- Steps 1–3: the probes came through with their formulas intact. Typing into the
+  box moved the dark blue bar, and the light blue bar chained off it moved with it,
+  so the formulas were **live after the paste** — not constants that happened to
+  equal the right number. Backward reference, forward reference, `Parent`
+  arithmetic and the container's own `Width` all held.
+- Step 4, the positive control: dragging behaved as MS Learn documents. **So the
+  instrument could see freezing, and did not see it on paste.** That is what makes
+  this a real negative rather than an inconclusive one.
 
-`.claude/skills/powerapp-canvas-design` §4 and §5, the `studio-transfer` note on
-auto-layout being "the one layout that survives", the validator's cross-control
-NOTE (`tools/validate_pa_yaml.py`), the memory Decisions entry, and the defensive
-absolute-arithmetic comments in `src/Screens/scrProjects.pa.yaml` and elsewhere.
-Do not start rewriting those until the result is recorded here.
+**The rule was wrong, and it was wrong in a specific, repeatable way: an inference
+was written down in the voice of its citation.** The MS Learn quote said *dragging*;
+the skill said *pasting* and kept the quote directly beneath it, so every later
+reader — including several sessions of me — checked the citation, saw a real
+Microsoft sentence, and moved on. A false claim with a true quote attached to it is
+far more durable than one with no evidence at all.
+
+**What actually caused the `Y=193` gallery, since something did.** The original
+2026-08-04 report (`docs/build-history.md`, now annotated as superseded) was
+first-hand and specific: *"in github i see the dynamic calculation… but on paste the
+gallery's Y value becomes hardcoded."* That observation was real. It was also
+uncontrolled, and this probe did not reproduce it.
+
+The reconciliation that fits both results: **a reference that fails to RESOLVE gets
+replaced by a constant, while one that resolves stays a formula.** If a pasted
+control lands as `txtProjSearch_1`, every reference to `txtProjSearch` in that paste
+points at the old control or at nothing. That is a different mechanism from
+freezing, and it is already avoided by deleting a screen before pasting it back —
+which is this project's practice and why nothing has landed at `Y=193` since.
+
+**Open sub-question, NOT tested here:** P3 referenced a control that *does* exist
+later in the same paste. The unresolvable case — a reference to a name that is not
+in the paste at all — was never probed. If that turns out to write a constant, the
+2026-08-04 report is fully explained and the rule becomes "references are fine as
+long as the name survives the paste". Worth a second probe before anyone relies on
+cross-screen or cross-component references.
+
+### What changed as a result
+
+Corrected 2026-08-13: `.claude/skills/powerapp-canvas-design` §4 and §5, the
+`studio-transfer` note on auto-layout being "the one layout that survives", the
+validator's cross-control NOTE (`tools/validate_pa_yaml.py`), the memory Decisions
+entry, and the defensive comments in `src/Screens/scrProjects.pa.yaml`.
+
+**The authored geometry in `src/` was NOT rewritten.** Absolute `gTheme.Space.*`
+arithmetic is still correct and still readable; it is simply no longer *compulsory*.
+Converting 11 screens to relative positioning is a real change with real regression
+risk across a one-way gap, and it buys responsiveness this fixed-canvas tablet app
+does not currently need. It is now available, not required.

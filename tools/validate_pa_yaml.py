@@ -305,42 +305,19 @@ def token_errors(doc) -> list[str]:
                     f"Gate it on the same flag that opens it, or make its Height conditional"
                 )
 
-    # A control's POSITION must not depend on another control's geometry.
+    # NO CROSS-CONTROL GEOMETRY CHECK — it was REMOVED 2026-08-13, do not re-add it.
     #
-    # THE REASON IS THE FREEZE, NOT A RENAME. This message used to blame Studio
-    # suffixing a colliding name (SearchBox -> SearchBox_1) and the reference failing
-    # to resolve. docs/build-history.md 2026-08-04 settled it the other way and said so
-    # explicitly — "the true origin of Y=193: NOT an unresolved reference, but
-    # `SearchBox.Y + SearchBox.Height + Gap` evaluated mid-paste and frozen". The two
-    # had drifted apart; the build history is the first-party-grounded one and wins.
+    # It flagged `Y: =Other.Y + Other.Height` on the grounds that layout formulas freeze
+    # at paste, so a sibling reference could land as a constant that was never correct.
+    # `tests/scrProbe-layout-freeze.pa.yaml` disproved the premise in Studio: formulas
+    # cross a paste LIVE, including references to a control declared later in the same
+    # file. Dragging freezes; pasting does not. The check would now fire on exactly the
+    # construct the experiment showed to be safe.
     #
-    # Why a sibling reference is worse than `Parent.Width - 48`, when BOTH freeze:
-    # Parent's geometry is settled before its children are laid out, so that constant
-    # was correct when it froze and stays correct for a fixed-size app — you lose
-    # responsiveness, which this project already accepts. A SIBLING's geometry is being
-    # established by the same paste, so the constant can be a value that was never
-    # correct at any instant the user sees. That is the whole difference: both freeze,
-    # only one can freeze to something that was never true.
-    #
-    # Anchoring X/Width to a backdrop rectangle is harmless by comparison, so only Y
-    # and Height are flagged. This stays a NOTE, not a failure: three low-traffic
-    # screens (scrAdmin, scrReference, scrReports) still position off a backdrop and
-    # work, because their referents are static and land before them.
-    for path, node in walk(doc):
-        for name, body in node.items():
-            if not isinstance(body, dict):
-                continue
-            for prop in ("Y", "Height"):
-                f = strip_comments(str((body.get("Properties") or {}).get(prop, "")))
-                for ref in re.findall(r"\b([A-Z][A-Za-z0-9_]*|gal[A-Za-z0-9_]*)\.(?:X|Y|Width|Height)\b", f):
-                    if ref in ("Parent", "Self", "ThisItem", "App", "Theme"):
-                        continue
-                    out.append(
-                        f"{path}/{name}/{prop}: NOTE positions off `{ref}` — layout formulas FREEZE "
-                        f"at paste, and `{ref}` is still being placed by that same paste, so this "
-                        f"can land as a constant that was never correct. Prefer Theme arithmetic, "
-                        f"or an auto-layout container (children carry no Y at all)"
-                    )
+    # The `Y=193` gallery this check was built for had a different cause: a control that
+    # lands with a suffixed name (`txtProjSearch_1`) breaks every reference to the
+    # original in that paste. Deleting a screen before pasting it back — this project's
+    # practice — avoids that, and it is not something a static check on the source can see.
 
     # MS Learn documents the Icon property and NEVER enumerates its values, so every
     # icon name here was a guess until the list was recovered from Templates.json

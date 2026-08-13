@@ -8,7 +8,7 @@ description: >
   a modal", "why is my Y value hardcoded after pasting", "nothing on this screen is
   clickable", "design the header / nav". Covers: vertical band planning and the collision
   arithmetic that must be done at author time, auto-layout containers vs absolute positioning,
-  overlay and modal patterns, scrolling, the paste-time freezing of X/Y/Width/Height, hit
+  overlay and modal patterns, scrolling, why dragging (not pasting) freezes X/Y/Width/Height, hit
   testing and z-order, and Theme-driven spacing and type. Boundaries: which control to place
   is powerapp-canvas-controls; the formulas in its properties are powerapp-canvas-development;
   reusable component contracts are power-apps-components; SVG visuals are power-apps-svg.
@@ -67,32 +67,43 @@ First child = bottom, last = top. There is no `ZIndex`.
   `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)` — full-screen only while open,
   when swallowing the click is the point.
 
-## 4. Layout formulas FREEZE on paste — this changes everything
+## 4. DRAGGING freezes a layout formula. Pasting does not.
 
 > *"After you write formulas for the X, Y, Width and Height properties of a control, your
 > formulas will be overwritten with constant values if you subsequently drag the control in
 > the canvas editor."* — MS Learn, *Create responsive layouts*
 
-A paste positions controls, so **every layout formula lands as whatever it evaluated to at that
-instant.** Consequences:
+Read that quote for what it says: **dragging**. This section used to be titled "Layout formulas
+FREEZE on paste" and treated the two as the same event. They are not, and the difference was
+settled by experiment — `tests/scrProbe-layout-freeze.pa.yaml`, run in Studio 2026-08-13.
+Formulas came through a code-view paste **live**: `Parent` arithmetic, references to a control
+declared earlier, references to one declared later, and a container's own `Width` all kept
+recomputing afterwards. Dragging, tested in the same session as a control, froze on contact.
 
-- **Never position a control off another control** (`Y: =Other.Y + Other.Height + Gap`). It
-  will be evaluated mid-paste, when the referenced control may not be where it ends up, and
-  frozen wrong. A gallery landed at `Y=193` on top of its own filter row this way.
-- The landed app **is not responsive**. `Parent.Width - 48` becomes `1318`. Acceptable for a
-  fixed-size tablet app; know that it is true.
-- A wrong position is fixed **in the formula bar**, not by re-pasting — re-pasting re-freezes.
-- Prefer **plain integers** for X/Y/Width/Height wherever the value is static anyway, so what
-  lands equals what was authored.
+So:
 
-## 5. Auto-layout containers are the one layout that survives
+- **Positioning a control off another control is allowed.** `Y: =Other.Y + Other.Height + Gap`
+  survives and stays live.
+- **The landed app IS responsive**, to the extent it is authored to be. `Parent.Width - 48`
+  stays `Parent.Width - 48`.
+- **Once a property is a formula, stop dragging that control.** This is the real hazard, and it
+  is invisible: the drag silently rewrites your formula to the number it happened to be at.
+- A wrong position is still fixed **in the formula bar**. Re-pasting is fine too — it does not
+  re-freeze anything.
+
+**The one paste hazard that IS real, and is a different mechanism:** if a control lands with a
+suffixed name (`txtProjSearch_1`), every reference to `txtProjSearch` in that same paste
+resolves to the old control or to nothing. Deleting a screen before pasting it back avoids this
+entirely, which is this project's working practice.
+
+## 5. Auto-layout containers, and what they are actually for
 
 `GroupContainer@1.5.0` / `Variant: AutoLayout` children carry **no X/Y** — the container places
-them. Since X/Y are exactly what freezes, the *children's placement* is **immune** to §4.
-Mind the scope: it's the children's absent X/Y that can't freeze. The **container's own**
-`Width`/`Height` are ordinary layout formulas and **do** freeze on paste (`=Parent.Height - 196`
-lands as a constant) — fine for this fixed-size tablet app, but don't expect the scroll region to
-re-flow if the screen later changes size.
+them. That is worth reaching for because it expresses intent (a row, a stack, a gap) instead of
+arithmetic, and because inserting a child re-flows its siblings for free.
+
+It is **not** a way to escape freezing — nothing needs escaping (§4). The container's own
+`Width`/`Height` are ordinary layout formulas and stay live like any other.
 
 ```yaml
 - frmScroll:
@@ -111,7 +122,7 @@ re-flow if the screen later changes size.
 2026-08-10. Its children place themselves with four numeric properties instead of X/Y:
 `LayoutGridColumnStart` / `LayoutGridColumnEnd` / `LayoutGridRowStart` / `LayoutGridRowEnd`.
 Studio writes `X`/`Y` on those children anyway, exactly as it does for auto-layout children
-whose X/Y are ignored — so §4's freezing note applies unchanged: their placement is immune.
+whose X/Y are ignored — the container places them regardless of what those properties say.
 
 **What is NOT known is how the grid's own shape is declared** — no column count, row count or
 track sizes appear anywhere in the sample. So a grid is placeable but not creatable from here:
@@ -133,8 +144,8 @@ Width:          =220
 pattern: put a picker's results gallery *inline* after its search box and it expands the column
 when it opens, collapses when it closes. No z-order, no covering, no one-open-at-a-time gate.
 
-Put an **opaque** bar behind a fixed footer anyway. If a stale `Height` ever freezes in, an
-opaque rectangle still stops content showing through the Save row.
+Put an **opaque** bar behind a fixed footer anyway. If a `Height` is ever wrong, an opaque
+rectangle still stops content showing through the Save row.
 
 ## 6. Compactness comes from control choice, not from squeezing
 
@@ -160,8 +171,8 @@ All colour, size and spacing goes through the `Theme` named formula
 
 - A **component cannot read app-scope named formulas** — colours inside a component are
   literals that mirror Theme, and must be kept in step by hand.
-- Because layout formulas freeze (§4), `Theme.Space.*` only ever applies **at paste time**.
-  Colours and sizes stay live; positions do not.
+- `Theme.Space.*` in a layout formula stays **live** — positions recompute like colours and
+  sizes do (§4). What breaks the link is dragging that control, not pasting it.
 
 ## Scale-to-fit vs Lock-aspect-ratio: Studio and the player DIVERGE (2026-08-12)
 
