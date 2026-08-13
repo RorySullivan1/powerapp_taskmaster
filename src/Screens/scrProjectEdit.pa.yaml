@@ -38,8 +38,22 @@ Screens:
         Set( gPrRegionPath, If( gEditMode = "Edit", Coalesce(gEditProject.project_region_path, ""), "" ) );
         Set( gPrTypeId,     If( gEditMode = "Edit", Coalesce(gEditProject.project_type_id, 0), 0 ) );
         Set( gPrTypePath,   If( gEditMode = "Edit", Coalesce(gEditProject.project_type_path, ""), "" ) );
-        ClearCollect( colPrCovChoices, Choices([@taskmaster_projects].project_coverage) );
-        Set( gPrCov, If( gEditMode = "Edit", Coalesce(gEditProject.project_coverage.Value, ""), "" ) );
+        // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
+        // synthesised POSITIONALLY: Sequence() numbers the rows, Index() reads the nth
+        // choice back out. Priority is REQUIRED so it has no blank row; coverage is
+        // optional, so row 1 is "(none)" and the real choices start at Id 2. The Ids mean
+        // nothing beyond "which row" — each DefaultId looks its value up by Label.
+        ClearCollect( colPrPriorityOpts,
+                      With( { ch: Choices([@taskmaster_projects].project_priority) },
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+        ClearCollect( colPrCovOpts,
+                      With( { ch: Choices([@taskmaster_projects].project_coverage) },
+                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
+                                    { Id:    n.Value,
+                                      Label: If( n.Value = 1, "(none)",
+                                                 Index(ch, n.Value - 1).Value ) } ) ) );
+        Set( gPrCov, If( gEditMode = "Edit", Coalesce(gEditProject.project_coverage.Value, "(none)"), "(none)" ) );
         Clear( colNewTasks ); Clear( colNewTransactions );
         If( gEditMode = "Edit",
             ClearCollect( colLinkedTasks, Filter(taskmaster_tasks, task_project_id.Id = gEditProject.ID) );
@@ -71,14 +85,14 @@ Screens:
         // only on Reset. Without this, opening project B after project A leaves A's
         // priority showing while gPrPriority already holds B's — and re-picking the
         // displayed value fires no OnChange, so the correction cannot be made by hand.
-        Reset( cboPrPriority );
+        Reset( selPrPriority );
         // The pickers DO need resetting. A component's inner combo boxes read their
         // DefaultSelectedItems once, so clearing gPrRegionPath above is not enough on
         // its own — the previous project's selection stays on screen. Reset() on the
         // INSTANCE fires the component's OnReset, which is the only way in from here.
         // Must come after the Set()s above, so DefaultPath is already cleared.
         Reset( pickPrRegion ); Reset( pickPrType );
-        Reset( cboPrCov );
+        Reset( selPrCov );
         Reset( cboNtPriority ); Reset( cboNxCcy )
     Children:
       - HeaderBar:
@@ -173,70 +187,87 @@ Screens:
                   Color: =gTheme.Color.Primary
                   Width: =Parent.Width - 48
                   Height: =24
+            # AUTO-LAYOUT, not a grid. Name takes two thirds and priority one, via
+            # FillPortions 2 and 1 — a GridLayout child spanning two of three columns did
+            # not render at the intended width on scrIssueEdit, so the split is expressed
+            # as portions rather than as a span.
             - rowPrD1:
                 Control: GroupContainer@1.5.0
-                Variant: GridLayout
+                Variant: AutoLayout
                 Properties:
-                  LayoutGridColumns: =3
-                  LayoutGridRows: =10
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
                   Width: =Parent.Width - 48
                   Height: =62
                 Children:
-                  - lblPrNameCap:
-                      Control: Label@2.5.1
+                  - colPrName:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Text: ="Project name  *"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =1
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =3
-                        Width: =Parent.Width
-                        Height: =18
-                  - txtPrName:
-                      Control: ModernTextInput@1.1.1
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =2
+                        LayoutMinWidth: =280
+                        Height: =62
+                      Children:
+                        - lblPrNameCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Project name  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - txtPrName:
+                            Control: ModernTextInput@1.1.1
+                            Properties:
+                              Default: =If(gEditMode = "Edit", gEditProject.project_name, "")
+                              Placeholder: ="What is this project called?"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Body
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                  - colPrPriority:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Default: =If(gEditMode = "Edit", gEditProject.project_name, "")
-                        Placeholder: ="What is this project called?"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Body
-                        LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =1
-                        LayoutGridRowStart: =4
-                        LayoutGridRowEnd: =10
-                        Width: =Parent.Width
-                        Height: =36
-                  - lblPrPriorityCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Priority  *"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        LayoutGridColumnStart: =3
-                        LayoutGridColumnEnd: =3
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =3
-                        Width: =Parent.Width
-                        Height: =18
-                  - cboPrPriority:
-                      Control: ModernCombobox@1.1.1
-                      Properties:
-                        Items: =["Lowest", "Low", "Moderate", "High", "Critical"]
-                        ItemDisplayText: =ThisItem.Value
-                        InputTextPlaceholder: ="Select a priority"
-                        SelectMultiple: =false
-                        IsSearchable: =false
-                        DefaultSelectedItems: =[gPrPriority]
-                        LayoutGridColumnStart: =3
-                        LayoutGridColumnEnd: =3
-                        LayoutGridRowStart: =4
-                        LayoutGridRowEnd: =10
-                        Width: =Parent.Width
-                        Height: =36
-                        OnChange: =Set(gPrPriority, cboPrPriority.Selected.Value)
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =62
+                      Children:
+                        - lblPrPriorityCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Priority  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        # FontSize 10: five options sharing a third of the row.
+                        - selPrPriority:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
+                            Properties:
+                              FontSize: =10
+                              Width: =Parent.Width
+                              Height: =36
+                              Items: =colPrPriorityOpts
+                              DefaultId: |
+                                =Coalesce( LookUp(colPrPriorityOpts, Label = gPrPriority, Id), 1 )
+                              OnChange: =Set(gPrPriority, selPrPriority.Selected.Label)
             - rowPrD2:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
@@ -551,18 +582,18 @@ Screens:
                   Color: =gTheme.Color.TextMuted
                   Width: =Parent.Width - 48
                   Height: =18
-            - cboPrCov:
-                Control: ModernCombobox@1.1.1
+            # FontSize 10: coverage can carry several options across the full form width,
+            # and the labels are business terms rather than single words.
+            - selPrCov:
+                Control: CanvasComponent
+                ComponentName: cmpSelection
                 Properties:
-                  Items: =colPrCovChoices
-                  ItemDisplayText: =ThisItem.Value
-                  DefaultSelectedItems: =Filter( colPrCovChoices, Value = gPrCov )
-                  SelectMultiple: =false
-                  IsSearchable: =true
-                  InputTextPlaceholder: ="Select a coverage area"
+                  FontSize: =10
                   Width: =Parent.Width - 48
-                  Height: =32
-                  OnChange: =Set( gPrCov, cboPrCov.Selected.Value )
+                  Height: =36
+                  Items: =colPrCovOpts
+                  DefaultId: =Coalesce( LookUp(colPrCovOpts, Label = gPrCov, Id), 1 )
+                  OnChange: =Set( gPrCov, selPrCov.Selected.Label )
             - divPrStaged:
                 Control: Rectangle@2.3.0
                 Properties:
@@ -1175,8 +1206,12 @@ Screens:
                                   // gPrCov seeds to "" on New with no required-field gate —
                                   // so an unpicked Coverage sent an empty Choice member, which
                                   // is not a member, and the connector rejected the insert.
+                                  // "(none)" is the strip's clearable row, and Blank() is the
+                                  // only legal way to write an unset Choice — {Value: ""} is
+                                  // not a member and the connector rejects the whole insert.
                                   project_coverage:
-                                      If( Len(gPrCov) > 0, { Value: gPrCov }, Blank() ),
+                                      If( gPrCov <> "(none)" && Len(gPrCov) > 0,
+                                          { Value: gPrCov }, Blank() ),
                                   project_date_start:    dtpPrStart.SelectedDate,
                                   project_date_target:   dtpPrTarget.SelectedDate,
                                   // Written by the Mark complete button on scrProject, which is

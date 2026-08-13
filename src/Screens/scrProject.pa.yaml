@@ -122,9 +122,9 @@ Screens:
                   BorderColor: =gTheme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =172
+                  LayoutMinHeight: =230
                   Width: =Parent.Width - 48
-                  Height: =172
+                  Height: =230
                 Children:
                   - colFacts:
                       Control: GroupContainer@1.5.0
@@ -472,142 +472,182 @@ Screens:
                   # contract check rejects them there. scrProjectEdit's pickers set
                   # only Width/Height for the same reason. Without a pinned wrapper the
                   # ring would default to FillPortions 1 and stretch across the card.
-                  - wrapRing:
+                  # TWO ROWS. The ring and the action icons sit side by side; Mark complete
+                  # spans the pair beneath them, so the control that changes the project's
+                  # state reads as belonging to both rather than hanging off the icons.
+                  - colRight:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =0
+                        LayoutGap: =8
                         FillPortions: =0
-                        LayoutMinWidth: =120
-                        Width: =120
-                        Height: =120
+                        LayoutMinWidth: =300
+                        Width: =300
+                        Height: =190
                       Children:
-                        - ringProject:
-                            Control: CanvasComponent
-                            ComponentName: cmpKpiRing
+                        - rowRingActions:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
                             Properties:
-                              Width: =120
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =16
+                              FillPortions: =0
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width
                               Height: =120
-                              Percent: =Coalesce(gSelProject.project_perc_completion, 0)
-                              Label: =Coalesce(gSelProject.project_perc_completion, 0) & "%"
-                              AccentHex: ="#005A9E"
-                  - colActions:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =12
-                        FillPortions: =0
-                        LayoutMinWidth: =190
-                        Width: =190
-                        Height: =140
-                      Children:
-                        - icoEditProject:
-                            Control: Classic/Icon@2.5.0
-                            Properties:
-                              Icon: =Icon.Edit
-                              Color: =gTheme.Color.Primary
-                              HoverColor: =gTheme.Color.PrimaryDark
-                              HoverFill: =gTheme.Color.Hover
-                              HoverBorderColor: =RGBA(0, 0, 0, 0)
-                              Tooltip: ="Edit this project"
-                              FillPortions: =0
-                              LayoutMinHeight: =28
-                              Width: =28
-                              Height: =28
-                              OnSelect: |
-                                =Set( gEditMode, "Edit" );
-                                 Set( gEditProject, gSelProject );
-                                 Navigate( scrProjectEdit, ScreenTransition.Cover )
-                        - icoDeleteProject:
-                            Control: Classic/Icon@2.5.0
-                            Properties:
-                              Icon: =If( gPrDelArm, Icon.Warning, Icon.Trash )
-                              Color: =gTheme.Color.Danger
-                              HoverColor: =gTheme.Color.Danger
-                              # A RED wash, not gTheme.Color.Hover — a blue tint behind a red destructive
-                              # icon reads as a different control.
-                              HoverFill: =RGBA(197, 58, 58, 0.08)
-                              HoverBorderColor: =RGBA(0, 0, 0, 0)
-                              Tooltip: |
-                                =If( gPrDelArm,
-                                     "Press again to delete this project and everything attached to it",
-                                     "Delete this project" )
-                              FillPortions: =0
-                              LayoutMinHeight: =28
-                              Width: =28
-                              Height: =28
-                              OnSelect: |
-                                =If( !gPrDelArm,
-                                     Set( gPrDelArm, true ),
-                                     Set( gPrDelErr, "" );
-                                     // Children FIRST. Every child carries a REQUIRED lookup
-                                     // to the project, so removing the parent while they
-                                     // exist would leave rows SharePoint will not let
-                                     // anything edit afterwards.
-                                     //
-                                     // Each removal is wrapped in a Set. MS Learn's own idiom
-                                     // is IfError( Remove(...), Notify(...) ), but Remove and
-                                     // RemoveIf "return the modified data source as a TABLE"
-                                     // while Notify and Set return a boolean, and IfError
-                                     // requires ALL its arguments to be type-compatible — so
-                                     // the documented form is rejected. Four DIFFERENT scrap names: a global's
-                                     // type unifies across every Set, so one name holding four
-                                     // differently-shaped tables is a type conflict. They exist
-                                     // only to make both arms a Set.
-                                     //
-                                     // RemoveIf is NOT delegable: it pulls matching rows up to the
-                                     // data row limit and deletes them one by one. A partial pass
-                                     // raises NO error, so without the count first the parent
-                                     // would be removed on top of surviving children — and a child
-                                     // holding a required lookup to a deleted project cannot be
-                                     // edited or deleted by anything afterwards. Count, then refuse
-                                     // rather than half-do it. Same shape as the archive cascade.
-                                     Set( gPrDelBlock, false );
-                                     With( { nI: CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gSelProject.ID) ),
-                                             nX: CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gSelProject.ID) ),
-                                             nT: CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gSelProject.ID) ) },
-                                         If( nI >= 500 || nX >= 500 || nT >= 500,
-                                             Set( gPrDelBlock, true ),
-                                             IfError( Set( gPrDelScrapI,
-                                                           RemoveIf( taskmaster_issues,
-                                                                     issue_project_id.Id = gSelProject.ID ) ),
-                                                      Set( gPrDelErr, FirstError.Message ) );
-                                             IfError( Set( gPrDelScrapX,
-                                                           RemoveIf( taskmaster_transactions,
-                                                                     transaction_project_id.Id = gSelProject.ID ) ),
-                                                      Set( gPrDelErr, FirstError.Message ) );
-                                             IfError( Set( gPrDelScrapT,
-                                                           RemoveIf( taskmaster_tasks,
-                                                                     task_project_id.Id = gSelProject.ID ) ),
-                                                      Set( gPrDelErr, FirstError.Message ) ) ) );
-                                     If( Len(gPrDelErr) = 0 && !gPrDelBlock,
-                                         IfError( Set( gPrDelScrapP,
-                                                       Remove( taskmaster_projects, gSelProject ) ),
-                                                  Set( gPrDelErr, FirstError.Message ) ) );
-                                     If( gPrDelBlock,
-                                         Notify( "This project has too many attached items to delete in one pass. Nothing was deleted — ask for the cleanup workflow.",
-                                                 NotificationType.Error ),
-                                         Len(gPrDelErr) > 0,
-                                         // Say that the children may be gone. There is no
-                                         // transaction here: by the time the parent fails, the
-                                         // child removals have already committed.
-                                         Notify( "Couldn't finish deleting the project: " & gPrDelErr
-                                                   & " Some attached items may already have been removed — reopen the project to check.",
-                                                 NotificationType.Error ),
-                                         Set( gSelProject, Blank() );
-                                         Set( gEditProject, Blank() );
-                                         Clear( colProjectTasks );
-                                         Notify( "Project deleted, with everything attached to it.",
-                                                 NotificationType.Success );
-                                         Navigate( scrProjects, ScreenTransition.UnCover ) );
-                                     Set( gPrDelArm, false ) )
-                        # THE ONLY WAY A PROJECT REACHES "Complete". Every other phase is
-                        # derived on this screen's OnVisible; this button is the one place a
-                        # human decides, and it writes the completion date with it.
+                            Children:
+                              - wrapRing:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =0
+                                    FillPortions: =0
+                                    LayoutMinWidth: =120
+                                    Width: =120
+                                    Height: =120
+                                  Children:
+                                    - ringProject:
+                                        Control: CanvasComponent
+                                        ComponentName: cmpKpiRing
+                                        Properties:
+                                          Width: =120
+                                          Height: =120
+                                          Percent: =Coalesce(gSelProject.project_perc_completion, 0)
+                                          Label: =Coalesce(gSelProject.project_perc_completion, 0) & "%"
+                                          AccentHex: ="#005A9E"
+                              - colActions:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =12
+                                    FillPortions: =0
+                                    LayoutMinWidth: =120
+                                    Width: =120
+                                    Height: =120
+                                  Children:
+                                    - icoEditProject:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Edit
+                                          Color: =gTheme.Color.Primary
+                                          HoverColor: =gTheme.Color.PrimaryDark
+                                          HoverFill: =gTheme.Color.Hover
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: ="Edit this project"
+                                          FillPortions: =0
+                                          LayoutMinHeight: =28
+                                          Width: =28
+                                          Height: =28
+                                          OnSelect: |
+                                            =Set( gEditMode, "Edit" );
+                                             Set( gEditProject, gSelProject );
+                                             Navigate( scrProjectEdit, ScreenTransition.Cover )
+                                    - icoDeleteProject:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =If( gPrDelArm, Icon.Warning, Icon.Trash )
+                                          Color: =gTheme.Color.Danger
+                                          HoverColor: =gTheme.Color.Danger
+                                          # A RED wash, not gTheme.Color.Hover — a blue tint behind a red destructive
+                                          # icon reads as a different control.
+                                          HoverFill: =RGBA(197, 58, 58, 0.08)
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: |
+                                            =If( gPrDelArm,
+                                                 "Press again to delete this project and everything attached to it",
+                                                 "Delete this project" )
+                                          FillPortions: =0
+                                          LayoutMinHeight: =28
+                                          Width: =28
+                                          Height: =28
+                                          OnSelect: |
+                                            =If( !gPrDelArm,
+                                                 Set( gPrDelArm, true ),
+                                                 Set( gPrDelErr, "" );
+                                                 // Children FIRST. Every child carries a REQUIRED lookup
+                                                 // to the project, so removing the parent while they
+                                                 // exist would leave rows SharePoint will not let
+                                                 // anything edit afterwards.
+                                                 //
+                                                 // Each removal is wrapped in a Set. MS Learn's own idiom
+                                                 // is IfError( Remove(...), Notify(...) ), but Remove and
+                                                 // RemoveIf "return the modified data source as a TABLE"
+                                                 // while Notify and Set return a boolean, and IfError
+                                                 // requires ALL its arguments to be type-compatible — so
+                                                 // the documented form is rejected. Four DIFFERENT scrap names: a global's
+                                                 // type unifies across every Set, so one name holding four
+                                                 // differently-shaped tables is a type conflict. They exist
+                                                 // only to make both arms a Set.
+                                                 //
+                                                 // RemoveIf is NOT delegable: it pulls matching rows up to the
+                                                 // data row limit and deletes them one by one. A partial pass
+                                                 // raises NO error, so without the count first the parent
+                                                 // would be removed on top of surviving children — and a child
+                                                 // holding a required lookup to a deleted project cannot be
+                                                 // edited or deleted by anything afterwards. Count, then refuse
+                                                 // rather than half-do it. Same shape as the archive cascade.
+                                                 Set( gPrDelBlock, false );
+                                                 With( { nI: CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gSelProject.ID) ),
+                                                         nX: CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gSelProject.ID) ),
+                                                         nT: CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gSelProject.ID) ) },
+                                                     If( nI >= 500 || nX >= 500 || nT >= 500,
+                                                         Set( gPrDelBlock, true ),
+                                                         IfError( Set( gPrDelScrapI,
+                                                                       RemoveIf( taskmaster_issues,
+                                                                                 issue_project_id.Id = gSelProject.ID ) ),
+                                                                  Set( gPrDelErr, FirstError.Message ) );
+                                                         IfError( Set( gPrDelScrapX,
+                                                                       RemoveIf( taskmaster_transactions,
+                                                                                 transaction_project_id.Id = gSelProject.ID ) ),
+                                                                  Set( gPrDelErr, FirstError.Message ) );
+                                                         IfError( Set( gPrDelScrapT,
+                                                                       RemoveIf( taskmaster_tasks,
+                                                                                 task_project_id.Id = gSelProject.ID ) ),
+                                                                  Set( gPrDelErr, FirstError.Message ) ) ) );
+                                                 If( Len(gPrDelErr) = 0 && !gPrDelBlock,
+                                                     IfError( Set( gPrDelScrapP,
+                                                                   Remove( taskmaster_projects, gSelProject ) ),
+                                                              Set( gPrDelErr, FirstError.Message ) ) );
+                                                 If( gPrDelBlock,
+                                                     Notify( "This project has too many attached items to delete in one pass. Nothing was deleted — ask for the cleanup workflow.",
+                                                             NotificationType.Error ),
+                                                     Len(gPrDelErr) > 0,
+                                                     // Say that the children may be gone. There is no
+                                                     // transaction here: by the time the parent fails, the
+                                                     // child removals have already committed.
+                                                     Notify( "Couldn't finish deleting the project: " & gPrDelErr
+                                                               & " Some attached items may already have been removed — reopen the project to check.",
+                                                             NotificationType.Error ),
+                                                     Set( gSelProject, Blank() );
+                                                     Set( gEditProject, Blank() );
+                                                     Clear( colProjectTasks );
+                                                     Notify( "Project deleted, with everything attached to it.",
+                                                             NotificationType.Success );
+                                                     Navigate( scrProjects, ScreenTransition.UnCover ) );
+                                                 Set( gPrDelArm, false ) )
+                                    # THE ONLY WAY A PROJECT REACHES "Complete". Every other phase is
+                                    # derived on this screen's OnVisible; this button is the one place a
+                                    # human decides, and it writes the completion date with it.
+                                    - lblDelArmed:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Visible: =gPrDelArm
+                                          Text: ="again"
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.Danger
+                                          Align: =Align.Center
+                                          FillPortions: =0
+                                          LayoutMinHeight: =16
+                                          Width: =Parent.Width
+                                          Height: =16
                         - btnPrjComplete:
                             Control: Classic/Button@2.2.0
                             Properties:
@@ -671,19 +711,6 @@ Screens:
                               LayoutMinHeight: =18
                               Width: =Parent.Width
                               Height: =18
-                        - lblDelArmed:
-                            Control: Label@2.5.1
-                            Properties:
-                              Visible: =gPrDelArm
-                              Text: ="again"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.Danger
-                              Align: =Align.Center
-                              FillPortions: =0
-                              LayoutMinHeight: =16
-                              Width: =Parent.Width
-                              Height: =16
             - rowWork:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
