@@ -1,12 +1,14 @@
 # IF A CONSUMER READS BLANK FROM `Selected`, CHECK STUDIO BEFORE CHANGING ANY SCREEN.
 # A component crosses the gap in TWO parts: the CONTROLS paste through code view, but
-# every custom property's formula is TYPED BY HAND in the component editor. So this file
-# can be correct while the Studio copy is not, and the failure is silent — the strip
+# every custom property is DECLARED AND TYPED BY HAND in the component editor. So this
+# file can be correct while the Studio copy is not, and the failure is silent — the strip
 # renders and highlights normally while `Selected` returns nothing.
 #
-# The tell: `Selected` falls back to `First(cmpSelection.Items)`, so a correctly wired
-# component CANNOT return a blank Label unless Items is empty. Blank across several
-# consumers at once means the output formula itself is missing in Studio.
+# CHECK THE PROPERTY KIND FIRST. `Selected` has to exist as an OUTPUT property (Property
+# type: Output, Data type: Record). Declared as anything else it cannot reference `galSel`
+# at all, and Studio's complaint — "controls in a component cannot be referenced in the
+# component's properties" — describes the symptom rather than the cause. Blank readings
+# across several consumers at once mean the property, not the screens.
 #
 # The three hand-typed formulas, verbatim. Set them with the COMPONENT selected inside
 # the component editor — on an INSTANCE the component's own controls are out of scope and
@@ -48,16 +50,11 @@ ComponentDefinitions:
       Height: =40
       Width: =360
       Fill: =RGBA(0, 0, 0, 0)
-      # EXACTLY the documented shape: MS Learn's own walkthrough sets an output property
-      # to `Gallery1.Selected.Item`. It used to read
-      #   =If(IsBlank(galSel.Selected), First(cmpSelection.Items), galSel.Selected)
-      # and Studio rejected that — an OUTPUT property reading the component's own INPUT
-      # (`cmpSelection.Items`) is the circular-reference case in the canvas-component
-      # limitations, and the rejection reads as "controls in a component cannot be
-      # referenced", which points at the wrong half of the expression.
-      #
-      # The fallback is not needed: galSel carries a Default, so a gallery with a
-      # Default always has a Selected.
+      # The documented shape — MS Learn's component walkthrough sets an output property to
+      # `Gallery1.Selected.Item`. It used to carry a
+      # `If(IsBlank(galSel.Selected), First(cmpSelection.Items), …)` fallback; that is
+      # unnecessary because galSel has a Default, and a gallery with a Default always has
+      # a Selected.
       Selected: =galSel.Selected
       # WITHOUT THIS THE STRIP LIES. A gallery re-reads its `Default` only on
       # Reset, and `galSel.Default` is the seed from `DefaultId` — so an instance
