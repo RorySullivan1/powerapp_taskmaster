@@ -142,98 +142,137 @@ Screens:
             Height: =Parent.Height - gTheme.Space.HeaderH
           Children:
             # ---- Header + Refresh ------------------------------------------
+            # cmpSectionHeader carries ONE action button, so a second action has to
+            # be a sibling. The header sits in a flexible wrapper — a CanvasComponent
+            # instance cannot take FillPortions itself — and New project is pinned to
+            # the right of it, which lands it immediately beside Refresh Stats.
             - wrapHdr:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
-                  LayoutDirection: =LayoutDirection.Vertical
-                  LayoutAlignItems: =LayoutAlignItems.Start
-                  LayoutGap: =0
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =gTheme.Space.Gap
                   FillPortions: =0
                   LayoutMinHeight: =60
                   Width: =Parent.Width - 48
                   Height: =60
                 Children:
-                  - hdrMyWork:
-                      Control: CanvasComponent
-                      ComponentName: cmpSectionHeader
+                  - wrapHdrTitle:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Width: =Parent.Width
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =0
+                        FillPortions: =1
+                        LayoutMinWidth: =320
                         Height: =60
-                        Title: ="My work"
-                        Subtitle: ="Everything you lead or own, across every open project"
-                        ShowAction: =true
-                        ActionLabel: ="Refresh"
-                        # THIS BLOCK MUST STAY IDENTICAL TO OnVisible ABOVE. There is no
-                        # shared function to call: a divergence shows up as the dashboard
-                        # reading one set of numbers on open and a different set after a
-                        # Refresh, with nothing to say which is right.
-                        OnAction: |
-                          =Refresh(taskmaster_projects); Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
-                          Concurrent(
-                              ClearCollect( colMyProjects,
-                                  Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
-                              ClearCollect( colMyTasks,
-                                  Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
-                              ClearCollect( colMyIssues,
-                                  Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
-                          );
-                          Set( gPrjLed,
-                               CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
-                          Set( gPrjLedOverdue,
-                               CountRows( Filter( colMyProjects,
-                                   project_phase.Value <> "Complete"
-                                && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
-                          Set( gTaskLed,
-                               CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
-                          Set( gTaskLedOverdue,
-                               CountRows( Filter( colMyTasks,
-                                   task_stage.Value <> "Complete"
-                                && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
-                          Set( gIssLed,
-                               Coalesce( Sum( ForAll( colMyProjects As p,
-                                                      CountRows( Filter( OpenIssues,
-                                                                         issue_project_id.Id = p.ID ) ) ),
-                                              Value ),
-                                         0 ) );
-                          Set( gIssMine, CountRows(colMyIssues) );
-                          Set( gMyPercent,
-                               If( CountRows(colMyTasks) = 0, 0,
-                                   RoundDown( Average( AddColumns( colMyTasks, wgt,
-                                       Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-                          // ---- Timeline rows -------------------------------------------------
-                          // BUILT AS COLLECTIONS, not inline in the chart's Image formula. Across a
-                          // one-way gap a chart that draws nothing is indistinguishable from a chart
-                          // whose data never arrived; a collection can be opened in Studio's
-                          // Collections pane, so this splits "the maths is wrong" from "there is
-                          // nothing to plot".
-                          //
-                          // `Sequence(CountRows(...))` + `Index(...)` is the only way a row gets a
-                          // POSITION, which is what a y-coordinate needs. The count comes from the
-                          // same table Index reads, so Index can never be out of range — it ERRORS
-                          // out of range, it does not return blank.
-                          ClearCollect( colTlSrc,
-                              FirstN( Sort( Filter( colMyProjects,
-                                                    project_phase.Value <> "Complete"
-                                                 && !IsBlank(project_date_target) ),
-                                            project_date_target ), 10 ) );
-                          Clear( colTimeline );
-                          Collect( colTimeline,
-                              ForAll( Sequence( CountRows(colTlSrc) ) As s,
-                                  With( { r: Index(colTlSrc, s.Value) },
-                                      { idx: s.Value,
-                                        nm:  r.project_name,
-                                        d0:  Coalesce(r.project_date_start, Today()),
-                                        d1:  r.project_date_target } ) ) );
-                          // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
-                          // Min/Max over a date column would come back as a number.
-                          Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
-                                             Today(), First(colTlSrc).project_date_target ) );
-                          Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
-                                             Last(colTlSrc).project_date_target ) );
-                          Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) );
-                          Set(gToastShow, false);
-                          Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
+                      Children:
+                        - hdrMyWork:
+                            Control: CanvasComponent
+                            ComponentName: cmpSectionHeader
+                            Properties:
+                              Width: =Parent.Width
+                              Height: =60
+                              Title: ="My work"
+                              Subtitle: ="Everything you lead or own, across every open project"
+                              ShowAction: =true
+                              ActionLabel: ="Refresh Stats"
+                              # THIS BLOCK MUST STAY IDENTICAL TO OnVisible ABOVE. There is no
+                              # shared function to call: a divergence shows up as the dashboard
+                              # reading one set of numbers on open and a different set after a
+                              # Refresh, with nothing to say which is right.
+                              OnAction: |
+                                =Refresh(taskmaster_projects); Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
+                                Concurrent(
+                                    ClearCollect( colMyProjects,
+                                        Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
+                                    ClearCollect( colMyTasks,
+                                        Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
+                                    ClearCollect( colMyIssues,
+                                        Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
+                                );
+                                Set( gPrjLed,
+                                     CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
+                                Set( gPrjLedOverdue,
+                                     CountRows( Filter( colMyProjects,
+                                         project_phase.Value <> "Complete"
+                                      && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
+                                Set( gTaskLed,
+                                     CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
+                                Set( gTaskLedOverdue,
+                                     CountRows( Filter( colMyTasks,
+                                         task_stage.Value <> "Complete"
+                                      && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
+                                Set( gIssLed,
+                                     Coalesce( Sum( ForAll( colMyProjects As p,
+                                                            CountRows( Filter( OpenIssues,
+                                                                               issue_project_id.Id = p.ID ) ) ),
+                                                    Value ),
+                                               0 ) );
+                                Set( gIssMine, CountRows(colMyIssues) );
+                                Set( gMyPercent,
+                                     If( CountRows(colMyTasks) = 0, 0,
+                                         RoundDown( Average( AddColumns( colMyTasks, wgt,
+                                             Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
+                                // ---- Timeline rows -------------------------------------------------
+                                // BUILT AS COLLECTIONS, not inline in the chart's Image formula. Across a
+                                // one-way gap a chart that draws nothing is indistinguishable from a chart
+                                // whose data never arrived; a collection can be opened in Studio's
+                                // Collections pane, so this splits "the maths is wrong" from "there is
+                                // nothing to plot".
+                                //
+                                // `Sequence(CountRows(...))` + `Index(...)` is the only way a row gets a
+                                // POSITION, which is what a y-coordinate needs. The count comes from the
+                                // same table Index reads, so Index can never be out of range — it ERRORS
+                                // out of range, it does not return blank.
+                                ClearCollect( colTlSrc,
+                                    FirstN( Sort( Filter( colMyProjects,
+                                                          project_phase.Value <> "Complete"
+                                                       && !IsBlank(project_date_target) ),
+                                                  project_date_target ), 10 ) );
+                                Clear( colTimeline );
+                                Collect( colTimeline,
+                                    ForAll( Sequence( CountRows(colTlSrc) ) As s,
+                                        With( { r: Index(colTlSrc, s.Value) },
+                                            { idx: s.Value,
+                                              nm:  r.project_name,
+                                              d0:  Coalesce(r.project_date_start, Today()),
+                                              d1:  r.project_date_target } ) ) );
+                                // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
+                                // Min/Max over a date column would come back as a number.
+                                Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
+                                                   Today(), First(colTlSrc).project_date_target ) );
+                                Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
+                                                   Last(colTlSrc).project_date_target ) );
+                                Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) );
+                                Set(gToastShow, false);
+                                Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
+                  - btnNewProject:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: ="+  New project"
+                        Fill: =gTheme.Color.Surface
+                        Color: =gTheme.Color.Primary
+                        HoverFill: =gTheme.Color.Hover
+                        PressedFill: =gTheme.Color.Press
+                        BorderColor: =gTheme.Color.Primary
+                        BorderThickness: =1
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FillPortions: =0
+                        LayoutMinWidth: =150
+                        Width: =150
+                        Height: =36
+                        # gSelProject is cleared too: the child edit screens pre-attach
+                        # to it, and a stale selection would silently parent the new
+                        # project's children to the last project opened.
+                        OnSelect: |
+                          =Set( gEditMode, "New" );
+                           Set( gEditProject, Blank() );
+                           Set( gSelProject, Blank() );
+                           Navigate( scrProjectEdit, ScreenTransition.Cover )
             # ---- Metric cards ----------------------------------------------
             # PLAIN CONTAINERS, NOT cmpStatusCard. The component carries a
             # full-bleed transparent button with a hover wash, so it reads as
@@ -492,7 +531,7 @@ Screens:
                         - lblMyTasksTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open tasks I lead   " & gTaskLed
+                              Text: ="Open tasks I lead   (" & gTaskLed & ")"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -722,7 +761,7 @@ Screens:
                         - lblMyIssuesTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open issues I own   " & gIssMine
+                              Text: ="Open issues I own   (" & gIssMine & ")"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1034,7 +1073,7 @@ Screens:
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         FillPortions: =1
-                        LayoutMinWidth: =200
+                        LayoutMinWidth: =210
                         Height: =Parent.Height
                       Children:
                         - lblPieTasksTitle:
@@ -1059,10 +1098,13 @@ Screens:
                               LayoutMinHeight: =90
                               Width: =Parent.Width - 24
                               Height: =Parent.Height - 48
-                              # DONUT + LEGEND IN ONE SVG. The legend has to live inside the
-                              # picture: an Image is a single control, so there is nothing to
-                              # hover and no per-slice click, and a five-row legend built from
-                              # real controls would cost more than the chart.
+                              # DONUT + LEGEND IN ONE SVG, legend UNDER the ring. The legend
+                              # has to live inside the picture: an Image is a single control,
+                              # so there is nothing to hover and no per-slice click, and a
+                              # legend built from real controls would cost more than the chart.
+                              # Stacked rather than side by side because the panel is now a
+                              # third of the row — a wide chart would render as a thin strip
+                              # across the middle of it.
                               #
                               # THE CATEGORY TABLE IS WRITTEN OUT, not derived with GroupBy.
                               # A group only exists when a row has that value, so GroupBy would
@@ -1118,23 +1160,28 @@ Screens:
                                                        With( { g: Index(Filter(cats, n > 0), s.Value) },
                                                            { j: s.Value, lk: g.k, ln: g.n, lc: g.c } ) ) },
                                             "data:image/svg+xml," & EncodeUrl(
-                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1040 400'>"
-                                              & "<circle cx='200' cy='200' r='159.155' fill='none'"
-                                              & " stroke='#EEF1F5' stroke-width='45'/>"
+                                                // HEIGHT GROWS WITH THE LEGEND so the chart stays close to
+                                                // square and fills a third-width panel. The ring's radius is
+                                                // FIXED at 159.155 — that is what makes the circumference
+                                                // exactly 1000, which the integer dasharray depends on.
+                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 440 "
+                                              & (410 + CountRows(leg) * 34 + 12) & "'>"
+                                              & "<circle cx='220' cy='200' r='159.155' fill='none'"
+                                              & " stroke='#EEF1F5' stroke-width='40'/>"
                                               & Concat( Filter(arcs, u > 0),
-                                                    "<circle cx='200' cy='200' r='159.155' fill='none' stroke='" & c
-                                                  & "' stroke-width='45' stroke-dasharray='"
+                                                    "<circle cx='220' cy='200' r='159.155' fill='none' stroke='" & c
+                                                  & "' stroke-width='40' stroke-dasharray='"
                                                   & u & " " & (1000 - u)
                                                   & "' stroke-dashoffset='" & Mod(1250 - uc, 1000) & "'/>" )
-                                              & "<text x='200' y='215' text-anchor='middle' font-size='90'"
+                                              & "<text x='220' y='215' text-anchor='middle' font-size='90'"
                                               & " font-weight='600' font-family='Segoe UI, sans-serif' fill='#20262D'>"
                                               & CountRows(colMyTasks) & "</text>"
-                                              & "<text x='200' y='265' text-anchor='middle' font-size='34'"
+                                              & "<text x='220' y='262' text-anchor='middle' font-size='34'"
                                               & " font-family='Segoe UI, sans-serif' fill='#6E7882'>TASKS</text>"
                                               & Concat( leg,
-                                                    "<rect x='460' y='" & (j * 62 - 32)
-                                                  & "' width='42' height='42' rx='10' fill='" & lc & "'/>"
-                                                  & "<text x='525' y='" & (j * 62) & "' font-size='44'"
+                                                    "<rect x='120' y='" & (410 + (j - 1) * 34 + 4)
+                                                  & "' width='26' height='26' rx='6' fill='" & lc & "'/>"
+                                                  & "<text x='158' y='" & (410 + (j - 1) * 34 + 24) & "' font-size='28'"
                                                   & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                                   & EncodeHTML(lk) & "  " & ln & "</text>" )
                                               & "</svg>" ) ) ) )
@@ -1153,7 +1200,7 @@ Screens:
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         FillPortions: =1
-                        LayoutMinWidth: =200
+                        LayoutMinWidth: =210
                         Height: =Parent.Height
                       Children:
                         - lblPieIssuesTitle:
@@ -1213,23 +1260,28 @@ Screens:
                                                        With( { g: Index(Filter(cats, n > 0), s.Value) },
                                                            { j: s.Value, lk: g.k, ln: g.n, lc: g.c } ) ) },
                                             "data:image/svg+xml," & EncodeUrl(
-                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1040 400'>"
-                                              & "<circle cx='200' cy='200' r='159.155' fill='none'"
-                                              & " stroke='#EEF1F5' stroke-width='45'/>"
+                                                // HEIGHT GROWS WITH THE LEGEND so the chart stays close to
+                                                // square and fills a third-width panel. The ring's radius is
+                                                // FIXED at 159.155 — that is what makes the circumference
+                                                // exactly 1000, which the integer dasharray depends on.
+                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 440 "
+                                              & (410 + CountRows(leg) * 34 + 12) & "'>"
+                                              & "<circle cx='220' cy='200' r='159.155' fill='none'"
+                                              & " stroke='#EEF1F5' stroke-width='40'/>"
                                               & Concat( Filter(arcs, u > 0),
-                                                    "<circle cx='200' cy='200' r='159.155' fill='none' stroke='" & c
-                                                  & "' stroke-width='45' stroke-dasharray='"
+                                                    "<circle cx='220' cy='200' r='159.155' fill='none' stroke='" & c
+                                                  & "' stroke-width='40' stroke-dasharray='"
                                                   & u & " " & (1000 - u)
                                                   & "' stroke-dashoffset='" & Mod(1250 - uc, 1000) & "'/>" )
-                                              & "<text x='200' y='215' text-anchor='middle' font-size='90'"
+                                              & "<text x='220' y='215' text-anchor='middle' font-size='90'"
                                               & " font-weight='600' font-family='Segoe UI, sans-serif' fill='#20262D'>"
                                               & CountRows(colMyIssues) & "</text>"
-                                              & "<text x='200' y='265' text-anchor='middle' font-size='34'"
+                                              & "<text x='220' y='262' text-anchor='middle' font-size='34'"
                                               & " font-family='Segoe UI, sans-serif' fill='#6E7882'>ISSUES</text>"
                                               & Concat( leg,
-                                                    "<rect x='460' y='" & (j * 62 - 32)
-                                                  & "' width='42' height='42' rx='10' fill='" & lc & "'/>"
-                                                  & "<text x='525' y='" & (j * 62) & "' font-size='44'"
+                                                    "<rect x='120' y='" & (410 + (j - 1) * 34 + 4)
+                                                  & "' width='26' height='26' rx='6' fill='" & lc & "'/>"
+                                                  & "<text x='158' y='" & (410 + (j - 1) * 34 + 24) & "' font-size='28'"
                                                   & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                                   & EncodeHTML(lk) & "  " & ln & "</text>" )
                                               & "</svg>" ) ) ) )
@@ -1247,21 +1299,19 @@ Screens:
                         LayoutGap: =8
                         PaddingTop: =12
                         PaddingBottom: =12
-                        # NO SIDE PADDING, and that is what makes the 100 floor real:
-                        # padding eats the inner width first, so 12 a side would leave
-                        # 76px for a 100px ring at the floor and clip it there instead.
+                        # NO SIDE PADDING: padding eats the inner width first, and at
+                        # the floor below that would clip the ring rather than inset it.
                         PaddingLeft: =0
                         PaddingRight: =0
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
-                        # NARROW ON PURPOSE. This panel is the LAST child of rowCharts,
-                        # so it is the one that falls off the right edge when the four
-                        # minimum widths plus the gaps exceed the window:
-                        # 300 + 170 + 170 + 100 + 48 = 788.
-                        FillPortions: =0
-                        LayoutMinWidth: =100
-                        Width: =150
+                        # ONE OF THREE EQUAL THIRDS. Same FillPortions and the same floor
+                        # as the two donut panels, so whatever the timeline does not take
+                        # is divided evenly between them. Row minimum is
+                        # 300 + 210 + 210 + 210 + 48 = 978.
+                        FillPortions: =1
+                        LayoutMinWidth: =210
                         Height: =Parent.Height
                       Children:
                         - wrapRing:
@@ -1274,17 +1324,22 @@ Screens:
                               # VERTICAL parent, so height is the main axis and width is the
                               # cross axis — the floor that keeps the ring from being squeezed
                               # is the width one.
+                              #
+                              # SQUARE, AND AS BIG AS THE PANEL ALLOWS. Whichever of the two
+                              # is scarcer decides: 84 is the caption plus the gap plus the
+                              # top and bottom padding, so this is the largest circle that
+                              # still leaves the caption its two lines.
                               FillPortions: =0
                               LayoutMinWidth: =100
-                              Width: =100
-                              Height: =100
+                              Width: =Max( 100, Min(Parent.Width, Parent.Height - 84) )
+                              Height: =Max( 100, Min(Parent.Width, Parent.Height - 84) )
                             Children:
                               - ringHome:
                                   Control: CanvasComponent
                                   ComponentName: cmpKpiRing
                                   Properties:
-                                    Width: =100
-                                    Height: =100
+                                    Width: =Parent.Width
+                                    Height: =Parent.Height
                                     Percent: =gMyPercent
                                     Label: =gMyPercent & "%"
                                     AccentHex: ="#005A9E"

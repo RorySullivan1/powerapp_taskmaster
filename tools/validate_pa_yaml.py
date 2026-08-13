@@ -285,7 +285,14 @@ def token_errors(doc) -> list[str]:
     # A CanvasComponent instance sized to the screen with no `Visible` sits on
     # top and swallows EVERY click — a transparent fill does not help, the
     # component still hit-tests. Cost a whole preview session on scrHome.
+    #
+    # DIRECT SCREEN CHILDREN ONLY. Nested one level down, `Parent` is the
+    # CONTAINER, so Parent.Width/Parent.Height means "fill my box" — the normal
+    # way to size anything inside auto-layout, and not a screen-wide hit target.
+    # Firing there flagged a 236px KPI ring as a full-screen overlay.
     for path, node in walk(doc):
+        if not path.startswith("Screens/") or path.count("/Children") != 1:
+            continue
         for name, body in node.items():
             if not isinstance(body, dict) or body.get("Control") != "CanvasComponent":
                 continue
