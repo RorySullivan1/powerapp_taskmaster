@@ -305,6 +305,37 @@ def token_errors(doc) -> list[str]:
                     f"Gate it on the same flag that opens it, or make its Height conditional"
                 )
 
+    # A COMPONENT CANNOT LIVE INSIDE A GALLERY (or a form). First-party and flat:
+    # MS Learn, Canvas component overview -> Known limitations #4 — "You can't insert
+    # a component into a gallery or a form (including SharePoint form)."
+    #
+    # A hard FAIL, not a note: Studio refuses the control, so the paste comes back as
+    # "it didn't work" with nothing to point at. Caught the expensive way on
+    # scrProjects, where a status-glyph component had to be inlined as an Image.
+    containers = {}
+    for _p, node in walk(doc):
+        for name, body in node.items():
+            if isinstance(body, dict) and isinstance(body.get("Control"), str):
+                containers[name] = body["Control"]
+
+    def is_gallery_or_form(control: str) -> bool:
+        c = control.split("@")[0].split("/")[-1]
+        return c in ("Gallery", "Form", "EditForm", "DisplayForm", "FormViewer")
+
+    for path, node in walk(doc):
+        for name, body in node.items():
+            if not isinstance(body, dict) or body.get("Control") != "CanvasComponent":
+                continue
+            enclosing = [seg for seg in path.split("/")
+                         if is_gallery_or_form(containers.get(seg, ""))]
+            if enclosing:
+                out.append(
+                    f"{path}/{name}: component `{body.get('ComponentName')}` sits inside "
+                    f"`{enclosing[-1]}` — a component CANNOT be inserted into a Gallery or a "
+                    f"Form (MS Learn, canvas component known limitations). Studio refuses the "
+                    f"control and the whole paste fails. Inline the controls instead"
+                )
+
     # NO CROSS-CONTROL GEOMETRY CHECK — it was REMOVED 2026-08-13, do not re-add it.
     #
     # It flagged `Y: =Other.Y + Other.Height` on the grounds that layout formulas freeze

@@ -54,7 +54,7 @@ The repo houses the app's source and nothing else — one file per unit, in pa-y
   (`ActiveProjects`, `OpenIssues`, `LiveTasks`), which must stay named formulas or they stop
   delegating.
 - **`src/Screens/`** — one file per screen, 11 of them.
-- **`src/Components/`** — one file per component, 11 of them. A component is a **whole
+- **`src/Components/`** — one file per component, 10 of them. A component is a **whole
   definition** here: its custom properties and its controls live in the same file.
 - **`schema/`** — **`schema.yaml` is the GOLDEN SOURCE** for the SharePoint backend (repo
   defines, SharePoint applies); `incoming-lists.md` is provenance.
@@ -113,5 +113,5 @@ or ship fallbacks — no pull/round-trip exists), that
 **transactions are full transaction-level primary** (delegation/indexing critical), that
 **`schema/schema.yaml` is the golden source** (repo defines, SharePoint applies), that **not
 everyone is Power BI-licensed** (native nav + empty state), and that **the app is BUILT** — all
-11 screens, 11 components and the App object are authored here and live in Studio, so the work is
+11 screens, 10 components and the App object are authored here and live in Studio, so the work is
 editing and refining, not creating.

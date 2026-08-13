@@ -61,6 +61,9 @@ Overlap is not always a bug — a dropdown *should* cover what's beneath it — 
 First child = bottom, last = top. There is no `ZIndex`.
 
 - Anything that floats (dropdown results, modal, app bar) is declared **LAST**.
+- **A component cannot be placed inside a Gallery or a Form at all** (MS Learn, canvas component
+  known limitations #4). Per-row visuals are plain controls inlined in the template — an `Image`
+  with an SVG data URI, a `Label`, a `Rectangle`. The validator fails the build on it.
 - **A component instance intercepts every click inside its bounds.** A transparent `Fill` does
   not help. A full-screen instance with no `Visible` makes the entire screen dead — that is a
   real bug this app shipped. Gate the *instance*, not just what it draws inside.

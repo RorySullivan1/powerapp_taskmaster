@@ -6,13 +6,13 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **BUILT — editing and refining, not creating.** 11 screens, 11 components, the App object.
-  23/23 valid. **The published app renders properly** (user, 2026-08-12).
+- **BUILT — editing and refining, not creating.** 11 screens, 10 components, the App object.
+  22/22 valid. **The published app renders properly** (user, 2026-08-12).
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`, `gHasPowerBiLicence`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
 - **Paste in progress.** Landed: `App.OnStart`, `cmpAppBar`. Remaining: `cmpPicker`,
-  `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, the NEW `cmpProjectStatus`, then every
+  `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then every
   screen but `scrHome`. `scrProjects` is a full rework; `scrProject` / `scrIssueEdit` /
   `scrTransactionEdit` / the picker screens carry LOGIC fixes, so none of it is cosmetic.
 - **SharePoint matches `schema/schema.yaml` EXCEPT one pending edit:** `project_phase` needs
@@ -39,6 +39,7 @@ not know them will author something broken:
 - [2026-08-12] A gallery bound to a DATA SOURCE pages as the user scrolls, so `.AllItems` is what is on screen, not the total. Count from the query — INDEX Decisions
 - [2026-08-12] A global's type unifies across every `Set`; one name holding differently-shaped records is a type conflict — INDEX Decisions
 - [2026-08-06] Modern controls are ON in this tenant — ARCHIVE
+- [2026-08-13] **A COMPONENT CANNOT BE INSERTED INTO A GALLERY OR A FORM** (MS Learn, canvas component known limitations #4 — user hit it landing `cmpProjectStatus`). Per-row visuals must be plain controls inlined in the template; the status glyph is now an `Image` + SVG data URI inside `scrProjects`. **The validator now FAILS on it** — a documented, unambiguous rule is worth a hard check, unlike the geometry NOTE removed the same day — INDEX Decisions
 - [2026-08-05] A component is a CONTRACT: custom properties are hand-typed in the editor, and `AccessAppScope: false` means it cannot read `gTheme` or any data source — colours are literals — ARCHIVE
 - [2026-08-12] Layout formulas FREEZE at paste, so cross-control geometry references can land as a constant that was never correct — ARCHIVE
 - [2026-08-13] **SUPERSEDES THE LINE ABOVE — it was FALSE.** A probe in Studio (`tests/README.md`) showed layout formulas cross a paste LIVE, forward references included: changing an input MOVED the controls, which a constant cannot do. What replaces a formula with a number is **DIRECT MANIPULATION** — drag, resize handle, or the position/size boxes in the properties pane; the formula bar keeps what you type. The old rule was an inference written in the voice of its citation, so every later reader checked the quote, saw a real Microsoft sentence, and moved on. **A false claim with a true quote attached is more durable than one with no evidence at all** — INDEX Decisions

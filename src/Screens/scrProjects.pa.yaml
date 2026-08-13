@@ -150,15 +150,57 @@ Screens:
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 60 + gTheme.Space.Gap + 40 + gTheme.Space.Gap
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
+            # INLINE SVG, NOT A COMPONENT. A canvas component cannot be placed inside
+            # a gallery template — Studio refuses the paste. The glyph therefore lives
+            # here as an Image data URI, same technique as cmpKpiRing.
+            #
+            # SHAPE CARRIES THE MEANING, colour only reinforces it: an empty ring, a
+            # ring of dots, a ring with a filled core, a barred disc and a tick are all
+            # distinguishable in greyscale and to a red-green colour-blind reader. The
+            # set also reads as a progression — empty, thinking, working, done.
+            #
+            # HEX TEXT, not gTheme.Color.*: these drop straight into the SVG string,
+            # and Power Fx has no Color-to-hex conversion. They mirror the palette —
+            # Primary #005A9E · Success #31825D · Danger #C53A3A · TextMuted #6E7882.
+            #
+            # NO "Archived" CASE. Archived projects never reach this gallery, so one
+            # would land on the "?" glyph — the right answer if it ever appears, since
+            # it means something is showing work that should be hidden.
             - rowStatus:
-                Control: CanvasComponent
-                ComponentName: cmpProjectStatus
+                Control: Image@2.2.3
                 Properties:
-                  Status: =Coalesce(ThisItem.project_phase.Value, "")
+                  ImagePosition: =ImagePosition.Fit
                   X: =16
                   Y: =22
                   Width: =28
                   Height: =28
+                  Image: |
+                    =With(
+                        { g: Switch( Coalesce(ThisItem.project_phase.Value, ""),
+                              "Not Started",
+                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#B9C0C8' stroke-width='2.5'/>",
+                              "Planning",
+                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'/>"
+                                & "<circle cx='12.5' cy='18' r='1.7' fill='#6E7882'/>"
+                                & "<circle cx='18'   cy='18' r='1.7' fill='#6E7882'/>"
+                                & "<circle cx='23.5' cy='18' r='1.7' fill='#6E7882'/>",
+                              "Active",
+                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
+                                & "<circle cx='18' cy='18' r='7' fill='#005A9E'/>",
+                              "Blocked",
+                                  "<circle cx='18' cy='18' r='14.5' fill='#C53A3A'/>"
+                                & "<rect x='9' y='16' width='18' height='4' rx='2' fill='#FFFFFF'/>",
+                              "Complete",
+                                  "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                  "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                & " stroke-dasharray='4 3'/>"
+                                & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
+                        "data:image/svg+xml," & EncodeUrl(
+                            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                    )
             - rowName:
                 Control: Label@2.5.1
                 Properties:
