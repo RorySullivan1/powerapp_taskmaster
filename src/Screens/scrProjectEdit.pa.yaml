@@ -26,7 +26,10 @@ Screens:
         // Phase starts EMPTY on New — the user picks it, rather than being given a
         // default they might not notice and save by accident. It is a required column,
         // so btnPrSave gates on it and lblPrMissing names it.
-        Set( gPrPhase,    If( gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, ""), "" ) );
+        // A new project opens on "Not Started", matching the column default — the
+        // phase is required, and an empty combo box makes the user set something
+        // they have no opinion about yet.
+        Set( gPrPhase,    If( gEditMode = "Edit", Coalesce(gEditProject.project_phase.Value, ""), "Not Started" ) );
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
         ClearCollect( colMapRegion,   mapping_regions );
         ClearCollect( colMapActivity, mapping_activitytype );
@@ -221,7 +224,8 @@ Screens:
                   - cboPrPhase:
                       Control: ModernCombobox@1.1.1
                       Properties:
-                        Items: =["Planning", "Active", "Blocked", "Complete", "Archived"]
+                        Items: |
+                          =["Not Started", "Planning", "Active", "Blocked", "Complete", "Archived"]
                         ItemDisplayText: =ThisItem.Value
                         InputTextPlaceholder: ="Select a phase"
                         SelectMultiple: =false

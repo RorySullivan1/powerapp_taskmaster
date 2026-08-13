@@ -107,7 +107,7 @@ Screens:
       # The phases are ENUMERATED rather than written as `<> "Complete"`: a Text
       # `<>` does not delegate, and one non-delegable clause silently truncates the
       # whole query at the row limit. ActiveProjects already excludes Archived, so
-      # "show completed" is the difference between three phases and four.
+      # "show completed" is the difference between four phases and five.
       #
       # `project_coverage` is NOT indexed in the golden source. Equality on it
       # delegates, but SharePoint refuses an unindexed filter once the list passes
@@ -128,13 +128,15 @@ Screens:
                          project_name ),
                    cboPrjCoverage.Selected.Value = "All coverage",
                    Sort( Filter( ActiveProjects,
-                             ( project_phase.Value = "Planning"
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
                             || project_phase.Value = "Active"
                             || project_phase.Value = "Blocked" )
                           && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    Sort( Filter( ActiveProjects,
-                             ( project_phase.Value = "Planning"
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
                             || project_phase.Value = "Active"
                             || project_phase.Value = "Blocked" )
                           && project_coverage.Value = cboPrjCoverage.Selected.Value
