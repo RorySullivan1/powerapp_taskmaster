@@ -90,7 +90,19 @@ Screens:
             Y: =(gTheme.Space.HeaderH - 24) / 2
             Width: =24
             Height: =24
-            OnSelect: =Back()
+            # AN EXPLICIT DESTINATION, NOT Back(). This screen has four inbound
+            # edges — the projects list, both scrHome galleries, and
+            # scrProjectEdit's save, which lands here with a Navigate. Back()
+            # honours whichever one was used, so saving a project and then
+            # pressing X put the user straight back INTO the editor.
+            #
+            # Back() also alternates between the two most recently displayed
+            # screens rather than unwinding a stack, so scrProject -> scrTaskEdit
+            # -> Back() -> scrProject leaves X pointing at the task editor.
+            #
+            # UnCover is the inverse of the Cover every inbound Navigate uses, and
+            # matches the delete path further down this screen.
+            OnSelect: =Navigate( scrProjects, ScreenTransition.UnCover )
       - bodyRoot:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
