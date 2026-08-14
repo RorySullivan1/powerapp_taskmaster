@@ -32,8 +32,28 @@ Screens:
         Set( gPdTypePath, If( gPdMode = "Edit", Coalesce(gEditProduct.product_type_path, ""), "" ) );
         Set( gPdDesc,     If( gPdMode = "Edit", Coalesce(gEditProduct.product_description, ""), "" ) );
         ClearCollect( colMapProdType, mapping_producttype );
+        // FROM Choices() ON THE COLUMN, never a literal list. product_assetclass ships
+        // with PLACEHOLDER values in the golden source, so whatever is actually
+        // provisioned appears here with no app change — and a label the Choice would
+        // refuse can never be written, which is what broke issue_type on 2026-08-13.
+        //
+        // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
+        // synthesised POSITIONALLY. Row 1 is "(none)", so the real choices start at
+        // Id 2 — the Ids mean nothing beyond "which row", so DefaultId looks up by Label.
+        ClearCollect( colPdAssetOpts,
+                      With( { ch: Choices([@taskmaster_products].product_assetclass) },
+                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
+                                    { Id:    n.Value,
+                                      Label: If( n.Value = 1, "(none)",
+                                                 Index(ch, n.Value - 1).Value ) } ) ) );
+        Set( gPdAsset, If( gPdMode = "Edit",
+                           Coalesce(gEditProduct.product_assetclass.Value, "(none)"), "(none)" ) );
         Set( gPdDup, false );
-        Reset( txtPdUid ); Reset( txtPdDesc ); Reset( pickPdType )
+        // A toggle re-reads Default and cmpSelection re-reads DefaultId ONLY on Reset —
+        // without these the previous product's values survive into the next one, and the
+        // control then DISAGREES WITH THE SAVE rather than failing visibly.
+        Reset( txtPdUid ); Reset( txtPdDesc ); Reset( pickPdType );
+        Reset( tglPdEsg ); Reset( selPdAsset )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -155,6 +175,73 @@ Screens:
                         OnChange: |
                           =Set( gPdTypeId,   pickPdType.SelectedId );
                            Set( gPdTypePath, pickPdType.SelectedPath )
+            - lblPdAssetCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Asset class"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            # A cmpSelection INSTANCE takes no FillPortions/LayoutMinHeight — the
+            # contract check rejects them there — so it carries Width/Height only.
+            - selPdAsset:
+                Control: CanvasComponent
+                ComponentName: cmpSelection
+                Properties:
+                  Width: =Parent.Width - 48
+                  Height: =40
+                  Items: =colPdAssetOpts
+                  DefaultId: =Coalesce( LookUp(colPdAssetOpts, Label = gPdAsset, Id), 1 )
+                  OnChange: =Set( gPdAsset, selPdAsset.Selected.Label )
+            # A Classic/Toggle, NOT a check box: the check-box token is not grounded for
+            # this dialect and an unverified control fails the WHOLE screen paste. Same
+            # control the two scrTaskEdit section switches use.
+            #
+            # No global behind it. Default seeds from the record and the save reads
+            # tglPdEsg.Value directly, exactly as txtPdUid/txtPdDesc do — a global would
+            # be a third copy of the same fact.
+            - rowPdEsg:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =12
+                  FillPortions: =0
+                  LayoutMinHeight: =34
+                  Width: =Parent.Width - 48
+                  Height: =34
+                Children:
+                  - tglPdEsg:
+                      Control: Classic/Toggle@2.1.0
+                      Properties:
+                        # Coalesce, not a bare read: a Yes/No column added to a list that
+                        # already has rows comes back BLANK on those rows, not false.
+                        Default: |
+                          =If( gPdMode = "Edit",
+                               Coalesce(gEditProduct.product_esg, false), false )
+                        FalseText: =""
+                        TrueText: =""
+                        FillPortions: =0
+                        LayoutMinWidth: =60
+                        Width: =60
+                        Height: =30
+                  - lblPdEsgCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="ESG product"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =140
+                        Height: =34
             - lblPdDescCap:
                 Control: Label@2.5.1
                 Properties:
@@ -283,7 +370,11 @@ Screens:
               { product_uid:         Trim(txtPdUid.Text),
               product_type_id:     gPdTypeId,
               product_type_path:   gPdTypePath,
-              product_description: txtPdDesc.Text } ) ),
+              product_description: txtPdDesc.Text,
+              // Optional, so "(none)" writes Blank() — the same shape scrIssueEdit uses
+              // for issue_type and issue_impact.
+              product_assetclass:  If( gPdAsset <> "(none)", { Value: gPdAsset }, Blank() ),
+              product_esg:         tglPdEsg.Value } ) ),
               Set( gPdErr, FirstError.Message ) );
               // Trust the RECORD, never the message.
               If( IsBlank(gPdSaved.ID) && Len(gPdErr) = 0,
