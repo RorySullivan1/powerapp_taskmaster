@@ -245,7 +245,7 @@ lists:
       # DENORMALISED SUMMARY of the linked products, comma-joined, rewritten by
       # scrTaskEdit on every save. Galleries render this instead of querying the
       # junction once per visible row. Text, so join_cost is unaffected.
-      - { name: task_product_summary,  type: Text,            required: false,                 desc: "Comma-joined product_uid list of the task's taskmaster_taskproduct rows. Display only — the junction is the source of truth" }
+      - { name: task_product_summary,  type: Text,            required: false,                 desc: "Comma-joined product_uid list of the task's taskmaster_taskproduct rows. Display only — the junction is the source of truth. Provisioned 2026-08-14" }
       - { name: task_client_stage,     type: Choice,          required: false,                 desc: "Client lifecycle stage", values: [Prospect, Active, Existing, "Post-Trade"] }
 
   # ---------------------------------------------------------------------------
@@ -372,11 +372,14 @@ lists:
     provisioned: live        # 2026-08-14
     join_cost: 2
     columns:
-      # Cascade delete: removing a task removes its links in SharePoint, so the app
-      # never has to. That matters because the project-delete cascade uses RemoveIf,
-      # which is NOT delegable and can half-complete.
+      # CASCADE DELETE, set in SharePoint and user-confirmed 2026-08-14: removing a
+      # task removes its links, so the app never has to and MUST NOT be given a
+      # RemoveIf for them. That matters because the project-delete cascade on
+      # scrProject uses RemoveIf, which is NOT delegable and can half-complete.
       - { name: taskproduct_task_id,     type: Lookup, required: true,  indexed: true, desc: "The task", lookup: { list: taskmaster_tasks, show: task_name } }
-      # Restrict delete: a product in use cannot be deleted out from under its tasks.
+      # RESTRICT DELETE, set in SharePoint and user-confirmed 2026-08-14: a product in
+      # use cannot be deleted out from under its tasks. Nothing in the app deletes
+      # products, so this only ever fires in the SharePoint UI — which is the point.
       - { name: taskproduct_product_id,  type: Lookup, required: true,  indexed: true, desc: "The product", lookup: { list: taskmaster_products, show: product_uid } }
       # DENORMALISED, and not redundant even though the lookup above shows the same
       # value. A lookup is a COMPLEX type and `Sort`/`SortByColumns` do NOT delegate
