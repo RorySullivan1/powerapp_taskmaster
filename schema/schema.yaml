@@ -237,7 +237,15 @@ lists:
       - { name: task_output_branding,  type: Choice,          required: false,                 desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
       - { name: task_output_asset,     type: Lookup,          required: false,                 desc: "Linked asset", lookup: { list: asset_library, show: asset_name } }
       - { name: task_client_name,      type: Lookup,          required: false,                 desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
-      - { name: task_product_id,       type: Lookup,          required: false,                 desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
+      # RETIRED 2026-08-14 — superseded by the taskmaster_taskproduct junction. The
+      # column is LEFT IN PLACE rather than deleted: dropping it destroys the stored
+      # values, and it costs nothing while no view projects it. The app no longer
+      # reads or writes it.
+      - { name: task_product_id,       type: Lookup,          required: false, retired: true,   desc: "RETIRED — was the single associated product; use taskmaster_taskproduct", lookup: { list: taskmaster_products, show: product_uid } }
+      # DENORMALISED SUMMARY of the linked products, comma-joined, rewritten by
+      # scrTaskEdit on every save. Galleries render this instead of querying the
+      # junction once per visible row. Text, so join_cost is unaffected.
+      - { name: task_product_summary,  type: Text,            required: false,                 desc: "Comma-joined product_uid list of the task's taskmaster_taskproduct rows. Display only — the junction is the source of truth" }
       - { name: task_client_stage,     type: Choice,          required: false,                 desc: "Client lifecycle stage", values: [Prospect, Active, Existing, "Post-Trade"] }
 
   # ---------------------------------------------------------------------------
@@ -349,6 +357,41 @@ lists:
       - { name: issue_date_target,      type: DateTime, required: false, indexed: true,  desc: "Expected resolution date" }
       - { name: issue_date_close,       type: DateTime, required: false,                 desc: "Resolution date" }
       - { name: issue_owner,            type: Person, multi: false, required: false,     desc: "Who raised the issue; stamped with User() on insert only. Display only — no picker" }
+
+  # ---------------------------------------------------------------------------
+  taskmaster_taskproduct:
+    role: >-
+      JUNCTION. One row per (task, product) pair. A task is 1:1 with a client but
+      1:n with products, and task_product_id could only ever hold one — it is
+      RETIRED in favour of this list, see retired_columns.
+      NOT a multi-value lookup: MS Learn lists "columns that support multiple
+      values or selections" as unsupported for canvas apps, they cannot be indexed
+      and they do not delegate, so "which tasks use product X" would silently
+      truncate. This shape delegates in BOTH directions on `.Id`.
+      NAME IS SINGULAR — provisioned as taskmaster_taskproduct, not ...products.
+    provisioned: live        # 2026-08-14
+    join_cost: 2
+    columns:
+      # Cascade delete: removing a task removes its links in SharePoint, so the app
+      # never has to. That matters because the project-delete cascade uses RemoveIf,
+      # which is NOT delegable and can half-complete.
+      - { name: taskproduct_task_id,     type: Lookup, required: true,  indexed: true, desc: "The task", lookup: { list: taskmaster_tasks, show: task_name } }
+      # Restrict delete: a product in use cannot be deleted out from under its tasks.
+      - { name: taskproduct_product_id,  type: Lookup, required: true,  indexed: true, desc: "The product", lookup: { list: taskmaster_products, show: product_uid } }
+      # DENORMALISED, and not redundant even though the lookup above shows the same
+      # value. A lookup is a COMPLEX type and `Sort`/`SortByColumns` do NOT delegate
+      # on one (SharePoint delegation table: Complex is the only type with Sort: No).
+      # This column is what the app renders and the only thing it can sort server-side.
+      # Goes stale if a product_uid is renamed — same trade as project_region_path.
+      - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, desc: "product_uid of the linked product, copied at write time. The app always writes it" }
+      # WRITE-ONCE. The app has the parent to hand (gTkProject) and a task CANNOT be
+      # re-parented — scrTaskEdit derives gTkProject in OnVisible and offers no picker
+      # — so this cannot drift. There is deliberately NO *_project_archived mirror
+      # here: nothing queries this list across projects (galleries read
+      # task_product_summary, the editor reads it one task at a time), and the
+      # archiving flow filters on this id instead. Adding a Yes/No later is cheap;
+      # an internal NAME is what freezes.
+      - { name: taskproduct_project_id,  type: Number, required: false, indexed: true, desc: "ID of the parent project, mirrored from the task. What the archiving flow filters on" }
 
   # ---------------------------------------------------------------------------
   taskmaster_clients:
@@ -561,6 +604,8 @@ migration:
   retired_columns:
     taskmaster_projects: [project_region, project_type, project_coverage]
     taskmaster_tasks:    [task_category]   # retired outright — nothing replaces it
+    # task_product_id is retired but NOT listed here: those entries are columns to
+    # DELETE, and this one stays in place holding its values. See its `retired: true`.
     taskmaster_clients:  [client_region, client_type, client_coverage]
     taskmaster_products: [product_type]
 
