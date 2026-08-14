@@ -38,16 +38,26 @@ Screens:
         // refuse can never be written, which is what broke issue_type on 2026-08-13.
         //
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
-        // synthesised POSITIONALLY. Row 1 is "(none)", so the real choices start at
-        // Id 2 — the Ids mean nothing beyond "which row", so DefaultId looks up by Label.
+        // synthesised POSITIONALLY. The Ids mean nothing beyond "which row", so DefaultId
+        // looks up by Label.
+        //
+        // NO "(none)" ROW — the column is REQUIRED, so there is nothing to represent.
         ClearCollect( colPdAssetOpts,
                       With( { ch: Choices([@taskmaster_products].product_assetclass) },
-                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
+                            ForAll( Sequence( CountRows(ch) ) As n,
                                     { Id:    n.Value,
-                                      Label: If( n.Value = 1, "(none)",
-                                                 Index(ch, n.Value - 1).Value ) } ) ) );
+                                      Label: Index(ch, n.Value).Value } ) ) );
+        // A NEW PRODUCT OPENS ON THE FIRST CHOICE, so the ORDER of the column's values
+        // decides its default — order them with the safest first.
+        //
+        // Seeding it rather than leaving it blank is deliberate: cmpSelection's DefaultId
+        // falls back to row 1 whichever way, so a blank global would leave the strip
+        // HIGHLIGHTING a value the save does not hold. A display that disagrees with the
+        // write is the defect that got scrTask deleted.
         Set( gPdAsset, If( gPdMode = "Edit",
-                           Coalesce(gEditProduct.product_assetclass.Value, "(none)"), "(none)" ) );
+                           Coalesce( gEditProduct.product_assetclass.Value,
+                                     First(colPdAssetOpts).Label ),
+                           First(colPdAssetOpts).Label ) );
         Set( gPdDup, false );
         // A toggle re-reads Default and cmpSelection re-reads DefaultId ONLY on Reset —
         // without these the previous product's values survive into the next one, and the
@@ -178,7 +188,7 @@ Screens:
             - lblPdAssetCap:
                 Control: Label@2.5.1
                 Properties:
-                  Text: ="Asset class"
+                  Text: ="Asset class  *"
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
@@ -286,6 +296,10 @@ Screens:
               =Trim(
               If( Len(Trim(txtPdUid.Text)) = 0, "a product ID   ", "" ) &
               If( Len(gPdTypePath) = 0,         "a product type   ", "" ) &
+              // Can only fire if the column has no Choice values provisioned at all —
+              // otherwise the strip always holds one. Cheap, and it turns a rejected
+              // Patch into a sentence.
+              If( Len(gPdAsset) = 0,            "an asset class   ", "" ) &
               If( Len(Trim(txtPdDesc.Text)) = 0, "a description   ", "" ) )
             Font: =gTheme.Font
             Size: =gTheme.Size.Small
@@ -371,9 +385,7 @@ Screens:
               product_type_id:     gPdTypeId,
               product_type_path:   gPdTypePath,
               product_description: txtPdDesc.Text,
-              // Optional, so "(none)" writes Blank() — the same shape scrIssueEdit uses
-              // for issue_type and issue_impact.
-              product_assetclass:  If( gPdAsset <> "(none)", { Value: gPdAsset }, Blank() ),
+              product_assetclass:  { Value: gPdAsset },
               product_esg:         tglPdEsg.Value } ) ),
               Set( gPdErr, FirstError.Message ) );
               // Trust the RECORD, never the message.

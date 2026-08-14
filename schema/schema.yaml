@@ -420,10 +420,10 @@ lists:
       - { name: product_type_id,     type: Number,          required: false, indexed: true, desc: "ID of the mapping_producttype row, or 0 when the path names a branch", maps_to: mapping_producttype }
       - { name: product_type_path,   type: Text,            required: true, indexed: true, desc: "Composed path of that row" }
       - { name: product_description, type: Note,            required: true,                desc: "Description (display only)" }
-      # OPTIONAL, so the strip carries a "(none)" row — an optional Choice has to be
-      # clearable and {Value: ""} is not a legal write, so the blank has to be a real
-      # option. Tighten to required only after the vocabulary is settled.
-      - { name: product_assetclass,  type: Choice,          required: false, indexed: true, desc: "Asset class of the product", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning. scrProductEdit binds Choices() on the column, NOT a literal list, so the real values need no app change. Suggested starting set for an EQD desk: Equity · Fixed Income · Credit · Rates · FX · Commodity · Multi-Asset" }
+      # REQUIRED, so the strip carries NO "(none)" row and there is no way to represent
+      # unset. THE ORDER OF THE VALUES IS LOAD-BEARING: a new product opens on the FIRST
+      # one, so put the safest default first.
+      - { name: product_assetclass,  type: Choice,          required: true,  indexed: true, desc: "Asset class of the product", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning. scrProductEdit binds Choices() on the column, NOT a literal list, so the real values need no app change, but the ORDER decides what a new product defaults to. Suggested starting set for an EQD desk: Equity · Fixed Income · Credit · Rates · FX · Commodity · Multi-Asset" }
       # Indexed because the reason to flag ESG at all is to filter and group on it,
       # in the app and in Power BI. Costs nothing on a list this small.
       - { name: product_esg,         type: Boolean,         required: false, indexed: true, default: false, desc: "TRUE when the product is flagged ESG" }

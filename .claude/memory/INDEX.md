@@ -59,11 +59,12 @@ not know them will author something broken:
 - [2026-08-12] COMMENTS ARE NOT A CHANGELOG (now enforced in CLAUDE.md): git holds history, `.claude/memory/` holds reasoning, comments hold constraints — ARCHIVE
 
 ## Threads          (open items; remove when closed)
-- **OWED IN SHAREPOINT:** add `product_assetclass` (Choice, optional, indexed) and
+- **OWED IN SHAREPOINT:** add `product_assetclass` (Choice, **required**, indexed) and
   `product_esg` (Yes/No, optional, indexed, default No) to `taskmaster_products`, and
   **supply the real asset-class values** — `schema.yaml` carries PLACEHOLDERs. scrProductEdit
-  binds `Choices()`, so the values need no app change, but the COLUMNS must exist before the
-  screen is pasted or the Patch fails.
+  binds `Choices()`, so the values need no app change — but their **ORDER decides what a new
+  product defaults to**, because the strip opens on the first one. The COLUMNS must exist
+  before the screen is pasted or the Patch fails.
 - **`taskmaster_taskproduct` is live (2026-08-14)** — the task↔product junction, SINGULAR
   name. `task_product_summary` is provisioned; CASCADE delete on `taskproduct_task_id` and
   RESTRICT on `taskproduct_product_id` are set and confirmed. `task_product_id` is RETIRED
