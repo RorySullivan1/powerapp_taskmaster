@@ -841,7 +841,11 @@ Screens:
                                   || !IsBlank(gEditTask.task_output_language.Value)
                                   || !IsBlank(gEditTask.task_output_branding.Value)
                                   || !IsBlank(gEditTask.task_output_approval_id)
-                                  || gEditTask.task_product_id.Id > 0,
+                                  // colTkProducts, not the retired task_product_id. OnVisible
+                                  // seeds it from the junction before this Default is read, so
+                                  // a task whose ONLY output data is its products still opens
+                                  // the section instead of hiding them.
+                                  || !IsEmpty(colTkProducts),
                                      false )
                               FalseText: =""
                               TrueText: =""
