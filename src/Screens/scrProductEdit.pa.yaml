@@ -291,9 +291,14 @@ Screens:
               If( Len(gPdErr) > 0,
               Notify( "Couldn't save the product: " & gPdErr, NotificationType.Error ) );
               If( Len(gPdErr) = 0 && !IsBlank(gPdSaved.ID),
+              // TWO ONE-ARMED Ifs, not one two-armed one: the task branch Collects and
+              // the transaction branch Sets, and an If's arms have to agree on type —
+              // Collect returns a table, Set a boolean. A task takes MANY products now,
+              // so a newly created one is appended to the staging collection rather than
+              // replacing a single global.
               If( gPdReturn = "TaskProduct",
-              Set( gTkProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ),
-              gPdReturn = "TxProduct",
+              Collect( colTkProducts, { Id: gPdSaved.ID, Uid: gPdSaved.product_uid } ) );
+              If( gPdReturn = "TxProduct",
               Set( gTxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
               Set( gPdReturn, "" );
               Notify( If(gPdMode = "Edit", "Product saved", "Product created"), NotificationType.Success );

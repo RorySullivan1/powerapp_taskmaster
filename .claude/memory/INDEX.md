@@ -59,6 +59,13 @@ not know them will author something broken:
 - [2026-08-12] COMMENTS ARE NOT A CHANGELOG (now enforced in CLAUDE.md): git holds history, `.claude/memory/` holds reasoning, comments hold constraints — ARCHIVE
 
 ## Threads          (open items; remove when closed)
+- **OWED IN SHAREPOINT before scrTaskEdit can be pasted:** add `task_product_summary`
+  (single line of text) to `taskmaster_tasks`. The save Patches it, so the paste fails
+  without it. Also confirm CASCADE delete on `taskproduct_task_id` and RESTRICT on
+  `taskproduct_product_id` — the app relies on cascade to clean links up.
+- **`taskmaster_taskproduct` is live (2026-08-14)** — the task↔product junction, singular
+  name. `task_product_id` is RETIRED but left in place holding its values, and existing
+  values are NOT migrated into the junction yet.
 - **`cmpStatusCard` and `cmpConfirmDialog` now have NO consumer in `src/`** — scrHome's
   rebuild dropped both (inert cards are plain containers; the archive button and its
   confirm modal are gone). Files kept; Studio housekeeping candidates.
@@ -118,3 +125,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-13 | scrHome rebuilt as a dashboard: four inert cards, my-tasks/my-issues galleries routing to the parent project, chart placeholders + the KPI ring; archive button and confirm modal removed | sessions/2026-08-13-1739-scrhome-dashboard.md
 - 2026-08-13 | scrHome chart placeholders replaced with real SVG charts; power-apps-svg skill gains the data-driven section (Concat, Sequence+Index, running totals, literal category tables, the locale decimal trap) | .claude/skills/power-apps-svg/SKILL.md
 - 2026-08-13 | scrTaskEdit stage/health/priority converted from ModernCombobox to cmpSelection strips fed from Choices(); stage hoisted to its own full-width row | INDEX Threads
+- 2026-08-14 | taskmaster_taskproduct junction added to the golden source; scrTaskEdit's single product field replaced by a staged multi-select reconciled on save | INDEX Threads

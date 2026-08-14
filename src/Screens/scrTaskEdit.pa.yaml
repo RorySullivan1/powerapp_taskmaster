@@ -62,10 +62,22 @@ Screens:
               If( gEditMode = "Edit" && gEditTask.task_client_name.Id > 0,
                   { Id: gEditTask.task_client_name.Id, Value: gEditTask.task_client_name.Value },
                   { Id: 0, Value: "" } ) );
-        Set( gTkProduct,
-              If( gEditMode = "Edit" && gEditTask.task_product_id.Id > 0,
-                  { Id: gEditTask.task_product_id.Id, Value: gEditTask.task_product_id.Value },
-                  { Id: 0, Value: "" } ) );
+        // PRODUCTS ARE MULTI NOW. colTkProducts is the staging set the form edits;
+        // taskmaster_taskproduct is only touched on save. Seeded from the junction on
+        // Edit and left empty on New.
+        //
+        // INSIDE THE gTkResume GUARD, like every other seed on this screen — coming
+        // back from "create a new product" must not wipe what the user already staged.
+        //
+        // Shaped to {Id, Uid} on read: taskproduct_product_uid is the denormalised
+        // copy, and reading it here avoids a LookUp per link just to show a name.
+        Clear( colTkProducts );
+        If( gEditMode = "Edit",
+            Collect( colTkProducts,
+                     ForAll( Filter( taskmaster_taskproduct,
+                                     taskproduct_task_id.Id = gEditTask.ID ) As lk,
+                             { Id:  lk.taskproduct_product_id.Id,
+                               Uid: lk.taskproduct_product_uid } ) ) );
         // OPTION TABLES FOR THE THREE STRIPS. cmpSelection needs {Id, Label} and
         // Choices() returns only Value, so the Id is synthesised POSITIONALLY:
         // Sequence() numbers the rows and Index() reads the nth choice back out.
@@ -791,9 +803,9 @@ Screens:
                   BorderColor: =gTheme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =274
+                  LayoutMinHeight: =408
                   Width: =Parent.Width - 48
-                  Height: =274
+                  Height: =408
                 Children:
                   - lblsecTkOutputHead:
                       Control: Label@2.5.1
@@ -898,33 +910,147 @@ Screens:
                                     LayoutMinHeight: =36
                                     Width: =Parent.Width
                                     Height: =36
-                        - colTkProduct:
+                  # PRODUCTS ARE 1:n. A task is 1:1 with a client but can carry several
+                  # products, so this is a staged LIST plus an add button rather than the
+                  # single cmpLookupField it replaced. It gets a full-width block of its
+                  # own because a chip row cannot share a 62px row with the approval id.
+                  - blkTkProducts:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        FillPortions: =0
+                        Visible: =tglTkOutput.Value
+                        LayoutMinHeight: =124
+                        Width: =Parent.Width - 40
+                        Height: =124
+                      Children:
+                        - rowTkProdHead:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
                             Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =200
-                              Height: =62
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =12
+                              FillPortions: =0
+                              LayoutMinHeight: =28
+                              Width: =Parent.Width
+                              Height: =28
                             Children:
-                              - fldProduct:
-                                  Control: CanvasComponent
-                                  ComponentName: cmpLookupField
+                              - lblTkProductsCap:
+                                  Control: Label@2.5.1
                                   Properties:
-                                    Caption: ="Product"
-                                    PickLabel: ="＋  Choose a product"
-                                    HasValue: =gTkProduct.Id > 0
-                                    Display: =gTkProduct.Value
-                                    Width: =Parent.Width
-                                    Height: =62
-                                    OnPick: |
+                                    Text: |
+                                      ="Products" & If( CountRows(colTkProducts) > 0,
+                                                        "   (" & CountRows(colTkProducts) & ")", "" )
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =140
+                                    Height: =28
+                              - btnTkAddProduct:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Text: ="＋  Add a product"
+                                    Fill: =gTheme.Color.Surface
+                                    Color: =gTheme.Color.Primary
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderColor: =gTheme.Color.Primary
+                                    BorderThickness: =1
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    FillPortions: =0
+                                    LayoutMinWidth: =160
+                                    Width: =160
+                                    Height: =28
+                                    OnSelect: |
                                       =Set( gTkPicker, "Product" );
                                        Reset( cmpTkPick );
                                        Set( gTkQuery, "" )
-                                    OnClear: |
-                                      =Set( gTkProduct, { Id: 0, Value: "" } )
+                        - lblTkProductsEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(colTkProducts)
+                              Text: ="No products linked yet."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =22
+                              Width: =Parent.Width
+                              Height: =22
+                        - galTkProducts:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              # A LOCAL collection, so nothing here has to delegate.
+                              Items: =colTkProducts
+                              WrapCount: =1
+                              TemplateSize: =30
+                              TemplatePadding: =0
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              ShowScrollbar: =true
+                              FillPortions: =1
+                              LayoutMinHeight: =60
+                              Width: =Parent.Width
+                              Height: =90
+                            Children:
+                              - rowTkProdBody:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =10
+                                    PaddingLeft: =4
+                                    PaddingRight: =4
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight - 1
+                                  Children:
+                                    - cellTkProdUid:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.Uid
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Body
+                                          Color: =gTheme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =140
+                                          Height: =26
+                                    - icoTkProdRemove:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Cancel
+                                          Color: =gTheme.Color.TextMuted
+                                          HoverColor: =gTheme.Color.Danger
+                                          HoverFill: =RGBA(197, 58, 58, 0.08)
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: ="Remove this product from the task"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =20
+                                          Width: =20
+                                          Height: =20
+                                          # Staging only — the junction is not touched
+                                          # until Save reconciles it.
+                                          OnSelect: =Remove( colTkProducts, ThisItem )
+                              - rowTkProdLine:
+                                  Control: Rectangle@2.3.0
+                                  Properties:
+                                    Fill: =gTheme.Color.Border
+                                    X: =0
+                                    Y: =Parent.TemplateHeight - 1
+                                    Width: =Parent.TemplateWidth
+                                    Height: =1
                   - rowTkOut2:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1225,9 +1351,12 @@ Screens:
                     task_client_name:
                     If( tglTkClient.Value && gTkClient.Id > 0,
                     { Id: gTkClient.Id, Value: gTkClient.Value }, Blank() ),
-                    task_product_id:
-                    If( tglTkOutput.Value && gTkProduct.Id > 0,
-                    { Id: gTkProduct.Id, Value: gTkProduct.Value }, Blank() ),
+                    // task_product_id is RETIRED — the junction replaced it and this
+                    // screen no longer writes it. The column keeps its stored values.
+                    // A copy for galleries; taskmaster_taskproduct is the source of truth.
+                    // Both are rewritten from the same collection below, so they cannot drift.
+                    task_product_summary:
+                    If( tglTkOutput.Value, Concat(colTkProducts, Uid, ", "), "" ),
                     task_output_language:
                     If( tglTkOutput.Value && gTkLanguage <> "(none)", { Value: gTkLanguage }, Blank() ),
                     task_output_format:
@@ -1245,6 +1374,32 @@ Screens:
                     If( Len(gTkErr) > 0,
                     Notify("Couldn't save the task: " & gTkErr, NotificationType.Error) );
                     If( Len(gTkErr) = 0 && !IsBlank(gTkSaved.ID),
+                    // --- reconcile taskmaster_taskproduct against the staged set -------
+                    // Gated on the same toggle as every other output field: with the
+                    // section off the task keeps no products, so colTkWanted is empty and
+                    // every existing link is removed.
+                    Clear( colTkWanted );
+                    If( tglTkOutput.Value, Collect( colTkWanted, colTkProducts ) );
+                    // SHAPED ON READ so the diffs can use a single-column extraction:
+                    // `colTkLinksNow.ProdId` is a table of numbers, while
+                    // `<collection>.taskproduct_product_id.Id` is not a projection Power Fx
+                    // will give you. Scoped to one task, so both sides are small.
+                    ClearCollect( colTkLinksNow,
+                    ForAll( Filter( taskmaster_taskproduct,
+                    taskproduct_task_id.Id = gTkSaved.ID ) As lk,
+                    { LinkId: lk.ID, ProdId: lk.taskproduct_product_id.Id } ) );
+                    ForAll( Filter( colTkLinksNow, !(ProdId in colTkWanted.Id) ) As gone,
+                    Remove( taskmaster_taskproduct,
+                    LookUp(taskmaster_taskproduct, ID = gone.LinkId) ) );
+                    // The lookup pair is written as {Id, Value} — the shape SharePoint
+                    // wants — and taskproduct_product_uid is the flat copy that can be
+                    // sorted server-side, which a lookup column cannot.
+                    ForAll( Filter( colTkWanted, !(Id in colTkLinksNow.ProdId) ) As add,
+                    Collect( taskmaster_taskproduct,
+                    { taskproduct_task_id:     { Id: gTkSaved.ID, Value: gTkSaved.task_name },
+                    taskproduct_product_id:  { Id: add.Id, Value: add.Uid },
+                    taskproduct_product_uid: add.Uid,
+                    taskproduct_project_id:  gTkProject.Id } ) );
                     // --- C3: rewrite the parent project's weighted completion ---------
                     // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average
                     // over task STAGES, so editing a description, a date, a priority or any
@@ -1373,8 +1528,20 @@ Screens:
               =Switch( gTkPicker,
               "Lead",      Set( gTkLead,      { DisplayName: cmpTkPick.Picked.Primary, Mail: cmpTkPick.Picked.Secondary } ),
               "Supporter", Set( gTkSupporter, { DisplayName: cmpTkPick.Picked.Primary, Mail: cmpTkPick.Picked.Secondary } ),
-              "Client",    Set( gTkClient,    { Id: Value(cmpTkPick.Picked.Key), Value: cmpTkPick.Picked.Primary } ),
-              "Product",   Set( gTkProduct,   { Id: Value(cmpTkPick.Picked.Key), Value: cmpTkPick.Picked.Primary } ) );
+              "Client",    Set( gTkClient,    { Id: Value(cmpTkPick.Picked.Key), Value: cmpTkPick.Picked.Primary } ) );
+              // PRODUCT CANNOT SIT IN THE SWITCH ABOVE. It Collects rather than Sets,
+              // and Switch's arms have to agree on type — Collect returns a TABLE while
+              // Set returns a boolean, the same mismatch that made IfError reject the
+              // documented Remove/Notify idiom on scrProject.
+              //
+              // The LookUp is a duplicate guard: the picker will happily offer a product
+              // that is already staged, and two identical links would double-count it in
+              // the summary and in Power BI.
+              If( gTkPicker = "Product"
+               && IsBlank( LookUp(colTkProducts, Id = Value(cmpTkPick.Picked.Key)) ),
+                  Collect( colTkProducts,
+                           { Id:  Value(cmpTkPick.Picked.Key),
+                             Uid: cmpTkPick.Picked.Primary } ) );
               Set( gTkPicker, "" )
             OnCreateNew: |
               =Set( gTkResume, true );
