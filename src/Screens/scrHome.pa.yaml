@@ -524,8 +524,13 @@ Screens:
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
+                        # 480 IS NOT ROUND, IT IS THE TASK ROW'S FLOOR PLUS THE PANEL:
+                        # 22 + 70 + 130 + 100 + 70 columns, 40 of gaps, 16 of row padding,
+                        # 32 of panel padding. Raising it further would make rowLists the
+                        # widest band on the screen; rowCharts is 978 and this pair is 976,
+                        # so the charts still govern the minimum width and nothing clips.
                         FillPortions: =1
-                        LayoutMinWidth: =340
+                        LayoutMinWidth: =480
                         Height: =Parent.Height
                       Children:
                         - lblMyTasksTitle:
@@ -694,10 +699,40 @@ Screens:
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.Small
                                           Color: =gTheme.Color.TextMuted
-                                          Align: =Align.Right
                                           VerticalAlign: =VerticalAlign.Middle
                                           FillPortions: =2
-                                          LayoutMinWidth: =110
+                                          LayoutMinWidth: =100
+                                          Height: =40
+                                    - cellMyTaskDue:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          # A missing target date is "-", not an empty cell:
+                                          # a blank reads as a rendering fault, a dash reads
+                                          # as "nobody set one".
+                                          #
+                                          # No stage test on the overdue branch — this gallery
+                                          # is already filtered to open tasks, so a completed
+                                          # one cannot reach it.
+                                          Text: |
+                                            =If( IsBlank(ThisItem.task_date_target), "-",
+                                                 With( { d: DateDiff(Today(), ThisItem.task_date_target, TimeUnit.Days) },
+                                                       If( d < 0, "Overdue",
+                                                           d = 0, "Due today",
+                                                                  d & "d Left" ) ) )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: |
+                                            =If( IsBlank(ThisItem.task_date_target),
+                                                 gTheme.Color.TextMuted,
+                                                 ThisItem.task_date_target < Today(),
+                                                 gTheme.Color.Danger,
+                                                 DateDiff(Today(), ThisItem.task_date_target, TimeUnit.Days) = 0,
+                                                 gTheme.Color.Warning,
+                                                 gTheme.Color.TextMuted )
+                                          Align: =Align.Right
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =70
                                           Height: =40
                               # Absolute siblings of the row container, not children of
                               # it: both must span the whole template, and the hit button
@@ -755,7 +790,7 @@ Screens:
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         FillPortions: =1
-                        LayoutMinWidth: =340
+                        LayoutMinWidth: =480
                         Height: =Parent.Height
                       Children:
                         - lblMyIssuesTitle:
