@@ -89,9 +89,11 @@ not know them will author something broken:
   is the permanent fix if confirmed.
 - **OWED IN SHAREPOINT:** set the `project_phase` column default to `Not Started` (the value
   itself already exists).
-- **`cmpSelection` is IN USE and WORKING** — issue status, type, impact and transaction
-  currency, all fed from `Choices()`. Fixed 2026-08-13 by declaring `Selected` as an Output
-  property in Studio. Do not convert these to comboboxes; the control was never the fault.
+- **`cmpSelection` is IN USE and WORKING** — issue status/type/impact, transaction currency,
+  and now task stage/health/priority, all fed from `Choices()`. Fixed 2026-08-13 by declaring
+  `Selected` as an Output property in Studio. Do not convert these to comboboxes; the control
+  was never the fault. **The strips carry no colour input**, so scrTaskEdit's stage/health/
+  priority lost the value-coloured text the comboboxes had.
 - **Three auto-layout containers have BOTH children unpinned** (`colIssType` among them) —
   unpinned children split space evenly and ignore declared heights.
 - **The Choice columns that replaced Managed Metadata (2026-08-10) have no recorded internal
@@ -115,3 +117,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-13 | project_phase derived in-app + Mark-complete button; cmpSelection root cause (Selected not an Output property); scrProject galleries rebuilt; scrProjects reworked | sessions/2026-08-13-1724-project-phase-derivation-and-selection-fix.md
 - 2026-08-13 | scrHome rebuilt as a dashboard: four inert cards, my-tasks/my-issues galleries routing to the parent project, chart placeholders + the KPI ring; archive button and confirm modal removed | sessions/2026-08-13-1739-scrhome-dashboard.md
 - 2026-08-13 | scrHome chart placeholders replaced with real SVG charts; power-apps-svg skill gains the data-driven section (Concat, Sequence+Index, running totals, literal category tables, the locale decimal trap) | .claude/skills/power-apps-svg/SKILL.md
+- 2026-08-13 | scrTaskEdit stage/health/priority converted from ModernCombobox to cmpSelection strips fed from Choices(); stage hoisted to its own full-width row | INDEX Threads

@@ -66,6 +66,26 @@ Screens:
               If( gEditMode = "Edit" && gEditTask.task_product_id.Id > 0,
                   { Id: gEditTask.task_product_id.Id, Value: gEditTask.task_product_id.Value },
                   { Id: 0, Value: "" } ) );
+        // OPTION TABLES FOR THE THREE STRIPS. cmpSelection needs {Id, Label} and
+        // Choices() returns only Value, so the Id is synthesised POSITIONALLY:
+        // Sequence() numbers the rows and Index() reads the nth choice back out.
+        // The Ids mean nothing beyond "which row" — never hard-code one, look it up
+        // by Label, which is what each DefaultId does.
+        //
+        // All three columns are REQUIRED with a default (C9), so none of them gets a
+        // "(none)" row: there is no legal blank to write back.
+        ClearCollect( colTkStageOpts,
+                      With( { ch: Choices([@taskmaster_tasks].task_stage) },
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+        ClearCollect( colTkStatusOpts,
+                      With( { ch: Choices([@taskmaster_tasks].task_status) },
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+        ClearCollect( colTkPriorityOpts,
+                      With( { ch: Choices([@taskmaster_tasks].task_priority) },
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         Set( gTkStage,    If( gEditMode = "Edit", Coalesce(gEditTask.task_stage.Value, "Not Started"), "Not Started" ) );
         Set( gTkStatus,   If( gEditMode = "Edit", Coalesce(gEditTask.task_status.Value, "Green"), "Green" ) );
         Set( gTkPriority, If( gEditMode = "Edit", Coalesce(gEditTask.task_priority.Value, "Moderate"), "Moderate" ) );
@@ -78,9 +98,11 @@ Screens:
         Reset( cmpTkPick );
         Set( gTkQuery, "" );
         Reset( txtTkApprovalId );
-        // A combo box re-reads DefaultSelectedItems ONLY on Reset, so without these
-        // the previous task's stage/health/priority survive into the next one.
-        Reset( cboTkStage ); Reset( cboTkStatus ); Reset( cboTkPriority );
+        // cmpSelection re-reads its DefaultId ONLY on Reset — without these the
+        // previous task's stage/health/priority survive into the next one, and the
+        // strip then DISAGREES WITH THE SAVE rather than failing visibly.
+        Reset( selTkStage ); Reset( selTkStatus ); Reset( selTkPriority );
+        // A combo box re-reads DefaultSelectedItems ONLY on Reset.
         Reset( cboTkLanguage ); Reset( cboTkFormat ); Reset( cboTkBranding ); Reset( cboTkClientStage );
         Reset( tglTkOutput ); Reset( tglTkClient );
         // A date picker re-reads DefaultDate ONLY on Reset. Without these the seeds
@@ -283,9 +305,9 @@ Screens:
                   BorderColor: =gTheme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =134
+                  LayoutMinHeight: =198
                   Width: =Parent.Width - 48
-                  Height: =134
+                  Height: =198
                 Children:
                   - lblsecTkStateHead:
                       Control: Label@2.5.1
@@ -300,16 +322,22 @@ Screens:
                         LayoutMinHeight: =26
                         Width: =Parent.Width - 40
                         Height: =26
-                  - gridTkState:
+                  # STAGE ON ITS OWN ROW, health and priority sharing the next.
+                  # A five-option strip in a third-width cell gives each label about
+                  # 60px, and "Not Started" does not fit in 60px at any legible size.
+                  # A vertical stack rather than a two-row grid because a GridLayout
+                  # span did not render full width when scrIssueEdit tried it.
+                  - stackTkState:
                       Control: GroupContainer@1.5.0
-                      Variant: GridLayout
+                      Variant: AutoLayout
                       Properties:
-                        LayoutGridColumns: =3
-                        LayoutGridRows: =1
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =10
                         FillPortions: =0
-                        LayoutMinHeight: =80
+                        LayoutMinHeight: =134
                         Width: =Parent.Width - 40
-                        Height: =80
+                        Height: =134
                       Children:
                         - colTkStage:
                             Control: GroupContainer@1.5.0
@@ -318,11 +346,10 @@ Screens:
                               LayoutDirection: =LayoutDirection.Vertical
                               LayoutAlignItems: =LayoutAlignItems.Start
                               LayoutGap: =4
-                              LayoutGridColumnStart: =1
-                              LayoutGridColumnEnd: =1
-                              LayoutGridRowStart: =1
-                              LayoutGridRowEnd: =1
-                              Height: =80
+                              FillPortions: =0
+                              LayoutMinHeight: =62
+                              Width: =Parent.Width
+                              Height: =62
                             Children:
                               - lblTkStageCap:
                                   Control: Label@2.5.1
@@ -336,116 +363,91 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              - cboTkStage:
-                                  Control: ModernCombobox@1.1.1
+                              - selTkStage:
+                                  Control: CanvasComponent
+                                  ComponentName: cmpSelection
                                   Properties:
-                                    Items: =["Not Started", "Planning", "Drafting", "Finalizing", "Complete"]
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkStage], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =Switch( gTkStage,
-                                      "Complete",     gTheme.Color.Success,
-                                      "Finalizing",   gTheme.Color.Warning,
-                                      "Not Started",  gTheme.Color.TextMuted,
-                                      gTheme.Color.TextPrimary )
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
                                     Width: =Parent.Width
                                     Height: =40
-                                    OnChange: =Set(gTkStage, cboTkStage.Selected.Value)
-                        - colTkStatus:
+                                    Items: =colTkStageOpts
+                                    DefaultId: =Coalesce( LookUp(colTkStageOpts, Label = gTkStage, Id), 1 )
+                                    OnChange: =Set(gTkStage, selTkStage.Selected.Label)
+                        - rowTkStatePair:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
                             Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
+                              LayoutDirection: =LayoutDirection.Horizontal
                               LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              LayoutGridColumnStart: =2
-                              LayoutGridColumnEnd: =2
-                              LayoutGridRowStart: =1
-                              LayoutGridRowEnd: =1
-                              Height: =80
+                              LayoutGap: =16
+                              FillPortions: =0
+                              LayoutMinHeight: =62
+                              Width: =Parent.Width
+                              Height: =62
                             Children:
-                              - lblTkStatusCap:
-                                  Control: Label@2.5.1
+                              - colTkStatus:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
                                   Properties:
-                                    Text: ="Health  *"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - cboTkStatus:
-                                  Control: ModernCombobox@1.1.1
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =4
+                                    FillPortions: =1
+                                    LayoutMinWidth: =200
+                                    Height: =62
+                                  Children:
+                                    - lblTkStatusCap:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: ="Health  *"
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinHeight: =18
+                                          Width: =Parent.Width
+                                          Height: =18
+                                    - selTkStatus:
+                                        Control: CanvasComponent
+                                        ComponentName: cmpSelection
+                                        Properties:
+                                          Width: =Parent.Width
+                                          Height: =40
+                                          Items: =colTkStatusOpts
+                                          DefaultId: =Coalesce( LookUp(colTkStatusOpts, Label = gTkStatus, Id), 1 )
+                                          OnChange: =Set(gTkStatus, selTkStatus.Selected.Label)
+                              - colTkPriority:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
                                   Properties:
-                                    Items: =["Green", "Amber", "Red"]
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkStatus], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =Switch( gTkStatus,
-                                      "Green", gTheme.Color.Success,
-                                      "Amber", gTheme.Color.Warning,
-                                      "Red",   gTheme.Color.Danger,
-                                      gTheme.Color.TextPrimary )
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =40
-                                    OnChange: =Set(gTkStatus, cboTkStatus.Selected.Value)
-                        - colTkPriority:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              LayoutGridColumnStart: =3
-                              LayoutGridColumnEnd: =3
-                              LayoutGridRowStart: =1
-                              LayoutGridRowEnd: =1
-                              Height: =80
-                            Children:
-                              - lblTkPriorityCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Priority  *"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - cboTkPriority:
-                                  Control: ModernCombobox@1.1.1
-                                  Properties:
-                                    Items: =["Low", "Moderate", "High", "Critical"]
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkPriority], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =Switch( gTkPriority,
-                                      "Critical", gTheme.Color.Danger,
-                                      "High",     gTheme.Color.Warning,
-                                      "Low",      gTheme.Color.TextMuted,
-                                      gTheme.Color.TextPrimary )
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =40
-                                    OnChange: =Set(gTkPriority, cboTkPriority.Selected.Value)
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =4
+                                    FillPortions: =1
+                                    LayoutMinWidth: =200
+                                    Height: =62
+                                  Children:
+                                    - lblTkPriorityCap:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: ="Priority  *"
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinHeight: =18
+                                          Width: =Parent.Width
+                                          Height: =18
+                                    - selTkPriority:
+                                        Control: CanvasComponent
+                                        ComponentName: cmpSelection
+                                        Properties:
+                                          Width: =Parent.Width
+                                          Height: =40
+                                          Items: =colTkPriorityOpts
+                                          DefaultId: =Coalesce( LookUp(colTkPriorityOpts, Label = gTkPriority, Id), 1 )
+                                          OnChange: =Set(gTkPriority, selTkPriority.Selected.Label)
             - secTkPeopleDates:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
