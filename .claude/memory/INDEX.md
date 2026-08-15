@@ -112,7 +112,12 @@ not know them will author something broken:
 - **The Choice columns that replaced Managed Metadata (2026-08-10) have no recorded internal
   names** — verify against SharePoint before any formula binds them.
 - **Column-token validator write-time hook** — proposed in CLAUDE.md, not built. "Never invent a
-  column name" is prose a model can drift past; a hook would make it enforced.
+  column name" is prose a model can drift past; a hook would make it enforced. Scaffold it with
+  `/add-hook` and copy `pre_read_guard.py`'s fail-open shape — a guard that misfires costs a paste.
+- **This INDEX has drifted past its own budget again (noticed 2026-08-15)** — 378 lines / 150KB
+  against the ≤80-line target at the top of the file. It was pruned to ~80 on 2026-08-13, so it
+  has regrown 5× in two days: the Decisions ledger is append-only and nothing has been archived
+  since. Next prune moves the settled entries to `sessions/ARCHIVE-2026.md` verbatim, as before.
 - **App and Power BI disagree on blank vs zero**: the app shows `Coalesce(project_perc_completion, 0)`
   so a project with no tasks reads 0%, while Power BI sees blank and excludes it from averages.
 - **Power BI owes the blended notional** (an FX dimension: currency, rate, as-of date).
