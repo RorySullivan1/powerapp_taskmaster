@@ -64,6 +64,19 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/post_bash_filter.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
@@ -90,6 +103,19 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/skills/skill-distiller/scripts/plan_nudge.py"
+            ],
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PreCompact": [
@@ -102,6 +128,21 @@
             "args": [
               "${CLAUDE_PROJECT_DIR}/.claude/skills/session-memory/scripts/memory.py",
               "precompact-hook"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/pre_read_guard.py"
             ],
             "timeout": 10
           }
