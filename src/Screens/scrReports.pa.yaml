@@ -362,24 +362,33 @@ Screens:
                   Collect( colRptFamBar,
                       { Idx: CountRows(colRptFam) + 1, K: "Other", N: gRptFamOther } ) );
               Set( gRptFamMax, Max( 1, Coalesce(Max(colRptFamBar, N), 0) ) );
-              // FIXED VOCABULARY + Unspecified + Other. "Other" counts rows matching none
-              // of the enumerated values: if it is ever non-zero, SharePoint and
-              // schema.yaml disagree — visible on sight instead of silently reweighting
-              // every share.
+              // THE VOCABULARY COMES FROM THE COLUMN, via Choices(). A literal list here
+              // was a second copy of the column that drifts the moment someone edits it in
+              // SharePoint, and this chart would then under-count in silence.
+              // Choices() keeps the property this section actually needs — it returns EVERY
+              // value the column offers, including ones no task currently holds, so an
+              // unused format still draws a zero bar. That is the same reason the gap grid
+              // reads its axes from the dimension lists: a GroupBy over the facts would
+              // delete exactly the categories worth seeing.
+              ClearCollect( colRptFmtVocab,
+                  ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+                          { K: c.Value } ) );
               Clear( colRptFmtBar );
               Collect( colRptFmtBar,
-                  ForAll(
-                      Table( { Idx: 1, K: "Flyer" },   { Idx: 2, K: "Email" },
-                             { Idx: 3, K: "PDF" },     { Idx: 4, K: "Webpage" },
-                             { Idx: 5, K: "Deck" },    { Idx: 6, K: "Video" },
-                             { Idx: 7, K: "Unspecified" }, { Idx: 8, K: "Other" } ) As c,
-                      { Idx: c.Idx, K: c.K,
-                        N: If( c.K = "Other",
-                               CountRows( Filter( colRptOpenTag,
-                                   !( Fmt = "Flyer" || Fmt = "Email" || Fmt = "PDF"
-                                   || Fmt = "Webpage" || Fmt = "Deck" || Fmt = "Video"
-                                   || Fmt = "Unspecified" ) ) ),
-                               CountRows( Filter(colRptOpenTag, Fmt = c.K) ) ) } ) );
+                  ForAll( Sequence( CountRows(colRptFmtVocab) ) As s,
+                      With( { k: Index(colRptFmtVocab, s.Value).K },
+                          { Idx: s.Value, K: k,
+                            N: CountRows( Filter(colRptOpenTag, Fmt = k) ) } ) ) );
+              // Blank is not a Choice value, so it needs its own bucket. "Other" now means
+              // a value tasks still HOLD that the column no longer offers — retired in
+              // SharePoint while rows kept it — which is a data question, not the
+              // schema.yaml disagreement it used to mean.
+              Collect( colRptFmtBar,
+                  { Idx: CountRows(colRptFmtVocab) + 1, K: "Unspecified",
+                    N: CountRows( Filter(colRptOpenTag, Fmt = "Unspecified") ) },
+                  { Idx: CountRows(colRptFmtVocab) + 2, K: "Other",
+                    N: CountRows( Filter( colRptOpenTag,
+                           Fmt <> "Unspecified" && !(Fmt in colRptFmtVocab.K) ) ) } );
               Set( gRptFmtMax, Max( 1, Coalesce(Max(colRptFmtBar, N), 0) ) );
               // Median cycle time by family — the elapsed-time counterpart to the two
               // volume charts, and the only genuine duration signal in the model.
@@ -1705,7 +1714,7 @@ Screens:
                             Properties:
                               Text: |
                                 =If( LookUp(colRptFmtBar, K = "Other", N) > 0,
-                                     "Other is NON-ZERO — SharePoint and schema.yaml disagree on this column.",
+                                     "Other is NON-ZERO — tasks hold a format the column no longer offers.",
                                      "Direct on the task, no join." )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
@@ -1724,9 +1733,16 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 80
+                              # THE viewBox HEIGHT IS COMPUTED, because the row count is now
+                              # the column's vocabulary length plus two and is no longer
+                              # known at author time. A fixed 360 fitted exactly the eight
+                              # hard-coded rows; a ninth Choice value would have been drawn
+                              # outside the canvas and simply not appeared.
                               Image: |
-                                ="data:image/svg+xml;charset=utf-8," & EncodeUrl(
-                                      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 360'>"
+                                =With( { n: Max(1, CountRows(colRptFmtBar)) },
+                                  "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 "
+                                    & (n * 44 + 16) & "'>"
                                     & Concat( colRptFmtBar,
                                           "<text x='0' y='" & ((Idx - 1) * 44 + 26)
                                         & "' font-size='17' font-family='Segoe UI, sans-serif' fill='#20262D'>"
@@ -1741,7 +1757,7 @@ Screens:
                                         & "<text x='598' y='" & ((Idx - 1) * 44 + 27)
                                         & "' text-anchor='end' font-size='16'"
                                         & " font-family='Segoe UI, sans-serif' fill='#6E7882'>" & N & "</text>" )
-                                    & "</svg>" )
+                                    & "</svg>" ) )
             - pnlRptCyc:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout

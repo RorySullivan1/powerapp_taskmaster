@@ -105,6 +105,15 @@ Screens:
         Set( gTkFormat,   If( gEditMode = "Edit", Coalesce(gEditTask.task_output_format.Value, "(none)"), "(none)" ) );
         Set( gTkBranding, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_branding.Value, "(none)"), "(none)" ) );
         Set( gTkClientStage, If( gEditMode = "Edit", Coalesce(gEditTask.task_client_stage.Value, "(none)"), "(none)" ) );
+        // THE FORMAT LIST COMES FROM THE COLUMN, not a literal copy of it. A literal
+        // drifts the moment someone edits the Choice in SharePoint, and the failure is
+        // silent both ways: a removed value stays offered and will not save, a new one
+        // never appears. "(none)" is Collected FIRST so it sorts to the top; it is an
+        // app concept, not a column value, and the save maps it back to Blank().
+        ClearCollect( colTkFormat, { Value: "(none)" } );
+        Collect( colTkFormat,
+                 ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+                         { Value: c.Value } ) );
         Set( gTkPicker, "" );
         Reset( txtTkName ); Reset( txtTkDesc );
         Reset( cmpTkPick );
@@ -1133,7 +1142,7 @@ Screens:
                               - cboTkFormat:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
-                                    Items: =["(none)", "Flyer", "Email", "PDF", "Webpage", "Deck", "Video"]
+                                    Items: =colTkFormat
                                     ItemDisplayText: =ThisItem.Value
                                     DefaultSelectedItems: =Filter( [gTkFormat], !IsBlank(Value) )
                                     SelectMultiple: =false
