@@ -105,6 +105,15 @@ Screens:
         Set( gTkFormat,   If( gEditMode = "Edit", Coalesce(gEditTask.task_output_format.Value, "(none)"), "(none)" ) );
         Set( gTkBranding, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_branding.Value, "(none)"), "(none)" ) );
         Set( gTkClientStage, If( gEditMode = "Edit", Coalesce(gEditTask.task_client_stage.Value, "(none)"), "(none)" ) );
+        Set( gTkPicker, "" );
+        Reset( txtTkName ); Reset( txtTkDesc );
+        Reset( cmpTkPick );
+        Set( gTkQuery, "" );
+        Reset( txtTkApprovalId );
+        // THE OPTION LISTS LOAD HERE, AFTER the modal and query state is cleared and
+        // before the combo Resets that read them. Order is defensive: a Choices() call
+        // that errors stops the whole OnVisible, and anything left above it never runs —
+        // so nothing that decides whether the screen is USABLE may sit below this block.
         // EVERY OPTION LIST COMES FROM ITS COLUMN, not a literal copy of it. A literal
         // drifts the moment someone edits the Choice in SharePoint, and the failure is
         // silent both ways: a removed value stays offered and will not save, a new one
@@ -130,11 +139,6 @@ Screens:
         Collect( colTkCliStageOpts,
                  ForAll( Choices([@taskmaster_tasks].task_client_stage) As c,
                          { Value: c.Value } ) );
-        Set( gTkPicker, "" );
-        Reset( txtTkName ); Reset( txtTkDesc );
-        Reset( cmpTkPick );
-        Set( gTkQuery, "" );
-        Reset( txtTkApprovalId );
         // cmpSelection re-reads its DefaultId ONLY on Reset — without these the
         // previous task's stage/health/priority survive into the next one, and the
         // strip then DISAGREES WITH THE SAVE rather than failing visibly.
