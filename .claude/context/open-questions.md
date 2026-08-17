@@ -25,10 +25,10 @@ decision and delete it here.
   term store directly via `Choices()`, so there is no cache list to populate and no flow in that
   path unless a term set exceeds 20 terms.
 - **Q14 FX rates** → **do not convert in the app at all.** `transaction_notional_usd` is dropped;
-  the app stores currency + amount and converts nothing. **REOPENED 2026-08-17:** the answer
-  named Power BI as the converter and Power BI is now out of scope, so **nothing owns the
-  blended notional**. Either the model grows an FX dimension (currency, rate, as-of date) or
-  the cross-currency figure is permanently out of scope. See `.claude/context/schema.md` → C5.
+  the app stores currency + amount and converts nothing. **SETTLED 2026-08-17: cross-currency
+  conversion is OUT OF SCOPE for this project and other tools handle it.** Power BI's departure
+  left it briefly unowned; it is now deliberately unowned. No blended notional anywhere, ever.
+  See `.claude/context/schema.md` → C5.
 - **Power BI licence gate** → **REMOVED 2026-08-17.** Power BI is out of scope; `gHasPowerBiLicence`,
   `NeedsLicence` and `cmpAppBar.HasLicence` are all deleted.
 - ~~**Q2b Power BI workspace / refresh / embedded-vs-linked.**~~ CLOSED 2026-08-17 — out of scope. Which workspace hosts the report,

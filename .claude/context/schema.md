@@ -201,7 +201,7 @@ the rates were a static table that would silently go stale.
 rows. `scrProject`'s transactions tab therefore totals **per currency** and labels itself as such.
 Never FX-convert inside a query either: it neither delegates nor reproduces.
 
-**NOBODY owes this figure as of 2026-08-17** — Power BI is out of scope.** It needs an FX dimension (currency, rate, effective date) and a
+**CROSS-CURRENCY CONVERSION IS OUT OF SCOPE (user, 2026-08-17) and is handled by other tools outside this project. No blended figure is owed anywhere.** It needs an FX dimension (currency, rate, effective date) and a
 measure converting at the trade date. Until that exists there is no blended notional anywhere —
 that is the accepted cost of the decision, not an oversight.
 

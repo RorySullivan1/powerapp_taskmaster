@@ -40,8 +40,8 @@ Stated here so a later session doesn't try to build it and find out the hard way
   columns. A true snapshot needs a snapshot list written by a scheduled flow (blocked on Q12).
 - **No blended notional.** C5 is emphatic: `transaction_notional` is denominated in
   `transaction_currency` and must never be summed across rows. Notional appears **per currency
-  only**. **Nothing owes the FX-converted figure** now that Power BI is out of scope — it needs
-  an FX dimension the model does not have. Open decision.
+  only**. CROSS-CURRENCY CONVERSION IS OUT OF SCOPE (user, 2026-08-17) and is handled by other tools outside this project. The screen never
+  shows a cross-currency total and must not be asked to.
 - **No org-wide certainty past the row cap.** Aggregates never delegate to SharePoint, so every
   number here is computed locally over fetched rows. The truncation banner (below) is what keeps
   that honest.

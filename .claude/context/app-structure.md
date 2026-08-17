@@ -30,11 +30,12 @@ What was reversed: the old rule said *do not rebuild the aggregate dashboard as 
 to dodge the licence gap*. That rule is void — native charts are now the design, not a dodge.
 See `docs/reports-screen-design.md`.
 
-**Consequence with no owner:** the blended cross-currency notional. C5 sends
-`transaction_notional` per-currency only and named Power BI as the thing that would convert
-it. **Nothing owns that now** — it needs an FX dimension (currency, rate, as-of date) that
-does not exist in the model. Either the app grows one, or the blended figure is permanently
-out of scope. Open.
+**Cross-currency conversion is OUT OF SCOPE (2026-08-17).** C5 sends `transaction_notional`
+per-currency only, and dropping Power BI removed the thing that would have converted it. The
+user has settled it: **other tools handle FX**, so this project never converts, never stores a
+converted amount, and never shows a blended total. Per-currency is the whole answer — a screen
+asking for one cross-currency number is asking for something the model deliberately cannot
+give.
 
 ## Required screens
 
