@@ -1,105 +1,1145 @@
 # =============================================================================
-# scrReports  —  native analytics (screen-map §2). INTERIM: three KPI rings.
-# SLATED FOR FULL REPLACEMENT — docs/reports-screen-design.md designs this screen
-# as person-level analytics built entirely from SVG. Power BI is OUT OF SCOPE for
-# this project (2026-08-17), so there is no licence gate and no embed.
-# DIALECT: modern structured schema; positional z-order. Header + nav are one
-# component (cmpAppBar), declared LAST so the fly-out floats over the content.
+# scrReports  —  native analytics. Power BI is OUT OF SCOPE; every chart here is
+# SVG in an Image control. Design note: docs/reports-screen-design.md.
+#
+# TRANCHE 1 OF 2. Bands 0-2 (control bar, desk pulse, people) plus the WHOLE
+# data layer. Bands 3-5 (where the work sits, project trend, transactions +
+# coverage heatmap) are rendering only and land next; their folds are already
+# built below so the second tranche adds no queries.
+#
+# ARCHITECTURE — fetch bounded, fold once, render from folds.
+#   * Every fact fetch is delegable and date- or state-bounded.
+#   * Everything renders from small pre-aggregated collections. NO CountRows,
+#     LookUp or Filter over a fact collection may appear in a gallery Items or
+#     row property — that is the N+1, and a 40-row people gallery each scanning
+#     800 tasks is 32,000 row-scans PER REPAINT.
+#
+# THE LOAD LIVES IN ONE PLACE — btnRptLoad.OnSelect — and OnVisible, the refresh
+# icon and the period strip all reach it with Select(). MS Learn is explicit that
+# "Select QUEUES the target OnSelect for later processing... it does not cause it
+# to evaluate immediately, nor does it wait": so nothing may read a fold in the
+# same formula that Selects the loader. Nothing here does — the bands are
+# declarative over the collections and simply repaint when they fill.
+#
+# BANDS: header 0..64 absolute, control bar 64..136 absolute (fixed, outside the
+# scroll), bodyRoot 136..bottom vertical auto-layout with LayoutOverflowY Scroll.
+# Sections stack, so there is NO manual Y arithmetic below the control bar.
 # =============================================================================
 Screens:
   scrReports:
     Properties:
       Fill: =gTheme.Color.Bg
-      # ---- PHASE-2 DATA ----------------------------------------------------
-      # SCOPE MATTERS: SharePoint cannot count org-wide accurately from the app —
-      # CountRows never delegates, so it only ever counts the rows already pulled
-      # (the data row limit). Every figure here is therefore deliberately scoped
-      # to a set small enough to be exact: YOUR tasks, and the active projects
-      # list. Desk-wide aggregates need the row-cap banner the design specifies.
+      # Defaults + the reload guard, and nothing else. The fetches are in
+      # btnRptLoad so that the period strip and the refresh icon run the same
+      # code rather than three copies that drift apart.
       OnVisible: |
         =
-        // SELF-HEAL, and it is not belt-and-braces. App.OnStart is NON-BLOCKING, so this
-        // screen can run before it finishes. A blank gUserEmail makes the Person filters
-        // below match NOTHING, and these KPIs are imperative Sets — they run once and never
-        // re-fire when the global later arrives, so the dashboard latches at zero until a
-        // manual refresh. Declarative properties like gTheme self-heal; these cannot.
+        // SELF-HEAL. App.OnStart is NON-BLOCKING, so this screen can run before it
+        // finishes; a blank gUserEmail makes every "mine" test match nothing, and these
+        // are imperative Sets that never re-fire.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
-        Concurrent(
-            ClearCollect( colMyTasks,
-                Filter( LiveTasks,
-                    task_lead.Email = gUserEmail || task_supporter.Email = gUserEmail ) ),
-            ClearCollect( colMyProjects,
-                Filter( ActiveProjects,
-                    project_manager.Email = gUserEmail || project_supporter.Email = gUserEmail ) )
-        );
-        Set( gRptOpen, Filter(colMyTasks, task_stage.Value <> "Complete") );
-        Set( gRptOnTrack,
-             If( CountRows(gRptOpen) = 0, 0,
-                 RoundDown( CountRows(Filter(gRptOpen, task_status.Value = "Green"))
-                            / CountRows(gRptOpen) * 100, 0 ) ) );
-        Set( gRptAtRisk,
-             If( CountRows(gRptOpen) = 0, 0,
-                 RoundDown( CountRows(Filter(gRptOpen,
-                              task_status.Value = "Amber" || task_status.Value = "Red"))
-                            / CountRows(gRptOpen) * 100, 0 ) ) );
-        Set( gRptPortfolio,
-             If( CountRows(colMyProjects) = 0, 0,
-                 RoundDown( Average( AddColumns( colMyProjects, pc,
-                     Coalesce(project_perc_completion, 0) ), pc ), 0 ) ) )
+        If( IsBlank(gRptPeriod), Set( gRptPeriod, "90 days" ) );
+        If( IsBlank(gRptScope),  Set( gRptScope,  "Me" ) );
+        Set( gRptSelPerson, "" );
+        // Refetch ONLY when the period changed, or on the first visit. A revisit with
+        // the same window repaints from folds already in memory.
+        Set( gRptKey, gRptPeriod );
+        If( gRptKey <> gRptLoadedKey, Select( btnRptLoad ) )
     Children:
-      - hdrFallback:
-          Control: CanvasComponent
-          ComponentName: cmpSectionHeader
+      - HeaderBar:
+          Control: Rectangle@2.3.0
           Properties:
+            Fill: =gTheme.Color.Primary
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =gTheme.Space.HeaderH
+      - AppTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="EQD Taskmaster"
+            Color: =gTheme.Color.OnPrimary
+            Font: =gTheme.Font
+            Size: =gTheme.Size.H2
+            FontWeight: =FontWeight.Semibold
+            VerticalAlign: =VerticalAlign.Middle
             X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter
-            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: =60
-            Title: ="Headline status"
-            Subtitle: ="Scoped to your tasks and active projects."
-            ShowAction: =false
-      - ringOnTrack:
-          Control: CanvasComponent
-          ComponentName: cmpKpiRing
+            Y: =0
+            Width: =360
+            Height: =gTheme.Space.HeaderH
+      # =====================================================================
+      # THE LOAD. One copy, reached with Select() from three places.
+      # =====================================================================
+      # Hidden, and Visible: =false is safe — Select fires regardless of
+      # visibility. It must NOT be disabled: Select does nothing on a control
+      # whose DisplayMode is Disabled.
+      - btnRptLoad:
+          Control: Classic/Button@2.2.0
           Properties:
-            X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =140
-            Height: =140
-            Percent: =gRptOnTrack
-            Label: =gRptOnTrack & "% green"
-            AccentHex: ="#31825D"
-      - ringAtRisk:
-          Control: CanvasComponent
-          ComponentName: cmpKpiRing
+            Visible: =false
+            Text: =""
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            # EVERY ClearCollect NAMES ITS COLUMNS. Explicit Column Selection is on by
+            # default and trims retrieved columns to those it can prove are used;
+            # Microsoft documents that column lineage is occasionally lost when data
+            # moves through collections and variables, and ECS then drops the column.
+            # This is the most collection-heavy screen in the app. A dropped column
+            # renders as a blank number, which across the one-way gap comes back only
+            # as "it didn't work".
+            OnSelect: |
+              =Set( gRptBusy, true );
+              // ---- the window ------------------------------------------------------
+              Set( gRptFrom,
+                   Switch( gRptPeriod,
+                           "Quarter",   DateAdd(Today(), -90,  TimeUnit.Days),
+                           "90 days",   DateAdd(Today(), -90,  TimeUnit.Days),
+                           "YTD",       Date(Year(Today()), 1, 1),
+                           "12 months", DateAdd(Today(), -365, TimeUnit.Days),
+                                        DateAdd(Today(), -90,  TimeUnit.Days) ) );
+              // TWICE the window. One transaction fetch then serves both the current
+              // window and the prior-period delta, and feeds the monthly trend bars.
+              Set( gRptFrom2x,
+                   DateAdd( Today(), -2 * DateDiff(gRptFrom, Today(), TimeUnit.Days), TimeUnit.Days ) );
+              // ---- F1..F5, all delegable ------------------------------------------
+              // F1 is unbounded but SELF-LIMITING: open work does not accumulate.
+              // The stages are ENUMERATED because a Text <> does not delegate.
+              Concurrent(
+                  ClearCollect( colRptOpen,
+                      ShowColumns(
+                          Filter( LiveTasks,
+                                  task_stage.Value = "Not Started" || task_stage.Value = "Planning"
+                               || task_stage.Value = "Drafting"    || task_stage.Value = "Finalizing" ),
+                          ID, task_name, task_stage, task_status, task_date_target,
+                          task_lead, task_supporter, task_project_id, task_output_format ) ),
+                  ClearCollect( colRptDone,
+                      ShowColumns(
+                          Filter( LiveTasks,
+                                  task_stage.Value = "Complete"
+                               && task_date_completion >= gRptFrom ),
+                          ID, task_date_start, task_date_completion, task_date_target,
+                          task_lead, task_supporter, task_project_id, task_output_format ) ),
+                  // F3 is the LOAD-BEARING bound — transactions grow fastest.
+                  ClearCollect( colRptTx,
+                      ShowColumns(
+                          Filter( taskmaster_transactions,
+                                  transaction_project_archived = false
+                               && transaction_date >= gRptFrom2x ),
+                          ID, transaction_date, transaction_client_name, transaction_project_id,
+                          transaction_currency, transaction_notional ) ),
+                  ClearCollect( colRptPrj,
+                      ShowColumns( ActiveProjects,
+                          ID, project_name, project_phase, project_perc_completion,
+                          project_date_start, project_date_target, project_date_complete,
+                          project_type_path, project_manager, project_supporter ) ),
+                  ClearCollect( colRptIss, ShowColumns( OpenIssues, ID, issue_project_id ) )
+              );
+              // ---- D1..D4 dimensions ----------------------------------------------
+              // THE VOCABULARIES COME FROM THE DIMENSION LISTS, never from the
+              // transactions. A gap is an ABSENT group — deriving the axes from the
+              // data would delete exactly the cells the gap grid exists to show.
+              // Bound with Choices() so the screen is agnostic to the values.
+              Concurrent(
+                  ClearCollect( colRptClients,  ShowColumns( taskmaster_clients, ID, client_name, client_coverage ) ),
+                  ClearCollect( colRptProducts, ShowColumns( taskmaster_products, ID, product_uid, product_type_path ) ),
+                  ClearCollect( colRptCoverage, Choices([@taskmaster_clients].client_coverage) ),
+                  ClearCollect( colRptProdL1,   Distinct( mapping_producttype, level1 ) )
+              );
+              // ---- truncation ------------------------------------------------------
+              // Aggregates never delegate, so every figure is computed locally over
+              // fetched rows. This is the ONLY place the app can notice it ran out.
+              Set( gRptTrunc,
+                   Trim(
+                     If( CountRows(colRptOpen) >= 2000, "open tasks  ", "" ) &
+                     If( CountRows(colRptDone) >= 2000, "completed tasks  ", "" ) &
+                     If( CountRows(colRptTx)   >= 2000, "transactions  ", "" ) &
+                     If( CountRows(colRptPrj)  >= 2000, "projects  ", "" ) ) );
+              // Transactions inside the CURRENT window; colRptTx holds two windows.
+              ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
+              // ---- project map -----------------------------------------------------
+              // Level 1 of a "A | B | C" path with Find/Left, NOT Split: the separator
+              // is part of the stored data and blanks need their own bucket.
+              ClearCollect( colRptPrjMap,
+                  ForAll( colRptPrj As p,
+                      { PId:  p.ID,
+                        PNm:  p.project_name,
+                        Fam:  With( { s: Trim(Coalesce(p.project_type_path, "")) },
+                                  With( { i: Find(" | ", s) },
+                                      If( IsBlank(s), "Unclassified",
+                                          If( i > 0, Left(s, i - 1), s ) ) ) ),
+                        Mgr:  Lower(Coalesce(p.project_manager.Email, "")),
+                        Sup:  Lower(Coalesce(p.project_supporter.Email, "")) } ) );
+              // The IDs of the projects I run. A single-column table, so `in` works.
+              Set( gRptMyPrj,
+                   Filter( colRptPrjMap, Mgr = gUserEmail || Sup = gUserEmail ).PId );
+              // ---- person unpivot --------------------------------------------------
+              // TWO ATTRIBUTION PATHS, BOTH FROM TASKS: task_lead owns and
+              // task_supporter supports. They are counted separately and NEVER summed
+              // into one workload number — that double-counts the desk total.
+              // transaction_sales is NOT a third path (user-confirmed 2026-08-17): the
+              // person who sold the trade did not do the desk work measured here.
+              //
+              // Ungroup flattens the two-row table each task emits. Days and OnT carry
+              // -1 for "not applicable" so the medians and rates can exclude them
+              // without confusing a real zero with a missing value.
+              Clear( colRptPersonSrc );
+              Collect( colRptPersonSrc,
+                  Ungroup(
+                      ForAll( colRptOpen As t,
+                          { r: Table(
+                              { Em: Lower(Coalesce(t.task_lead.Email, "")),
+                                Nm: Coalesce(t.task_lead.DisplayName, ""),
+                                Role: "Owns", PId: t.task_project_id.Id, Op: 1,
+                                Ovd: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ),
+                                Gc: If(t.task_status.Value = "Green", 1, 0),
+                                Ac: If(t.task_status.Value = "Amber", 1, 0),
+                                Rc: If(t.task_status.Value = "Red",   1, 0),
+                                Dn: 0, Days: -1, OnT: -1 },
+                              { Em: Lower(Coalesce(t.task_supporter.Email, "")),
+                                Nm: Coalesce(t.task_supporter.DisplayName, ""),
+                                Role: "Supports", PId: t.task_project_id.Id, Op: 1,
+                                Ovd: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ),
+                                Gc: If(t.task_status.Value = "Green", 1, 0),
+                                Ac: If(t.task_status.Value = "Amber", 1, 0),
+                                Rc: If(t.task_status.Value = "Red",   1, 0),
+                                Dn: 0, Days: -1, OnT: -1 } ) } ),
+                      r ) );
+              Collect( colRptPersonSrc,
+                  Ungroup(
+                      ForAll( colRptDone As t,
+                          { r: Table(
+                              { Em: Lower(Coalesce(t.task_lead.Email, "")),
+                                Nm: Coalesce(t.task_lead.DisplayName, ""),
+                                Role: "Owns", PId: t.task_project_id.Id, Op: 0,
+                                Ovd: 0, Gc: 0, Ac: 0, Rc: 0, Dn: 1,
+                                Days: If( IsBlank(t.task_date_start), -1,
+                                          DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
+                                OnT:  If( IsBlank(t.task_date_target), -1,
+                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ) },
+                              { Em: Lower(Coalesce(t.task_supporter.Email, "")),
+                                Nm: Coalesce(t.task_supporter.DisplayName, ""),
+                                Role: "Supports", PId: t.task_project_id.Id, Op: 0,
+                                Ovd: 0, Gc: 0, Ac: 0, Rc: 0, Dn: 1,
+                                Days: If( IsBlank(t.task_date_start), -1,
+                                          DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
+                                OnT:  If( IsBlank(t.task_date_target), -1,
+                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ) } ) } ),
+                      r ) );
+              // ---- person fold -----------------------------------------------------
+              // ~40 rows, every measure precomputed. This costs persons x rows ONCE per
+              // load; the rule it exists to obey is that no gallery row may scan a fact
+              // collection.
+              //
+              // MEDIAN is hand-rolled: Power Fx has no Median. Sort, then take the
+              // lower-middle element. On an even count that is the lower of the two
+              // central days rather than their mean — deliberate, on integer days.
+              ClearCollect( colRptPerson,
+                  ForAll( Distinct( Filter(colRptPersonSrc, Len(Em) > 0), Em ) As pp,
+                      With( { rw: Filter(colRptPersonSrc, Em = pp.Value) },
+                          { Em:   pp.Value,
+                            Nm:   First(rw).Nm,
+                            Owns: CountRows( Filter(rw, Role = "Owns"     && Op = 1) ),
+                            Sups: CountRows( Filter(rw, Role = "Supports" && Op = 1) ),
+                            Ovd:  Sum(rw, Ovd),
+                            Gc:   Sum(rw, Gc), Ac: Sum(rw, Ac), Rc: Sum(rw, Rc),
+                            Dn:   Sum(rw, Dn),
+                            Med:  With( { ds: Sort( Filter(rw, Days >= 0), Days ) },
+                                      With( { n: CountRows(ds) },
+                                          If( n = 0, -1, Index(ds, RoundUp(n / 2, 0)).Days ) ) ),
+                            OnTp: With( { dt: Filter(rw, OnT >= 0) },
+                                      If( CountRows(dt) = 0, -1,
+                                          RoundDown( Sum(dt, OnT) / CountRows(dt) * 100, 0 ) ) ),
+                            Mine: CountRows( Filter(rw, PId in gRptMyPrj) ) > 0,
+                            Tx:   CountRows( Filter( colRptTxCur,
+                                      transaction_project_id.Id in
+                                          Filter(colRptPrjMap, Mgr = pp.Value || Sup = pp.Value).PId ) ) } ) ) );
+              // ---- desk pulse ------------------------------------------------------
+              Set( gRptOpenN,  CountRows(colRptOpen) );
+              Set( gRptOvdN,   CountRows( Filter( colRptOpen,
+                                   !IsBlank(task_date_target) && task_date_target < Today() ) ) );
+              Set( gRptTxN,    CountRows(colRptTxCur) );
+              Set( gRptTxPrev, CountRows( Filter(colRptTx, transaction_date < gRptFrom) ) );
+              Set( gRptIssN,   CountRows(colRptIss) );
+              Set( gRptAsAt,   Text(Now(), "[$-en-US]hh:mm") );
+              Set( gRptLoadedKey, gRptKey );
+              Set( gRptBusy, false )
+      # =====================================================================
+      # BAND 0 — control bar. FIXED, outside the scroll body.
+      # =====================================================================
+      - rowRptControl:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
           Properties:
-            X: =gTheme.Space.Gutter + 140 + gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =140
-            Height: =140
-            Percent: =gRptAtRisk
-            Label: =gRptAtRisk & "% amber/red"
-            AccentHex: ="#D69828"
-      - ringPortfolio:
-          Control: CanvasComponent
-          ComponentName: cmpKpiRing
+            LayoutDirection: =LayoutDirection.Horizontal
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =gTheme.Space.Gap
+            PaddingLeft: =gTheme.Space.Gutter
+            PaddingRight: =gTheme.Space.Gutter
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =0
+            Y: =gTheme.Space.HeaderH
+            Width: =Parent.Width
+            Height: =72
+          Children:
+            - wrapRptPeriod:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =2
+                  FillPortions: =0
+                  LayoutMinWidth: =300
+                  Width: =300
+                  Height: =56
+                Children:
+                  - lblRptPeriodCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Period"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =16
+                        Width: =Parent.Width
+                        Height: =16
+                  # A LITERAL option list is right here and nowhere else on this screen:
+                  # these are app concepts, not a SharePoint column, so there is no
+                  # Choices() to bind and no vocabulary that can drift.
+                  - selRptPeriod:
+                      Control: CanvasComponent
+                      ComponentName: cmpSelection
+                      Properties:
+                        FontSize: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        Items: |
+                          =Table( { Id: 1, Label: "Quarter" }, { Id: 2, Label: "90 days" },
+                                  { Id: 3, Label: "YTD" },     { Id: 4, Label: "12 months" } )
+                        DefaultId: |
+                          =Switch( gRptPeriod, "Quarter", 1, "90 days", 2, "YTD", 3, "12 months", 4, 2 )
+                        # The ONLY interaction that refetches. Select() queues the load;
+                        # nothing after it may read a fold, and nothing does.
+                        OnChange: |
+                          =Set( gRptPeriod, selRptPeriod.Selected.Label );
+                           Set( gRptKey, selRptPeriod.Selected.Label );
+                           Select( btnRptLoad )
+            - wrapRptScope:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =2
+                  FillPortions: =0
+                  LayoutMinWidth: =260
+                  Width: =260
+                  Height: =56
+                Children:
+                  - lblRptScopeCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Scope"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =16
+                        Width: =Parent.Width
+                        Height: =16
+                  # Scope NEVER refetches — it re-filters a ~40-row collection.
+                  - selRptScope:
+                      Control: CanvasComponent
+                      ComponentName: cmpSelection
+                      Properties:
+                        FontSize: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        Items: |
+                          =Table( { Id: 1, Label: "Me" }, { Id: 2, Label: "My projects" },
+                                  { Id: 3, Label: "Desk" } )
+                        DefaultId: =Switch( gRptScope, "Me", 1, "My projects", 2, "Desk", 3, 1 )
+                        OnChange: =Set( gRptScope, selRptScope.Selected.Label )
+            - lblRptAsAt:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =If( gRptBusy, "Loading…",
+                         Len(Coalesce(gRptLoadedKey, "")) = 0, "Not loaded",
+                         "as at " & gRptAsAt )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  Align: =Align.Right
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =1
+                  LayoutMinWidth: =120
+                  Height: =56
+            - icoRptRefresh:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =Icon.Reload
+                  Color: =gTheme.Color.Primary
+                  HoverColor: =gTheme.Color.PrimaryDark
+                  HoverFill: =gTheme.Color.Hover
+                  HoverBorderColor: =RGBA(0, 0, 0, 0)
+                  Tooltip: ="Refetch everything for the current period"
+                  FillPortions: =0
+                  LayoutMinWidth: =28
+                  Width: =28
+                  Height: =28
+                  # Refresh(...) first so the connector does not serve the same page
+                  # back, THEN the load. Both are queued behaviours, so the order here
+                  # is the order they are issued in, not a guarantee of completion.
+                  OnSelect: |
+                    =Refresh(taskmaster_tasks); Refresh(taskmaster_transactions);
+                     Refresh(taskmaster_projects); Refresh(taskmaster_issues);
+                     Set( gRptLoadedKey, "" );
+                     Select( btnRptLoad )
+      # =====================================================================
+      # BODY — everything below the control bar stacks and scrolls.
+      # =====================================================================
+      - bodyRoot:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
           Properties:
-            X: =gTheme.Space.Gutter + 2 * (140 + gTheme.Space.Gutter)
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
-            Width: =140
-            Height: =140
-            Percent: =gRptPortfolio
-            Label: =gRptPortfolio & "% of yours"
-            AccentHex: ="#005A9E"
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Start
+            LayoutGap: =gTheme.Space.Gap
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =gTheme.Space.Gutter
+            PaddingBottom: =gTheme.Space.Gutter
+            PaddingLeft: =gTheme.Space.Gutter
+            PaddingRight: =gTheme.Space.Gutter
+            X: =0
+            Y: =gTheme.Space.HeaderH + 72
+            Width: =Parent.Width
+            Height: =Parent.Height - gTheme.Space.HeaderH - 72
+          Children:
+            # ---- truncation banner ------------------------------------------
+            # A report that silently undercounts is worse than no report.
+            - barRptTrunc:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  Visible: =Len(Coalesce(gRptTrunc, "")) > 0
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =12
+                  PaddingLeft: =16
+                  PaddingRight: =16
+                  Fill: =RGBA(214, 152, 40, 0.12)
+                  BorderColor: =gTheme.Color.Warning
+                  BorderThickness: =1
+                  FillPortions: =0
+                  LayoutMinHeight: =44
+                  Width: =Parent.Width - 48
+                  Height: =44
+                Children:
+                  - lblRptTrunc:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Hit the data row limit on: " & gRptTrunc
+                           & "   —   every figure below is a FLOOR, not a total."
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =44
+            # =============================================================
+            # BAND 1 — desk pulse
+            # =============================================================
+            - rowRptPulse:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =gTheme.Space.Gap
+                  FillPortions: =0
+                  LayoutMinHeight: =96
+                  Width: =Parent.Width - 48
+                  Height: =96
+                Children:
+                  - cardRptOpen:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblRptOpenCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width - 32
+                              Height: =18
+                        - lblRptOpenVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gRptOpenN)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextPrimary
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        - lblRptOpenSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="across the desk"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                  - cardRptOvd:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblRptOvdCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Overdue"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width - 32
+                              Height: =18
+                        - lblRptOvdVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gRptOvdN)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =If(gRptOvdN > 0, gTheme.Color.Danger, gTheme.Color.TextPrimary)
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        - lblRptOvdSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( gRptOpenN = 0, "none open",
+                                     RoundDown(gRptOvdN / gRptOpenN * 100, 0) & "% of open work" )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                  - cardRptTx:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblRptTxCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Transactions"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width - 32
+                              Height: =18
+                        - lblRptTxVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gRptTxN)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextPrimary
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        # THE ONLY PRIOR-PERIOD DELTA ON THE SCREEN. The task tiles get
+                        # none and do not pretend to: there is no task history to
+                        # compare against, only current state.
+                        - lblRptTxSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( gRptTxPrev = 0, "no prior-period comparison",
+                                     With( { d: RoundDown((gRptTxN - gRptTxPrev) / gRptTxPrev * 100, 0) },
+                                          If(d >= 0, "+" & d & "% vs prior period",
+                                                     d & "% vs prior period" ) ) )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: |
+                                =If( gRptTxPrev = 0, gTheme.Color.TextMuted,
+                                     gRptTxN >= gRptTxPrev, gTheme.Color.Success,
+                                     gTheme.Color.Danger )
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                  - cardRptIss:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =2
+                        PaddingTop: =12
+                        PaddingBottom: =10
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =190
+                        Height: =96
+                      Children:
+                        - lblRptIssCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open issues"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width - 32
+                              Height: =18
+                        - lblRptIssVal:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Text(gRptIssN)
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H1
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextPrimary
+                              FillPortions: =0
+                              LayoutMinHeight: =34
+                              Width: =Parent.Width - 32
+                              Height: =34
+                        - lblRptIssSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="on live projects"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+            # =============================================================
+            # BAND 2 — people (primary)
+            # =============================================================
+            - secRptPeople:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =8
+                  PaddingTop: =12
+                  PaddingBottom: =12
+                  PaddingLeft: =16
+                  PaddingRight: =16
+                  Fill: =gTheme.Color.Surface
+                  BorderColor: =gTheme.Color.Border
+                  BorderThickness: =1
+                  FillPortions: =0
+                  LayoutMinHeight: =420
+                  Width: =Parent.Width - 48
+                  Height: =420
+                Children:
+                  - lblRptPeopleTitle:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="People"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.H3
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.Primary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =26
+                        Width: =Parent.Width - 32
+                        Height: =26
+                  # THE BASIS IS ON THE FACE OF THE SCREEN. The model has no hours and
+                  # no effort column, so this is volume and elapsed time — it is never
+                  # called effort.
+                  - lblRptPeopleSub:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Task volume and elapsed time — the model holds no hours, so this is not effort. "
+                           & "Owns and supports are counted separately and never summed."
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width - 32
+                        Height: =18
+                  - rowRptPeopleHead:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        PaddingLeft: =8
+                        PaddingRight: =8
+                        Fill: =gTheme.Color.Bg
+                        FillPortions: =0
+                        LayoutMinHeight: =26
+                        Width: =Parent.Width - 32
+                        Height: =26
+                      Children:
+                        - hdRptNm:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Person"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =3
+                              LayoutMinWidth: =140
+                              Height: =26
+                        - hdRptOwns:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Owns"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =52
+                              Height: =26
+                        - hdRptSups:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Supports"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =66
+                              Height: =26
+                        - hdRptOvd:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Overdue"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =62
+                              Height: =26
+                        - hdRptHealth:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Health"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =2
+                              LayoutMinWidth: =90
+                              Height: =26
+                        - hdRptDn:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Done"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =52
+                              Height: =26
+                        - hdRptMed:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Median d"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =70
+                              Height: =26
+                        - hdRptOnT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="On-time"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =64
+                              Height: =26
+                        - hdRptTx:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Tx"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =44
+                              Height: =26
+                  - lblRptPeopleEmpty:
+                      Control: Label@2.5.1
+                      Properties:
+                        Visible: =IsEmpty(galRptPeople.AllItems)
+                        Text: |
+                          =If( Len(Coalesce(gRptLoadedKey, "")) = 0,
+                               "Loading…",
+                               "Nobody matches this scope in the selected period." )
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =24
+                        Width: =Parent.Width - 32
+                        Height: =24
+                  - galRptPeople:
+                      Control: Gallery@2.15.0
+                      Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                      Properties:
+                        # SCOPE RE-FILTERS A ~40-ROW FOLD. It never refetches, and no row
+                        # property here touches a fact collection.
+                        Items: |
+                          =Sort(
+                             Switch( gRptScope,
+                                     "Me",          Filter(colRptPerson, Em = gUserEmail),
+                                     "My projects", Filter(colRptPerson, Mine),
+                                                    colRptPerson ),
+                             Owns + Sups, SortOrder.Descending )
+                        WrapCount: =1
+                        TemplateSize: =40
+                        TemplatePadding: =0
+                        TemplateFill: |
+                          =If( ThisItem.Em = gRptSelPerson, gTheme.Color.Accent, RGBA(0, 0, 0, 0) )
+                        BorderThickness: =0
+                        ShowScrollbar: =true
+                        FillPortions: =1
+                        LayoutMinHeight: =200
+                        Width: =Parent.Width - 32
+                        Height: =Parent.Height - 120
+                      Children:
+                        - rowRptPersonBody:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =8
+                              PaddingLeft: =8
+                              PaddingRight: =8
+                              X: =0
+                              Y: =0
+                              Width: =Parent.TemplateWidth
+                              Height: =Parent.TemplateHeight - 1
+                            Children:
+                              - cellRptNm:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Coalesce(ThisItem.Nm, ThisItem.Em)
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    Color: =gTheme.Color.TextPrimary
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =3
+                                    LayoutMinWidth: =140
+                                    Height: =32
+                              - cellRptOwns:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Text(ThisItem.Owns)
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    FontWeight: =FontWeight.Semibold
+                                    Color: =gTheme.Color.TextPrimary
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =52
+                                    Height: =32
+                              - cellRptSups:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Text(ThisItem.Sups)
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    Color: =gTheme.Color.TextMuted
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =66
+                                    Height: =32
+                              - cellRptOvd:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Text(ThisItem.Ovd)
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    FontWeight: =FontWeight.Semibold
+                                    Color: |
+                                      =If(ThisItem.Ovd > 0, gTheme.Color.Danger, gTheme.Color.TextMuted)
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =62
+                                    Height: =32
+                              # A PLAIN Image, NOT cmpKpiRing. A canvas component cannot be
+                              # inserted into a gallery (MS Learn known limitation #4) and the
+                              # validator hard-fails on it.
+                              #
+                              # Whole numbers only: a fraction would have to go through Text(),
+                              # which drags the locale decimal separator into an SVG attribute,
+                              # and an attribute Power Fx cannot render comes out EMPTY — a
+                              # width='' rect is not a thin rect, it is no rect.
+                              - cellRptHealth:
+                                  Control: Image@2.2.3
+                                  Properties:
+                                    ImagePosition: =ImagePosition.Fit
+                                    FillPortions: =2
+                                    LayoutMinWidth: =90
+                                    Height: =18
+                                    Image: |
+                                      =With( { tot: Max(1, ThisItem.Gc + ThisItem.Ac + ThisItem.Rc) },
+                                          With( { g: Round(ThisItem.Gc / tot * 300, 0),
+                                                  a: Round(ThisItem.Ac / tot * 300, 0) },
+                                              "data:image/svg+xml," & EncodeUrl(
+                                                  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 40'>"
+                                                & "<rect x='0' y='10' width='300' height='20' rx='10' fill='#EEF1F5'/>"
+                                                & "<rect x='0' y='10' width='" & g
+                                                & "' height='20' fill='#31825D'/>"
+                                                & "<rect x='" & g & "' y='10' width='" & a
+                                                & "' height='20' fill='#D69828'/>"
+                                                & "<rect x='" & (g + a) & "' y='10' width='" & (300 - g - a)
+                                                & "' height='20' fill='#C53A3A'/>"
+                                                & "</svg>" ) ) )
+                              - cellRptDn:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Text(ThisItem.Dn)
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    Color: =gTheme.Color.TextPrimary
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =52
+                                    Height: =32
+                              # -1 is "not applicable", not zero: a dash where no completed
+                              # task carried a start date, so a real 0-day turnaround is not
+                              # confused with a missing one.
+                              - cellRptMed:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =If(ThisItem.Med < 0, "—", Text(ThisItem.Med))
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    Color: =gTheme.Color.TextMuted
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =70
+                                    Height: =32
+                              - cellRptOnT:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =If(ThisItem.OnTp < 0, "—", ThisItem.OnTp & "%")
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    Color: |
+                                      =If( ThisItem.OnTp < 0,  gTheme.Color.TextMuted,
+                                           ThisItem.OnTp >= 80, gTheme.Color.Success,
+                                           ThisItem.OnTp >= 50, gTheme.Color.Warning,
+                                                                gTheme.Color.Danger )
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =64
+                                    Height: =32
+                              # A COUNT, not a notional. Cross-currency conversion is out of
+                              # scope, so there is no blended figure to show.
+                              - cellRptTx:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Text(ThisItem.Tx)
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    Color: =gTheme.Color.TextMuted
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =44
+                                    Height: =32
+                        - rowRptPersonLine:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              Fill: =gTheme.Color.Border
+                              X: =0
+                              Y: =Parent.TemplateHeight - 1
+                              Width: =Parent.TemplateWidth
+                              Height: =1
+                        - galRptPeopleHit:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Text: =""
+                              Fill: =RGBA(0, 0, 0, 0)
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
+                              X: =0
+                              Y: =0
+                              Width: =Parent.TemplateWidth
+                              Height: =Parent.TemplateHeight
+                              # Selects, never navigates. The detail is an OVERLAY on this
+                              # screen: a Navigate would cost a fresh OnVisible and throw
+                              # away every fold, which is the whole point of folding.
+                              OnSelect: |
+                                =Select(Parent);
+                                 Set( gRptSelPerson,
+                                      If(gRptSelPerson = ThisItem.Em, "", ThisItem.Em) )
+            # =============================================================
+            # BANDS 3-5 — authored next. Their folds are already built above,
+            # so the second tranche adds rendering only, not queries.
+            # =============================================================
+            - pnlRptPending:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =4
+                  PaddingTop: =14
+                  PaddingBottom: =14
+                  PaddingLeft: =16
+                  PaddingRight: =16
+                  Fill: =gTheme.Color.Surface
+                  BorderColor: =gTheme.Color.Border
+                  BorderThickness: =1
+                  FillPortions: =0
+                  LayoutMinHeight: =70
+                  Width: =Parent.Width - 48
+                  Height: =70
+                Children:
+                  - lblRptPendingT:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Where the work sits · Project trend · Transactions"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.H3
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =24
+                        Width: =Parent.Width - 32
+                        Height: =24
+                  - lblRptPendingB:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Bands 3-5 land in the next tranche. The data they need is already loaded."
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width - 32
+                        Height: =18
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
-      #
-      # Height is dynamic and that is the whole trick: a component intercepts every
-      # click inside its bounds, so closed it must own nothing but the 64px header
-      # strip. Open, covering the screen is exactly right — the scrim wants the click.
-      #
-      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
-      # the chosen entry and this screen does the navigating.
       - appBar:
           Control: CanvasComponent
           ComponentName: cmpAppBar
