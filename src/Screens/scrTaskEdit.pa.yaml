@@ -110,8 +110,12 @@ Screens:
         // silent both ways: a removed value stays offered and will not save, a new one
         // never appears. "(none)" is Collected FIRST so it sorts to the top; it is an
         // app concept, not a column value, and the save maps it back to Blank().
-        ClearCollect( colTkFormat, { Value: "(none)" } );
-        Collect( colTkFormat,
+        // NOT colTkFormat — that is the NAME OF THE CONTAINER around the combo. This
+        // screen uses col* for both column containers and collections, so a collection
+        // named after its own container silently resolves to the control and every
+        // reader of it fails as an incompatible type.
+        ClearCollect( colTkFmtOpts, { Value: "(none)" } );
+        Collect( colTkFmtOpts,
                  ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
                          { Value: c.Value } ) );
         Set( gTkPicker, "" );
@@ -1142,7 +1146,7 @@ Screens:
                               - cboTkFormat:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
-                                    Items: =colTkFormat
+                                    Items: =colTkFmtOpts
                                     ItemDisplayText: =ThisItem.Value
                                     DefaultSelectedItems: =Filter( [gTkFormat], !IsBlank(Value) )
                                     SelectMultiple: =false
