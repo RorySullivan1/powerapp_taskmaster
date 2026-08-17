@@ -605,11 +605,26 @@ migration:
     have leaves the picker BLANK with no error. Do not reintroduce it without
     provisioning it first.
   title_column: >-
-    All three mapping lists use an EXPLICIT `level1` column; the built-in Title is
-    left unused and set not-required. An earlier draft of this file told two of the
-    three to map level1 onto Title and the third not to, which is a contradiction —
-    the app filters on `level1` in every formula, so a list without that column
-    returns nothing and its picker is silently empty.
+    EVERY LIST USES AN EXPLICIT NAME COLUMN AND LEAVES Title UNUSED AND NOT
+    REQUIRED. The three mapping lists were built this way from the start; the main
+    lists are being brought into line after taskmaster_projects was found on
+    2026-08-17 to be storing the project name in Title under a renamed display
+    label, so `project_name` did not exist and every reader of it failed.
+    Title CANNOT be deleted — it belongs to the Item content type — so the pattern
+    is: create the explicit column, then set Title not-required and hide it.
+    NOT-REQUIRED IS LOAD-BEARING, NOT TIDINESS: the app never writes Title, so
+    while it stays required every create Patch fails.
+    Chosen over pointing the app at Title because the app tokens are the golden
+    source's vocabulary — `Title` would mean ~100 edits across the screens and five
+    lists whose name column is all spelled the same, losing the one thing that
+    makes a formula readable about which list it reads.
+    WATCH THE LOOKUPS: a lookup's display column (`show:`) points at whatever was
+    chosen when it was created, usually Title. Repoint it to the explicit column,
+    or it renders blank once Title stops being populated.
+    An earlier draft of this file told two of the three mapping lists to map level1
+    onto Title and the third not to, which is a contradiction — the app filters on
+    `level1` in every formula, so a list without that column returns nothing and
+    its picker is silently empty.
   internal_name_reuse: >-
     project_coverage, client_type and client_coverage keep their internal names
     while changing type, so the old column must be deleted before the new one is
