@@ -297,8 +297,15 @@ Small, and none of them block the build:
 1. **Index `task_date_completion`** (`taskmaster_tasks`, DateTime). F2's window filter rides on it.
    It is combined with two indexed predicates so it will hold for now, but it is the cheap insurance
    and indexes cannot be added past 20,000 items.
-2. **Real `client_coverage` values.** The gap grid's row vocabulary *is* this column; PLACEHOLDER
-   values make the grid meaningless. Already an open thread covering four columns.
+2. ~~Real `client_coverage` values.~~ **NOT AN ASK — the screen does not need them.** The grid's
+   row vocabulary is read with `Choices()` at runtime (D3), so whatever the column holds is what
+   renders, and real values landing in SharePoint need no app change at all. What is outstanding is
+   narrower and is a DOCUMENTATION issue: `schema.yaml` still records PLACEHOLDER values for this
+   column and three others, so the golden source misdescribes SharePoint. That is worth fixing for
+   anyone reading the schema to learn the vocabulary — it does not gate this build.
+
+   The only value-dependent thing here is CARDINALITY, and it is already handled at runtime: past
+   roughly 60 cells the heatmap suppresses itself and the ranked gap list carries the section.
 3. ~~Confirm `transaction_sales` is sales-side, not desk-side.~~ **CONFIRMED 2026-08-17 — do not
    use it.** It is sales-side, so it is **not** a person-productivity attribution path and must not
    appear in `colRptPerson`. The user notes a later analysis may relate salespeople to
