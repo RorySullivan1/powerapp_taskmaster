@@ -133,21 +133,31 @@ Screens:
                                && transaction_date >= gRptFrom2x ),
                           ID, transaction_date, transaction_client_name, transaction_project_id,
                           transaction_product_id, transaction_currency, transaction_notional ) ),
-                  // ONE BAD NAME HERE BREAKS EVERY READER OF colRptPrj, NOT JUST ITS OWN
-                  // COLUMN. ShowColumns resolves as a UNIT: one name the source cannot
-                  // resolve errors the whole expression, the collection never gets a
-                  // schema, and Studio then reports "not recognized" on p.project_name,
-                  // p.project_manager and every other field downstream — including ones
-                  // that are perfectly valid. THE ERROR LIST IS NOT THE FAULT LIST.
-                  // This is also why the fault shows up HERE and nowhere else: every other
-                  // screen reads these columns one at a time, off a record or inside a
-                  // Patch, where a bad sibling cannot poison a good field. Do not read a
-                  // burst of errors here as evidence against the columns it names.
+                  // AN EXPLICIT ForAll PROJECTION, NOT ShowColumns, AND THE ONLY FETCH ON
+                  // THIS SCREEN THAT NEEDS TO BE. ShowColumns over a BARE NAMED FORMULA
+                  // accepts the column names but does not carry the schema into the
+                  // collection, so `ClearCollect` reports no error while every later
+                  // `p.project_name` reads as "not recognized". The three fetches above
+                  // are immune because their first argument is a Filter EXPRESSION, whose
+                  // type resolves directly to the data source; colRptIss survives the same
+                  // bare-named-formula shape only because nothing ever reads a field off
+                  // it. Writing the record out by hand states the shape outright, which
+                  // is both the fix and a stronger guarantee than ShowColumns gave against
+                  // Explicit Column Selection dropping a column.
+                  // The Choice and Person columns are copied WHOLE, so project_phase.Value
+                  // and project_manager.Email still resolve downstream.
                   ClearCollect( colRptPrj,
-                      ShowColumns( ActiveProjects,
-                          ID, project_name, project_phase, project_perc_completion,
-                          project_date_start, project_date_target, project_date_complete,
-                          project_type_path, project_manager, project_supporter ) ),
+                      ForAll( ActiveProjects As p,
+                          { ID:                      p.ID,
+                            project_name:            p.project_name,
+                            project_phase:           p.project_phase,
+                            project_perc_completion: p.project_perc_completion,
+                            project_date_start:      p.project_date_start,
+                            project_date_target:     p.project_date_target,
+                            project_date_complete:   p.project_date_complete,
+                            project_type_path:       p.project_type_path,
+                            project_manager:         p.project_manager,
+                            project_supporter:       p.project_supporter } ) ),
                   ClearCollect( colRptIss, ShowColumns( OpenIssues, ID, issue_project_id ) )
               );
               // ---- D1..D4 dimensions ----------------------------------------------
