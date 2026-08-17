@@ -13,10 +13,12 @@
   holds only the three data-source filters, which **must stay named formulas**.
 - **Paste in progress.** Landed: `App.OnStart`, `cmpAppBar`. Remaining: `cmpPicker`,
   `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, then EVERY screen — `scrHome` was the
-  last one not on the queue and it is now a full rework. **`scrReports` is a full rework too —
-  DESIGNED 2026-08-17 (`docs/reports-screen-design.md`), not yet authored.** `scrProjects` is a full rework;
-  `scrProject` / `scrIssueEdit` / `scrTransactionEdit` / the picker screens carry LOGIC
-  fixes, so none of it is cosmetic.
+  last one not on the queue and it is now a full rework. **`scrReports` is AUTHORED and twice
+  reviewed (2026-08-17, ~2,560 lines) but HAS NOT CROSSED THE GAP — nothing in it is confirmed.**
+  `scrProjects` is a full rework; `scrProject` / `scrIssueEdit` / `scrTransactionEdit` / the
+  picker screens carry LOGIC fixes, so none of it is cosmetic.
+  **Paste ORDER matters in one place: `scrProductEdit` BEFORE `scrTaskEdit`** (its return path
+  feeds `colTkProducts`).
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -68,6 +70,12 @@ not know them will author something broken:
 - [2026-08-17] **COVERAGE ON A TRANSACTION IS `client_coverage`, reached through `transaction_client_name`** — not `project_coverage` through the parent project. A transaction carries BOTH a required client and a required project, so this was a real fork, and it is purely semantic: both are client-side joins off small dimension lists, so neither costs delegation and either is cheap to swap. Chosen because trades are a client axis — the grid reads "this coverage team has never traded that product type". The grid's row vocabulary is read with `Choices()` at runtime, so **the screen is agnostic to the values and needs no change when they change** — `schema.yaml` carrying PLACEHOLDERs is a golden-source accuracy gap, NOT a build blocker. (Corrected 2026-08-17: this entry previously called the section "semantically empty until the real values land", which conflated the app with the data.) — user-decided 2026-08-17 — INDEX Decisions
 - [2026-08-17] **"WHERE PEOPLE SPEND THEIR TIME" HAS NO BACKING COLUMN — the model has no hours or effort field anywhere.** It is measured as task VOLUME by activity family and output format, plus MEDIAN CYCLE TIME (`task_date_start` → `task_date_completion`), which is the only genuine duration signal in the schema. The screen says "volume and elapsed time" on its face and **must never call either one effort** — elapsed is not effort, and volume is not either. A `task_effort` column was offered and DECLINED for now: internal names freeze at creation and the column is worthless until people populate it. **Related and equally structural: the model stores NO point-in-time history**, so every trend on the screen is built from DATED EVENTS (`transaction_date`, `task_date_completion`, `project_date_start`, `project_date_complete`) and never from stateful columns like `project_perc_completion`. "Completion over time" is natively impossible and needs a snapshot list from a scheduled flow (Q12) — INDEX Decisions
 - [2026-08-17] **EXPLICIT COLUMN SELECTION CAN SILENTLY DROP A COLUMN WHOSE LINEAGE IS LOST THROUGH A COLLECTION** (MS Learn, `fast-app-page-load` / `code-optimization`). ECS is ON BY DEFAULT and trims retrieved columns to those it can prove are used; Microsoft documents that lineage is "occasionally lost when the data moves through collections and variables", and ECS then drops the column. **The fix is `ShowColumns` on every `ClearCollect` — and it is CORRECTNESS, not optimisation.** A dropped column renders as a blank number, and across the one-way gap a blank number returns only as "it didn't work", which is undiagnosable. Any collection-heavy screen is exposed; `scrReports` most of all — INDEX Decisions
+- [2026-08-17] **`Select()` QUEUES the target's `OnSelect` — it does not run inline and does not wait** (MS Learn). That is what lets ONE load routine serve three callers: `scrReports`' whole fetch/enrich/fold chain lives in a hidden `btnRptLoad.OnSelect`, reached by `Select()` from `OnVisible`, the period strip and the refresh icon, so no band re-queries and there is one definition of every number. **The constraint that comes with it: nothing may read a fold in the same formula that `Select`s the button which builds it** — set the input global, Select, and let the queued routine do the rest — INDEX Decisions
+- [2026-08-17] **A FIX THAT MAKES A BOUNDARY MORE CORRECT CAN ALSO MAKE IT DEGENERATE — check a window at its own edges.** Review round 1 replaced "Quarter = 90 days" with a real calendar quarter; that meant on **1 April `gRptFrom = Today()`**, so the doubled prior-window span `gRptFrom2x` was ZERO and **every transaction fetch in `scrReports` came back empty** — blank trend, blank tiles, blank grid, one day in ninety and only on that day. The fixed 90 days could not degenerate. Now floored at 14 days each side. **Two review passes over the same file found 17 findings, all legitimate, and the sharpest one was introduced BY the previous pass** — INDEX Decisions
+- [2026-08-17] **THREE MORE WAYS STRING-BUILT SVG FAILS SILENTLY, all found in `scrReports` review** (they extend, not replace, the 2026-08-13 empty-attribute rule). **(1) Put a unit suffix INSIDE every branch** — `fill-opacity` emitted `'1%'`, one percent instead of opaque, because the `"%"` was appended outside the `If`, so the empty cells a gap grid exists to show rendered as smudges. **(2) Round the RUNNING BOUNDARY of a stacked bar, never each segment** — `Round(112.5)+Round(187.5)=301` overflowed a 300 track and the last rect came out `width='-1'`, an SVG error that kills the entire drawing; cumulative rounding is monotonic so widths are non-negative by construction. **(3) Filtering a chart's rows is not enough — collapse the ORDINAL too**, or the surviving row draws at its index in the unfiltered grid and the chart looks empty. Where a datum can be a control property instead of a string, prefer it: the person overlay's bars are plain `Rectangle`s whose `Width` IS the number, so there is no string to build and no decimal separator to get wrong — INDEX Decisions
+- [2026-08-17] **A COLLECTION SPANNING TWO WINDOWS WILL BE READ AS ONE.** `scrReports`' monthly bars read `colRptTx`, which holds the current AND prior windows; because `gRptFrom` rarely lands on the 1st, a transaction earlier in the same CALENDAR MONTH as the window start shared its month key and inflated the first bar — so the trend disagreed with the desk-pulse tile directly above it, which is how it was caught. Two disagreeing numbers on one screen is the cheap detector; **name the narrower fold (`colRptTxCur`) and make the wide one obviously wide.** Same family: a header that counts unfiltered while the list beneath it is filtered — the header and its gallery must share one predicate — INDEX Decisions
+- [2026-08-17] **A TOTAL THAT DOES NOT RECONCILE IS WORSE THAN ONE THAT EXPLAINS ITSELF.** `scrReports` transactions whose client has no coverage, or whose product has no type path, land on fallback labels matching no axis — so they sit in NO heatmap cell while still counting in the KPI tile above. `gRptUnmapped` now states that count under the grid. Related sizing trap in the same file: `WrapCount: 5` fitting exactly the five currency values the column has today meant a SIXTH added in SharePoint would be silently unreachable — **a container sized to today's vocabulary is a bug, not a fit** — INDEX Decisions
+- [2026-08-17] **GATE EVERY COMMIT WITH `&&`, NEVER `;`.** A validate-then-commit run with `;` committed a file that had already failed validation (`b45fc06`): an inline `DefaultSelectedItems: =Table( { Value: "..." } )` makes YAML read the inner `Value:` as a mapping key, so the screen must use a block scalar. With no CI on this machine the validator is the ONLY gate, and a separator that ignores its exit code disables it — INDEX Decisions
 - [2026-08-15] **`pre_read_guard` exempts `src/` and `schema/`.** The only files over its 60KB cap are the three largest authored screens, so unmodified it would fire almost exclusively on the golden source. A screen read at 1500 of 3000 lines is how a truncated read becomes a wrong paste — and the gap returns only "it didn't work", so the cause is undiagnosable. **Any future write-time guard must fail open for the same reason** — a misfiring hook here costs a paste — INDEX Decisions
 
 ## Threads          (open items; remove when closed)
@@ -131,17 +139,13 @@ not know them will author something broken:
 - **Known edge, accepted:** an issue whose linked task/transaction belongs to a DIFFERENT project.
 - Open questions Q3–Q10, Q13 — see `.claude/context/open-questions.md`. Q2/Q2b are CLOSED (out of scope).
 
-- **LATENT COLLISION IN `scrReports` — it collects into `colMyTasks` / `colMyProjects`, THE SAME
-  NAMES `scrHome` USES.** Benign today only because both screens apply identical "mine" filters.
-  The redesign takes `scrReports` desk-wide, which would silently corrupt Home's KPIs — so the
-  rebuild namespaces everything `colRpt*` / `gRpt*`. **Collections are app-global; check the name
-  before reusing one.** Closes when the new screen is authored.
 - **OWED IN SHAREPOINT (reporting):** index `task_date_completion` (DateTime, `taskmaster_tasks`) —
   the reports window filter rides on it. It is combined with two indexed predicates so it holds for
   now, but indexes CANNOT be added past 20,000 items.
-- **UNCONFIRMED: is `transaction_sales` a desk person or sales-side?** The `scrReports` design
-  assumes sales-side and keeps it OUT of person productivity. If that is wrong it is a fourth
-  attribution path.
+- **`scrReports` IS AUTHORED BUT UNPASTED — the single largest unverified thing in the repo.**
+  ~2,560 lines, 22/22 valid, two review passes, ZERO Studio confirmation. It is also the most
+  fold-heavy screen, so it is the most exposed to the ECS lineage trap. Expect the first paste to
+  return one sentence; plan the diagnosis before pasting, not after.
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
@@ -161,3 +165,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-17 | Power BI dropped from scope entirely; licence gate stripped from App/cmpAppBar/4 screens/scrReports, power-bi-dax + power-query-m skills removed, charts are SVG | INDEX Decisions 2026-08-17
 - 2026-08-17 | transaction_sales confirmed sales-side and excluded from person productivity; licence gating and the no-native-dashboarding rule confirmed dead | INDEX Decisions 2026-08-17
 - 2026-08-17 | main fast-forwarded to the feature branch; cross-currency conversion settled as out of scope | INDEX Decisions 2026-08-17
+- 2026-08-17 | scrReports authored end to end (~2,560 lines, 6 bands + person overlay) on one Select()-queued load routine; two code-review passes, 17 findings, 16 fixed and the join cost accepted | sessions/2026-08-17-1448-scrreports-authoring-and-review.md
