@@ -629,6 +629,20 @@ migration:
     delete-and-recreate, not rename. Where a name is ever in doubt, the check that
     settles it is List settings -> click the column -> read `Field=` out of the
     URL; that is the internal name, and it is the only place it is visible.
+    SECOND INSTANCE THE SAME DAY: project_perc_completion was misspelt at creation,
+    so the app could not see it at all. Both were found only by pasting a screen
+    into Studio, which is the ONLY validator that reads SharePoint — nothing on the
+    repo side can catch it, because every token was internally consistent with this
+    file the whole time. THIS FILE AGREEING WITH THE SCREENS IS NOT EVIDENCE THAT
+    EITHER AGREES WITH SHAREPOINT.
+  recreated_columns_come_back_empty: >-
+    Deleting and recreating a column to fix its internal name discards every stored
+    value and drops any index. task_supporter (2026-08-17) needs its index restored;
+    project_perc_completion does not carry one. project_perc_completion also comes
+    back EMPTY, so every project reads 0% until the app-side rollup (C3) next writes
+    it — that happens on a project or task save, so it heals as people work rather
+    than needing a back-fill, but the figure is wrong until then and the reports
+    screen will show it.
   retired_columns:
     taskmaster_projects: [project_region, project_type, project_coverage]
     taskmaster_tasks:    [task_category]   # retired outright — nothing replaces it
