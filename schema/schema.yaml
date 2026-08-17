@@ -168,6 +168,10 @@ lists:
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
       - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  desc: "Desired completion date" }
       - { name: project_date_complete,   type: DateTime,        required: false,                 desc: "Actual completion date" }
+      # INTERNAL NAME UNVERIFIED — C1 replaced project_other_resources with this in
+      # the same pass that produced task_supporter, which turned out to be a rename,
+      # not a recreation. Check `Field=` in the column settings URL before trusting
+      # it; scrReports reads it to decide which projects a person runs.
       - { name: project_supporter,       type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside project_manager)" }
 
   # ---------------------------------------------------------------------------
@@ -227,6 +231,9 @@ lists:
       - { name: task_project_archived, type: Boolean, required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Denormalised so the exclusion delegates; see the note above" }
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
       - { name: task_lead,             type: Person, multi: false, required: true,  indexed: true,  desc: "Primary owner" }
+      # Deleted and recreated 2026-08-17 to get the internal name right (it was
+      # created as task_other_resources and only renamed). A recreated column comes
+      # back EMPTY and UNINDEXED — see notes.renamed_not_recreated.
       - { name: task_supporter,        type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
       - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
       - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
@@ -614,6 +621,19 @@ migration:
     immediately. If creation is refused, provision with a `_c` suffix and record
     the real name here — internal names freeze at creation, so the fallback must
     be written down, not remembered.
+  renamed_not_recreated: >-
+    A COLUMN THIS FILE RENAMES IS A COLUMN THIS FILE IS WRONG ABOUT UNTIL IT IS
+    DELETED AND RECREATED. The three frozen-name warnings above all describe
+    CREATION, so none of them fires on a rename — and a rename is what silently
+    breaks the app, because SharePoint changes only the display label while every
+    token here targets the internal name. task_supporter was created as
+    task_other_resources and renamed; it read as correct in this file and in every
+    screen while the list still answered to the old name. Deleted and recreated
+    2026-08-17, so it is now genuinely task_supporter. VERIFY THE REST rather than
+    assume: open List settings, click the column, and read `Field=` out of the
+    URL — that is the internal name, and it is the only place the truth is
+    visible. project_supporter is the KNOWN-UNVERIFIED one: C1 replaced it in the
+    same pass, by the same route.
   retired_columns:
     taskmaster_projects: [project_region, project_type, project_coverage]
     taskmaster_tasks:    [task_category]   # retired outright — nothing replaces it
