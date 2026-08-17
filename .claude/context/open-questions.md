@@ -10,8 +10,9 @@ decision and delete it here.
 - **Q1 Ticket-level rows** → **Yes, full ticket-level as the primary store.** `tmTickets`
   holds every trade row and drives figures. Consequence: max delegation/threshold exposure →
   indexing mandatory, every query delegable.
-- **Q2 Power BI licensing** → **Not everyone is licensed.** Dashboard can't carry core nav;
-  native licence-independent navigation + a real empty state. (Sub-items below still open.)
+- **Q2 Power BI licensing** → **MOOT (2026-08-17): Power BI is out of scope entirely.** No
+  embed, no licence gate, no sub-items. Reporting is native and every chart is SVG. What
+  survives is the reasoning, not the gate: navigation never depends on a reporting surface.
 - **Q11 Provisioning route** → **Manual (SharePoint UI)** *(under reconsideration — see Q11-bis).*
   High `_x0020_` internal-name risk; the schema snapshot must capture **true** internal names. No
   automated term-store sync path.
@@ -24,46 +25,13 @@ decision and delete it here.
   term store directly via `Choices()`, so there is no cache list to populate and no flow in that
   path unless a term set exceeds 20 terms.
 - **Q14 FX rates** → **do not convert in the app at all.** `transaction_notional_usd` is dropped;
-  Power BI converts against an FX dimension keyed on currency + trade date. Reasoning and the
-  consequences (no cross-currency figure anywhere in the app; Power BI now owes the blended
-  notional) are in `.claude/context/schema.md` → C5.
-- **Power BI licence gate** → **soft gate.** Unlicensed users see Reports **greyed but reachable**,
-  landing on the empty-state card plus the three licence-free KPI rings. Reports is never hidden —
-  a hidden feature is one nobody knows to request a licence for. `gHasPowerBiLicence` stays `false`
-  (everyone treated as unlicensed) until a real signal is supplied; nav and the Reports screen both
-  read that one line.
-
-## Q11-bis — reconsider provisioning: flow-as-list-provisioner (2026-08-02)
-
-Reviewing April Dunnam's templates surfaced a **third route** that wasn't on the table when Q11
-was decided (`docs/powerapp-patterns-distillation.md` §D, T18): ship provisioning as a **Power
-Automate flow** that creates the 8 lists + columns from a site URL — typically "Send an HTTP
-request to SharePoint" actions, or the SharePoint create-list/create-column actions.
-
-| Route | Sets clean internal names? | Repeatable (dev→test→prod)? | Term-store sync? | Needs |
-|---|---|---|---|---|
-| **Manual UI** *(current pick)* | Only if hand-disciplined; **high `_x0020_` risk** | **No** — click every column by hand, 8 lists | No | Nothing extra |
-| **Flow-as-provisioner** *(new candidate)* | **Yes** — internal name set explicitly at creation | **Yes** — re-runnable, one input (site URL) | Possible via HTTP calls | **Power Automate (Q12)** + work-machine tenant access |
-| PnP / CSOM | Yes | Yes | **Yes** (native) | PnP tooling + auth (out of this repo's reach) |
-| Graph | Yes | Yes | No (term store excluded) | Graph app reg + auth |
-
-**Recommendation:** if **Power Automate is available (Q12)**, switch Q11 to the **flow-as-
-provisioner** route — it removes the `_x0020_` risk *and* gives repeatable, environment-portable
-provisioning (which also helps Q13 solution-awareness), for far less effort than clicking 8 lists
-by hand. Keep **manual UI as the fallback** only if Power Automate is not available. This does
-**not** solve term-store taxonomy sync natively (still needs PnP/CSOM or HTTP calls), so the
-`tmIndices`/`tmLookups` taxonomy remains a separate open item regardless.
-
-**UNBLOCKED 2026-08-03 — Q12 answered YES.** The recommendation above was explicitly conditional
-on Power Automate being available, and it is, so **flow-as-provisioner is now the recommended
-route** and supersedes the manual-UI pick in Q11. Manual UI remains the fallback. Still to do:
-author the provisioning flow (**8 lists** — `taskmaster_terms` no longer exists — with internal
-names set explicitly at creation and indexes applied while each list is small). No term-store sync
-flow is needed: the app reads the term store directly (C10).
-
-## Blocking-adjacent (elevated by this build)
-
-- **Q2b Power BI workspace / refresh / embedded-vs-linked.** Which workspace hosts the report,
+  the app stores currency + amount and converts nothing. **REOPENED 2026-08-17:** the answer
+  named Power BI as the converter and Power BI is now out of scope, so **nothing owns the
+  blended notional**. Either the model grows an FX dimension (currency, rate, as-of date) or
+  the cross-currency figure is permanently out of scope. See `.claude/context/schema.md` → C5.
+- **Power BI licence gate** → **REMOVED 2026-08-17.** Power BI is out of scope; `gHasPowerBiLicence`,
+  `NeedsLicence` and `cmpAppBar.HasLicence` are all deleted.
+- ~~**Q2b Power BI workspace / refresh / embedded-vs-linked.**~~ CLOSED 2026-08-17 — out of scope. Which workspace hosts the report,
   how often it refreshes, and whether it's embedded or linked. Needed before the reporting
   panel is real. *(Was a sub-part of the answered Q2; the licence question is settled, these
   aren't.)*

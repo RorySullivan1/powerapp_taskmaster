@@ -1,7 +1,7 @@
 # powerapp_taskmaster
 
 A **canvas Power App** for EQD desk work management, backed by **SharePoint lists**, reported
-on in **Power BI**. This repo is the **authoritative source** for that app: the App object, the
+with **native SVG charts**. This repo is the **authoritative source** for that app: the App object, the
 screens, the components, the schema, and the `.claude/` asset set that maintains them. Nothing
 flows back from Studio — the gap is one-way — so these files are the truth. It is **not** the
 running app: that lives in Power Apps Studio on a work machine.
@@ -36,7 +36,8 @@ their `description:` — Claude picks the right one; don't invoke by hand. **Com
   hand-off). The **`powerapp-canvas-developer`** agent builds end to end across all four.
 - **Canvas app (this repo)** — Power Fx authoring + delegation, reusable components/HtmlText, and review.
 - **SharePoint backend** — list/schema architecture and declarative column/view formatting.
-- **Integration & reporting** — Microsoft Graph, Power BI DAX, and Power Query/M.
+- **Integration** — Microsoft Graph. **Power BI is OUT OF SCOPE (2026-08-17)**: reporting is
+  native and every chart is SVG via `power-apps-svg`.
 - **The air gap** — Studio transfer discipline (skill) and pre-paste audit (agent), plus the
   `change-end-to-end` workflow.
 - **Authoring the asset set itself** — skill/agent/workflow authoring, the skill-vs-context
@@ -55,7 +56,7 @@ surfaces each by its `description:`.
 The repo houses the app's source and nothing else — one file per unit, in pa-yaml v3.0.
 - **`src/App.pa.yaml`** — the App object, two formula-bar properties. **`OnStart`** sets the
   constants every screen reads (`gTheme`, `gNavMenu`, `gStageWeights`, `gClaimPrefix`,
-  `gUserEmail`, `gHasPowerBiLicence`); **`Formulas`** holds only the three data-source filters
+  `gUserEmail`); **`Formulas`** holds only the three data-source filters
   (`ActiveProjects`, `OpenIssues`, `LiveTasks`), which must stay named formulas or they stop
   delegating.
 - **`src/Screens/`** — one file per screen, 11 of them.
@@ -121,6 +122,6 @@ On compaction, preserve: **the air gap** (clipboard-only, **ONE-WAY** repo→Stu
 or ship fallbacks — no pull/round-trip exists), that
 **transactions are full transaction-level primary** (delegation/indexing critical), that
 **`schema/schema.yaml` is the golden source** (repo defines, SharePoint applies), that **not
-everyone is Power BI-licensed** (native nav + empty state), and that **the app is BUILT** — all
+**Power BI is OUT OF SCOPE — charts are SVG**, and that **the app is BUILT** — all
 11 screens, 10 components and the App object are authored here and live in Studio, so the work is
 editing and refining, not creating.

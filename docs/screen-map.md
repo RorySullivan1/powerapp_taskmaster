@@ -24,8 +24,7 @@ to confirm it).
 
 One reusable **nav component** driven by a `Table({Name, Icon, Screen, Visible})` (template
 technique T6 — see distillation §B), placed on every screen. `OnSelect: Navigate(ThisItem.Screen)`.
-**Not** dependent on the Power BI dashboard (our Q2 decision). The `Reports` entry is hidden/greyed
-when the user has no Power BI licence.
+**Not** dependent on any reporting surface. Every entry is always reachable.
 
 ---
 
@@ -49,13 +48,12 @@ boolean `=`, `StartsWith` on Text, `Sort` on Number/Date).
 - **Nav out:** any tile → the relevant detail screen.
 
 ### 2. Reports — dashboard panel  *(template: Dashboard, re-architected)*
-- **Purpose:** the embedded **Power BI** report for licensed users.
+- **Purpose:** native analytics for everyone, drawn as SVG. Power BI is OUT OF SCOPE (2026-08-17).
 - **CHANGE from template:** the template aggregates via a **SQL view** (`vw_TaskStatusSummary`) —
   **we cannot** (no server-side aggregation on SharePoint; it's the "snapshot list" we rejected).
-  Power BI imports the lists whole and does the aggregation.
-- **Empty state:** unlicensed users get a real "reporting needs a Power BI licence" card — never a
+  Aggregates are computed locally over a bounded, delegably-filtered set.
   broken frame — **plus** optional **native SVG KPI rings** (distillation C1) computed from a
-  delegable-filtered small collection, so they still see headline status without Power BI.
+  delegable-filtered small collection, so every figure on it is exact.
 
 ### 3. Projects menu  *(template: Screen5 Project Task Overview)*
 - **Items (delegable):** `Sort(Filter(tmProjects, IsArchived = false), SortOrder)` (Sort on Number
@@ -104,10 +102,10 @@ Automate flow, carries ISIN/IndexTicker), Triage, My Week, Global Search (`Start
 | Template | Our version | Why |
 |---|---|---|
 | **Screen1 User Management** (SQL User table CRUD) | **Dropped as a screen** | Users are directory-sourced — SharePoint **Person** columns bound to Office365Users, not an in-app user table. |
-| **Dashboard via `vw_TaskStatusSummary` SQL view** | **Power BI** (+ native SVG fallback) | No server-side aggregation on SharePoint; the SQL view = the snapshot list we rejected. |
+| **Dashboard via `vw_TaskStatusSummary` SQL view** | **native SVG charts** | No server-side aggregation on SharePoint; the SQL view = the snapshot list we rejected. |
 | **Auto-increment PKs** (`UserID`, `TaskID`) | Keys from built-in `ID` in a **2nd write** | SharePoint has no atomic increment; a per-project counter races. |
 | **Role/status dropdowns** (SQL columns) | `tmLookups`-driven vocabularies | Nothing hardcoded; cached whole at startup. |
-| **SQL-delegable ops** (`Search`/`contains`/`Sum`) | Delegable SharePoint equivalents | SharePoint delegates far less — `StartsWith` not `Search`; Power BI/local for aggregates. |
+| **SQL-delegable ops** (`Search`/`contains`/`Sum`) | Delegable SharePoint equivalents | SharePoint delegates far less — `StartsWith` not `Search`; aggregates are local. |
 | *(none)* | **Ticket & Issue surfaces added** | Our three-peers-under-a-project model is a superset of the template. |
 
 ---
@@ -125,5 +123,5 @@ Automate flow, carries ISIN/IndexTicker), Triage, My Week, Global Search (`Start
 - **Phase 2 — after provisioning (true names captured by hand):** wire the **delegable data
   bindings** per screen above; Person patching; key second-writes; forms. Audit every unit with
   `pre-paste-review` (schema tokens + delegation) before hand-off.
-- **Phase 3 — reporting & automation:** Power BI embed + SVG fallback; the extract/blotter (Power
+- **Phase 3 — reporting & automation:** the native SVG analytics screen; the extract/blotter (Power
   Automate); admin. Depends on Q2b (workspace/refresh/embed) and Q12 (Power Automate).

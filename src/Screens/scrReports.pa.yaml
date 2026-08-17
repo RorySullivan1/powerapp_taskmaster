@@ -1,8 +1,8 @@
 # =============================================================================
-# scrReports  —  Power BI dashboard panel (screen-map §2). CORE-SHELL: header +
-# nav + the real Q2 empty-state (unlicensed users get a card, never a broken
-# embed). Phase 3 adds the PowerBI control for licensed users + the native SVG
-# KPI fallback (distillation C1). Header + nav identical to scrHome by design.
+# scrReports  —  native analytics (screen-map §2). INTERIM: three KPI rings.
+# SLATED FOR FULL REPLACEMENT — docs/reports-screen-design.md designs this screen
+# as person-level analytics built entirely from SVG. Power BI is OUT OF SCOPE for
+# this project (2026-08-17), so there is no licence gate and no embed.
 # DIALECT: modern structured schema; positional z-order. Header + nav are one
 # component (cmpAppBar), declared LAST so the fly-out floats over the content.
 # =============================================================================
@@ -10,12 +10,12 @@ Screens:
   scrReports:
     Properties:
       Fill: =gTheme.Color.Bg
-      # ---- PHASE-2 DATA (Q2 licence-free fallback) --------------------------
+      # ---- PHASE-2 DATA ----------------------------------------------------
       # SCOPE MATTERS: SharePoint cannot count org-wide accurately from the app —
       # CountRows never delegates, so it only ever counts the rows already pulled
       # (the data row limit). Every figure here is therefore deliberately scoped
       # to a set small enough to be exact: YOUR tasks, and the active projects
-      # list. Org-wide analytics stay in Power BI, which imports the lists whole.
+      # list. Desk-wide aggregates need the row-cap banner the design specifies.
       OnVisible: |
         =
         // SELF-HEAL, and it is not belt-and-braces. App.OnStart is NON-BLOCKING, so this
@@ -47,78 +47,21 @@ Screens:
                  RoundDown( Average( AddColumns( colMyProjects, pc,
                      Coalesce(project_perc_completion, 0) ), pc ), 0 ) ) )
     Children:
-      - LicenceCard:
-          Control: Rectangle@2.3.0
-          Properties:
-            Fill: =gTheme.Color.Surface
-            Height: =220
-            Width: =Min(560, Parent.Width - (gTheme.Space.Gutter * 2))
-            X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter
-            Visible: =Not(gHasPowerBiLicence)
-      - LicenceIcon:
-          Control: Classic/Icon@2.5.0
-          Properties:
-            Icon: =Icon.DetailList
-            Color: =gTheme.Color.Accent
-            # Decorative. Pinned so a passing mouse does not dim it.
-            HoverColor: =gTheme.Color.Accent
-            HoverFill: =RGBA(0, 0, 0, 0)
-            HoverBorderColor: =RGBA(0, 0, 0, 0)
-            Height: =40
-            Width: =40
-            X: =LicenceCard.X + gTheme.Space.Gutter
-            Y: =LicenceCard.Y + gTheme.Space.Gutter
-            Visible: =Not(gHasPowerBiLicence)
-      - LicenceHeading:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Reporting needs a Power BI licence"
-            Font: =gTheme.Font
-            FontWeight: =FontWeight.Semibold
-            Size: =gTheme.Size.H2
-            Color: =gTheme.Color.TextPrimary
-            X: =LicenceIcon.X + 40 + gTheme.Space.Gap
-            Y: =LicenceCard.Y + gTheme.Space.Gutter
-            Width: =LicenceCard.Width - (LicenceIcon.X - LicenceCard.X) - 40 - (gTheme.Space.Gap * 2)
-            Height: =40
-            VerticalAlign: =VerticalAlign.Middle
-            Visible: =Not(gHasPowerBiLicence)
-      - LicenceBody:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Your account isn't licensed for the embedded dashboard. Headline status still appears on Home and across the app — no Power BI required."
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            Color: =gTheme.Color.TextMuted
-            X: =LicenceHeading.X
-            Y: =LicenceHeading.Y + LicenceHeading.Height + gTheme.Space.Gap
-            Width: =LicenceHeading.Width
-            Height: =90
-            Visible: =Not(gHasPowerBiLicence)
-      # ---- Native SVG KPI fallback (Q2 / distillation C1) ------------------
-      # Licence-free headline visuals via cmpKpiRing, fed by the locals Set in
-      # OnVisible. Rings 1-2 read task_status (health), which is required with a
-      # Green default (C9), so green% + amber-red% now sum to 100. Ring 3 is the
-      # mean of project_perc_completion, the app-side weighted rollup (C3) — it
-      # reads 0 until the write-back is placed on a task-edit screen.
       - hdrFallback:
           Control: CanvasComponent
           ComponentName: cmpSectionHeader
           Properties:
-            Visible: =Not(gHasPowerBiLicence)
             X: =gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
             Height: =60
             Title: ="Headline status"
-            Subtitle: ="Drawn natively — no Power BI licence required. Scoped to your tasks and active projects; org-wide analysis lives in Power BI."
+            Subtitle: ="Scoped to your tasks and active projects."
             ShowAction: =false
       - ringOnTrack:
           Control: CanvasComponent
           ComponentName: cmpKpiRing
           Properties:
-            Visible: =Not(gHasPowerBiLicence)
             X: =gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
             Width: =140
@@ -130,7 +73,6 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpKpiRing
           Properties:
-            Visible: =Not(gHasPowerBiLicence)
             X: =gTheme.Space.Gutter + 140 + gTheme.Space.Gutter
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
             Width: =140
@@ -142,7 +84,6 @@ Screens:
           Control: CanvasComponent
           ComponentName: cmpKpiRing
           Properties:
-            Visible: =Not(gHasPowerBiLicence)
             X: =gTheme.Space.Gutter + 2 * (140 + gTheme.Space.Gutter)
             Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 220 + gTheme.Space.Gutter + 60 + gTheme.Space.Gap
             Width: =140
@@ -169,7 +110,6 @@ Screens:
             Height: =If(gNavOpen, Parent.Height, gTheme.Space.HeaderH)
             Items: =gNavMenu
             ActiveKey: =2
-            HasLicence: =gHasPowerBiLicence
             AppTitle: ="EQD Taskmaster"
             ScreenTitle: ="Reports"
             IsOpen: =gNavOpen

@@ -32,7 +32,8 @@ Boundaries matter more than count, because these overlap. In rough dependency or
   (audits), `power-apps-components`, `power-apps-editable-table`, `power-apps-svg`.
 - **SharePoint backend** — `sharepoint-list-architecture` (the store),
   `sharepoint-column-formatting` (declarative formatter JSON).
-- **Integration & reporting** — `graph-api-integration`, `power-bi-dax`, `power-query-m`.
+- **Integration** — `graph-api-integration`. (Reporting is native: charts are `power-apps-svg`.
+  Power BI is out of scope, so `power-bi-dax` and `power-query-m` were removed 2026-08-17.)
 - **The air gap** — `studio-transfer` owns the transfer channel and its discipline.
 - **Authoring** — `skill-authoring`, `agent-authoring`, `workflow-authoring`,
   `context-vs-skill`, `skill-distiller`: how to build more of this.

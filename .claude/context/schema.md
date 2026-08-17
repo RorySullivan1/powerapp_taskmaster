@@ -94,7 +94,7 @@ references, and Managed Metadata only for taxonomies actually governed centrally
 
 **Aggregates never delegate to SharePoint** (`Sum`, `Average`, `CountRows`, `CountIf`, `Max`,
 `Min`). The pattern: filter delegably down to a bounded set, *then* aggregate locally — or
-aggregate in Power BI.
+aggregate outside the app.
 
 **Writing Lookup and Person columns** — records, never scalars:
 
@@ -188,7 +188,7 @@ column in the model is Calculated any more.
 
 **C5 ⟲ Reversed 2026-08-03 (Q14) — conversion moved to the REPORT layer.**
 `transaction_notional_usd` was briefly added and normalised at write time. It is now **dropped**:
-the app stores only `transaction_notional` + `transaction_currency`, and Power BI converts against
+the app stores only `transaction_notional` + `transaction_currency`, and something downstream converts against
 an FX dimension keyed on currency and trade date.
 
 Why the reversal: a write-time rate **freezes** whatever number the app happened to hold on the day
@@ -201,7 +201,7 @@ the rates were a static table that would silently go stale.
 rows. `scrProject`'s transactions tab therefore totals **per currency** and labels itself as such.
 Never FX-convert inside a query either: it neither delegates nor reproduces.
 
-**Power BI now owes this figure.** It needs an FX dimension (currency, rate, effective date) and a
+**NOBODY owes this figure as of 2026-08-17** — Power BI is out of scope.** It needs an FX dimension (currency, rate, effective date) and a
 measure converting at the trade date. Until that exists there is no blended notional anywhere —
 that is the accepted cost of the decision, not an oversight.
 
@@ -211,7 +211,7 @@ that is the accepted cost of the decision, not an oversight.
 setting**, so the divergence in type and value set is intentional and no conformed dimension is required.
 
 **Operational consequence** (not a problem, just a rule): don't build a single cross-model region
-slicer. `project_region` and `client_region` are Managed Metadata subfields; in Power BI model them
+slicer. `project_region` and `client_region` are Managed Metadata subfields; downstream model them
 as **separate dimensions** and don't try to relate them.
 
 **C10 ✅ Resolved 2026-08-03 — MM stays, and the app reads the term store directly.**

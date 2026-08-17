@@ -12,7 +12,7 @@ reach that path: `scrClientEdit` read `gEditClient` for two days while the only
 entry point opened it in New mode, so nothing ever assigned it.
 
 App NAMED FORMULAS are declared in App.pa.yaml rather than assigned, so they are
-read from there and excluded — `gUserEmail` and `gHasPowerBiLicence` are
+read from there and excluded — `gUserEmail` are
 legitimately never `Set`.
 
   python3 tools/audit_globals.py

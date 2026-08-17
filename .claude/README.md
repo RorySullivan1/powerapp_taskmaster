@@ -53,7 +53,7 @@ All seven layers are populated:
 
 - **skills/** — the canvas-app families (`powerapp-canvas-*`, `power-fx-*`,
   `power-apps-*`), the SharePoint backend (`sharepoint-*`), integration and reporting
-  (`graph-api-integration`, `power-bi-dax`, `power-query-m`), `studio-transfer` for the
+  (`graph-api-integration`), `studio-transfer` for the
   air gap, the authoring meta-skills, the GitHub set, and the operational skills
   (`session-memory`, `knowledge-router`, `agent-finder`, `token-optimizer`,
   `skill-distiller`). See `skills/README.md` for the category map.

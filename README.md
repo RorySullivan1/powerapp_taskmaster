@@ -1,7 +1,7 @@
 # powerapp_taskmaster
 
 Source for the **EQD Taskmaster** canvas Power App — a work-management app over SharePoint
-lists, reported on in Power BI.
+lists, with native SVG charts.
 
 This repo is the authoritative source. The running app lives in Power Apps Studio; changes are
 authored here and carried across by hand. Nothing is read back, so these files are the truth.

@@ -17,13 +17,11 @@ Three were settled with the user on 2026-08-17 and belong in the Decisions ledge
 1. **Coverage axis = `client_coverage`.** A transaction reaches coverage through its client
    (`transaction_client_name` → `taskmaster_clients.client_coverage`), not through its project. The
    gap grid therefore reads "this coverage team has never traded that product type".
-2. **The licence gate comes off.** `scrReports` becomes the real analytics surface for everyone;
-   Power BI demotes to an optional deep-dive for licensed users and the licence card shrinks to a
-   footer line. **This reverses part of `app-structure.md`** ("do not rebuild the aggregate
-   dashboard as native charts to dodge the licence gap"). That constraint existed to stop navigation
-   depending on Power BI and to stop a broken embed — both still hold. What changes is that the
-   native surface is now the primary one rather than a fallback. `gHasPowerBiLicence` is hard-set
-   `false`, so the gated content was dead code for every user anyway.
+2. **Power BI is OUT OF SCOPE entirely (2026-08-17).** Not demoted — dropped. `scrReports` is
+   the analytics surface, full stop, and every chart on it is SVG. **This voids the
+   `app-structure.md` rule** "do not rebuild the aggregate dashboard as native charts to dodge the
+   licence gap": native charts are the design now, not a dodge. `gHasPowerBiLicence`,
+   `NeedsLicence` and `cmpAppBar.HasLicence` are all deleted from the source.
 3. **Effort is proxied, and labelled as such.** The model has no hours or effort column. "Where time
    goes" is measured as **task volume** by activity family and output format, plus **median cycle
    time** (`task_date_start` → `task_date_completion`) as a genuine elapsed-duration signal. The
@@ -42,7 +40,8 @@ Stated here so a later session doesn't try to build it and find out the hard way
   columns. A true snapshot needs a snapshot list written by a scheduled flow (blocked on Q12).
 - **No blended notional.** C5 is emphatic: `transaction_notional` is denominated in
   `transaction_currency` and must never be summed across rows. Notional appears **per currency
-  only**. Power BI owes the FX-converted figure.
+  only**. **Nothing owes the FX-converted figure** now that Power BI is out of scope — it needs
+  an FX dimension the model does not have. Open decision.
 - **No org-wide certainty past the row cap.** Aggregates never delegate to SharePoint, so every
   number here is computed locally over fetched rows. The truncation banner (below) is what keeps
   that honest.
@@ -242,8 +241,7 @@ provenance line.
 
 ### Band 6 — Footer
 
-Power BI deep-dive for licensed users (`gHasPowerBiLicence`), the licence card reduced to one line,
-and a provenance line: window in force, archived work excluded, truncation state.
+A provenance line: window in force, archived work excluded, truncation state.
 
 ---
 
@@ -270,8 +268,8 @@ All charts are SVG data URIs in `Image` controls, per the pattern already proven
 identical "mine" filters so the collision is benign; the moment this screen goes desk-wide, Home's
 KPIs would silently read desk-wide data. The existing reuse is dropped.
 
-Retired with the rebuild: `gRptOpen`, `gRptOnTrack`, `gRptAtRisk`, `gRptPortfolio`, the three
-`cmpKpiRing` instances, and the full-size licence card.
+Retired with the rebuild: `gRptOpen`, `gRptOnTrack`, `gRptAtRisk`, `gRptPortfolio` and the three
+`cmpKpiRing` instances. The licence card is already gone.
 
 `OnVisible` keeps the `gUserEmail` self-heal. `App.OnStart` is non-blocking, and these are
 imperative `Set`s — they run once and never re-fire, so a blank `gUserEmail` would latch the whole

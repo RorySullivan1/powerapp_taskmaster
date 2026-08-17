@@ -16,21 +16,16 @@ ComponentDefinitions:
         DataType: Table
         Default: |
           =Table(
-              { Key: 1, Title: "Home",      Icon: Icon.Home,      NeedsLicence: false },
-              { Key: 2, Title: "Reports",   Icon: Icon.DetailList, NeedsLicence: true  },
-              { Key: 3, Title: "Projects",  Icon: Icon.Document,   NeedsLicence: false },
-              { Key: 4, Title: "Reference", Icon: Icon.Bookmark,  NeedsLicence: false },
-              { Key: 5, Title: "Admin",     Icon: Icon.Settings,  NeedsLicence: false } )
+              { Key: 1, Title: "Home",      Icon: Icon.Home       },
+              { Key: 2, Title: "Reports",   Icon: Icon.DetailList },
+              { Key: 3, Title: "Projects",  Icon: Icon.Document   },
+              { Key: 4, Title: "Reference", Icon: Icon.Bookmark   },
+              { Key: 5, Title: "Admin",     Icon: Icon.Settings   } )
       ActiveKey:
         PropertyKind: Input
         Description: Key of the screen this instance sits on — highlights that row.
         DataType: Number
         Default: =1
-      HasLicence:
-        PropertyKind: Input
-        Description: Pass gHasPowerBiLicence. Entries flagged NeedsLicence grey out when false.
-        DataType: Boolean
-        Default: =false
       AppTitle:
         PropertyKind: Input
         Description: Product name shown at the left of the bar.
@@ -103,15 +98,10 @@ ComponentDefinitions:
                 Control: Classic/Icon@2.5.0
                 Properties:
                   Icon: =ThisItem.Icon
-                  Color: |
-                    =If( ThisItem.NeedsLicence && !cmpAppBar.HasLicence,
-                         RGBA(110, 120, 130, 1), RGBA(0, 90, 158, 1) )
-                  # Pinned to Color, and worth the duplicated expression: navHit owns the
-                  # click, so the icon dimming under the cursor would fight the row wash
-                  # and make one row look like two controls.
-                  HoverColor: |
-                    =If( ThisItem.NeedsLicence && !cmpAppBar.HasLicence,
-                         RGBA(110, 120, 130, 1), RGBA(0, 90, 158, 1) )
+                  Color: =RGBA(0, 90, 158, 1)
+                  # Pinned to Color: navHit owns the click, so the icon dimming under the
+                  # cursor would fight the row wash and make one row look like two controls.
+                  HoverColor: =RGBA(0, 90, 158, 1)
                   HoverFill: =RGBA(0, 0, 0, 0)
                   HoverBorderColor: =RGBA(0, 0, 0, 0)
                   Height: =24
@@ -127,9 +117,7 @@ ComponentDefinitions:
                   FontWeight: |
                     =If( ThisItem.Key = cmpAppBar.ActiveKey,
                          FontWeight.Semibold, FontWeight.Normal )
-                  Color: |
-                    =If( ThisItem.NeedsLicence && !cmpAppBar.HasLicence,
-                         RGBA(110, 120, 130, 1), RGBA(32, 38, 45, 1) )
+                  Color: =RGBA(32, 38, 45, 1)
                   Height: =Parent.TemplateHeight
                   VerticalAlign: =VerticalAlign.Middle
                   X: =56

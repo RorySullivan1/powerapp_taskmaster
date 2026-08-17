@@ -63,7 +63,7 @@ types:
 # SharePoint connector does NOT surface `Created By` on taskmaster_issues, so
 # `rec.'Created By'` does not resolve — the column the app can see is not the same
 # set as the column the list has. They are listed here because they EXIST on the
-# list (a SharePoint view or a Power BI query can project them), not because the app
+# list (a SharePoint view can project them), not because the app
 # can read them. Provenance the APP has to show must be an app-written column.
 # NOT INDEXED BY DEFAULT either, so a >5,000-item list cannot sort or filter on
 # `Created` without an index like any other column.
@@ -289,7 +289,7 @@ lists:
       - { name: transaction_currency,   type: Choice,   required: true,                  desc: "Currency denomination", values: [USD, EUR, GBP, JPY, CHF] }
       # SUPERSEDED 2026-08-03 (Q14) — DO NOT PROVISION. Kept here so the decision is
       # discoverable rather than silently missing. Currency conversion moved to the
-      # REPORT layer: Power BI joins an FX dimension to transaction_currency +
+      # REPORT layer (UNOWNED since 2026-08-17): an FX dimension would join to transaction_currency +
       # transaction_date. Nothing in the app writes this column, so provisioning it
       # would leave a permanently blank Currency field that looks like a real figure.
       # If you ever reinstate it, reinstate a WRITER at the same time.
@@ -425,7 +425,7 @@ lists:
       # one, so put the safest default first.
       - { name: product_assetclass,  type: Choice,          required: true,  indexed: true, desc: "Asset class of the product", values: [PLACEHOLDER_A, PLACEHOLDER_B], review: "VALUES NOT SUPPLIED — replace before provisioning. scrProductEdit binds Choices() on the column, NOT a literal list, so the real values need no app change, but the ORDER decides what a new product defaults to. Suggested starting set for an EQD desk: Equity · Fixed Income · Credit · Rates · FX · Commodity · Multi-Asset" }
       # Indexed because the reason to flag ESG at all is to filter and group on it,
-      # in the app and in Power BI. Costs nothing on a list this small.
+      # in the app and in any downstream report. Costs nothing on a list this small.
       - { name: product_esg,         type: Boolean,         required: false, indexed: true, default: false, desc: "TRUE when the product is flagged ESG" }
 
   # ---------------------------------------------------------------------------
@@ -725,7 +725,7 @@ open_recommendations:
     status: SUPERSEDED  # 2026-08-03 (Q14) — write-time normalisation REVERSED
     superseded_by: >-
       Convert in the REPORT layer. The app stores only transaction_notional +
-      transaction_currency; Power BI joins an FX dimension on currency + date. A
+      transaction_currency; an FX dimension would join on currency + date. A
       write-time rate freezes whatever number the app held on the trade date and
       nothing downstream can correct it, whereas report-time conversion can be
       restated, back-dated and audited.
@@ -735,7 +735,7 @@ open_recommendations:
       been removed from App.Formulas. Do not reintroduce a rate table to "just add
       a total".
     reporting_obligation: >-
-      Power BI now OWES this figure. It needs an FX dimension (currency, rate,
+      NOTHING owes this figure since Power BI was dropped 2026-08-17. It needs an FX dimension (currency, rate,
       effective date) and a measure converting transaction_notional at the trade
       date. Until that exists there is no blended notional anywhere - which is the
       accepted cost, not an oversight.

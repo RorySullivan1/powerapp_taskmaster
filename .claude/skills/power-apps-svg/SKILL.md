@@ -14,8 +14,8 @@ description: >
   the Image control's data URI. Rich HTML text/tables/badges via the HtmlText control are
   power-apps-components; declarative JSON that styles a SharePoint *list cell/view* is
   sharepoint-column-formatting; the Power Fx data/aggregation feeding the visual is
-  power-fx-development; DAX/Power BI visuals are power-bi-dax. This skill is the in-app
-  vector-graphics layer only.
+  power-fx-development. This skill is the in-app vector-graphics layer AND THE ONLY CHARTING
+  LAYER THIS PROJECT HAS — Power BI is out of scope, so every chart is drawn here.
 ---
 
 # Power Apps SVG Skill
@@ -56,7 +56,7 @@ documented URL encoder; image/URI strings have **no preset length limit**.
 | A ring/gauge/bar/sparkline/thermometer, or an icon that recolours by value | **this skill** (SVG in Image) |
 | A formatted table / badge / rich text block | `power-apps-components` (HtmlText) |
 | A colour pill on a SharePoint **list** column/view | `sharepoint-column-formatting` |
-| A real analytical chart over the whole dataset | `power-bi-dax` (Power BI) |
+| A real analytical chart over the whole dataset | **still this skill** — Power BI is out of scope for this project |
 
 ## The method
 
@@ -265,5 +265,5 @@ for *label text*, where a wrong separator is cosmetic and an empty string is vis
 - **HtmlText tables/badges/rich text** and **reusable components / responsive layout** →
   `power-apps-components`.
 - **SharePoint list-cell/view formatting JSON** → `sharepoint-column-formatting`.
-- **Real analytical charts over the whole dataset** → `power-bi-dax` (Power BI). This skill is
-  the native, licence-free visual layer — useful precisely where Power BI isn't available.
+- Nothing. **Power BI is out of scope for this project (2026-08-17)**, so there is no other
+  charting layer to defer to — every chart in this app is SVG drawn here.

@@ -214,4 +214,4 @@ active projects, delegation is working; if it collapses to one row, a non-delega
 - **Writing new formulas or architecting an app from scratch** — that's `power-fx-development`; this skill audits Power Fx that already exists.
 - **Building reusable canvas UI components** (custom components, `HtmlText` rendering) — hand to `power-apps-components`.
 - **Redesigning the backend data model** when a delegation problem is really a list-shape problem (wrong column types, list too wide, needs indexing) — that's `sharepoint-list-architecture`.
-- **JSON column/view formatting** → `sharepoint-column-formatting`; **Microsoft Graph calls** → `graph-api-integration`; **DAX** → `power-bi-dax`; **Power Query / M** → `power-query-m`.
+- **JSON column/view formatting** → `sharepoint-column-formatting`; **Microsoft Graph calls** → `graph-api-integration`; **charts** → `power-apps-svg` (Power BI is out of scope).

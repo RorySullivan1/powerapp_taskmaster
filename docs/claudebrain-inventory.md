@@ -47,8 +47,8 @@ each folder** from `example-project/.claude/skills/<name>/` → `.claude/skills/
 | `sharepoint-list-architecture` | `…/skills/sharepoint-list-architecture/` | Column-type/index/threshold/relationship design behind §6. | **ADOPT.** The **schema context doc** (§4) is the *concrete instance* (this app's real columns + internal names); this skill is the *how-to*. Keep them DRY (§3). |
 | `sharepoint-column-formatting` | `…/skills/sharepoint-column-formatting/` | Status pills / colour-from-lookups in list views (§7 status badge). | **ADOPT.** |
 | `graph-api-integration` (+ `endpoints.md`) | `…/skills/graph-api-integration/` | Provisioning over Graph, the egress/extract path (§6, §7). | **ADOPT** — but see the **PnP/CSOM gap** (§5); it does not cover term-store reads. |
-| `power-bi-dax` | `…/skills/power-bi-dax/` | The embedded Power BI dashboard measures (§7). | **ADOPT.** |
-| `power-query-m` | `…/skills/power-query-m/` | Loading SharePoint lists into Power BI, expanding Person/Choice columns (§7 dashboard, §6 "Power BI imports lists whole"). | **ADOPT.** |
+| ~~`power-bi-dax`~~ | — | The embedded Power BI dashboard measures (§7). | **REMOVED 2026-08-17** — Power BI is out of scope. |
+| ~~`power-query-m`~~ | — | Loading SharePoint lists into Power BI (§7). | **REMOVED 2026-08-17** — Power BI is out of scope. |
 
 ---
 
@@ -128,7 +128,7 @@ The brief anticipated all of them (§4). **Placement flags** note which are gene
 | VBA family: `vba-development`, `-review`, `-maintenance`, `-distribution`, `-userforms`, `-code-test-writing`, `vba-addin-building`; `vba-developer` agent | `…/skills/vba-*`, `…/agents/vba-developer.md` | Office macro stack; nothing in a canvas Power App. |
 | VSTO family: `VSTO-development`, `-review`, `-maintenance`, `-distribution`; `vsto-developer` agent | `…/skills/VSTO-*`, `…/agents/vsto-developer.md` | C#/.NET Office add-ins; not this app. |
 | Python family: `python-development`, `-review`, `-maintenance`, `-deployment`; `python-developer` agent; `coding-standards` | `…/skills/python-*`, `…/agents/python-developer.md` | No Python codebase in this repo (the air gap keeps runnable code out; provisioning runs elsewhere). Revisit only if a provisioning script lands here. |
-| Quant family: `quantitative-finance`, `backtesting-validation`, `quant-code-review`, `financial-timeseries-analysis`; `finance-quantitative-developer`, `data-analyst` agents | `…/skills/`, `…/agents/` | Analytics methodology, not app-building. (`data-analyst` could marginally inform Power BI report design — optional at most.) |
+| Quant family: `quantitative-finance`, `backtesting-validation`, `quant-code-review`, `financial-timeseries-analysis`; `finance-quantitative-developer`, `data-analyst` agents | `…/skills/`, `…/agents/` | Analytics methodology, not app-building. |
 | Branding → presentation pipeline: `branding`, `presentation-design`, `deck-builder`, `one-pager-builder`, `brochure-builder`, `pamphlet-builder`, `report-builder`; `presentation-architect` agent | `…/skills/`, `…/agents/` | Document/deck production, not an app. |
 | Docs skills: `technical-documentation-drafter`, `user-guide-drafter`, `development-mapping` | `…/skills/` | Authoring docs; not needed to build the app. (`user-guide-drafter` optional for end-user docs later.) |
 | GitHub: `github-comments`, `github-issues`, `github-pull-requests`, `github-releases`; `github-operator` agent | `…/skills/github-*`, `…/agents/github-operator.md` | The harness already provides GitHub MCP + house attribution conventions. |

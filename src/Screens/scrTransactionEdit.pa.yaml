@@ -11,7 +11,7 @@
 # CURRENCY — read this before adding any total to this screen (Q14, 2026-08-03).
 # This form writes the NATIVE notional and its currency, and nothing else. It does
 # NOT convert to USD: conversion happens in the report layer, against a proper FX
-# dimension in Power BI. A write-time rate freezes whatever number the app happened
+# dimension for whatever converts it. A write-time rate freezes whatever number the app happened
 # to hold on the day of the trade and nothing downstream can ever correct it;
 # report-time conversion can be restated, back-dated and audited.
 #
@@ -277,7 +277,7 @@ Screens:
                               Text: |
                                 =If( IsBlank(Value(numTxNotional.Text)), "no notional entered",
                                      "= " & gTxCurrency & " " & Text(Value(numTxNotional.Text), "[$-en-US]#,##0")
-                                       & "   (converted to a reporting currency in Power BI, not here)" )
+                                       & "   (not converted — notional is per currency)" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted

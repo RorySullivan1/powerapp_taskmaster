@@ -1434,8 +1434,8 @@ Screens:
                     // Don't spend a write on a number that has not moved. Most stage changes
                     // inside a big project leave the rounded average where it was.
                     // Coalesce to -1: a just-inserted row holds NULL and newPc is 0, so a bare
-                    // compare can skip the write and leave NULL. Power BI's AVERAGE drops blanks
-                    // from the denominator, so portfolio completion then reads high.
+                    // compare can skip the write and leave NULL. Average() drops blanks from the
+                    // denominator, so portfolio completion then reads high.
                     If( newPc <> Coalesce(gTkRollupProj.project_perc_completion, -1),
                     IfError(
                     Set( gSelProject,
@@ -1540,7 +1540,7 @@ Screens:
               //
               // The LookUp is a duplicate guard: the picker will happily offer a product
               // that is already staged, and two identical links would double-count it in
-              // the summary and in Power BI.
+              // the summary and in every count drawn from the junction.
               If( gTkPicker = "Product"
                && IsBlank( LookUp(colTkProducts, Id = Value(cmpTkPick.Picked.Key)) ),
                   Collect( colTkProducts,

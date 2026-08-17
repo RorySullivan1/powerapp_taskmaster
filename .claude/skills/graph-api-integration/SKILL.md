@@ -19,7 +19,7 @@ description: >
   architecture; JSON column/view formatting is sharepoint-column-formatting;
   in-app data access from a canvas app (native SharePoint connector, delegation)
   is power-fx-development; pulling list data into Power BI reporting is
-  power-query-m. This skill owns *Graph API usage*, not the list nor the app.
+  power-apps-svg. This skill owns *Graph API usage*, not the list nor the app.
 ---
 
 # Microsoft Graph Integration Skill (SharePoint / M365)
@@ -376,8 +376,7 @@ the native connector (that's `power-fx-development`, not this skill).
   delegation → `power-fx-development` (reusable UI components → `power-apps-components`;
   reviewing that Power Fx → `power-fx-review`).
 - **Pulling list data into Power BI reporting** — that path is Power Query/M against the
-  SharePoint connector, a different pipeline than Graph → `power-query-m` (and the
-  measures on top → `power-bi-dax`).
+  SharePoint connector, a different pipeline than Graph. Power BI is OUT OF SCOPE for this project — charts are drawn in the app as SVG (`power-apps-svg`).
 
 This skill stops at the Graph call and the auth behind it. The list's shape, the app's
 in-session data layer, and BI reporting each belong to the siblings above.

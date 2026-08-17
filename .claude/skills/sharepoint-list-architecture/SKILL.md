@@ -22,8 +22,8 @@ description: >
   reusable canvas UI over the data use power-apps-components; for the declarative
   JSON that changes how a column or view *looks* (colors, pills, layout) use
   sharepoint-column-formatting; for reaching the list programmatically over REST use
-  graph-api-integration; for analytics over the data use power-bi-dax and
-  power-query-m. This skill owns the list design; those own what runs against it.
+  graph-api-integration; for charts over the data use power-apps-svg (Power BI is out of
+  scope for this project). This skill owns the list design, not what runs against it.
 ---
 
 # SharePoint List Architecture Skill
@@ -270,5 +270,4 @@ structured rows behind an app, a well-indexed list is the right, cheaper tool.
   skill decides the columns *exist*; that one styles them.
 - **Programmatic access to the list over REST** (create/read/update items, batch,
   app-only auth) → **graph-api-integration**.
-- **Analytics and reporting over the list** → **power-bi-dax** (measures) and
-  **power-query-m** (shaping/loading).
+- **Charts over the list** → **power-apps-svg**. Power BI is OUT OF SCOPE for this project — charts are drawn in the app as SVG (`power-apps-svg`).

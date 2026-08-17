@@ -415,4 +415,4 @@ formatted, non-interactive markup a single control can't otherwise express.
   surface (declarative JSON formatting of list cells, not the app) → **sharepoint-column-formatting**.
 - **Designing the SharePoint list/library backing the app** → **sharepoint-list-architecture**.
 - **Microsoft Graph calls** (users, files, calendar) → **graph-api-integration**.
-- **DAX / Power BI visuals** → **power-bi-dax**; **Power Query / M** data prep → **power-query-m**.
+- **Charts and analytical visuals** → **power-apps-svg**. Power BI is OUT OF SCOPE for this project — charts are drawn in the app as SVG (`power-apps-svg`).

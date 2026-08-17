@@ -19,8 +19,8 @@ description: >
   UI components and HtmlText rich content defer to power-apps-components; for
   designing the list schema, indexing, and view-threshold strategy defer to
   sharepoint-list-architecture; for programmatic (non-in-app) data access defer to
-  graph-api-integration. DAX belongs to power-bi-dax and Power Query/M to
-  power-query-m — this skill is canvas Power Fx only.
+  graph-api-integration; charts belong to power-apps-svg. Power BI is out of scope for
+  this project — this skill is canvas Power Fx only.
 ---
 
 # Power Fx Development Skill
@@ -285,4 +285,4 @@ IfError(
   threshold, lookup design → `sharepoint-list-architecture`.
 - **Programmatic data access outside the app** (server-side, flows, bulk operations via
   Microsoft Graph) → `graph-api-integration`.
-- **DAX** → `power-bi-dax`. **Power Query / M** → `power-query-m`. This skill is canvas Power Fx.
+- **Charts** → `power-apps-svg`. Power BI is OUT OF SCOPE for this project — charts are drawn in the app as SVG (`power-apps-svg`). This skill is canvas Power Fx.

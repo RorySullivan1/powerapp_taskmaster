@@ -1,35 +1,46 @@
 # App structure — screens, components, and the reporting surface
 
 Reference for the canvas app's shape: the screens, what each does, the components, and how the
-Power BI reporting surface fits. The *how-to* of building any of it — responsive containers,
+native reporting surface fits. The *how-to* of building any of it — responsive containers,
 custom-property contracts, HtmlText, galleries/forms — is the **`power-apps-components`** skill;
-the query logic and delegation behind each screen is **`power-fx-development`**; the embedded
-report's measures are **`power-bi-dax`** and its data load **`power-query-m`**. This doc records
-*what* the app is, not *how* to build a control.
+the query logic and delegation behind each screen is **`power-fx-development`**; charts are
+**`power-apps-svg`**. This doc records *what* the app is, not *how* to build a control.
 
-## Reporting surface — decided constraint (2026-07-26)
+## Reporting surface — POWER BI IS OUT OF SCOPE (2026-08-17)
 
-**Not everyone who opens the app has a Power BI licence.** Consequences, in force:
+**Power BI has been dropped from this project entirely.** No embed, no licence gate, no
+`gHasPowerBiLicence`, no DAX, no Power Query. `scrReports` is the analytics surface for
+everyone, built natively.
 
-- **The embedded Power BI report is not the primary dashboard and cannot carry core
-  navigation.** A user without a licence must still be able to reach every part of the app.
-- **Navigation is native and licence-independent.** The home screen and menu stand on their own.
-- The embedded report appears as a **reporting panel for licensed users**, with a **real empty
-  state** (a clear "reporting needs a Power BI licence — here's who to ask" card, not a broken
-  frame) for everyone else.
-- Where the app shows figures natively, it uses delegable in-app queries; Power BI remains the
-  place for aggregate analytics (it imports the lists whole — see the "no snapshot list"
-  decision). Do **not** rebuild the aggregate dashboard as native charts to dodge the licence
-  gap; provide the empty state instead. (Q2 sub-items — workspace, refresh cadence, embedded vs
-  linked — remain open; see `open-questions.md`.)
+**Charts are SVG by default** — an `Image` control fed a `data:image/svg+xml` URI built in
+Power Fx, per the **`power-apps-svg`** skill, which is now the only charting layer this app
+has. The reason is not cost avoidance: SVG is fully custom, needs no licence, no PCF and no
+external asset, and it renders inside galleries where a chart control cannot go.
+
+What survives from the old constraint, because it was never really about licensing:
+
+- **Navigation is native and stands on its own.** Nothing about reaching a part of the app
+  ever depends on a reporting surface.
+- **Aggregates never delegate.** `CountRows`/`Sum`/`Average` compute locally over fetched
+  rows, so every figure must be scoped to a set small enough to be exact, and a screen showing
+  desk-wide numbers owes the user a truncation banner saying so.
+
+What was reversed: the old rule said *do not rebuild the aggregate dashboard as native charts
+to dodge the licence gap*. That rule is void — native charts are now the design, not a dodge.
+See `docs/reports-screen-design.md`.
+
+**Consequence with no owner:** the blended cross-currency notional. C5 sends
+`transaction_notional` per-currency only and named Power BI as the thing that would convert
+it. **Nothing owns that now** — it needs an FX dimension (currency, rate, as-of date) that
+does not exist in the model. Either the app grows one, or the blended figure is permanently
+out of scope. Open.
 
 ## Required screens
 
 - **Personalised home.** My open tasks (owned **or** backed up, via the delegable `Or` on the
   three Person columns); due/overdue counts; my open issues; pinned projects; recent activity;
-  quick-add. This is the licence-independent landing surface.
-- **Dashboard (reporting panel).** The **embedded Power BI report** for licensed users, with the
-  empty state above for the rest. Not a navigation hub.
+  quick-add.
+- **Reports.** Native analytics for everyone, drawn as SVG. Not a navigation hub.
 - **Projects menu.** Browse/select projects.
 - **Project detail — three genuinely different tabs**, served by **three separate
   `ProjectId`-filtered queries** (not one shared query):
