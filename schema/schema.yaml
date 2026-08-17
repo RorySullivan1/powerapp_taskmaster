@@ -635,6 +635,18 @@ migration:
     repo side can catch it, because every token was internally consistent with this
     file the whole time. THIS FILE AGREEING WITH THE SCREENS IS NOT EVIDENCE THAT
     EITHER AGREES WITH SHAREPOINT.
+  the_app_caches_the_column_set: >-
+    FIXING A COLUMN IN SHAREPOINT DOES NOT FIX THE APP, AND RE-PASTING THE SCREEN
+    DOES NOT EITHER. The app holds its own cached copy of each list's columns
+    ("the data source has the same column names and data types as the underlying
+    table in the connection" — MS Learn), stored against the app rather than the
+    screen, so Studio keeps validating formulas against the OLD column set and the
+    same errors come back from a clean paste. Refresh the list in the Data pane;
+    after a delete-and-recreate expect to remove and re-add the data source, which
+    is Microsoft's own next step when a refresh does not take. NOT the Refresh()
+    function — that is documented as fetching fresh RECORDS, not a fresh schema, so
+    putting it in the loader changes nothing. Do this for every list whose columns
+    were recreated, not only the one that errored.
   recreated_columns_come_back_empty: >-
     Deleting and recreating a column to fix its internal name discards every stored
     value and drops any index. task_supporter (2026-08-17) needs its index restored;
