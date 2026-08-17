@@ -54,7 +54,9 @@ Screens:
         // are imperative Sets that never re-fire.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
         If( IsBlank(gRptPeriod), Set( gRptPeriod, "1QTR" ) );
-        If( IsBlank(gRptScope),  Set( gRptScope,  "Me" ) );
+        // Scope holds a project manager's EMAIL, or "" for All. IsBlank cannot seed it —
+        // "" is the All value and is itself blank — so it is set unconditionally.
+        Set( gRptScope, Coalesce(gRptScope, "") );
         If( IsBlank(gRptSort),   Set( gRptSort, "Owns" ); Set( gRptSortDesc, true ) );
         If( IsBlank(gRptCoverage), Set( gRptCoverage, "All coverage" ) );
         Set( gRptSelPerson, "" );
@@ -209,10 +211,24 @@ Screens:
                                       If( IsBlank(s), "Unclassified",
                                           If( i > 0, Left(s, i - 1), s ) ) ) ),
                         Mgr:  Lower(Coalesce(p.project_manager.Email, "")),
+                        // The display name is carried alongside the email because the scope
+                        // picker lists PEOPLE and matches on IDENTITY: email is the key,
+                        // the name is only ever shown.
+                        MgrNm: Coalesce(p.project_manager.DisplayName, ""),
                         Sup:  Lower(Coalesce(p.project_supporter.Email, "")) } ) );
-              // The IDs of the projects I run. A single-column table, so `in` works.
-              Set( gRptMyPrj,
-                   Filter( colRptPrjMap, Mgr = gUserEmail || Sup = gUserEmail ).PId );
+              // ---- scope options ---------------------------------------------------
+              // "All" plus one row per project manager, built from the projects actually
+              // in the window — so the list can never offer a manager with nothing to show.
+              // Em is the key and is BLANK for "All", which is what the filter tests; a
+              // manager with no display name falls back to the email rather than
+              // rendering an unpickable blank row.
+              ClearCollect( colRptMgrOpts, { Value: "All", Em: "" } );
+              Collect( colRptMgrOpts,
+                  Sort( ForAll( Distinct( Filter(colRptPrjMap, Len(Mgr) > 0), Mgr ) As m,
+                            { Value: With( { n: LookUp(colRptPrjMap, Mgr = m.Value, MgrNm) },
+                                         If( Len(Coalesce(n, "")) > 0, n, m.Value ) ),
+                              Em:    m.Value } ),
+                        Value ) );
               // ---- person unpivot --------------------------------------------------
               // TWO ATTRIBUTION PATHS, BOTH FROM TASKS: task_lead owns and
               // task_supporter supports. They are counted separately and NEVER summed
@@ -309,7 +325,6 @@ Screens:
                             OnTp: With( { dt: Filter(rw, OnT >= 0) },
                                       If( CountRows(dt) = 0, -1,
                                           RoundDown( Sum(dt, OnT) / Max(1, CountRows(dt)) * 100, 0 ) ) ),
-                            Mine: CountRows( Filter(rw, PId in gRptMyPrj) ) > 0,
                             // HOISTED. Left inside the predicate this re-filtered every
                             // project for every transaction for every person — ~40 x 2000 x 300
                             // row evaluations, the N+1 this file's own header forbids, merely
@@ -517,6 +532,15 @@ Screens:
               Set( gRptUnmapped,
                    CountRows( Filter( colRptTxEnriched,
                                       Cov = "Unassigned" || Prd = "Unclassified" ) ) );
+              // The people on the scoped manager's projects, resolved to a flat email
+              // list so the gallery filters with `in` over ~40 rows rather than scanning
+              // the unpivot on every repaint. Recomputed HERE as well as in the picker's
+              // OnChange because a period change rebuilds colRptPersonSrc underneath a
+              // scope that is already set — the two must stay identical.
+              ClearCollect( colRptScopeEm,
+                  Distinct( Filter( colRptPersonSrc,
+                                    PId in Filter(colRptPrjMap, Mgr = Coalesce(gRptScope, "")).PId ),
+                            Em ) );
               Set( gRptAsAt,   Text(Now(), "[$-en-US]hh:mm") );
               Set( gRptLoadedKey, gRptKey );
               Set( gRptBusy, false )
@@ -608,18 +632,35 @@ Screens:
                         Width: =Parent.Width
                         Height: =16
                   # Scope NEVER refetches — it re-filters a ~40-row collection.
-                  - selRptScope:
-                      Control: CanvasComponent
-                      ComponentName: cmpSelection
+                  # A COMBOBOX, not a cmpSelection strip: the option list is one row per
+                  # project manager and grows with the desk, so it cannot be a fixed-width
+                  # strip of buttons. Bound to colRptMgrOpts rather than a literal table
+                  # for the same reason.
+                  - cboRptScope:
+                      Control: ModernCombobox@1.1.1
                       Properties:
-                        FontSize: =10
+                        Items: =colRptMgrOpts
+                        ItemDisplayText: =ThisItem.Value
+                        # Matched on Em, never on the display name: two people can share a
+                        # name and neither would select reliably.
+                        DefaultSelectedItems: |
+                          =Filter( colRptMgrOpts, Em = Coalesce(gRptScope, "") )
+                        SelectMultiple: =false
+                        IsSearchable: =true
+                        InputTextPlaceholder: ="Scope"
+                        FillPortions: =0
+                        LayoutMinWidth: =Parent.Width
                         Width: =Parent.Width
                         Height: =36
-                        Items: |
-                          =Table( { Id: 1, Label: "Me" }, { Id: 2, Label: "My projects" },
-                                  { Id: 3, Label: "Desk" } )
-                        DefaultId: =Switch( gRptScope, "Me", 1, "My projects", 2, "Desk", 3, 1 )
-                        OnChange: =Set( gRptScope, selRptScope.Selected.Label )
+                        # Re-folds the scoped email list. Same fold as the one at the end
+                        # of btnRptLoad.OnSelect — keep the two identical.
+                        OnChange: |
+                          =Set( gRptScope, Coalesce(cboRptScope.Selected.Em, "") );
+                           ClearCollect( colRptScopeEm,
+                               Distinct( Filter( colRptPersonSrc,
+                                                 PId in Filter( colRptPrjMap,
+                                                                Mgr = Coalesce(cboRptScope.Selected.Em, "") ).PId ),
+                                         Em ) )
             - wrapRptCov:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1283,10 +1324,9 @@ Screens:
                         # line, but whether it still accepts a string post-3.24042 is not
                         # grounded here, and a wrong guess fails the whole paste.
                         Items: |
-                          =With( { sc: Switch( gRptScope,
-                                               "Me",          Filter(colRptPerson, Em = gUserEmail),
-                                               "My projects", Filter(colRptPerson, Mine),
-                                                              colRptPerson ),
+                          =With( { sc: If( Len(Coalesce(gRptScope, "")) = 0,
+                                           colRptPerson,
+                                           Filter(colRptPerson, Em in colRptScopeEm.Value) ),
                                    dr: If(gRptSortDesc, SortOrder.Descending, SortOrder.Ascending) },
                                If( gRptSort = "Nm",
                                    Sort( sc, Nm, dr ),
