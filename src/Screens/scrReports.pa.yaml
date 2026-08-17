@@ -91,8 +91,15 @@ Screens:
                                         DateAdd(Today(), -90,  TimeUnit.Days) ) );
               // TWICE the window. One transaction fetch then serves both the current
               // window and the prior-period delta, and feeds the monthly trend bars.
+              // FLOORED AT 14 DAYS EACH SIDE. On the first day of a calendar quarter
+              // gRptFrom IS today, so the doubled span was zero and EVERY transaction
+              // fetch came back empty — the trend, the tiles and the grid all blank on
+              // one day in ninety. The floor only widens the fetch; gRptFrom still bounds
+              // what counts as "current".
               Set( gRptFrom2x,
-                   DateAdd( Today(), -2 * DateDiff(gRptFrom, Today(), TimeUnit.Days), TimeUnit.Days ) );
+                   DateAdd( Today(),
+                            -2 * Max( 14, DateDiff(gRptFrom, Today(), TimeUnit.Days) ),
+                            TimeUnit.Days ) );
               // ---- F1..F5, all delegable ------------------------------------------
               // F1 is unbounded but SELF-LIMITING: open work does not accumulate.
               // The stages are ENUMERATED because a Text <> does not delegate.
@@ -156,7 +163,11 @@ Screens:
                      // grid's vocabulary — both are exactly what this banner exists for.
                      If( CountRows(colRptIss)      >= 2000, "issues  ", "" ) &
                      If( CountRows(colRptClients)  >= 2000, "clients  ", "" ) &
-                     If( CountRows(colRptProducts) >= 2000, "products  ", "" ) ) );
+                     If( CountRows(colRptProducts) >= 2000, "products  ", "" ) &
+                     // Distinct() over a data source does not delegate, and THIS is what
+                     // defines the grid's product axis — a capped product-type list
+                     // silently shortens the axis and invents gaps that are not gaps.
+                     If( CountRows(colRptProdL1)   >= 2000, "product types  ", "" ) ) );
               // Transactions inside the CURRENT window; colRptTx holds two windows.
               ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
               // ---- project map -----------------------------------------------------
@@ -366,10 +377,16 @@ Screens:
                                 Cp: CountRows( Filter( colRptPrj,
                                         !IsBlank(project_date_complete)
                                      && Year(project_date_complete) * 12 + Month(project_date_complete) = k ) ),
-                                Tx: CountRows( Filter( colRptTx,
+                                // colRptTxCur, NOT colRptTx. colRptTx spans TWO windows, and
+                                // gRptFrom rarely lands on the 1st — so a transaction earlier
+                                // in the same calendar month as the window start shares its
+                                // month key and was inflating the first bar, putting the trend
+                                // at odds with the desk-pulse tile.
+                                Tx: CountRows( Filter( colRptTxCur,
                                         Year(transaction_date) * 12 + Month(transaction_date) = k ) ),
                                 TxP: CountRows( Filter( colRptTx,
-                                        Year(transaction_date) * 12 + Month(transaction_date) = kp ) ) } ) ) ) );
+                                        transaction_date < gRptFrom
+                                     && Year(transaction_date) * 12 + Month(transaction_date) = kp ) ) } ) ) ) );
               // CUMULATIVE NET OPEN — started minus completed, running. This is the direct
               // answer to "how are projects trending" and it needs no snapshot list,
               // because it is built from dated EVENTS rather than stateful columns.
@@ -407,6 +424,13 @@ Screens:
               // Coverage reaches a transaction through its CLIENT, not its project
               // (decided 2026-08-17): the grid reads "this coverage team has never traded
               // that product type".
+              //
+              // ACCEPTED COST, NOT AN OVERSIGHT: two linear LookUps per transaction, so
+              // this is O(tx x clients) + O(tx x products) and it re-runs on every period
+              // change. Power Fx has no hash join and no index on a collection, so there
+              // is no cheaper shape — and it is bounded by the same 2000-row cap the
+              // truncation banner reports. If it ever becomes the bottleneck, the fix is a
+              // denormalised coverage column on the transaction, not a smarter join here.
               ClearCollect( colRptTxEnriched,
                   ForAll( colRptTxCur As x,
                       { Cov: Coalesce( LookUp( colRptClients,
@@ -447,6 +471,14 @@ Screens:
                                 CN: Coalesce( LookUp(colRptCovClients, K = cv, N), 0 ),
                                 N:  CountRows( Filter(colRptTxEnriched, Cov = cv && Prd = pv) ) } ) ) ) );
               Set( gRptGridMax, Max( 1, Coalesce(Max(colRptGrid, N), 0) ) );
+              // A client with no coverage, or a product with no type path, gets a fallback
+              // label that matches NO axis value — so those transactions sit in no cell
+              // while still counting in the KPI tile and the currency totals. Counted here
+              // and stated under the grid, because a total that does not reconcile is
+              // worse than one that explains itself.
+              Set( gRptUnmapped,
+                   CountRows( Filter( colRptTxEnriched,
+                                      Cov = "Unassigned" || Prd = "Unclassified" ) ) );
               Set( gRptAsAt,   Text(Now(), "[$-en-US]hh:mm") );
               Set( gRptLoadedKey, gRptKey );
               Set( gRptBusy, false )
@@ -1906,11 +1938,14 @@ Screens:
                         TemplatePadding: =0
                         TemplateFill: =RGBA(0, 0, 0, 0)
                         BorderThickness: =0
-                        ShowScrollbar: =false
+                        # SCROLLS, and two rows deep. The column has five values today, so
+                        # WrapCount 5 fits exactly — which is precisely why a sixth added in
+                        # SharePoint would have gone silently unreachable.
+                        ShowScrollbar: =true
                         FillPortions: =0
-                        LayoutMinHeight: =60
+                        LayoutMinHeight: =120
                         Width: =Parent.Width - 32
-                        Height: =60
+                        Height: =120
                       Children:
                         - colRptCcyBody:
                             Control: GroupContainer@1.5.0
@@ -1978,13 +2013,19 @@ Screens:
                         Height: =150
                         # Zero cells are DRAWN, hollow with a hairline border, so a gap is
                         # visible rather than absent. Shade is a whole-number alpha step.
+                        # THE COMBO FILTERS THIS TOO. Selecting one coverage leaves exactly
+                        # one row, so the row ordinal collapses to 1 rather than staying at
+                        # the cell's index in the full grid — otherwise the single row drew
+                        # at its original y and the chart looked empty. The heading said
+                        # "filtered" while the picture showed everything.
                         Image: |
-                          =With( { cw: RoundDown(760 / Max(1, gRptNPrd), 0) },
+                          =With( { cw: RoundDown(760 / Max(1, gRptNPrd), 0),
+                                   all: gRptCoverage = "All coverage" },
                               "data:image/svg+xml;charset=utf-8," & EncodeUrl(
                                   "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 "
-                                & (30 + gRptNCov * 40 + 10) & "'>"
-                                & Concat( Filter(colRptGrid, Pi = 1),
-                                      "<text x='0' y='" & (30 + (Ci - 1) * 40 + 26)
+                                & (30 + If(all, gRptNCov, 1) * 40 + 10) & "'>"
+                                & Concat( Filter(colRptGrid, Pi = 1 && (all || Cov = gRptCoverage)),
+                                      "<text x='0' y='" & (30 + If(all, Ci - 1, 0) * 40 + 26)
                                     & "' font-size='15' font-family='Segoe UI, sans-serif' fill='#20262D'>"
                                     & EncodeHTML( If(Len(Cov) > 16, Left(Cov, 15) & "..", Cov) ) & "</text>" )
                                 & Concat( Filter(colRptGrid, Ci = 1),
@@ -1992,15 +2033,22 @@ Screens:
                                     & "' y='20' text-anchor='middle' font-size='13'"
                                     & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                     & EncodeHTML( If(Len(Prd) > 10, Left(Prd, 9) & "..", Prd) ) & "</text>" )
-                                & Concat( colRptGrid,
-                                      "<rect x='" & (140 + (Pi - 1) * cw) & "' y='" & (30 + (Ci - 1) * 40)
+                                & Concat( Filter(colRptGrid, all || Cov = gRptCoverage),
+                                      "<rect x='" & (140 + (Pi - 1) * cw) & "' y='"
+                                    & (30 + If(all, Ci - 1, 0) * 40)
                                     & "' width='" & Max(4, cw - 4) & "' height='36' rx='4' fill='"
                                     & If(N = 0, "#FFFFFF", "#005A9E") & "' fill-opacity='"
-                                    & If( N = 0, "1", Text( Max(15, Round(N / gRptGridMax * 100, 0)) ) )
-                                    & "%' stroke='" & If(N = 0, "#E1E5EB", "none")
+                                    // The "%" belongs to the NUMERIC branch only. Appended
+                                    // unconditionally it turned the empty-cell opacity into
+                                    // fill-opacity='1%' — 1 percent, not fully opaque — so a
+                                    // gap rendered as a near-invisible smudge rather than a
+                                    // white cell with a hairline border.
+                                    & If( N = 0, "1",
+                                          Text( Max(15, Round(N / gRptGridMax * 100, 0)) ) & "%" )
+                                    & "' stroke='" & If(N = 0, "#E1E5EB", "none")
                                     & "' stroke-width='1'/>"
                                     & "<text x='" & (140 + (Pi - 1) * cw + RoundDown(cw / 2, 0)) & "' y='"
-                                    & (30 + (Ci - 1) * 40 + 23) & "' text-anchor='middle' font-size='14'"
+                                    & (30 + If(all, Ci - 1, 0) * 40 + 23) & "' text-anchor='middle' font-size='14'"
                                     & " font-family='Segoe UI, sans-serif' fill='"
                                     & If(N = 0, "#B9C0C8", "#20262D") & "'>" & N & "</text>" )
                                 & "</svg>" ) )
@@ -2018,11 +2066,32 @@ Screens:
                         LayoutMinHeight: =18
                         Width: =Parent.Width - 32
                         Height: =18
+                  - lblRptUnmapped:
+                      Control: Label@2.5.1
+                      Properties:
+                        Visible: =gRptUnmapped > 0
+                        Text: |
+                          =gRptUnmapped & If(gRptUnmapped = 1, " transaction has", " transactions have")
+                           & " no client coverage or no product type, so they appear in NO cell above"
+                           & " — the grid understates the period by that much."
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.Warning
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width - 32
+                        Height: =18
                   - lblRptGapT:
                       Control: Label@2.5.1
                       Properties:
+                        # SAME PREDICATE AS THE GALLERY BELOW. Counting every coverage while
+                        # the list showed one made the header contradict what was on screen.
                         Text: |
-                          ="Offering gaps   (" & CountRows(Filter(colRptGrid, N = 0)) & ")"
+                          ="Offering gaps   ("
+                           & CountRows( Filter( colRptGrid,
+                                                N = 0
+                                             && ( gRptCoverage = "All coverage"
+                                               || Cov = gRptCoverage ) ) ) & ")"
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Body
                         FontWeight: =FontWeight.Semibold
