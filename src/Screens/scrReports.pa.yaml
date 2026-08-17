@@ -134,11 +134,15 @@ Screens:
                           ID, transaction_date, transaction_client_name, transaction_project_id,
                           transaction_product_id, transaction_currency, transaction_notional ) ),
                   // ONE BAD NAME HERE BREAKS EVERY READER OF colRptPrj, NOT JUST ITS OWN
-                  // COLUMN. If any argument names a column the source does not have, the
-                  // whole ShowColumns errors, the collection never gets a valid schema,
-                  // and Studio reports "not recognized" on p.project_name, p.project_manager
-                  // and every other field downstream. Read the errors as ONE fault: find
-                  // the name the source rejects, and the rest clear with it.
+                  // COLUMN. ShowColumns resolves as a UNIT: one name the source cannot
+                  // resolve errors the whole expression, the collection never gets a
+                  // schema, and Studio then reports "not recognized" on p.project_name,
+                  // p.project_manager and every other field downstream — including ones
+                  // that are perfectly valid. THE ERROR LIST IS NOT THE FAULT LIST.
+                  // This is also why the fault shows up HERE and nowhere else: every other
+                  // screen reads these columns one at a time, off a record or inside a
+                  // Patch, where a bad sibling cannot poison a good field. Do not read a
+                  // burst of errors here as evidence against the columns it names.
                   ClearCollect( colRptPrj,
                       ShowColumns( ActiveProjects,
                           ID, project_name, project_phase, project_perc_completion,

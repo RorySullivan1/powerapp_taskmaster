@@ -606,21 +606,20 @@ migration:
     provisioning it first.
   title_column: >-
     EVERY LIST USES AN EXPLICIT NAME COLUMN AND LEAVES Title UNUSED AND NOT
-    REQUIRED. The three mapping lists were built this way from the start; the main
-    lists are being brought into line after taskmaster_projects was found on
-    2026-08-17 to be storing the project name in Title under a renamed display
-    label, so `project_name` did not exist and every reader of it failed.
-    Title CANNOT be deleted — it belongs to the Item content type — so the pattern
-    is: create the explicit column, then set Title not-required and hide it.
-    NOT-REQUIRED IS LOAD-BEARING, NOT TIDINESS: the app never writes Title, so
-    while it stays required every create Patch fails.
-    Chosen over pointing the app at Title because the app tokens are the golden
-    source's vocabulary — `Title` would mean ~100 edits across the screens and five
-    lists whose name column is all spelled the same, losing the one thing that
-    makes a formula readable about which list it reads.
-    WATCH THE LOOKUPS: a lookup's display column (`show:`) points at whatever was
-    chosen when it was created, usually Title. Repoint it to the explicit column,
-    or it renders blank once Title stops being populated.
+    REQUIRED. The three mapping lists are built this way and are confirmed.
+    WHETHER THE MAIN LISTS MATCH IS UNVERIFIED — a 2026-08-17 reading of
+    taskmaster_projects suggested the project name lived in Title under a renamed
+    display label, but that was NOT the cause of the errors that prompted the
+    check, and no list has been confirmed either way. Do not act on it without
+    reading `Field=` off the column itself.
+    IF a list ever does need converting: Title CANNOT be deleted, it belongs to
+    the Item content type, so the pattern is create the explicit column, then set
+    Title not-required and hide it. NOT-REQUIRED IS LOAD-BEARING: the app never
+    writes Title, so while it stays required every create Patch fails. Prefer this
+    over pointing the app at Title — the tokens are this file's vocabulary, and
+    `Title` would mean ~100 edits across the screens and five lists whose name
+    column is spelled identically. And repoint any lookup whose display column
+    (`show:`) was set to Title, or it renders blank once Title goes unpopulated.
     An earlier draft of this file told two of the three mapping lists to map level1
     onto Title and the third not to, which is a contradiction — the app filters on
     `level1` in every formula, so a list without that column returns nothing and
