@@ -6,12 +6,13 @@
 # banner), band 1 (desk pulse), band 2 (people, sortable, with an inline SVG
 # health bar).
 #
-# NOT BUILT — and the FETCHES they need are here but the FOLDS are not:
-#   * bands 3-5 (where the work sits, project trend, transactions + heatmap).
-#     colRptFam / colRptFmt / colRptMonths / colRptTxEnriched / colRptGrid /
-#     colRptCcy still have to be built in this load before they can render.
-#   * the person overlay. Tapping a row sets gRptSelPerson and highlights it;
-#     the detail panel is still to come.
+# ALSO BUILT: band 3 (activity family, output format, median cycle time),
+# band 4 (started/completed/net-open combo + ageing), band 5 (monthly trend,
+# per-currency tiles, coverage x product heatmap, ranked gap list), provenance.
+#
+# NOT BUILT: the person overlay. Tapping a row sets gRptSelPerson and highlights
+# it; the detail panel is still to come. It reads folds already in memory, so it
+# adds no queries.
 #
 # ARCHITECTURE — fetch bounded, fold once, render from folds.
 #   * Every fact fetch is delegable and date- or state-bounded.
@@ -274,6 +275,168 @@ Screens:
               Set( gRptTxN,    CountRows(colRptTxCur) );
               Set( gRptTxPrev, CountRows( Filter(colRptTx, transaction_date < gRptFrom) ) );
               Set( gRptIssN,   CountRows(colRptIss) );
+              // ---- BAND 3 folds: where the work sits --------------------------------
+              // Tag each open task ONCE with its activity family and output format.
+              // Every breakdown below then reads a tagged collection instead of
+              // re-joining to the project map per category.
+              ClearCollect( colRptOpenTag,
+                  ForAll( colRptOpen As t,
+                      { Fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
+                                       "Unclassified" ),
+                        Fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) } ) );
+              ClearCollect( colRptFamAll,
+                  ForAll( Distinct(colRptOpenTag, Fam) As f,
+                      { K: f.Value, N: CountRows( Filter(colRptOpenTag, Fam = f.Value) ) } ) );
+              // TOP 6 + Other. Sorted here, once, so the renderer can index straight in.
+              ClearCollect( colRptFam, FirstN( Sort(colRptFamAll, N, SortOrder.Descending), 6 ) );
+              Set( gRptFamOther, CountRows(colRptOpenTag) - Coalesce(Sum(colRptFam, N), 0) );
+              Clear( colRptFamBar );
+              Collect( colRptFamBar,
+                  ForAll( Sequence( CountRows(colRptFam) ) As s,
+                      With( { r: Index(colRptFam, s.Value) },
+                          { Idx: s.Value, K: r.K, N: r.N } ) ) );
+              If( gRptFamOther > 0,
+                  Collect( colRptFamBar,
+                      { Idx: CountRows(colRptFam) + 1, K: "Other", N: gRptFamOther } ) );
+              Set( gRptFamMax, Max( 1, Coalesce(Max(colRptFamBar, N), 0) ) );
+              // FIXED VOCABULARY + Unspecified + Other. "Other" counts rows matching none
+              // of the enumerated values: if it is ever non-zero, SharePoint and
+              // schema.yaml disagree — visible on sight instead of silently reweighting
+              // every share.
+              Clear( colRptFmtBar );
+              Collect( colRptFmtBar,
+                  ForAll(
+                      Table( { Idx: 1, K: "Flyer" },   { Idx: 2, K: "Email" },
+                             { Idx: 3, K: "PDF" },     { Idx: 4, K: "Webpage" },
+                             { Idx: 5, K: "Deck" },    { Idx: 6, K: "Video" },
+                             { Idx: 7, K: "Unspecified" }, { Idx: 8, K: "Other" } ) As c,
+                      { Idx: c.Idx, K: c.K,
+                        N: If( c.K = "Other",
+                               CountRows( Filter( colRptOpenTag,
+                                   !( Fmt = "Flyer" || Fmt = "Email" || Fmt = "PDF"
+                                   || Fmt = "Webpage" || Fmt = "Deck" || Fmt = "Video"
+                                   || Fmt = "Unspecified" ) ) ),
+                               CountRows( Filter(colRptOpenTag, Fmt = c.K) ) ) } ) );
+              Set( gRptFmtMax, Max( 1, Coalesce(Max(colRptFmtBar, N), 0) ) );
+              // Median cycle time by family — the elapsed-time counterpart to the two
+              // volume charts, and the only genuine duration signal in the model.
+              ClearCollect( colRptDoneTag,
+                  ForAll( Filter(colRptDone, !IsBlank(task_date_start)) As t,
+                      { Fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
+                                       "Unclassified" ),
+                        D:   DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) } ) );
+              ClearCollect( colRptCycAll,
+                  ForAll( Distinct(colRptDoneTag, Fam) As f,
+                      With( { ds: Sort( Filter(colRptDoneTag, Fam = f.Value), D ) },
+                          With( { n: CountRows(ds) },
+                              { K: f.Value, N: n,
+                                Med: If( n = 0, -1, Index(ds, RoundUp(n / 2, 0)).D ) } ) ) ) );
+              Clear( colRptCycBar );
+              Collect( colRptCycBar,
+                  ForAll( Sequence( CountRows(colRptCycAll) ) As s,
+                      With( { r: Index( Sort(colRptCycAll, Med, SortOrder.Descending), s.Value ) },
+                          { Idx: s.Value, K: r.K, N: r.N, Med: r.Med } ) ) );
+              Set( gRptCycMax, Max( 1, Coalesce(Max(colRptCycBar, Med), 0) ) );
+              // ---- BAND 4 folds: project trend -------------------------------------
+              // MONTH BUCKETS KEYED ON AN INTEGER — Year*12 + Month — not on date
+              // comparison. Exact, and it sidesteps every timezone and month-length edge.
+              // The prior window is aligned POSITIONALLY: month i of this window is
+              // compared with month i of the window before it.
+              ClearCollect( colRptMonthsRaw,
+                  ForAll( Sequence( 1 + DateDiff(gRptFrom, Today(), TimeUnit.Months) ) As s,
+                      With( { d:  DateAdd(gRptFrom,   s.Value - 1, TimeUnit.Months),
+                              dp: DateAdd(gRptFrom2x, s.Value - 1, TimeUnit.Months) },
+                          With( { k:  Year(d)  * 12 + Month(d),
+                                  kp: Year(dp) * 12 + Month(dp) },
+                              { Idx: s.Value,
+                                Lbl: Text(d, "[$-en-US]mmm"),
+                                St: CountRows( Filter( colRptPrj,
+                                        !IsBlank(project_date_start)
+                                     && Year(project_date_start) * 12 + Month(project_date_start) = k ) ),
+                                Cp: CountRows( Filter( colRptPrj,
+                                        !IsBlank(project_date_complete)
+                                     && Year(project_date_complete) * 12 + Month(project_date_complete) = k ) ),
+                                Tx: CountRows( Filter( colRptTx,
+                                        Year(transaction_date) * 12 + Month(transaction_date) = k ) ),
+                                TxP: CountRows( Filter( colRptTx,
+                                        Year(transaction_date) * 12 + Month(transaction_date) = kp ) ) } ) ) ) );
+              // CUMULATIVE NET OPEN — started minus completed, running. This is the direct
+              // answer to "how are projects trending" and it needs no snapshot list,
+              // because it is built from dated EVENTS rather than stateful columns.
+              ClearCollect( colRptMonths,
+                  ForAll( colRptMonthsRaw As m,
+                      { Idx: m.Idx, Lbl: m.Lbl, St: m.St, Cp: m.Cp, Tx: m.Tx, TxP: m.TxP,
+                        Net: Coalesce( Sum( Filter(colRptMonthsRaw, Idx <= m.Idx), St ), 0 )
+                           - Coalesce( Sum( Filter(colRptMonthsRaw, Idx <= m.Idx), Cp ), 0 ) } ) );
+              Set( gRptTrendMax,
+                   Max( 1, Coalesce(Max(colRptMonths, St), 0),
+                           Coalesce(Max(colRptMonths, Cp), 0),
+                           Coalesce(Max(colRptMonths, Net), 0) ) );
+              Set( gRptTxMax,
+                   Max( 1, Coalesce(Max(colRptMonths, Tx), 0),
+                           Coalesce(Max(colRptMonths, TxP), 0) ) );
+              // Ageing of OPEN projects, by days since start.
+              Set( gRptAgeA, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
+                                 && !IsBlank(project_date_start)
+                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) < 30 ) ) );
+              Set( gRptAgeB, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
+                                 && !IsBlank(project_date_start)
+                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) >= 30
+                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) < 90 ) ) );
+              Set( gRptAgeC, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
+                                 && !IsBlank(project_date_start)
+                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) >= 90
+                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) < 180 ) ) );
+              Set( gRptAgeD, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
+                                 && !IsBlank(project_date_start)
+                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) >= 180 ) ) );
+              Set( gRptStalled,  CountRows( Filter(colRptPrj, project_phase.Value = "Stalled") ) );
+              Set( gRptNoTarget, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
+                                     && IsBlank(project_date_target) ) ) );
+              // ---- BAND 5 folds: transactions --------------------------------------
+              // Coverage reaches a transaction through its CLIENT, not its project
+              // (decided 2026-08-17): the grid reads "this coverage team has never traded
+              // that product type".
+              ClearCollect( colRptTxEnriched,
+                  ForAll( colRptTxCur As x,
+                      { Cov: Coalesce( LookUp( colRptClients,
+                                           ID = x.transaction_client_name.Id ).client_coverage.Value,
+                                       "Unassigned" ),
+                        Prd: With( { sp: Trim( Coalesce( LookUp( colRptProducts,
+                                                   ID = x.transaction_product_id.Id ).product_type_path, "" ) ) },
+                                 With( { i: Find(" | ", sp) },
+                                     If( IsBlank(sp), "Unclassified",
+                                         If( i > 0, Left(sp, i - 1), sp ) ) ) ),
+                        Ccy: Coalesce(x.transaction_currency.Value, "—"),
+                        Amt: Coalesce(x.transaction_notional, 0) } ) );
+              // PER CURRENCY, NEVER SUMMED ACROSS THEM. Cross-currency conversion is out
+              // of scope for this project, so there is no blended figure to show.
+              ClearCollect( colRptCcy,
+                  ForAll( Distinct(colRptTxEnriched, Ccy) As c,
+                      { K: c.Value,
+                        N:   CountRows( Filter(colRptTxEnriched, Ccy = c.Value) ),
+                        Tot: Coalesce( Sum( Filter(colRptTxEnriched, Ccy = c.Value), Amt ), 0 ) } ) );
+              ClearCollect( colRptCovClients,
+                  ForAll( colRptCoverage As c,
+                      { K: c.Value,
+                        N: CountRows( Filter(colRptClients, client_coverage.Value = c.Value) ) } ) );
+              // THE FULL CROSS PRODUCT, zero cells included. A gap is an ABSENT group, so
+              // the grid is built from the two VOCABULARIES rather than from the
+              // transactions — deriving it from the data would delete exactly the cells
+              // this section exists to show. Cell s maps to row/col with RoundDown and Mod,
+              // which also hands the SVG the coordinates it needs.
+              Set( gRptNCov, CountRows(colRptCoverage) );
+              Set( gRptNPrd, CountRows(colRptProdL1) );
+              ClearCollect( colRptGrid,
+                  ForAll( Sequence( gRptNCov * gRptNPrd ) As s,
+                      With( { ci: RoundDown( (s.Value - 1) / Max(1, gRptNPrd), 0 ) + 1,
+                              pi: Mod( s.Value - 1, Max(1, gRptNPrd) ) + 1 },
+                          With( { cv: Index(colRptCoverage, ci).Value,
+                                  pv: Index(colRptProdL1, pi).Value },
+                              { Ci: ci, Pi: pi, Cov: cv, Prd: pv,
+                                CN: Coalesce( LookUp(colRptCovClients, K = cv, N), 0 ),
+                                N:  CountRows( Filter(colRptTxEnriched, Cov = cv && Prd = pv) ) } ) ) ) );
+              Set( gRptGridMax, Max( 1, Coalesce(Max(colRptGrid, N), 0) ) );
               Set( gRptAsAt,   Text(Now(), "[$-en-US]hh:mm") );
               Set( gRptLoadedKey, gRptKey );
               Set( gRptBusy, false )
@@ -1249,44 +1412,554 @@ Screens:
                                  Set( gRptSelPerson,
                                       If(gRptSelPerson = ThisItem.Em, "", ThisItem.Em) )
             # =============================================================
-            # BANDS 3-5 — authored next. Their folds are already built above,
-            # so the second tranche adds rendering only, not queries.
+            # BAND 3 — where the work sits
             # =============================================================
-            - pnlRptPending:
+            # EVERY COORDINATE IS A WHOLE NUMBER. A fraction would have to go through
+            # Text(), which drags the locale decimal separator into an SVG attribute,
+            # and an attribute Power Fx cannot render comes out EMPTY — a width='' rect
+            # is not a thin rect, it is no rect. The viewBoxes are scaled up instead.
+            - rowRptWork:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =gTheme.Space.Gap
+                  FillPortions: =0
+                  LayoutMinHeight: =300
+                  Width: =Parent.Width - 48
+                  Height: =300
+                Children:
+                  - pnlRptFam:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =320
+                        Height: =300
+                      Children:
+                        - lblRptFamT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks by activity family"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - lblRptFamS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Top 6, joined through the parent project."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - imgRptFam:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 80
+                              Image: |
+                                =With( { n: CountRows(colRptFamBar) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 "
+                                      & If(n = 0, 60, n * 44 + 8) & "'>"
+                                      & Concat( colRptFamBar,
+                                            "<text x='0' y='" & ((Idx - 1) * 44 + 26)
+                                          & "' font-size='17' font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 22, Left(K, 21) & "..", K) ) & "</text>"
+                                          & "<rect x='210' y='" & ((Idx - 1) * 44 + 12)
+                                          & "' width='330' height='20' rx='10' fill='#EEF1F5'/>"
+                                          & "<rect x='210' y='" & ((Idx - 1) * 44 + 12) & "' width='"
+                                          & Max(2, Round(N / gRptFamMax * 330, 0))
+                                          & "' height='20' rx='10' fill='"
+                                          & If(K = "Other", "#8A5AA8", "#005A9E") & "'/>"
+                                          & "<text x='598' y='" & ((Idx - 1) * 44 + 27)
+                                          & "' text-anchor='end' font-size='16'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>" & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='300' y='34' text-anchor='middle' font-size='17'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>No open tasks</text>", "" )
+                                      & "</svg>" ) )
+                  - pnlRptFmt:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =320
+                        Height: =300
+                      Children:
+                        - lblRptFmtT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks by output format"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - lblRptFmtS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( LookUp(colRptFmtBar, K = "Other", N) > 0,
+                                     "Other is NON-ZERO — SharePoint and schema.yaml disagree on this column.",
+                                     "Direct on the task, no join." )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: |
+                                =If( LookUp(colRptFmtBar, K = "Other", N) > 0,
+                                     gTheme.Color.Danger, gTheme.Color.TextMuted )
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - imgRptFmt:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 80
+                              Image: |
+                                ="data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 360'>"
+                                    & Concat( colRptFmtBar,
+                                          "<text x='0' y='" & ((Idx - 1) * 44 + 26)
+                                        & "' font-size='17' font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                        & EncodeHTML(K) & "</text>"
+                                        & "<rect x='210' y='" & ((Idx - 1) * 44 + 12)
+                                        & "' width='330' height='20' rx='10' fill='#EEF1F5'/>"
+                                        & "<rect x='210' y='" & ((Idx - 1) * 44 + 12) & "' width='"
+                                        & Max(2, Round(N / gRptFmtMax * 330, 0))
+                                        & "' height='20' rx='10' fill='"
+                                        & If( K = "Other", "#C53A3A",
+                                              If(K = "Unspecified", "#B9C0C8", "#005A9E") ) & "'/>"
+                                        & "<text x='598' y='" & ((Idx - 1) * 44 + 27)
+                                        & "' text-anchor='end' font-size='16'"
+                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>" & N & "</text>" )
+                                    & "</svg>" )
+            - pnlRptCyc:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
                   LayoutDirection: =LayoutDirection.Vertical
                   LayoutAlignItems: =LayoutAlignItems.Start
-                  LayoutGap: =4
-                  PaddingTop: =14
-                  PaddingBottom: =14
+                  LayoutGap: =6
+                  PaddingTop: =12
+                  PaddingBottom: =12
                   PaddingLeft: =16
                   PaddingRight: =16
                   Fill: =gTheme.Color.Surface
                   BorderColor: =gTheme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =70
+                  LayoutMinHeight: =260
                   Width: =Parent.Width - 48
-                  Height: =70
+                  Height: =260
                 Children:
-                  - lblRptPendingT:
+                  - lblRptCycT:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="Where the work sits · Project trend · Transactions"
+                        Text: ="Median cycle time by activity family"
                         Font: =gTheme.Font
                         Size: =gTheme.Size.H3
                         FontWeight: =FontWeight.Semibold
-                        Color: =gTheme.Color.TextMuted
+                        Color: =gTheme.Color.Primary
+                        VerticalAlign: =VerticalAlign.Middle
                         FillPortions: =0
                         LayoutMinHeight: =24
                         Width: =Parent.Width - 32
                         Height: =24
-                  - lblRptPendingB:
+                  - lblRptCycS:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="Bands 3-5 land in the next tranche. The data they need is already loaded."
+                        Text: ="Days from task start to completion, over the period's completions. Tasks with no start date are excluded."
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =16
+                        Width: =Parent.Width - 32
+                        Height: =16
+                  - imgRptCyc:
+                      Control: Image@2.2.3
+                      Properties:
+                        ImagePosition: =ImagePosition.Fit
+                        FillPortions: =1
+                        LayoutMinHeight: =120
+                        Width: =Parent.Width - 32
+                        Height: =Parent.Height - 80
+                        Image: |
+                          =With( { n: CountRows(colRptCycBar) },
+                              "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 "
+                                & If(n = 0, 60, n * 40 + 8) & "'>"
+                                & Concat( colRptCycBar,
+                                      "<text x='0' y='" & ((Idx - 1) * 40 + 24)
+                                    & "' font-size='16' font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                    & EncodeHTML( If(Len(K) > 26, Left(K, 25) & "..", K) ) & "</text>"
+                                    & "<rect x='250' y='" & ((Idx - 1) * 40 + 10) & "' width='"
+                                    & Max(2, Round(Med / gRptCycMax * 520, 0))
+                                    & "' height='18' rx='9' fill='#D69828'/>"
+                                    & "<text x='790' y='" & ((Idx - 1) * 40 + 24)
+                                    & "' text-anchor='end' font-size='15'"
+                                    & " font-family='Segoe UI, sans-serif' fill='#20262D'>" & Med & "d</text>"
+                                    & "<text x='898' y='" & ((Idx - 1) * 40 + 24)
+                                    & "' text-anchor='end' font-size='14'"
+                                    & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>n=" & N & "</text>" )
+                                & If( n = 0,
+                                      "<text x='450' y='34' text-anchor='middle' font-size='16'"
+                                    & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                    & "Nothing completed with a start date in this window</text>", "" )
+                                & "</svg>" ) )
+            # =============================================================
+            # BAND 4 — how projects are trending
+            # =============================================================
+            # BUILT ENTIRELY FROM DATED EVENTS. project_perc_completion, task_stage and
+            # project_phase are CURRENT STATE with no snapshot anywhere, so "completion
+            # over time" is impossible natively — every series here comes from
+            # project_date_start / project_date_complete instead.
+            - pnlRptTrend:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =6
+                  PaddingTop: =12
+                  PaddingBottom: =12
+                  PaddingLeft: =16
+                  PaddingRight: =16
+                  Fill: =gTheme.Color.Surface
+                  BorderColor: =gTheme.Color.Border
+                  BorderThickness: =1
+                  FillPortions: =0
+                  LayoutMinHeight: =320
+                  Width: =Parent.Width - 48
+                  Height: =320
+                Children:
+                  - lblRptTrendT:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Projects started, completed, and net open"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.H3
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.Primary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =24
+                        Width: =Parent.Width - 32
+                        Height: =24
+                  - lblRptTrendS:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Blue bars started · green bars completed · line is cumulative net open. "
+                           & "Archived projects are outside the query, so their completions are not counted."
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =16
+                        Width: =Parent.Width - 32
+                        Height: =16
+                  # ONE SCALE for all three series — they are all project counts, so a
+                  # second axis would only make the line look bigger than it is.
+                  - imgRptTrend:
+                      Control: Image@2.2.3
+                      Properties:
+                        ImagePosition: =ImagePosition.Fit
+                        FillPortions: =1
+                        LayoutMinHeight: =160
+                        Width: =Parent.Width - 32
+                        Height: =Parent.Height - 80
+                        Image: |
+                          =With( { n: Max(1, CountRows(colRptMonths)) },
+                              With( { w: RoundDown(880 / n, 0) },
+                                  "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 300'>"
+                                    & "<line x1='0' y1='250' x2='900' y2='250' stroke='#E1E5EB' stroke-width='2'/>"
+                                    & Concat( colRptMonths,
+                                          "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
+                                        & (250 - Round(St / gRptTrendMax * 210, 0)) & "' width='"
+                                        & Max(3, RoundDown(w / 2, 0) - 4) & "' height='"
+                                        & Round(St / gRptTrendMax * 210, 0) & "' fill='#005A9E'/>"
+                                        & "<rect x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='"
+                                        & (250 - Round(Cp / gRptTrendMax * 210, 0)) & "' width='"
+                                        & Max(3, RoundDown(w / 2, 0) - 4) & "' height='"
+                                        & Round(Cp / gRptTrendMax * 210, 0) & "' fill='#31825D'/>"
+                                        & "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='272'"
+                                        & " text-anchor='middle' font-size='15'"
+                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                        & EncodeHTML(Lbl) & "</text>" )
+                                    & "<polyline fill='none' stroke='#D69828' stroke-width='4'"
+                                    & " stroke-linejoin='round' points='"
+                                    & Concat( colRptMonths,
+                                          (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & ","
+                                        & (250 - Round(Net / gRptTrendMax * 210, 0)) & " " )
+                                    & "'/>"
+                                    & "</svg>" ) ) )
+                  - rowRptAge:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =20
+                        FillPortions: =0
+                        LayoutMinHeight: =30
+                        Width: =Parent.Width - 32
+                        Height: =30
+                      Children:
+                        - lblRptAge:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Open projects by age:   <30d " & gRptAgeA
+                                 & "    30-90d " & gRptAgeB
+                                 & "    90-180d " & gRptAgeC
+                                 & "    180d+ " & gRptAgeD
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =2
+                              LayoutMinWidth: =320
+                              Height: =30
+                        - lblRptStall:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Stalled " & gRptStalled & "    ·    no target date " & gRptNoTarget
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FontWeight: =FontWeight.Semibold
+                              Color: |
+                                =If( gRptStalled > 0, gTheme.Color.Danger, gTheme.Color.TextMuted )
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =200
+                              Height: =30
+            # =============================================================
+            # BAND 5 — transactions (secondary)
+            # =============================================================
+            - pnlRptTx:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =8
+                  PaddingTop: =12
+                  PaddingBottom: =12
+                  PaddingLeft: =16
+                  PaddingRight: =16
+                  Fill: =gTheme.Color.Surface
+                  BorderColor: =gTheme.Color.Border
+                  BorderThickness: =1
+                  FillPortions: =0
+                  LayoutMinHeight: =620
+                  Width: =Parent.Width - 48
+                  Height: =620
+                Children:
+                  - lblRptTxT:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Transactions"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.H3
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.Primary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =24
+                        Width: =Parent.Width - 32
+                        Height: =24
+                  - imgRptTxTrend:
+                      Control: Image@2.2.3
+                      Properties:
+                        ImagePosition: =ImagePosition.Fit
+                        FillPortions: =0
+                        LayoutMinHeight: =130
+                        Width: =Parent.Width - 32
+                        Height: =130
+                        # Current window solid, prior window greyed BEHIND it.
+                        Image: |
+                          =With( { n: Max(1, CountRows(colRptMonths)) },
+                              With( { w: RoundDown(880 / n, 0) },
+                                  "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 220'>"
+                                    & "<line x1='0' y1='180' x2='900' y2='180' stroke='#E1E5EB' stroke-width='2'/>"
+                                    & Concat( colRptMonths,
+                                          "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
+                                        & (180 - Round(TxP / gRptTxMax * 150, 0)) & "' width='"
+                                        & Max(4, w - 12) & "' height='"
+                                        & Round(TxP / gRptTxMax * 150, 0) & "' fill='#E1E5EB'/>"
+                                        & "<rect x='" & (10 + (Idx - 1) * w + 6) & "' y='"
+                                        & (180 - Round(Tx / gRptTxMax * 150, 0)) & "' width='"
+                                        & Max(4, w - 24) & "' height='"
+                                        & Round(Tx / gRptTxMax * 150, 0) & "' fill='#005A9E'/>"
+                                        & "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='202'"
+                                        & " text-anchor='middle' font-size='14'"
+                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                        & EncodeHTML(Lbl) & "</text>" )
+                                    & "</svg>" ) ) )
+                  - galRptCcy:
+                      Control: Gallery@2.15.0
+                      Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                      Properties:
+                        # NEVER SUMMED ACROSS CURRENCIES — one tile each. Cross-currency
+                        # conversion is out of scope, so there is no blended total.
+                        Items: =Sort(colRptCcy, N, SortOrder.Descending)
+                        WrapCount: =5
+                        TemplateSize: =56
+                        TemplatePadding: =0
+                        TemplateFill: =RGBA(0, 0, 0, 0)
+                        BorderThickness: =0
+                        ShowScrollbar: =false
+                        FillPortions: =0
+                        LayoutMinHeight: =60
+                        Width: =Parent.Width - 32
+                        Height: =60
+                      Children:
+                        - colRptCcyBody:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Vertical
+                              LayoutAlignItems: =LayoutAlignItems.Start
+                              LayoutGap: =0
+                              PaddingLeft: =8
+                              PaddingRight: =8
+                              X: =0
+                              Y: =0
+                              Width: =Parent.TemplateWidth - 8
+                              Height: =Parent.TemplateHeight - 4
+                            Children:
+                              - lblRptCcyK:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =ThisItem.K & "   (" & ThisItem.N & ")"
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    FillPortions: =0
+                                    LayoutMinHeight: =18
+                                    Width: =Parent.Width
+                                    Height: =18
+                              - lblRptCcyV:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Text(ThisItem.Tot, "[$-en-US]#,###")
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.H3
+                                    FontWeight: =FontWeight.Semibold
+                                    Color: =gTheme.Color.TextPrimary
+                                    FillPortions: =0
+                                    LayoutMinHeight: =26
+                                    Width: =Parent.Width
+                                    Height: =26
+                  - lblRptGridT:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Coverage x product type" &
+                           If( gRptCoverage <> "All coverage", "   ·   " & gRptCoverage, "" )
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =22
+                        Width: =Parent.Width - 32
+                        Height: =22
+                  # LEGIBILITY CEILING ~60 CELLS. Past that the heatmap is suppressed and
+                  # the ranked gap list carries the section on its own — a grid nobody can
+                  # read is worse than no grid.
+                  - imgRptGrid:
+                      Control: Image@2.2.3
+                      Properties:
+                        Visible: =gRptNCov * gRptNPrd <= 60 && gRptNCov > 0 && gRptNPrd > 0
+                        ImagePosition: =ImagePosition.Fit
+                        FillPortions: =0
+                        LayoutMinHeight: =150
+                        Width: =Parent.Width - 32
+                        Height: =150
+                        # Zero cells are DRAWN, hollow with a hairline border, so a gap is
+                        # visible rather than absent. Shade is a whole-number alpha step.
+                        Image: |
+                          =With( { cw: RoundDown(760 / Max(1, gRptNPrd), 0) },
+                              "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 "
+                                & (30 + gRptNCov * 40 + 10) & "'>"
+                                & Concat( Filter(colRptGrid, Pi = 1),
+                                      "<text x='0' y='" & (30 + (Ci - 1) * 40 + 26)
+                                    & "' font-size='15' font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                    & EncodeHTML( If(Len(Cov) > 16, Left(Cov, 15) & "..", Cov) ) & "</text>" )
+                                & Concat( Filter(colRptGrid, Ci = 1),
+                                      "<text x='" & (140 + (Pi - 1) * cw + RoundDown(cw / 2, 0))
+                                    & "' y='20' text-anchor='middle' font-size='13'"
+                                    & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                    & EncodeHTML( If(Len(Prd) > 10, Left(Prd, 9) & "..", Prd) ) & "</text>" )
+                                & Concat( colRptGrid,
+                                      "<rect x='" & (140 + (Pi - 1) * cw) & "' y='" & (30 + (Ci - 1) * 40)
+                                    & "' width='" & Max(4, cw - 4) & "' height='36' rx='4' fill='"
+                                    & If(N = 0, "#FFFFFF", "#005A9E") & "' fill-opacity='"
+                                    & If( N = 0, "1", Text( Max(15, Round(N / gRptGridMax * 100, 0)) ) )
+                                    & "%' stroke='" & If(N = 0, "#E1E5EB", "none")
+                                    & "' stroke-width='1'/>"
+                                    & "<text x='" & (140 + (Pi - 1) * cw + RoundDown(cw / 2, 0)) & "' y='"
+                                    & (30 + (Ci - 1) * 40 + 23) & "' text-anchor='middle' font-size='14'"
+                                    & " font-family='Segoe UI, sans-serif' fill='"
+                                    & If(N = 0, "#B9C0C8", "#20262D") & "'>" & N & "</text>" )
+                                & "</svg>" ) )
+                  - lblRptGridSup:
+                      Control: Label@2.5.1
+                      Properties:
+                        Visible: =gRptNCov * gRptNPrd > 60
+                        Text: |
+                          ="Grid suppressed — " & (gRptNCov * gRptNPrd)
+                           & " cells is past the legible ceiling. The gap list below carries the section."
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
@@ -1294,6 +1967,97 @@ Screens:
                         LayoutMinHeight: =18
                         Width: =Parent.Width - 32
                         Height: =18
+                  - lblRptGapT:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Offering gaps   (" & CountRows(Filter(colRptGrid, N = 0)) & ")"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =22
+                        Width: =Parent.Width - 32
+                        Height: =22
+                  - galRptGaps:
+                      Control: Gallery@2.15.0
+                      Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                      Properties:
+                        # SIZED BY CLIENT COUNT, so the opportunity is quantified rather
+                        # than merely listed. The coverage combo filters it and never
+                        # refetches — colRptGrid is already in memory.
+                        Items: |
+                          =Sort(
+                             Filter( colRptGrid,
+                                     N = 0
+                                  && ( gRptCoverage = "All coverage" || Cov = gRptCoverage ) ),
+                             CN, SortOrder.Descending )
+                        WrapCount: =1
+                        TemplateSize: =32
+                        TemplatePadding: =0
+                        TemplateFill: =RGBA(0, 0, 0, 0)
+                        BorderThickness: =0
+                        ShowScrollbar: =true
+                        FillPortions: =1
+                        LayoutMinHeight: =90
+                        Width: =Parent.Width - 32
+                        Height: =Parent.Height - 480
+                      Children:
+                        - rowRptGapBody:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =10
+                              PaddingLeft: =8
+                              PaddingRight: =8
+                              X: =0
+                              Y: =0
+                              Width: =Parent.TemplateWidth
+                              Height: =Parent.TemplateHeight - 1
+                            Children:
+                              - cellRptGapTxt:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: |
+                                      =ThisItem.Cov & " — " & ThisItem.CN
+                                       & If(ThisItem.CN = 1, " client", " clients")
+                                       & ", no " & ThisItem.Prd & " transactions"
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextPrimary
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =240
+                                    Height: =26
+                        - rowRptGapLine:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              Fill: =gTheme.Color.Border
+                              X: =0
+                              Y: =Parent.TemplateHeight - 1
+                              Width: =Parent.TemplateWidth
+                              Height: =1
+            # ---- provenance --------------------------------------------------
+            - lblRptProv:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    ="Window: " & Text(gRptFrom, "[$-en-US]d mmm yyyy") & " to today   ·   "
+                     & "archived work excluded   ·   "
+                     & If( Len(Coalesce(gRptTrunc, "")) > 0,
+                           "TRUNCATED on " & gRptTrunc, "no fetch hit the row limit" )
+                     & "   ·   notional is per currency only, never blended."
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  FillPortions: =0
+                  LayoutMinHeight: =20
+                  Width: =Parent.Width - 48
+                  Height: =20
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       - appBar:
