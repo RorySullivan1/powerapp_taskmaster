@@ -265,7 +265,10 @@ lists:
       - { name: transaction_project_id, type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: transaction_client_name, type: Lookup,  required: true,  indexed: true,  desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
       - { name: transaction_product_id, type: Lookup,   required: true,                  desc: "Associated product", lookup: { list: taskmaster_products, show: product_uid } }
-      - { name: transaction_sales,      type: Person, multi: false, required: true,                  desc: "Sales owner" }
+      # SALES-SIDE, NOT DESK-SIDE (user-confirmed 2026-08-17). Do NOT feed it into person
+      # productivity: whoever sold the trade did not do the desk work. A sales-to-transaction
+      # analysis may come later and is a separate view, not another workload attribution path.
+      - { name: transaction_sales,      type: Person, multi: false, required: true,                  desc: "Sales owner. Display and sales-side analysis only — never a desk-workload attribution path" }
       - { name: transaction_notional,   type: Currency, required: false,                 desc: "Trade notional amount (positive)" }
       # ---------------------------------------------------------------------
       # DENORMALISED PARENT STATE — added 2026-08-12. Mirrors project_phase =

@@ -103,9 +103,15 @@ over a fact collection may appear in any gallery `Items` or row property** — t
 | `colRptGrid` | nCov × nProd | full cross product, counts joined in |
 | `colRptCcy` | ≤5 | per-currency notional totals |
 
-**Person attribution:** a task counts once for its `task_lead` ("owns") and separately for its
-`task_supporter` ("supports"). The two are **never summed into one workload number** — that would
-double-count the desk total. Both columns are single Person and indexed, so the unpivot is exact.
+**Person attribution: exactly two paths, both from tasks.** A task counts once for its
+`task_lead` ("owns") and separately for its `task_supporter` ("supports"). The two are **never
+summed into one workload number** — that would double-count the desk total. Both columns are
+single Person and indexed, so the unpivot is exact.
+
+**`transaction_sales` IS NOT A THIRD PATH** (user-confirmed 2026-08-17). It is sales-side, not
+desk-side: the person who sold the trade did not do the desk work the screen is measuring. It
+stays out of `colRptPerson` entirely. A sales-to-transaction view may come later and is a
+different question from "where does desk time go".
 
 **Activity family / product L1 extraction.** The `*_path` columns store levels joined by `" | "` and
 the separator is part of the stored data. Take level 1 with `Find`/`Left` rather than `Split`, and
@@ -293,6 +299,8 @@ Small, and none of them block the build:
    and indexes cannot be added past 20,000 items.
 2. **Real `client_coverage` values.** The gap grid's row vocabulary *is* this column; PLACEHOLDER
    values make the grid meaningless. Already an open thread covering four columns.
-3. **Confirm `transaction_sales` is sales-side, not desk-side.** This design assumes it is *not* a
-   desk person and does not feed it into person productivity. If that is wrong, it is a fourth
-   attribution path worth adding.
+3. ~~Confirm `transaction_sales` is sales-side, not desk-side.~~ **CONFIRMED 2026-08-17 — do not
+   use it.** It is sales-side, so it is **not** a person-productivity attribution path and must not
+   appear in `colRptPerson`. The user notes a later analysis may relate salespeople to
+   transactions; that is a **separate view**, not a fourth column in the desk workload unpivot —
+   folding it in would attribute desk effort to people who did none of it.

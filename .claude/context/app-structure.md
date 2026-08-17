@@ -12,10 +12,11 @@ the query logic and delegation behind each screen is **`power-fx-development`**;
 `gHasPowerBiLicence`, no DAX, no Power Query. `scrReports` is the analytics surface for
 everyone, built natively.
 
-**Charts are SVG by default** — an `Image` control fed a `data:image/svg+xml` URI built in
-Power Fx, per the **`power-apps-svg`** skill, which is now the only charting layer this app
-has. The reason is not cost avoidance: SVG is fully custom, needs no licence, no PCF and no
-external asset, and it renders inside galleries where a chart control cannot go.
+**`scrReports` is native controls and SVG only** (user-confirmed 2026-08-17). No embed of any
+kind, no PCF, no external visual. Every chart is an `Image` fed a `data:image/svg+xml` URI
+built in Power Fx, per the **`power-apps-svg`** skill — now the only charting layer this app
+has. The reason is not cost avoidance: SVG is fully custom, needs no licence and no asset, and
+it renders inside a gallery where a chart control cannot go.
 
 What survives from the old constraint, because it was never really about licensing:
 
