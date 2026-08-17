@@ -19,6 +19,16 @@
 #     row property — that is the N+1, and a 40-row people gallery each scanning
 #     800 tasks is 32,000 row-scans PER REPAINT.
 #
+# EVERY DENOMINATOR IN A PROPERTY FORMULA IS WRAPPED IN Max(1, ...) AT THE POINT
+# OF USE, even where the global was already Set with Max(1, ...). A property
+# formula is evaluated in the EDITOR, where the load has never run and every
+# global is BLANK — and blank divides as zero. Setting the guard at load time
+# protects the running app and does nothing for the editor. An `If(x = 0, ...)`
+# guard does not help either: blank is not reliably equal to 0 for an untyped
+# global, so the else arm is what runs. Max() ignores blanks and returns 1.
+# The divisions inside btnRptLoad.OnSelect are exempt — a behaviour formula runs
+# only when invoked, by which point the Sets above it have happened.
+#
 # THE LOAD LIVES IN ONE PLACE — btnRptLoad.OnSelect — and OnVisible, the refresh
 # icon and the period strip all reach it with Select(). MS Learn is explicit that
 # "Select QUEUES the target OnSelect for later processing... it does not cause it
@@ -278,7 +288,7 @@ Screens:
                                           If( n = 0, -1, Index(ds, RoundUp(n / 2, 0)).Days ) ) ),
                             OnTp: With( { dt: Filter(rw, OnT >= 0) },
                                       If( CountRows(dt) = 0, -1,
-                                          RoundDown( Sum(dt, OnT) / CountRows(dt) * 100, 0 ) ) ),
+                                          RoundDown( Sum(dt, OnT) / Max(1, CountRows(dt)) * 100, 0 ) ) ),
                             Mine: CountRows( Filter(rw, PId in gRptMyPrj) ) > 0,
                             // HOISTED. Left inside the predicate this re-filtered every
                             // project for every transaction for every person — ~40 x 2000 x 300
@@ -840,9 +850,15 @@ Screens:
                         - lblRptOvdSub:
                             Control: Label@2.5.1
                             Properties:
+                              # A GUARD IS NOT A DIVISION FIX. Before the load runs these
+                              # globals are BLANK, not 0, so `= 0` does not reliably take
+                              # the safe branch and the else arm divides blank by blank.
+                              # Max() ignores blanks and returns 1, so the denominator
+                              # cannot be zero whatever the comparison does; the If stays
+                              # because it chooses the wording, not because it protects.
                               Text: |
-                                =If( gRptOpenN = 0, "none open",
-                                     RoundDown(gRptOvdN / gRptOpenN * 100, 0) & "% of open work" )
+                                =If( Coalesce(gRptOpenN, 0) = 0, "none open",
+                                     RoundDown(gRptOvdN / Max(1, gRptOpenN) * 100, 0) & "% of open work" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -899,8 +915,8 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                =If( gRptTxPrev = 0, "no prior-period comparison",
-                                     With( { d: RoundDown((gRptTxN - gRptTxPrev) / gRptTxPrev * 100, 0) },
+                                =If( Coalesce(gRptTxPrev, 0) = 0, "no prior-period comparison",
+                                     With( { d: RoundDown((gRptTxN - gRptTxPrev) / Max(1, gRptTxPrev) * 100, 0) },
                                           If(d >= 0, "+" & d & "% vs prior period",
                                                      d & "% vs prior period" ) ) )
                               Font: =gTheme.Font
@@ -1363,9 +1379,9 @@ Screens:
                                     # for anyone who had finished all their work.
                                     Image: |
                                       =With( { tot: ThisItem.Gc + ThisItem.Ac + ThisItem.Rc },
-                                          With( { g:  If( tot = 0, 0, Round(ThisItem.Gc / tot * 300, 0) ),
+                                          With( { g:  If( tot = 0, 0, Round(ThisItem.Gc / Max(1, tot) * 300, 0) ),
                                                   ga: If( tot = 0, 0,
-                                                          Round((ThisItem.Gc + ThisItem.Ac) / tot * 300, 0) ) },
+                                                          Round((ThisItem.Gc + ThisItem.Ac) / Max(1, tot) * 300, 0) ) },
                                               "data:image/svg+xml," & EncodeUrl(
                                                   "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 40'>"
                                                 & "<rect x='0' y='10' width='300' height='20' rx='10' fill='#EEF1F5'/>"
@@ -1583,7 +1599,7 @@ Screens:
                                           & "<rect x='210' y='" & ((Idx - 1) * 44 + 12)
                                           & "' width='330' height='20' rx='10' fill='#EEF1F5'/>"
                                           & "<rect x='210' y='" & ((Idx - 1) * 44 + 12) & "' width='"
-                                          & Max(2, Round(N / gRptFamMax * 330, 0))
+                                          & Max(2, Round(N / Max(1, gRptFamMax) * 330, 0))
                                           & "' height='20' rx='10' fill='"
                                           & If(K = "Other", "#8A5AA8", "#005A9E") & "'/>"
                                           & "<text x='598' y='" & ((Idx - 1) * 44 + 27)
@@ -1658,7 +1674,7 @@ Screens:
                                         & "<rect x='210' y='" & ((Idx - 1) * 44 + 12)
                                         & "' width='330' height='20' rx='10' fill='#EEF1F5'/>"
                                         & "<rect x='210' y='" & ((Idx - 1) * 44 + 12) & "' width='"
-                                        & Max(2, Round(N / gRptFmtMax * 330, 0))
+                                        & Max(2, Round(N / Max(1, gRptFmtMax) * 330, 0))
                                         & "' height='20' rx='10' fill='"
                                         & If( K = "Other", "#C53A3A",
                                               If(K = "Unspecified", "#B9C0C8", "#005A9E") ) & "'/>"
@@ -1727,7 +1743,7 @@ Screens:
                                     & "' font-size='16' font-family='Segoe UI, sans-serif' fill='#20262D'>"
                                     & EncodeHTML( If(Len(K) > 26, Left(K, 25) & "..", K) ) & "</text>"
                                     & "<rect x='250' y='" & ((Idx - 1) * 40 + 10) & "' width='"
-                                    & Max(2, Round(Med / gRptCycMax * 520, 0))
+                                    & Max(2, Round(Med / Max(1, gRptCycMax) * 520, 0))
                                     & "' height='18' rx='9' fill='#D69828'/>"
                                     & "<text x='790' y='" & ((Idx - 1) * 40 + 24)
                                     & "' text-anchor='end' font-size='15'"
@@ -1810,13 +1826,13 @@ Screens:
                                     & "<line x1='0' y1='250' x2='900' y2='250' stroke='#E1E5EB' stroke-width='2'/>"
                                     & Concat( colRptBuckets,
                                           "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
-                                        & (250 - Round(St / gRptTrendMax * 210, 0)) & "' width='"
+                                        & (250 - Round(St / Max(1, gRptTrendMax) * 210, 0)) & "' width='"
                                         & Max(3, RoundDown(w / 2, 0) - 4) & "' height='"
-                                        & Round(St / gRptTrendMax * 210, 0) & "' fill='#005A9E'/>"
+                                        & Round(St / Max(1, gRptTrendMax) * 210, 0) & "' fill='#005A9E'/>"
                                         & "<rect x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='"
-                                        & (250 - Round(Cp / gRptTrendMax * 210, 0)) & "' width='"
+                                        & (250 - Round(Cp / Max(1, gRptTrendMax) * 210, 0)) & "' width='"
                                         & Max(3, RoundDown(w / 2, 0) - 4) & "' height='"
-                                        & Round(Cp / gRptTrendMax * 210, 0) & "' fill='#31825D'/>"
+                                        & Round(Cp / Max(1, gRptTrendMax) * 210, 0) & "' fill='#31825D'/>"
                                         & "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='272'"
                                         & " text-anchor='middle' font-size='15'"
                                         & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
@@ -1825,7 +1841,7 @@ Screens:
                                     & " stroke-linejoin='round' points='"
                                     & Concat( colRptBuckets,
                                           (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & ","
-                                        & (250 - Round(Net / gRptTrendMax * 210, 0)) & " " )
+                                        & (250 - Round(Net / Max(1, gRptTrendMax) * 210, 0)) & " " )
                                     & "'/>"
                                     & "</svg>" ) ) )
                   - rowRptAge:
@@ -1922,13 +1938,13 @@ Screens:
                                     & "<line x1='0' y1='180' x2='900' y2='180' stroke='#E1E5EB' stroke-width='2'/>"
                                     & Concat( colRptBuckets,
                                           "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
-                                        & (180 - Round(TxP / gRptTxMax * 150, 0)) & "' width='"
+                                        & (180 - Round(TxP / Max(1, gRptTxMax) * 150, 0)) & "' width='"
                                         & Max(4, w - 12) & "' height='"
-                                        & Round(TxP / gRptTxMax * 150, 0) & "' fill='#E1E5EB'/>"
+                                        & Round(TxP / Max(1, gRptTxMax) * 150, 0) & "' fill='#E1E5EB'/>"
                                         & "<rect x='" & (10 + (Idx - 1) * w + 6) & "' y='"
-                                        & (180 - Round(Tx / gRptTxMax * 150, 0)) & "' width='"
+                                        & (180 - Round(Tx / Max(1, gRptTxMax) * 150, 0)) & "' width='"
                                         & Max(4, w - 24) & "' height='"
-                                        & Round(Tx / gRptTxMax * 150, 0) & "' fill='#005A9E'/>"
+                                        & Round(Tx / Max(1, gRptTxMax) * 150, 0) & "' fill='#005A9E'/>"
                                         & "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='202'"
                                         & " text-anchor='middle' font-size='14'"
                                         & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
@@ -2052,7 +2068,7 @@ Screens:
                                     // gap rendered as a near-invisible smudge rather than a
                                     // white cell with a hairline border.
                                     & If( N = 0, "1",
-                                          Text( Max(15, Round(N / gRptGridMax * 100, 0)) ) & "%" )
+                                          Text( Max(15, Round(N / Max(1, gRptGridMax) * 100, 0)) ) & "%" )
                                     & "' stroke='" & If(N = 0, "#E1E5EB", "none")
                                     & "' stroke-width='1'/>"
                                     & "<text x='" & (140 + (Pi - 1) * cw + RoundDown(cw / 2, 0)) & "' y='"
@@ -2362,7 +2378,7 @@ Screens:
                         X: =210
                         Y: =6
                         Width: |
-                          =Max( 2, ThisItem.N / gRptPStgMax * (Parent.TemplateWidth - 270) )
+                          =Max( 2, ThisItem.N / Max(1, gRptPStgMax) * (Parent.TemplateWidth - 270) )
                         Height: =12
                   - lblRptOvlStgN:
                       Control: Label@2.5.1
@@ -2437,7 +2453,7 @@ Screens:
                         X: =210
                         Y: =6
                         Width: |
-                          =Max( 2, ThisItem.N / gRptPFamMax * (Parent.TemplateWidth - 270) )
+                          =Max( 2, ThisItem.N / Max(1, gRptPFamMax) * (Parent.TemplateWidth - 270) )
                         Height: =12
                   - lblRptOvlFamN:
                       Control: Label@2.5.1
@@ -2512,7 +2528,7 @@ Screens:
                         X: =210
                         Y: =6
                         Width: |
-                          =Max( 2, ThisItem.N / gRptPFmtMax * (Parent.TemplateWidth - 270) )
+                          =Max( 2, ThisItem.N / Max(1, gRptPFmtMax) * (Parent.TemplateWidth - 270) )
                         Height: =12
                   - lblRptOvlFmtN:
                       Control: Label@2.5.1
