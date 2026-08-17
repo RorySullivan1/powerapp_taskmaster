@@ -133,6 +133,12 @@ Screens:
                                && transaction_date >= gRptFrom2x ),
                           ID, transaction_date, transaction_client_name, transaction_project_id,
                           transaction_product_id, transaction_currency, transaction_notional ) ),
+                  // ONE BAD NAME HERE BREAKS EVERY READER OF colRptPrj, NOT JUST ITS OWN
+                  // COLUMN. If any argument names a column the source does not have, the
+                  // whole ShowColumns errors, the collection never gets a valid schema,
+                  // and Studio reports "not recognized" on p.project_name, p.project_manager
+                  // and every other field downstream. Read the errors as ONE fault: find
+                  // the name the source rejects, and the rest clear with it.
                   ClearCollect( colRptPrj,
                       ShowColumns( ActiveProjects,
                           ID, project_name, project_phase, project_perc_completion,
