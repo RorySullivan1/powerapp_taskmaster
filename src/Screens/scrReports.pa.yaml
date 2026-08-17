@@ -2,10 +2,12 @@
 # scrReports  —  native analytics. Power BI is OUT OF SCOPE; every chart here is
 # SVG in an Image control. Design note: docs/reports-screen-design.md.
 #
-# TRANCHE 1 OF 2. Bands 0-2 (control bar, desk pulse, people) plus the WHOLE
-# data layer. Bands 3-5 (where the work sits, project trend, transactions +
-# coverage heatmap) are rendering only and land next; their folds are already
-# built below so the second tranche adds no queries.
+# BUILT: band 0 (period + scope strips, coverage combo, refresh, truncation
+# banner), band 1 (desk pulse), band 2 (people, sortable, with an inline SVG
+# health bar). Bands 3-5 render from folds built in the same load.
+#
+# NOT BUILT: the person overlay. Tapping a row sets gRptSelPerson and highlights
+# it; the detail panel is still to come.
 #
 # ARCHITECTURE — fetch bounded, fold once, render from folds.
 #   * Every fact fetch is delegable and date- or state-bounded.
@@ -40,33 +42,14 @@ Screens:
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
         If( IsBlank(gRptPeriod), Set( gRptPeriod, "90 days" ) );
         If( IsBlank(gRptScope),  Set( gRptScope,  "Me" ) );
+        If( IsBlank(gRptSort),   Set( gRptSort, "Owns" ); Set( gRptSortDesc, true ) );
+        If( IsBlank(gRptCoverage), Set( gRptCoverage, "All coverage" ) );
         Set( gRptSelPerson, "" );
         // Refetch ONLY when the period changed, or on the first visit. A revisit with
         // the same window repaints from folds already in memory.
         Set( gRptKey, gRptPeriod );
         If( gRptKey <> gRptLoadedKey, Select( btnRptLoad ) )
     Children:
-      - HeaderBar:
-          Control: Rectangle@2.3.0
-          Properties:
-            Fill: =gTheme.Color.Primary
-            X: =0
-            Y: =0
-            Width: =Parent.Width
-            Height: =gTheme.Space.HeaderH
-      - AppTitle:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="EQD Taskmaster"
-            Color: =gTheme.Color.OnPrimary
-            Font: =gTheme.Font
-            Size: =gTheme.Size.H2
-            FontWeight: =FontWeight.Semibold
-            VerticalAlign: =VerticalAlign.Middle
-            X: =gTheme.Space.Gutter
-            Y: =0
-            Width: =360
-            Height: =gTheme.Space.HeaderH
       # =====================================================================
       # THE LOAD. One copy, reached with Select() from three places.
       # =====================================================================
@@ -94,7 +77,11 @@ Screens:
               // ---- the window ------------------------------------------------------
               Set( gRptFrom,
                    Switch( gRptPeriod,
-                           "Quarter",   DateAdd(Today(), -90,  TimeUnit.Days),
+                           // The CURRENT CALENDAR QUARTER, not 90 days — otherwise two of
+                           // the four options are the same window and switching between
+                           // them refetches everything to show identical numbers.
+                           "Quarter",   Date( Year(Today()),
+                                              RoundDown((Month(Today()) - 1) / 3, 0) * 3 + 1, 1 ),
                            "90 days",   DateAdd(Today(), -90,  TimeUnit.Days),
                            "YTD",       Date(Year(Today()), 1, 1),
                            "12 months", DateAdd(Today(), -365, TimeUnit.Days),
@@ -128,7 +115,7 @@ Screens:
                                   transaction_project_archived = false
                                && transaction_date >= gRptFrom2x ),
                           ID, transaction_date, transaction_client_name, transaction_project_id,
-                          transaction_currency, transaction_notional ) ),
+                          transaction_product_id, transaction_currency, transaction_notional ) ),
                   ClearCollect( colRptPrj,
                       ShowColumns( ActiveProjects,
                           ID, project_name, project_phase, project_perc_completion,
@@ -147,6 +134,11 @@ Screens:
                   ClearCollect( colRptCoverage, Choices([@taskmaster_clients].client_coverage) ),
                   ClearCollect( colRptProdL1,   Distinct( mapping_producttype, level1 ) )
               );
+              // "All coverage" is Collected FIRST so it leads the list and makes the
+              // unfiltered view selectable without a separate clear button — the pattern
+              // scrProjects already lands.
+              ClearCollect( colRptCovOpts, { Value: "All coverage" } );
+              Collect( colRptCovOpts, ForAll( colRptCoverage As c, { Value: c.Value } ) );
               // ---- truncation ------------------------------------------------------
               // Aggregates never delegate, so every figure is computed locally over
               // fetched rows. This is the ONLY place the app can notice it ran out.
@@ -155,7 +147,13 @@ Screens:
                      If( CountRows(colRptOpen) >= 2000, "open tasks  ", "" ) &
                      If( CountRows(colRptDone) >= 2000, "completed tasks  ", "" ) &
                      If( CountRows(colRptTx)   >= 2000, "transactions  ", "" ) &
-                     If( CountRows(colRptPrj)  >= 2000, "projects  ", "" ) ) );
+                     If( CountRows(colRptPrj)  >= 2000, "projects  ", "" ) &
+                     // F5 and the two dimension fetches count too. Issues feed a tile of
+                     // their own, and a capped dimension list silently shrinks the gap
+                     // grid's vocabulary — both are exactly what this banner exists for.
+                     If( CountRows(colRptIss)      >= 2000, "issues  ", "" ) &
+                     If( CountRows(colRptClients)  >= 2000, "clients  ", "" ) &
+                     If( CountRows(colRptProducts) >= 2000, "products  ", "" ) ) );
               // Transactions inside the CURRENT window; colRptTx holds two windows.
               ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
               // ---- project map -----------------------------------------------------
@@ -186,12 +184,12 @@ Screens:
               // without confusing a real zero with a missing value.
               Clear( colRptPersonSrc );
               Collect( colRptPersonSrc,
-                  Ungroup(
+                  Filter( Ungroup(
                       ForAll( colRptOpen As t,
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
-                                Role: "Owns", PId: t.task_project_id.Id, Op: 1,
+                                Role: "Owns", Dup: false, PId: t.task_project_id.Id, Op: 1,
                                 Ovd: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ),
                                 Gc: If(t.task_status.Value = "Green", 1, 0),
                                 Ac: If(t.task_status.Value = "Amber", 1, 0),
@@ -199,20 +197,25 @@ Screens:
                                 Dn: 0, Days: -1, OnT: -1 },
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
-                                Role: "Supports", PId: t.task_project_id.Id, Op: 1,
+                                Role: "Supports",
+                                // SAME PERSON ON BOTH COLUMNS COUNTS ONCE. The schema permits
+                                // lead = supporter, and counting both rows gave an Overdue
+                                // larger than the person's own task count.
+                                Dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")),
+                                PId: t.task_project_id.Id, Op: 1,
                                 Ovd: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ),
                                 Gc: If(t.task_status.Value = "Green", 1, 0),
                                 Ac: If(t.task_status.Value = "Amber", 1, 0),
                                 Rc: If(t.task_status.Value = "Red",   1, 0),
                                 Dn: 0, Days: -1, OnT: -1 } ) } ),
-                      r ) );
+                      r ), Len(Em) > 0 && !Dup ) );
               Collect( colRptPersonSrc,
-                  Ungroup(
+                  Filter( Ungroup(
                       ForAll( colRptDone As t,
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
-                                Role: "Owns", PId: t.task_project_id.Id, Op: 0,
+                                Role: "Owns", Dup: false, PId: t.task_project_id.Id, Op: 0,
                                 Ovd: 0, Gc: 0, Ac: 0, Rc: 0, Dn: 1,
                                 Days: If( IsBlank(t.task_date_start), -1,
                                           DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
@@ -220,13 +223,15 @@ Screens:
                                           If(t.task_date_completion <= t.task_date_target, 1, 0) ) },
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
-                                Role: "Supports", PId: t.task_project_id.Id, Op: 0,
+                                Role: "Supports",
+                                Dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")),
+                                PId: t.task_project_id.Id, Op: 0,
                                 Ovd: 0, Gc: 0, Ac: 0, Rc: 0, Dn: 1,
                                 Days: If( IsBlank(t.task_date_start), -1,
                                           DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
                                 OnT:  If( IsBlank(t.task_date_target), -1,
                                           If(t.task_date_completion <= t.task_date_target, 1, 0) ) } ) } ),
-                      r ) );
+                      r ), Len(Em) > 0 && !Dup ) );
               // ---- person fold -----------------------------------------------------
               // ~40 rows, every measure precomputed. This costs persons x rows ONCE per
               // load; the rule it exists to obey is that no gallery row may scan a fact
@@ -252,9 +257,12 @@ Screens:
                                       If( CountRows(dt) = 0, -1,
                                           RoundDown( Sum(dt, OnT) / CountRows(dt) * 100, 0 ) ) ),
                             Mine: CountRows( Filter(rw, PId in gRptMyPrj) ) > 0,
-                            Tx:   CountRows( Filter( colRptTxCur,
-                                      transaction_project_id.Id in
-                                          Filter(colRptPrjMap, Mgr = pp.Value || Sup = pp.Value).PId ) ) } ) ) );
+                            // HOISTED. Left inside the predicate this re-filtered every
+                            // project for every transaction for every person — ~40 x 2000 x 300
+                            // row evaluations, the N+1 this file's own header forbids, merely
+                            // moved to load time. With() evaluates it once per person.
+                            Tx:   With( { pids: Filter(colRptPrjMap, Mgr = pp.Value || Sup = pp.Value).PId },
+                                      CountRows( Filter(colRptTxCur, transaction_project_id.Id in pids) ) ) } ) ) );
               // ---- desk pulse ------------------------------------------------------
               Set( gRptOpenN,  CountRows(colRptOpen) );
               Set( gRptOvdN,   CountRows( Filter( colRptOpen,
@@ -365,6 +373,48 @@ Screens:
                                   { Id: 3, Label: "Desk" } )
                         DefaultId: =Switch( gRptScope, "Me", 1, "My projects", 2, "Desk", 3, 1 )
                         OnChange: =Set( gRptScope, selRptScope.Selected.Label )
+            - wrapRptCov:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =2
+                  FillPortions: =0
+                  LayoutMinWidth: =220
+                  Width: =220
+                  Height: =56
+                Children:
+                  - lblRptCovCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Coverage"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =16
+                        Width: =Parent.Width
+                        Height: =16
+                  # Filters the transaction bands ONLY, and never refetches — it
+                  # re-filters folds already in memory. Bound to Choices() via
+                  # colRptCovOpts, so the vocabulary is whatever the column holds.
+                  - cboRptCoverage:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colRptCovOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Table( { Value: "All coverage" } )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Coverage"
+                        FillPortions: =0
+                        LayoutMinWidth: =220
+                        Width: =220
+                        Height: =36
+                        OnChange: |
+                          =Set( gRptCoverage,
+                                Coalesce(cboRptCoverage.Selected.Value, "All coverage") )
             - lblRptAsAt:
                 Control: Label@2.5.1
                 Properties:
@@ -399,6 +449,10 @@ Screens:
                   OnSelect: |
                     =Refresh(taskmaster_tasks); Refresh(taskmaster_transactions);
                      Refresh(taskmaster_projects); Refresh(taskmaster_issues);
+                     // The dimensions too — the load re-collects them, so refreshing only
+                     // the fact lists lets a stale coverage or product vocabulary through.
+                     Refresh(taskmaster_clients); Refresh(taskmaster_products);
+                     Refresh(mapping_producttype);
                      Set( gRptLoadedKey, "" );
                      Select( btnRptLoad )
       # =====================================================================
@@ -761,56 +815,93 @@ Screens:
                         Height: =26
                       Children:
                         - hdRptNm:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="Person"
+                              Text: |
+                                ="Person" & If( gRptSort = "Nm", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "Nm", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
-                              VerticalAlign: =VerticalAlign.Middle
+                              Align: =Align.Left
                               FillPortions: =3
                               LayoutMinWidth: =140
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "Nm", !gRptSortDesc, true) );
+                                 Set( gRptSort, "Nm" )
                         - hdRptOwns:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="Owns"
+                              Text: |
+                                ="Owns" & If( gRptSort = "Owns", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "Owns", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
                               Align: =Align.Right
-                              VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =52
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "Owns", !gRptSortDesc, true) );
+                                 Set( gRptSort, "Owns" )
                         - hdRptSups:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="Supports"
+                              Text: |
+                                ="Supports" & If( gRptSort = "Sups", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "Sups", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
                               Align: =Align.Right
-                              VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =66
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "Sups", !gRptSortDesc, true) );
+                                 Set( gRptSort, "Sups" )
                         - hdRptOvd:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="Overdue"
+                              Text: |
+                                ="Overdue" & If( gRptSort = "Ovd", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "Ovd", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
                               Align: =Align.Right
-                              VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =62
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "Ovd", !gRptSortDesc, true) );
+                                 Set( gRptSort, "Ovd" )
                         - hdRptHealth:
                             Control: Label@2.5.1
                             Properties:
@@ -824,57 +915,93 @@ Screens:
                               LayoutMinWidth: =90
                               Height: =26
                         - hdRptDn:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="Done"
+                              Text: |
+                                ="Done" & If( gRptSort = "Dn", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "Dn", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
                               Align: =Align.Right
-                              VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =52
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "Dn", !gRptSortDesc, true) );
+                                 Set( gRptSort, "Dn" )
                         - hdRptMed:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="Median d"
+                              Text: |
+                                ="Median d" & If( gRptSort = "Med", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "Med", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
                               Align: =Align.Right
-                              VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =70
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "Med", !gRptSortDesc, true) );
+                                 Set( gRptSort, "Med" )
                         - hdRptOnT:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="On-time"
+                              Text: |
+                                ="On-time" & If( gRptSort = "OnTp", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "OnTp", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
                               Align: =Align.Right
-                              VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =64
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "OnTp", !gRptSortDesc, true) );
+                                 Set( gRptSort, "OnTp" )
                         - hdRptTx:
-                            Control: Label@2.5.1
+                            Control: Classic/Button@2.2.0
                             Properties:
-                              Text: ="Tx"
+                              Text: |
+                                ="Tx" & If( gRptSort = "Tx", If(gRptSortDesc, "  v", "  ^"), "" )
+                              Fill: =RGBA(0, 0, 0, 0)
+                              Color: |
+                                =If( gRptSort = "Tx", gTheme.Color.Primary, gTheme.Color.TextMuted )
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.TextMuted
                               Align: =Align.Right
-                              VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =1
                               LayoutMinWidth: =44
                               Height: =26
+                              # Toggles direction on the active column, otherwise switches
+                              # column and starts descending — the useful default for counts.
+                              OnSelect: |
+                                =Set( gRptSortDesc, If(gRptSort = "Tx", !gRptSortDesc, true) );
+                                 Set( gRptSort, "Tx" )
                   - lblRptPeopleEmpty:
                       Control: Label@2.5.1
                       Properties:
@@ -896,13 +1023,25 @@ Screens:
                       Properties:
                         # SCOPE RE-FILTERS A ~40-ROW FOLD. It never refetches, and no row
                         # property here touches a fact collection.
+                        # TWO BRANCHES, because Name is text and every other key is a
+                        # number: one Switch returning both would be a type conflict.
+                        # SortByColumns takes a column NAME and would collapse this to one
+                        # line, but whether it still accepts a string post-3.24042 is not
+                        # grounded here, and a wrong guess fails the whole paste.
                         Items: |
-                          =Sort(
-                             Switch( gRptScope,
-                                     "Me",          Filter(colRptPerson, Em = gUserEmail),
-                                     "My projects", Filter(colRptPerson, Mine),
-                                                    colRptPerson ),
-                             Owns + Sups, SortOrder.Descending )
+                          =With( { sc: Switch( gRptScope,
+                                               "Me",          Filter(colRptPerson, Em = gUserEmail),
+                                               "My projects", Filter(colRptPerson, Mine),
+                                                              colRptPerson ),
+                                   dr: If(gRptSortDesc, SortOrder.Descending, SortOrder.Ascending) },
+                               If( gRptSort = "Nm",
+                                   Sort( sc, Nm, dr ),
+                                   Sort( sc,
+                                         Switch( gRptSort,
+                                                 "Owns", Owns, "Sups", Sups, "Ovd",  Ovd,
+                                                 "Dn",   Dn,   "Med",  Med,  "OnTp", OnTp,
+                                                 "Tx",   Tx,   Owns + Sups ),
+                                         dr ) ) )
                         WrapCount: =1
                         TemplateSize: =40
                         TemplatePadding: =0
@@ -994,19 +1133,31 @@ Screens:
                                     FillPortions: =2
                                     LayoutMinWidth: =90
                                     Height: =18
+                                    # CUMULATIVE BOUNDARIES, NOT INDEPENDENT WIDTHS. Rounding each
+                                    # segment separately overflows — Gc=3, Ac=5, Rc=0 gives
+                                    # Round(112.5)=113 and Round(187.5)=188, so the red segment came
+                                    # out width='-1', an SVG error that kills the whole drawing.
+                                    # Rounding the running boundary instead is monotonic, so every
+                                    # width is >= 0 by construction and they always total 300.
+                                    #
+                                    # NO OPEN TASKS DRAWS THE EMPTY TRACK. Max(1, 0) used to make the
+                                    # denominator 1 with a zero numerator, painting a solid RED bar
+                                    # for anyone who had finished all their work.
                                     Image: |
-                                      =With( { tot: Max(1, ThisItem.Gc + ThisItem.Ac + ThisItem.Rc) },
-                                          With( { g: Round(ThisItem.Gc / tot * 300, 0),
-                                                  a: Round(ThisItem.Ac / tot * 300, 0) },
+                                      =With( { tot: ThisItem.Gc + ThisItem.Ac + ThisItem.Rc },
+                                          With( { g:  If( tot = 0, 0, Round(ThisItem.Gc / tot * 300, 0) ),
+                                                  ga: If( tot = 0, 0,
+                                                          Round((ThisItem.Gc + ThisItem.Ac) / tot * 300, 0) ) },
                                               "data:image/svg+xml," & EncodeUrl(
                                                   "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 40'>"
                                                 & "<rect x='0' y='10' width='300' height='20' rx='10' fill='#EEF1F5'/>"
-                                                & "<rect x='0' y='10' width='" & g
-                                                & "' height='20' fill='#31825D'/>"
-                                                & "<rect x='" & g & "' y='10' width='" & a
-                                                & "' height='20' fill='#D69828'/>"
-                                                & "<rect x='" & (g + a) & "' y='10' width='" & (300 - g - a)
-                                                & "' height='20' fill='#C53A3A'/>"
+                                                & If( tot = 0, "",
+                                                      "<rect x='0' y='10' width='" & g
+                                                    & "' height='20' fill='#31825D'/>"
+                                                    & "<rect x='" & g & "' y='10' width='" & (ga - g)
+                                                    & "' height='20' fill='#D69828'/>"
+                                                    & "<rect x='" & ga & "' y='10' width='" & (300 - ga)
+                                                    & "' height='20' fill='#C53A3A'/>" )
                                                 & "</svg>" ) ) )
                               - cellRptDn:
                                   Control: Label@2.5.1
