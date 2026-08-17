@@ -10,9 +10,7 @@
 # band 4 (started/completed/net-open combo + ageing), band 5 (monthly trend,
 # per-currency tiles, coverage x product heatmap, ranked gap list), provenance.
 #
-# NOT BUILT: the person overlay. Tapping a row sets gRptSelPerson and highlights
-# it; the detail panel is still to come. It reads folds already in memory, so it
-# adds no queries.
+# ALSO BUILT: the person overlay — a panel, not a screen, so the folds survive.
 #
 # ARCHITECTURE — fetch bounded, fold once, render from folds.
 #   * Every fact fetch is delegable and date- or state-bounded.
@@ -191,6 +189,13 @@ Screens:
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptOpen As t,
+                          // Tagged HERE, in a With, so the project LookUp runs once per
+                          // task rather than once per emitted row. The overlay reads these
+                          // straight back out — that is what makes it refetch nothing.
+                          With( { fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
+                                                 "Unclassified" ),
+                                  fmt: Coalesce( t.task_output_format.Value, "Unspecified" ),
+                                  stg: Coalesce( t.task_stage.Value, "Unspecified" ) },
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
@@ -199,7 +204,7 @@ Screens:
                                 Gc: If(t.task_status.Value = "Green", 1, 0),
                                 Ac: If(t.task_status.Value = "Amber", 1, 0),
                                 Rc: If(t.task_status.Value = "Red",   1, 0),
-                                Dn: 0, Days: -1, OnT: -1 },
+                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg },
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
                                 Role: "Supports",
@@ -212,11 +217,14 @@ Screens:
                                 Gc: If(t.task_status.Value = "Green", 1, 0),
                                 Ac: If(t.task_status.Value = "Amber", 1, 0),
                                 Rc: If(t.task_status.Value = "Red",   1, 0),
-                                Dn: 0, Days: -1, OnT: -1 } ) } ),
+                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg } ) } ) ),
                       r ), Len(Em) > 0 && !Dup ) );
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptDone As t,
+                          With( { fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
+                                                 "Unclassified" ),
+                                  fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) },
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
@@ -225,7 +233,8 @@ Screens:
                                 Days: If( IsBlank(t.task_date_start), -1,
                                           DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
                                 OnT:  If( IsBlank(t.task_date_target), -1,
-                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ) },
+                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ),
+                                Fam: fam, Fmt: fmt, Stg: "Complete" },
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
                                 Role: "Supports",
@@ -235,7 +244,8 @@ Screens:
                                 Days: If( IsBlank(t.task_date_start), -1,
                                           DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
                                 OnT:  If( IsBlank(t.task_date_target), -1,
-                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ) } ) } ),
+                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ),
+                                Fam: fam, Fmt: fmt, Stg: "Complete" } ) } ) ),
                       r ), Len(Em) > 0 && !Dup ) );
               // ---- person fold -----------------------------------------------------
               // ~40 rows, every measure precomputed. This costs persons x rows ONCE per
@@ -1407,10 +1417,51 @@ Screens:
                               # Selects, never navigates. The detail is an OVERLAY on this
                               # screen: a Navigate would cost a fresh OnVisible and throw
                               # away every fold, which is the whole point of folding.
+                              # EVERY FIGURE IN THE OVERLAY COMES FROM colRptPersonSrc,
+                              # which is already in memory — no refetch, which is the whole
+                              # payoff for folding at person grain. Built INLINE rather than
+                              # through Select() on a hidden button: Select queues, and a
+                              # queued build would paint the previous person's numbers for a
+                              # frame. These are four passes over one person's rows.
                               OnSelect: |
                                 =Select(Parent);
-                                 Set( gRptSelPerson,
-                                      If(gRptSelPerson = ThisItem.Em, "", ThisItem.Em) )
+                                 If( gRptSelPerson = ThisItem.Em,
+                                     Set( gRptSelPerson, "" ),
+                                     Set( gRptSelPerson, ThisItem.Em );
+                                     Set( gRptSelName, Coalesce(ThisItem.Nm, ThisItem.Em) );
+                                     Set( gRptSelRow, ThisItem );
+                                     ClearCollect( colRptPOpen,
+                                         Filter(colRptPersonSrc, Em = ThisItem.Em && Op = 1) );
+                                     ClearCollect( colRptPFam,
+                                         Sort( ForAll( Distinct(colRptPOpen, Fam) As f,
+                                                   { K: f.Value,
+                                                     N: CountRows(Filter(colRptPOpen, Fam = f.Value)) } ),
+                                               N, SortOrder.Descending ) );
+                                     ClearCollect( colRptPFmt,
+                                         Sort( ForAll( Distinct(colRptPOpen, Fmt) As f,
+                                                   { K: f.Value,
+                                                     N: CountRows(Filter(colRptPOpen, Fmt = f.Value)) } ),
+                                               N, SortOrder.Descending ) );
+                                     // FIXED VOCABULARY so an empty stage still shows as a
+                                     // zero row — the pipeline reads wrong if a stage nobody
+                                     // is in simply vanishes.
+                                     ClearCollect( colRptPStg,
+                                         ForAll( Table( { Idx: 1, K: "Not Started" },
+                                                        { Idx: 2, K: "Planning" },
+                                                        { Idx: 3, K: "Drafting" },
+                                                        { Idx: 4, K: "Finalizing" } ) As c,
+                                             { Idx: c.Idx, K: c.K,
+                                               N: CountRows(Filter(colRptPOpen, Stg = c.K)) } ) );
+                                     ClearCollect( colRptPPrj,
+                                         Sort( ForAll( Filter( colRptPrjMap,
+                                                           Mgr = ThisItem.Em || Sup = ThisItem.Em ) As m,
+                                                   { K: m.PNm,
+                                                     Pct: Coalesce( LookUp( colRptPrj, ID = m.PId,
+                                                                        project_perc_completion ), 0 ) } ),
+                                               Pct, SortOrder.Descending ) );
+                                     Set( gRptPFamMax, Max(1, Coalesce(Max(colRptPFam, N), 0)) );
+                                     Set( gRptPFmtMax, Max(1, Coalesce(Max(colRptPFmt, N), 0)) );
+                                     Set( gRptPStgMax, Max(1, Coalesce(Max(colRptPStg, N), 0)) ) )
             # =============================================================
             # BAND 3 — where the work sits
             # =============================================================
@@ -2057,6 +2108,434 @@ Screens:
                   FillPortions: =0
                   LayoutMinHeight: =20
                   Width: =Parent.Width - 48
+                  Height: =20
+      # =====================================================================
+      # PERSON OVERLAY — a panel, NOT a screen.
+      # =====================================================================
+      # A Navigate would cost a fresh OnVisible and throw away every fold, which
+      # is the whole reason the folds exist. Declared after bodyRoot so it paints
+      # over the content, and before appBar so the nav fly-out still floats above
+      # it. BOTH parts are gated on gRptSelPerson: an ungated full-screen control
+      # swallows every click on the screen beneath it, transparent or not.
+      - ovlRptScrim:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =Len(Coalesce(gRptSelPerson, "")) > 0
+            Text: =""
+            Fill: =RGBA(32, 38, 45, 0.35)
+            HoverFill: =RGBA(32, 38, 45, 0.35)
+            PressedFill: =RGBA(32, 38, 45, 0.45)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            # Clicking away closes it. The row tap toggles too, so the same person
+            # can be reopened without hunting for the close icon.
+            OnSelect: =Set( gRptSelPerson, "" )
+      - ovlRptCard:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Visible: =Len(Coalesce(gRptSelPerson, "")) > 0
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Start
+            LayoutGap: =8
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =16
+            PaddingBottom: =16
+            PaddingLeft: =20
+            PaddingRight: =20
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 760) / 2
+            Y: =80
+            Width: =760
+            Height: =Parent.Height - 160
+          Children:
+            - rowRptOvlHead:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =12
+                  FillPortions: =0
+                  LayoutMinHeight: =34
+                  Width: =Parent.Width - 40
+                  Height: =34
+                Children:
+                  - lblRptOvlName:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =gRptSelName
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.H2
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =34
+                  - icoRptOvlClose:
+                      Control: Classic/Icon@2.5.0
+                      Properties:
+                        Icon: =Icon.Cancel
+                        Color: =gTheme.Color.TextMuted
+                        HoverColor: =gTheme.Color.Danger
+                        HoverFill: =gTheme.Color.Hover
+                        HoverBorderColor: =RGBA(0, 0, 0, 0)
+                        Tooltip: ="Close"
+                        FillPortions: =0
+                        LayoutMinWidth: =24
+                        Width: =24
+                        Height: =24
+                        OnSelect: =Set( gRptSelPerson, "" )
+            # Reads the SELECTED ROW, which is the same fold the gallery renders —
+            # recomputing these here would be a second definition of the same number.
+            - lblRptOvlStats:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    ="Owns " & gRptSelRow.Owns & "   ·   supports " & gRptSelRow.Sups
+                     & "   ·   overdue " & gRptSelRow.Ovd
+                     & "   ·   completed " & gRptSelRow.Dn
+                     & "   ·   median " & If(gRptSelRow.Med < 0, "—", gRptSelRow.Med & "d")
+                     & "   ·   on-time " & If(gRptSelRow.OnTp < 0, "—", gRptSelRow.OnTp & "%")
+                     & "   ·   " & gRptSelRow.Tx & " transactions"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =22
+                  Width: =Parent.Width - 40
+                  Height: =22
+            - lblRptOvlBasis:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    ="Open work only in the three breakdowns below. Transactions are a COUNT — "
+                     & "notional is never blended across currencies."
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 40
+                  Height: =18
+            - lblRptOvlStgT:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Open by stage"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  FontWeight: =FontWeight.Semibold
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =20
+                  Width: =Parent.Width - 40
+                  Height: =20
+            - galRptOvlStg:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                Properties:
+                  Items: =colRptPStg
+                  WrapCount: =1
+                  TemplateSize: =26
+                  TemplatePadding: =0
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  ShowScrollbar: =true
+                  FillPortions: =0
+                  LayoutMinHeight: =110
+                  Width: =Parent.Width - 40
+                  Height: =110
+                Children:
+                  # ABSOLUTE inside the template, not auto-layout: the bar's Width IS
+                  # the datum, and a flexible child ignores a declared Width.
+                  - lblRptOvlStgK:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =ThisItem.K
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =0
+                        Y: =0
+                        Width: =200
+                        Height: =24
+                  - recRptOvlStgTrk:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =RGBA(238, 241, 245, 1)
+                        X: =210
+                        Y: =6
+                        Width: =Parent.TemplateWidth - 270
+                        Height: =12
+                  # A PLAIN RECTANGLE, not SVG. The value is a width, so there is no
+                  # string to build and no decimal separator to get wrong.
+                  - recRptOvlStgVal:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =gTheme.Color.Primary
+                        X: =210
+                        Y: =6
+                        Width: |
+                          =Max( 2, ThisItem.N / gRptPStgMax * (Parent.TemplateWidth - 270) )
+                        Height: =12
+                  - lblRptOvlStgN:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =Text(ThisItem.N)
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        Align: =Align.Right
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =Parent.TemplateWidth - 54
+                        Y: =0
+                        Width: =54
+                        Height: =24
+            - lblRptOvlFamT:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Activity family"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  FontWeight: =FontWeight.Semibold
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =20
+                  Width: =Parent.Width - 40
+                  Height: =20
+            - galRptOvlFam:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                Properties:
+                  Items: =colRptPFam
+                  WrapCount: =1
+                  TemplateSize: =26
+                  TemplatePadding: =0
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  ShowScrollbar: =true
+                  FillPortions: =0
+                  LayoutMinHeight: =110
+                  Width: =Parent.Width - 40
+                  Height: =110
+                Children:
+                  # ABSOLUTE inside the template, not auto-layout: the bar's Width IS
+                  # the datum, and a flexible child ignores a declared Width.
+                  - lblRptOvlFamK:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =ThisItem.K
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =0
+                        Y: =0
+                        Width: =200
+                        Height: =24
+                  - recRptOvlFamTrk:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =RGBA(238, 241, 245, 1)
+                        X: =210
+                        Y: =6
+                        Width: =Parent.TemplateWidth - 270
+                        Height: =12
+                  # A PLAIN RECTANGLE, not SVG. The value is a width, so there is no
+                  # string to build and no decimal separator to get wrong.
+                  - recRptOvlFamVal:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =gTheme.Color.Primary
+                        X: =210
+                        Y: =6
+                        Width: |
+                          =Max( 2, ThisItem.N / gRptPFamMax * (Parent.TemplateWidth - 270) )
+                        Height: =12
+                  - lblRptOvlFamN:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =Text(ThisItem.N)
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        Align: =Align.Right
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =Parent.TemplateWidth - 54
+                        Y: =0
+                        Width: =54
+                        Height: =24
+            - lblRptOvlFmtT:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Output format"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  FontWeight: =FontWeight.Semibold
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =20
+                  Width: =Parent.Width - 40
+                  Height: =20
+            - galRptOvlFmt:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                Properties:
+                  Items: =colRptPFmt
+                  WrapCount: =1
+                  TemplateSize: =26
+                  TemplatePadding: =0
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  ShowScrollbar: =true
+                  FillPortions: =0
+                  LayoutMinHeight: =110
+                  Width: =Parent.Width - 40
+                  Height: =110
+                Children:
+                  # ABSOLUTE inside the template, not auto-layout: the bar's Width IS
+                  # the datum, and a flexible child ignores a declared Width.
+                  - lblRptOvlFmtK:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =ThisItem.K
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =0
+                        Y: =0
+                        Width: =200
+                        Height: =24
+                  - recRptOvlFmtTrk:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =RGBA(238, 241, 245, 1)
+                        X: =210
+                        Y: =6
+                        Width: =Parent.TemplateWidth - 270
+                        Height: =12
+                  # A PLAIN RECTANGLE, not SVG. The value is a width, so there is no
+                  # string to build and no decimal separator to get wrong.
+                  - recRptOvlFmtVal:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =gTheme.Color.Primary
+                        X: =210
+                        Y: =6
+                        Width: |
+                          =Max( 2, ThisItem.N / gRptPFmtMax * (Parent.TemplateWidth - 270) )
+                        Height: =12
+                  - lblRptOvlFmtN:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =Text(ThisItem.N)
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        Align: =Align.Right
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =Parent.TemplateWidth - 54
+                        Y: =0
+                        Width: =54
+                        Height: =24
+            - lblRptOvlPrjT:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Projects they run, by completion"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  FontWeight: =FontWeight.Semibold
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =20
+                  Width: =Parent.Width - 40
+                  Height: =20
+            - galRptOvlPrj:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                Properties:
+                  Items: =colRptPPrj
+                  WrapCount: =1
+                  TemplateSize: =26
+                  TemplatePadding: =0
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  ShowScrollbar: =true
+                  FillPortions: =0
+                  LayoutMinHeight: =110
+                  Width: =Parent.Width - 40
+                  Height: =110
+                Children:
+                  # ABSOLUTE inside the template, not auto-layout: the bar's Width IS
+                  # the datum, and a flexible child ignores a declared Width.
+                  - lblRptOvlPrjK:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =ThisItem.K
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextPrimary
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =0
+                        Y: =0
+                        Width: =200
+                        Height: =24
+                  - recRptOvlPrjTrk:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =RGBA(238, 241, 245, 1)
+                        X: =210
+                        Y: =6
+                        Width: =Parent.TemplateWidth - 270
+                        Height: =12
+                  # A PLAIN RECTANGLE, not SVG. The value is a width, so there is no
+                  # string to build and no decimal separator to get wrong.
+                  - recRptOvlPrjVal:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =gTheme.Color.Primary
+                        X: =210
+                        Y: =6
+                        Width: |
+                          =Max( 2, ThisItem.Pct / 100 * (Parent.TemplateWidth - 270) )
+                        Height: =12
+                  - lblRptOvlPrjN:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =Text(ThisItem.Pct) & "%"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        Align: =Align.Right
+                        VerticalAlign: =VerticalAlign.Middle
+                        X: =Parent.TemplateWidth - 54
+                        Y: =0
+                        Width: =54
+                        Height: =24
+            - lblRptOvlPrjEmpty:
+                Control: Label@2.5.1
+                Properties:
+                  Visible: =IsEmpty(colRptPPrj)
+                  Text: ="Not the manager or supporter on any live project."
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  FillPortions: =0
+                  LayoutMinHeight: =20
+                  Width: =Parent.Width - 40
                   Height: =20
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
