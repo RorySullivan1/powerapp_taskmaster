@@ -1413,17 +1413,25 @@ Screens:
                     // every existing link is removed.
                     Clear( colTkWanted );
                     If( tglTkOutput.Value, Collect( colTkWanted, colTkProducts ) );
-                    // SHAPED ON READ so the diffs can use a single-column extraction:
-                    // `colTkLinksNow.ProdId` is a table of numbers, while
+                    // DELETE WITH RemoveIf. DO NOT PROJECT THE BUILT-IN ID INTO A
+                    // COLLECTION AND COMPARE IT BACK — Studio rejects `{ LinkId: lk.ID }`
+                    // out of a ForAll row and every use of it: ID unrecognized at the
+                    // projection, unrecognized in the LookUp that reads it, and the
+                    // comparison incompatible because the projected field never acquires a
+                    // type. A built-in does not travel that way; a real column does.
+                    // RemoveIf also needs one call rather than a LookUp and a Remove per
+                    // dropped link.
+                    RemoveIf( taskmaster_taskproduct,
+                    taskproduct_task_id.Id = gTkSaved.ID
+                    && !(taskproduct_product_id.Id in colTkWanted.Id) );
+                    // Read AFTER the delete, so what is here is what survives and the add
+                    // diff is against live state. Only the lookup subfield is projected —
                     // `<collection>.taskproduct_product_id.Id` is not a projection Power Fx
-                    // will give you. Scoped to one task, so both sides are small.
+                    // will give you, which is why the shaping exists at all.
                     ClearCollect( colTkLinksNow,
                     ForAll( Filter( taskmaster_taskproduct,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
-                    { LinkId: lk.ID, ProdId: lk.taskproduct_product_id.Id } ) );
-                    ForAll( Filter( colTkLinksNow, !(ProdId in colTkWanted.Id) ) As gone,
-                    Remove( taskmaster_taskproduct,
-                    LookUp(taskmaster_taskproduct, ID = gone.LinkId) ) );
+                    { ProdId: lk.taskproduct_product_id.Id } ) );
                     // The lookup pair is written as {Id, Value} — the shape SharePoint
                     // wants — and taskproduct_product_uid is the flat copy that can be
                     // sorted server-side, which a lookup column cannot.
