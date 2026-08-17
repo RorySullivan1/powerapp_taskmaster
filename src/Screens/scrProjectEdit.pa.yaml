@@ -64,6 +64,17 @@ Screens:
         Set( gNtEditSid, 0 ); Set( gNxEditSid, 0 );
         Set( gNtName, "" ); Set( gNtTarget, Blank() );
         Set( gNxName, "" ); Set( gNxDate, Blank() ); Set( gNxNotional, Blank() );
+        // The two modal option lists come from their columns, not from a literal copy.
+        // Neither carries a "(none)" row: both columns are REQUIRED, so every row must
+        // hold a real member and there is nothing for a blank option to write.
+        // The Opts suffix keeps these clear of the col* CONTAINER names this screen
+        // also uses; a collection named after a control resolves to the control.
+        ClearCollect( colNtPrioOpts,
+                      ForAll( Choices([@taskmaster_tasks].task_priority) As c,
+                              { Value: c.Value } ) );
+        ClearCollect( colNxCcyOpts,
+                      ForAll( Choices([@taskmaster_transactions].transaction_currency) As c,
+                              { Value: c.Value } ) );
         // Modal field state. Every default below is a REAL member of the matching
         // Choice column in schema/schema.yaml — task_priority, transaction_currency,
         // issue_status, issue_impact. Do not seed a value the list does not have.
@@ -1518,7 +1529,7 @@ Screens:
                   - cboNtPriority:
                       Control: ModernCombobox@1.1.1
                       Properties:
-                        Items: =["Low", "Moderate", "High", "Critical"]
+                        Items: =colNtPrioOpts
                         ItemDisplayText: =ThisItem.Value
                         InputTextPlaceholder: ="Priority"
                         SelectMultiple: =false
@@ -1815,7 +1826,7 @@ Screens:
                   - cboNxCcy:
                       Control: ModernCombobox@1.1.1
                       Properties:
-                        Items: =["USD", "EUR", "GBP", "JPY", "CHF"]
+                        Items: =colNxCcyOpts
                         ItemDisplayText: =ThisItem.Value
                         InputTextPlaceholder: ="Currency"
                         SelectMultiple: =false

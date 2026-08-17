@@ -105,18 +105,30 @@ Screens:
         Set( gTkFormat,   If( gEditMode = "Edit", Coalesce(gEditTask.task_output_format.Value, "(none)"), "(none)" ) );
         Set( gTkBranding, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_branding.Value, "(none)"), "(none)" ) );
         Set( gTkClientStage, If( gEditMode = "Edit", Coalesce(gEditTask.task_client_stage.Value, "(none)"), "(none)" ) );
-        // THE FORMAT LIST COMES FROM THE COLUMN, not a literal copy of it. A literal
+        // EVERY OPTION LIST COMES FROM ITS COLUMN, not a literal copy of it. A literal
         // drifts the moment someone edits the Choice in SharePoint, and the failure is
         // silent both ways: a removed value stays offered and will not save, a new one
         // never appears. "(none)" is Collected FIRST so it sorts to the top; it is an
         // app concept, not a column value, and the save maps it back to Blank().
-        // NOT colTkFormat — that is the NAME OF THE CONTAINER around the combo. This
-        // screen uses col* for both column containers and collections, so a collection
-        // named after its own container silently resolves to the control and every
-        // reader of it fails as an incompatible type.
+        // THE Opts SUFFIX IS LOAD-BEARING. This screen names its column containers col*
+        // too — colTkFormat, colTkLang, colTkBrand are CONTROLS — so a collection named
+        // after the container it sits in resolves to the control instead, and every
+        // reader of it fails as an incompatible type one hop away from the cause.
         ClearCollect( colTkFmtOpts, { Value: "(none)" } );
         Collect( colTkFmtOpts,
                  ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+                         { Value: c.Value } ) );
+        ClearCollect( colTkLangOpts, { Value: "(none)" } );
+        Collect( colTkLangOpts,
+                 ForAll( Choices([@taskmaster_tasks].task_output_language) As c,
+                         { Value: c.Value } ) );
+        ClearCollect( colTkBrandOpts, { Value: "(none)" } );
+        Collect( colTkBrandOpts,
+                 ForAll( Choices([@taskmaster_tasks].task_output_branding) As c,
+                         { Value: c.Value } ) );
+        ClearCollect( colTkCliStageOpts, { Value: "(none)" } );
+        Collect( colTkCliStageOpts,
+                 ForAll( Choices([@taskmaster_tasks].task_client_stage) As c,
                          { Value: c.Value } ) );
         Set( gTkPicker, "" );
         Reset( txtTkName ); Reset( txtTkDesc );
@@ -788,7 +800,7 @@ Screens:
                               - cboTkClientStage:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
-                                    Items: =["(none)", "Prospect", "Active", "Existing", "Post-Trade"]
+                                    Items: =colTkCliStageOpts
                                     ItemDisplayText: =ThisItem.Value
                                     DefaultSelectedItems: =Filter( [gTkClientStage], !IsBlank(Value) )
                                     SelectMultiple: =false
@@ -1107,7 +1119,7 @@ Screens:
                               - cboTkLanguage:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
-                                    Items: =["(none)", "EN", "FR", "DE", "ES", "IT", "JP"]
+                                    Items: =colTkLangOpts
                                     ItemDisplayText: =ThisItem.Value
                                     DefaultSelectedItems: =Filter( [gTkLanguage], !IsBlank(Value) )
                                     SelectMultiple: =false
@@ -1185,7 +1197,7 @@ Screens:
                               - cboTkBranding:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
-                                    Items: =["(none)", "Barclays", "QIS", "EXO", "Custom"]
+                                    Items: =colTkBrandOpts
                                     ItemDisplayText: =ThisItem.Value
                                     DefaultSelectedItems: =Filter( [gTkBranding], !IsBlank(Value) )
                                     SelectMultiple: =false
