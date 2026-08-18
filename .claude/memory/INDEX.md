@@ -214,6 +214,10 @@ not know them will author something broken:
   rejection and nothing on the repo side can see it. `tests/scrProbe-junction-write.pa.yaml`
   returns the actual message in one paste; the fixes stand whatever it says.
   **Do not re-derive the diagnosis** — it is in the session log with line numbers.
+
+## Log              (append-only pointers)
+Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-18 | issue #15: delete for tasks/transactions/issues from scrProject and the three edit screens; issues DETACHED not cascaded; the OnVisible derivation moved into a hidden btnPrjRecompute called by four sites after the probe confirmed Select() fires on an invisible control | sessions/2026-08-18-issue15-delete-children.md
 - 2026-08-18 | issue #17: scrProjects filters by project lead via cmpPicker; StartsWith(col,"") keeps the Items branch count at four instead of eight; filter row was full at 718/720 so a second row was forced and the gallery dropped 56px | sessions/2026-08-18-issue17-project-lead-filter.md
 - 2026-08-18 | issue #13: task_output_audience added; approval id required only at stage Completed, audience required whenever Output is on; enforcement is app-side only because SharePoint cannot hold a conditional requirement. Paste queue confirmed down to scrTaskEdit alone | sessions/2026-08-18-issue13-output-audience.md
 - 2026-08-13 | scrProjects rebuilt on auto-layout after the columns were found to collide below ~850px TemplateWidth; vertical stack now relative; status SVG inlined (a component cannot go in a gallery) | INDEX Decisions 2026-08-13
