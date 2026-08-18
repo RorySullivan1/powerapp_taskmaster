@@ -21,8 +21,14 @@
   **BEFORE PASTING ANY SCREEN: check every list it names is in the Data pane** — a paste
   never adds a data source, and that cost four rounds on `scrTaskEdit`.
 - **`scrTaskEdit` IS LANDED BUT ITS MULTI-PRODUCT SAVE IS BROKEN (issue #14).** The junction
-  is never written and the failure is silent. Diagnosed 2026-08-18, **fixes NOT yet written**
-  — see Threads and that session log. Its next paste carries them.
+  is never written and the failure is silent. Diagnosed 2026-08-18; **all four fixes are now
+  WRITTEN AND UNPASTED (`cabb467`)** — error handling plus a verifying re-read, the summary
+  moved after the reconcile, products out of the output gate, and a delegable delete. Its
+  next paste carries them. **WHY the write is rejected is STILL UNKNOWN**: it compiles, so it
+  is a runtime rejection. `tests/scrProbe-junction-write.pa.yaml` returns SharePoint's actual
+  message in one paste. **ELIMINATED 2026-08-18: `Title` is NOT required on the junction**
+  (user-confirmed), which was the cleanest fit. Still unchecked: the display field on both
+  lookup columns, and write permission.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
