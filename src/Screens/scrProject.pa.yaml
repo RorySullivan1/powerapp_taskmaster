@@ -64,6 +64,15 @@ Screens:
                                 Coalesce( LookUp(gStageWeights,
                                                  Stage = task_stage.Value, Weight), 0 ) ),
                             wgt ), 0 ) ) );
+        // HOW MANY TASKS CARRY A STAGE gStageWeights DOES NOT KNOW. Every weight lookup
+        // Coalesces a miss to 0, so a stale weights table and a project of genuinely
+        // unstarted work produce the SAME 0% and the screen cannot tell them apart.
+        // gStageWeights lives in App.OnStart — a formula-bar property no paste carries —
+        // so it is the one input to this number that can silently be a version behind.
+        // Stated below rather than left to inference; see issue #16.
+        Set( gPrjNoWgt,
+             CountRows( Filter( colProjectTasks,
+                                IsBlank( LookUp(gStageWeights, Stage = task_stage.Value, Weight) ) ) ) );
         // The 500 cap matches scrTaskEdit's rollup so the two writers cannot disagree:
         // past it the average is over a truncated fetch, and a wrong number written back
         // is worse than a stale one left alone.
@@ -811,6 +820,9 @@ Screens:
                                           Text: |
                                             ="Tasks   " & CountRows( Filter(colProjectTasks, task_stage.Value = "Completed") )
                                             & " of " & CountRows(colProjectTasks) & " complete"
+                                            & If( gPrjNoWgt > 0,
+                                                  "   ·   " & gPrjNoWgt
+                                                  & " with an unrecognised stage, scored 0", "" )
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.H3
                                           FontWeight: =FontWeight.Semibold
