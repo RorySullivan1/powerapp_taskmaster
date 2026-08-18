@@ -235,6 +235,12 @@ lists:
       - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
       - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
       - { name: task_date_completion,  type: DateTime,        required: false,                 desc: "Date completed" }
+      # NOT list-required, deliberately. The requirement is conditional on the app's
+      # Output section being on, and a SharePoint column cannot express "required only
+      # when another field is set" — marking it required here would reject every task
+      # that produces no output at all. scrTaskEdit enforces both this and the approval
+      # rule in the desc below; SharePoint holds the value, not the constraint.
+      - { name: task_output_audience,  type: Choice,          required: false,                 desc: "Who the output is for. GATES task_output_approval_id: any value but 'Internal Only' must carry an approval id before the task can reach stage Completed.", values: ["Direct Retail", "Indirect Retail", "Client-Specific", "Generic", "Internal Only"] }
       - { name: task_output_approval_id, type: Text,          required: false,                 desc: "ID of the approval task in the EXTERNAL approval portal (out of scope). Free-text pointer only — NOT a lookup, not validated, not indexed. Replaced the task_output_approval lookup on 2026-08-09 when asset_approval was retired." }
       - { name: task_output_language,  type: Choice,          required: false,                 desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
       - { name: task_output_format,    type: Choice,          required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
