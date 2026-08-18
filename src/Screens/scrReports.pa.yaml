@@ -249,7 +249,11 @@ Screens:
                           With( { fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
                                                  "Unclassified" ),
                                   fmt: Coalesce( t.task_output_format.Value, "Unspecified" ),
-                                  stg: Coalesce( t.task_stage.Value, "Unspecified" ) },
+                                  stg: Coalesce( t.task_stage.Value, "Unspecified" ),
+                                  // Hoisted for the same reason fam is: this is compared on
+                                  // every measure of the supports row, and left inline it
+                                  // was six Lower/Coalesce pairs per task.
+                                  dup: dup },
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
@@ -259,26 +263,37 @@ Screens:
                                 Ac: If(t.task_status.Value = "Amber", 1, 0),
                                 Rc: If(t.task_status.Value = "Red",   1, 0),
                                 Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg },
+                              // SAME PERSON ON BOTH COLUMNS IS COUNTED IN BOTH ROLES, ONCE
+                              // PER MEASURE. The schema permits lead = supporter, and this
+                              // row used to be DROPPED entirely — which kept Overdue honest
+                              // but also meant supporting a task you lead scored nothing at
+                              // all, understating the support count this screen exists to
+                              // report. The defect was never the row; it was that its
+                              // MEASURES double-counted. So the row stays and carries the
+                              // role, while Dup zeroes every measure on it: Ovd/Gc/Ac/Rc/Dn
+                              // to 0, Days/OnT to -1, which the median and on-time folds
+                              // already read as "not applicable".
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
                                 Role: "Supports",
-                                // SAME PERSON ON BOTH COLUMNS COUNTS ONCE. The schema permits
-                                // lead = supporter, and counting both rows gave an Overdue
-                                // larger than the person's own task count.
-                                Dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")),
-                                PId: t.task_project_id.Id, Op: 1,
-                                Ovd: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ),
-                                Gc: If(t.task_status.Value = "Green", 1, 0),
-                                Ac: If(t.task_status.Value = "Amber", 1, 0),
-                                Rc: If(t.task_status.Value = "Red",   1, 0),
+                                                                PId: t.task_project_id.Id, Op: 1,
+                                Ovd: If( dup, 0,
+                                         If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ) ),
+                                Gc: If( dup, 0,
+                                        If(t.task_status.Value = "Green", 1, 0) ),
+                                Ac: If( dup, 0,
+                                        If(t.task_status.Value = "Amber", 1, 0) ),
+                                Rc: If( dup, 0,
+                                        If(t.task_status.Value = "Red",   1, 0) ),
                                 Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg } ) } ) ),
-                      r ), Len(Em) > 0 && !Dup ) );
+                      r ), Len(Em) > 0 ) );
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptDone As t,
                           With( { fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
                                                  "Unclassified" ),
-                                  fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) },
+                                  fmt: Coalesce( t.task_output_format.Value, "Unspecified" ),
+                                  dup: dup },
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
@@ -292,15 +307,22 @@ Screens:
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
                                 Role: "Supports",
-                                Dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")),
-                                PId: t.task_project_id.Id, Op: 0,
-                                Ovd: 0, Gc: 0, Ac: 0, Rc: 0, Dn: 1,
-                                Days: If( IsBlank(t.task_date_start), -1,
-                                          DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
-                                OnT:  If( IsBlank(t.task_date_target), -1,
-                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ),
+                                                                PId: t.task_project_id.Id, Op: 0,
+                                // Dn is the measure that double-counts on a completed task,
+                                // and Days/OnT would pull the same task into the median and
+                                // the on-time rate twice. Zeroed on a duplicate, exactly as
+                                // on the open branch; the row itself survives so the role is
+                                // still counted.
+                                Ovd: 0, Gc: 0, Ac: 0, Rc: 0,
+                                Dn: If( dup, 0, 1 ),
+                                Days: If( dup, -1,
+                                          If( IsBlank(t.task_date_start), -1,
+                                          DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ) ),
+                                OnT:  If( dup, -1,
+                                          If( IsBlank(t.task_date_target), -1,
+                                          If(t.task_date_completion <= t.task_date_target, 1, 0) ) ),
                                 Fam: fam, Fmt: fmt, Stg: "Completed" } ) } ) ),
-                      r ), Len(Em) > 0 && !Dup ) );
+                      r ), Len(Em) > 0 ) );
               // ---- person fold -----------------------------------------------------
               // ~40 rows, every measure precomputed. This costs persons x rows ONCE per
               // load; the rule it exists to obey is that no gallery row may scan a fact
@@ -309,6 +331,16 @@ Screens:
               // MEDIAN is hand-rolled: Power Fx has no Median. Sort, then take the
               // lower-middle element. On an even count that is the lower of the two
               // central days rather than their mean — deliberate, on integer days.
+              // HOW MANY OPEN TASKS RECORD NO SUPPORTER AT ALL. Without this a support
+              // count of zero means two entirely different things — nobody supports
+              // anything, or the column is empty — and the screen cannot tell you which.
+              // That ambiguity is what made issue #10 hard to read: task_supporter was
+              // deleted and recreated on 2026-08-17, which discards every stored value, so
+              // a correct report over empty data looked identical to a broken one.
+              // Same rule as gRptUnmapped under the grid: state the gap rather than let a
+              // zero speak for it.
+              Set( gRptNoSup,
+                   CountRows( Filter( colRptOpen, IsBlank(task_supporter.Email) ) ) );
               ClearCollect( colRptPerson,
                   ForAll( Distinct( Filter(colRptPersonSrc, Len(Em) > 0), Em ) As pp,
                       With( { rw: Filter(colRptPersonSrc, Em = pp.Value) },
@@ -1096,6 +1128,9 @@ Screens:
                         Text: |
                           ="Task volume and elapsed time — the model holds no hours, so this is not effort. "
                            & "Owns and supports are counted separately and never summed."
+                           & If( gRptNoSup > 0,
+                                 "   ·   " & gRptNoSup & " of " & CountRows(colRptOpen)
+                                 & " open tasks record no supporter.", "" )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
@@ -1343,7 +1378,12 @@ Screens:
                                          Switch( gRptSort,
                                                  "Owns", Owns, "Sups", Sups, "Ovd",  Ovd,
                                                  "Dn",   Dn,   "Med",  Med,  "OnTp", OnTp,
-                                                 "Tx",   Tx,   Owns + Sups ),
+                                                 // Owns, NOT Owns + Sums. This fallback is
+                                                 // unreachable while gRptSort holds one of
+                                                 // the keys above, but it was the one place
+                                                 // in the file that summed the two — which
+                                                 // this band's own subtitle says never to do.
+                                                 "Tx",   Tx,   Owns ),
                                          dr ) ) )
                         WrapCount: =1
                         TemplateSize: =40
