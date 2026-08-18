@@ -346,18 +346,18 @@ Screens:
                       With( { rw: Filter(colRptPersonSrc, Em = pp.Value) },
                           { Em:   pp.Value,
                             Nm:   First(rw).Nm,
-                            // SUPPORTS IS EVERY TASK THE PERSON SUPPORTS, open or finished —
-                            // "a count of tasks where the person is the task supporter",
-                            // with no lifecycle qualifier (user, 2026-08-18). It previously
-                            // carried Op = 1 and so reported only open work, which reads as
-                            // zero for anyone whose supporting tasks have all completed.
-                            // OWNS DELIBERATELY KEEPS Op = 1 and still means open work; the
-                            // two columns answer different questions and the subtitle says so.
+                            // BOTH COLUMNS COUNT EVERY TASK IN THE ROLE, open or finished
+                            // (user, 2026-08-18). Neither carries Op = 1 any more: that
+                            // restricted them to open work, so anyone whose tasks had all
+                            // completed read zero in a table meant to show what they do.
                             // The reach is the fetch, not all of history: open tasks are
                             // unbounded but completed ones come back only inside the selected
-                            // period, so this is supports still open plus supports finished
-                            // in the window.
-                            Owns: CountRows( Filter(rw, Role = "Owns" && Op = 1) ),
+                            // period, so both are "still open, plus finished in the window"
+                            // and both move with the period control.
+                            // The MEASURES beside them stay lifecycle-scoped and are not
+                            // affected — Ovd/Gc/Ac/Rc are zero on a completed row, Dn counts
+                            // only completed ones. Volume is what changed, not health.
+                            Owns: CountRows( Filter(rw, Role = "Owns") ),
                             Sups: CountRows( Filter(rw, Role = "Supports") ),
                             Ovd:  Sum(rw, Ovd),
                             Gc:   Sum(rw, Gc), Ac: Sum(rw, Ac), Rc: Sum(rw, Rc),
@@ -1138,8 +1138,8 @@ Screens:
                       Properties:
                         Text: |
                           ="Task volume and elapsed time — the model holds no hours, so this is not effort. "
-                           & "Owns is open work; supports is every task supported, open or "
-                           & "finished in the period. Counted separately, never summed."
+                           & "Owns and supports count every task in that role, open or finished in "
+                           & "the period. Counted separately, never summed."
                            & If( gRptNoSup > 0,
                                  "   ·   " & gRptNoSup & " of " & CountRows(colRptOpen)
                                  & " open tasks record no supporter.", "" )
