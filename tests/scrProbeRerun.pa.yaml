@@ -1,37 +1,39 @@
 # =============================================================================
-# scrProbe-rerun-block — how does a screen re-run a behaviour block IN PLACE?
+# scrProbeRerun — SCREEN 1 of 2.  Issue #15.
 #
-# Issue #15. Deleting a task/transaction/issue from scrProject invalidates every
-# derived value that screen computes in OnVisible — project_phase, the weighted
-# completion rollup, the open-issue and open-task counts. OnVisible does NOT
-# re-run after an in-screen delete, so the screen would keep showing, and keep
-# writing back, numbers that no longer match the data.
+# CREATE BOTH BLANK SCREENS BEFORE PASTING EITHER ONE. The two screens navigate
+# to each other BY NAME, so the dependency is circular and no paste order fixes
+# it. If the partner screen does not exist yet, Navigate() is a compile error
+# and the button silently does nothing — which is indistinguishable from a
+# negative result. Once both screens exist, paste order does not matter.
 #
-# Duplicating that ~45-line derivation into each of the three delete handlers is
-# the one thing that must not happen: it would create four writers of
-# project_phase and project_perc_completion that can disagree.
+# ---------------------------------------------------------------------------
+# SET BY HAND IN THE FORMULA BAR — screens are not controls, so these two
+# properties CANNOT be pasted. Without the OnVisible, every counter reads 0 and
+# the whole probe looks like a failure.
 #
-# So the block needs ONE home and several callers. MS Learn documents Navigate
-# as setting "the OnVisible property of the NEW screen" and says Back/Navigate
-# "change only which screen is displayed" — it never addresses the case where
-# the new screen IS the current screen, so self-navigation is undefined, not
-# supported. Select() is documented and this app already relies on it
-# (cmpSelection's `Select(Parent)`), but whether it fires on a control the user
-# cannot see is folklore either way.
+#   Screen name   scrProbeRerun          (exactly this — the other screen
+#                                         navigates to it by name)
+#   Fill          RGBA(245, 247, 250, 1)
+#   OnVisible     Set( gRrOnVisible, Coalesce(gRrOnVisible, 0) + 1 )
 #
-# THE CLAIM: a screen can re-run its own setup block in place. Four mechanisms,
-# separated so a partial result is still readable.
+# THEN paste everything under `Children:` below onto the screen.
 #
-# READING THE RESULT
-#   "OnVisible fired" counts every OnVisible run on this screen.
-#   Each worker counter counts only its own OnSelect.
-#   POSITIVE CONTROL is the round trip: leaving to the second screen and coming
-#   back MUST raise "OnVisible fired". If it does not, the instrument cannot see
-#   OnVisible at all and NOTHING else on this probe means anything.
+# AFTER PASTING, CHECK THE TREE FOR `_1` SUFFIXES on these three:
+#   btnRrWorkVis · btnRrWorkTiny · btnRrWorkHidden
+# Buttons A/B/C call them BY NAME. A suffix leaves the call dangling, so they
+# do nothing for a reason unrelated to the question being asked. Rename any
+# that suffixed before running.
+# ---------------------------------------------------------------------------
 #
-# Rules kept: self-contained (no data source, no gTheme, no component), only
-# tokens this app has landed (Label@2.5.1, Classic/Button@2.2.0), literal
-# colours throughout, one claim, positive control, result recorded in README.md.
+# THE CLAIM: a screen can re-run its own setup block in place.
+#   A  Select() on a visible button
+#   B  Select() on a 1x1 transparent button (Visible := true)
+#   C  Select() on a Visible := false button
+#   D  Navigate() to the screen you are already on
+#   +  round trip via scrProbeRerunB = the positive control
+#
+# Protocol and how to read each outcome: tests/README.md.
 # =============================================================================
 Screens:
   scrProbeRerun:
@@ -254,35 +256,3 @@ Screens:
                Set( gRrWVis, 0 );
                Set( gRrWTiny, 0 );
                Set( gRrWHidden, 0 )
-  # ---------------------------------------------------------------------------
-  # Positive-control partner. Going here and back is a real screen change, so it
-  # must raise the OnVisible counter.
-  scrProbeRerunB:
-    Properties:
-      Fill: =RGBA(235, 242, 238, 1)
-    Children:
-      - lblRrBText:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Positive control. Go back — ""OnVisible fired"" must increase by 1."
-            Font: =Font.'Segoe UI'
-            Size: =16
-            Color: =RGBA(32, 38, 45, 1)
-            X: =16
-            Y: =16
-            Width: =700
-            Height: =40
-      - btnRrBBack:
-          Control: Classic/Button@2.2.0
-          Properties:
-            Text: ="back to the probe"
-            Fill: =RGBA(20, 122, 84, 1)
-            Color: =RGBA(255, 255, 255, 1)
-            BorderThickness: =0
-            Font: =Font.'Segoe UI'
-            Size: =13
-            X: =16
-            Y: =68
-            Width: =260
-            Height: =40
-            OnSelect: =Navigate( scrProbeRerun )

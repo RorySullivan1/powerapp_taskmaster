@@ -192,7 +192,7 @@ Delete the PROBE task row and any PROBE link afterwards.
 
 ---
 
-## `scrProbe-rerun-block.pa.yaml` — how does a screen re-run a behaviour block in place?
+## `scrProbeRerun.pa.yaml` + `scrProbeRerunB.pa.yaml` — how does a screen re-run a behaviour block in place?
 
 **Status: NOT YET RUN.** Blocks the `scrProject` half of issue #15.
 
@@ -228,6 +228,24 @@ both directions.
 | B | `Select()` on a 1×1 transparent button (`Visible: =true`) | The shape a real worker on `scrProject` would take |
 | C | `Select()` on a `Visible: =false` button | Whether the worker can be hidden outright |
 | D | `Navigate()` to the screen you are already on | The one-line repair proposed on issue #15 |
+
+### Setting it up
+
+**One file per screen, because you paste one screen at a time.**
+
+1. **Create BOTH blank screens first**, named exactly `scrProbeRerun` and `scrProbeRerunB`.
+   They navigate to each other by name, so the dependency is **circular** — no paste order
+   fixes it. A missing partner screen makes `Navigate()` a compile error and the button
+   silently does nothing, which reads exactly like a negative result.
+2. **Set the screen properties in the formula bar.** Screens are not controls, so these
+   cannot be pasted. Each file lists its own in the header. **Missing the `OnVisible` on
+   `scrProbeRerun` leaves every counter at 0 and makes the whole probe look like a failure.**
+3. **Paste the `Children:` block** of each file onto its screen. Order no longer matters.
+4. **Check the tree for `_1` suffixes** on `btnRrWorkVis`, `btnRrWorkTiny` and
+   `btnRrWorkHidden`. Buttons A/B/C call those **by name**, so a suffix leaves the call
+   dangling and they do nothing for a reason that has nothing to do with the claim. Rename
+   any that suffixed before running. These names exist nowhere else in the app, so a
+   collision is not expected — check anyway.
 
 ### Protocol
 
