@@ -11,12 +11,13 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **Paste in progress.** LANDED: `App.OnStart`, `cmpAppBar`, **`scrReports`** and
-  **`scrTaskEdit`** (both 2026-08-18, both after several fix rounds — see that session log).
-  Remaining: `cmpPicker`, `cmpLookupField`, `cmpNestedSelect`, `cmpToast`, and `scrHome`,
-  `scrProjects`, `scrProject`, `scrIssueEdit`, `scrTransactionEdit`, `scrProductEdit`.
-  `scrHome` and `scrProjects` are full reworks; `scrProject` / `scrIssueEdit` /
-  `scrTransactionEdit` / `scrProjectEdit` carry LOGIC fixes, so none of it is cosmetic.
+- **Paste in progress.** LANDED (all 2026-08-18): `App.OnStart`, `cmpAppBar`,
+  **`scrReports`**, **`scrTaskEdit`**, and **`scrProjectEdit` / `scrClientEdit` /
+  `scrProductEdit`** together as issue #12. Remaining: `cmpPicker`, `cmpLookupField`,
+  `cmpNestedSelect`, `cmpToast`, `scrHome`, `scrProjects`, `scrProject`, `scrIssueEdit`,
+  `scrTransactionEdit`. `scrHome` and `scrProjects` are full reworks; `scrProject` /
+  `scrIssueEdit` / `scrTransactionEdit` carry LOGIC fixes, so none of it is cosmetic.
+  The `scrProductEdit`-before-`scrTaskEdit` ordering constraint is DISCHARGED — both are in.
   **BEFORE PASTING ANY SCREEN: check every list it names is in the Data pane** — a paste
   never adds a data source, and that cost four rounds on `scrTaskEdit`.
 - **`scrTaskEdit` IS LANDED BUT ITS MULTI-PRODUCT SAVE IS BROKEN (issue #14).** The junction
@@ -139,6 +140,13 @@ not know them will author something broken:
   working") — a low count is most likely correct reporting over empty data, not a bug in the
   fold. Same for `project_perc_completion`, which self-heals via the C3 rollup on any save;
   `task_supporter` does NOT self-heal and needs entering by hand.
+- **KNOWN, ACCEPTED HOLE NOW LIVE (#12): every NEW project shares the resume key `"N"`.**
+  `scrProjectEdit`'s guard skips its seeds when `gPrResumeKey` matches, and a key left armed
+  by abandoning "+ New client/product" can therefore match a LATER new project and skip its
+  seeding. Chosen deliberately: the failure preserves the user's OWN draft and cannot match
+  an existing project. **If a user reports "New Project opened with my old draft in it", this
+  is why** — do not re-diagnose it as a seeding bug. The fix, if wanted, is a key unique per
+  entry rather than per context.
 - **OWED IN SHAREPOINT:** set the `project_phase` column default to `Not Started` (the value
   itself already exists).
 - **`cmpSelection` is IN USE and WORKING** — issue status/type/impact, transaction currency,
@@ -210,4 +218,5 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-17 | main fast-forwarded to the feature branch; cross-currency conversion settled as out of scope | INDEX Decisions 2026-08-17
 - 2026-08-17 | scrReports authored end to end (~2,560 lines, 6 bands + person overlay) on one Select()-queued load routine; two code-review passes, 17 findings, 16 fixed and the join cost accepted | sessions/2026-08-17-1448-scrreports-authoring-and-review.md
 - 2026-08-18 | scrReports AND scrTaskEdit both LANDED; period narrowed to 1W/1M/1QTR, scope became a manager combobox, five literal Choice arrays bound to Choices(); four paste defects diagnosed | sessions/2026-08-18-0311-scrreports-scrtaskedit-paste-defects.md
+- 2026-08-18 | issue #12 LANDED: create a client or product from a staged transaction; scrProjectEdit gains an identity-keyed resume guard, scrClientEdit and scrProductEdit gain NxClient/NxProduct return arms | GitHub #12
 - 2026-08-18 | issue #14 diagnosed read-only: the taskmaster_taskproduct reconcile is unguarded so a rejected write reports success, the summary is written before it and independently of it, the output toggle silently deletes links, and the RemoveIf does not delegate; probe-first plan posted, NOTHING written | sessions/2026-08-18-1118-issue14-multiproduct-diagnosis.md
