@@ -188,9 +188,15 @@ not know them will author something broken:
   different shapes. The ad-hoc version found two real bugs in one sitting. Note when
   building it that the column-token hook proposed in CLAUDE.md would NOT have caught either
   SharePoint name fault this session — scope it to authoring typos, not schema drift.
-- **OWED IN SHAREPOINT (reporting):** index `task_date_completion` (DateTime, `taskmaster_tasks`) —
-  the reports window filter rides on it. It is combined with two indexed predicates so it holds for
-  now, but indexes CANNOT be added past 20,000 items.
+- **EVERY `indexed: true` COLUMN IS LIVE IN SHAREPOINT (user, 2026-08-18)** — all 55 of them.
+  The label in `schema/schema.yaml` can now be trusted as provisioned fact, not intent.
+  **THREE COLUMNS WANT AN INDEX AND ARE NOT LABELLED, so the user's sweep did NOT cover them** —
+  the golden source has to declare it before SharePoint can apply it:
+  `task_date_completion` (the reports window filter rides on it), and
+  `issue_task_name` + `issue_transaction_name` (issue #15's detach query filters on both;
+  delegable but unindexed, and SharePoint refuses an unindexed filter past 5,000 items).
+  Label them in `schema.yaml` first, then provision. Per-list index counts are 9/9/5/6 against
+  SharePoint's cap of 20, so there is room. Indexes CANNOT be added past 20,000 items.
 
 - **ISSUE #14 IS DIAGNOSED AND THE FOUR FIXES ARE WRITTEN, UNPASTED.** Multi-product task links never
   reach `taskmaster_taskproduct` and the failure is silent. All four fixes are in `main` (guard +
@@ -200,6 +206,15 @@ not know them will author something broken:
   rejection and nothing on the repo side can see it. `tests/scrProbe-junction-write.pa.yaml`
   returns the actual message in one paste; the fixes stand whatever it says.
   **Do not re-derive the diagnosis** — it is in the session log with line numbers.
+- **`tests/scrProbe-rerun-block.pa.yaml` IS WRITTEN AND UNRUN — it BLOCKS the `scrProject` half
+  of issue #15.** Deleting a child invalidates `project_phase` and the completion rollup, but
+  `OnVisible` does not re-run in place, and copying its ~45-line derivation into three delete
+  handlers would create four writers of the same two columns that can disagree. **MS Learn does
+  NOT cover navigating to the screen you are already on** — it defines `Navigate` in terms of
+  "the NEW screen" — so the one-line repair proposed on #15 is undefined, not supported.
+  The probe tests four mechanisms (Select on a visible / 1x1 / hidden worker, and self-navigate)
+  with a round-trip positive control. It names NO data source, so it can be pasted any time.
+  `tests/README.md` carries the protocol and how to read each outcome.
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
