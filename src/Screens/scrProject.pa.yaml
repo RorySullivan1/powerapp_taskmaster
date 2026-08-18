@@ -4,93 +4,130 @@ Screens:
   scrProject:
     Properties:
       Fill: =gTheme.Color.Bg
+      # THIN ON PURPOSE. Everything derived from the project's children now lives in
+      # btnPrjRecompute's OnSelect, because this screen deletes children too and each
+      # delete invalidates the same numbers. Four callers, ONE copy of the block.
       OnVisible: |
-        =ClearCollect( colProjectTasks,
-            Filter( taskmaster_tasks,
-                task_project_id.Id = gSelProject.ID ) );
-        // PHASE IS DERIVED HERE, not chosen by anyone. scrProjectEdit has no phase
-        // control; this screen recomputes on open and writes back only on a change.
-        //   any OPEN issue                        -> Stalled
-        //   any started task, or any transaction  -> Active
-        //   any child at all, no started task     -> Planning
-        //   nothing attached                      -> Not Started
-        // Counted from the QUERY, not from a gallery — a gallery pages as the user
-        // scrolls, so its AllItems would make the phase depend on how far someone had
-        // scrolled. colProjectTasks is a full ClearCollect, so it is safe to count.
-        Set( gPrjOpenIss,
-             CountRows( Filter( taskmaster_issues,
-                                issue_project_id.Id = gSelProject.ID
-                             && issue_status.Value = "Open" ) ) );
-        Set( gPrjOpenTasks,
-             CountRows( Filter( colProjectTasks, task_stage.Value <> "Completed" ) ) );
-        Set( gPrjDerived,
-             With( { nT: CountRows(colProjectTasks),
-                     nStarted: CountRows( Filter(colProjectTasks, task_stage.Value <> "Not Started") ),
-                     nX: CountRows( Filter( taskmaster_transactions,
-                                            transaction_project_id.Id = gSelProject.ID ) ),
-                     nI: CountRows( Filter( taskmaster_issues,
-                                            issue_project_id.Id = gSelProject.ID ) ) },
-                 If( gPrjOpenIss > 0,          "Stalled",
-                     nStarted > 0 || nX > 0,   "Active",
-                     nT + nX + nI > 0,         "Planning",
-                                               "Not Started" ) ) );
-        // COMPLETE AND ARCHIVED ARE TERMINAL. Complete is reachable only through the
-        // Mark complete button, and Archived only through the external cleanup flow —
-        // the derivation must never drag a project back out of either.
-        If( Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
-         && Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
-         && gPrjDerived <> Coalesce(gSelProject.project_phase.Value, ""),
-            IfError( Set( gPrjPhaseScrap,
-                          Patch( taskmaster_projects,
-                                 LookUp(taskmaster_projects, ID = gSelProject.ID),
-                                 { project_phase: { Value: gPrjDerived } } ) ),
-                     // A failed re-phase is not worth interrupting a read-only screen
-                     // for: the next open retries it, and nothing downstream is wrong
-                     // in the meantime except a stale label.
-                     Set( gPrjPhaseErr, FirstError.Message ) );
-            Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
-        // WEIGHTED COMPLETION IS DERIVED HERE TOO, for the same reason as the phase
-        // above: this screen already holds every task on the project, so the number
-        // costs nothing to compute and is always current — whereas the STORED value is
-        // only ever as fresh as the last task save whose STAGE MOVED. Saving a task
-        // without changing its stage deliberately skips the rollup, so the column can
-        // sit stale indefinitely, and it is blank outright on any project untouched
-        // since it was recreated. A screen that shows a ring should not depend on that.
-        // Written back only on a change, exactly like the phase, so opening a project
-        // repairs the stored copy the other screens read.
-        Set( gPrjPc,
-             If( CountRows(colProjectTasks) = 0, 0,
-                 RoundDown( Average( AddColumns( colProjectTasks, wgt,
-                                Coalesce( LookUp(gStageWeights,
-                                                 Stage = task_stage.Value, Weight), 0 ) ),
-                            wgt ), 0 ) ) );
-        // HOW MANY TASKS CARRY A STAGE gStageWeights DOES NOT KNOW. Every weight lookup
-        // Coalesces a miss to 0, so a stale weights table and a project of genuinely
-        // unstarted work produce the SAME 0% and the screen cannot tell them apart.
-        // gStageWeights lives in App.OnStart — a formula-bar property no paste carries —
-        // so it is the one input to this number that can silently be a version behind.
-        // Stated below rather than left to inference; see issue #16.
-        Set( gPrjNoWgt,
-             CountRows( Filter( colProjectTasks,
-                                IsBlank( LookUp(gStageWeights, Stage = task_stage.Value, Weight) ) ) ) );
-        // The 500 cap matches scrTaskEdit's rollup so the two writers cannot disagree:
-        // past it the average is over a truncated fetch, and a wrong number written back
-        // is worse than a stale one left alone.
-        If( CountRows(colProjectTasks) < 500
-         && gPrjPc <> Coalesce(gSelProject.project_perc_completion, -1),
-            IfError( Set( gPrjPcScrap,
-                          Patch( taskmaster_projects,
-                                 LookUp(taskmaster_projects, ID = gSelProject.ID),
-                                 { project_perc_completion: gPrjPc } ) ),
-                     Set( gPrjPcErr, FirstError.Message ) );
-            Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
-        // NO gProjArchived. It counted this project's individually-archived TASKS, and
-        // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
-        // ever return 0 and the "N archived (hidden)" caption it fed could never show.
-        // Nothing is hidden from the task list any more: it is every task on the project.
-        // Delete is a TWO-PRESS action and must never open already armed.
-        Set( gPrDelArm, false )
+        =Set( gPrDelArm, false );
+         Set( gDelKind, "" );
+         Set( gDelErr, "" );
+         Select( btnPrjRecompute )
     Children:
+      # =====================================================================
+      # THE RECOMPUTE BLOCK — hidden, and CALLED rather than duplicated.
+      #
+      # WHY IT IS A CONTROL: Power Fx cannot name a behaviour block, and this one
+      # has four callers — OnVisible plus the three delete handlers. Inlining it in
+      # each would create four writers of project_phase and project_perc_completion
+      # that can drift apart, which is the exact failure the 500-cap comment below
+      # already guards against. A control's OnSelect is the only reusable behaviour
+      # unit the language offers, and Select() invokes it.
+      #
+      # WHY Visible:=false IS SAFE, and not folklore: confirmed in Studio
+      # 2026-08-18. tests/scrProbeRerun scored Select() on a visible button, a 1x1
+      # transparent button and a hidden button IDENTICALLY, with a passing positive
+      # control. Select() does NOT no-op on an invisible control. Do not "fix" this
+      # into a 1x1 transparent button — hidden is deliberate and grounded.
+      #
+      # It RE-READS colProjectTasks rather than trusting each caller to patch the
+      # snapshot: one delegable Filter on an indexed FK is cheaper than three delete
+      # handlers each remembering to keep a collection in step, and it cannot drift.
+      # =====================================================================
+      - btnPrjRecompute:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =ClearCollect( colProjectTasks,
+                  Filter( taskmaster_tasks,
+                      task_project_id.Id = gSelProject.ID ) );
+              // PHASE IS DERIVED HERE, not chosen by anyone. scrProjectEdit has no phase
+              // control; this screen recomputes on open and writes back only on a change.
+              //   any OPEN issue                        -> Stalled
+              //   any started task, or any transaction  -> Active
+              //   any child at all, no started task     -> Planning
+              //   nothing attached                      -> Not Started
+              // Counted from the QUERY, not from a gallery — a gallery pages as the user
+              // scrolls, so its AllItems would make the phase depend on how far someone had
+              // scrolled. colProjectTasks is a full ClearCollect, so it is safe to count.
+              Set( gPrjOpenIss,
+                   CountRows( Filter( taskmaster_issues,
+                                      issue_project_id.Id = gSelProject.ID
+                                   && issue_status.Value = "Open" ) ) );
+              Set( gPrjOpenTasks,
+                   CountRows( Filter( colProjectTasks, task_stage.Value <> "Completed" ) ) );
+              Set( gPrjDerived,
+                   With( { nT: CountRows(colProjectTasks),
+                           nStarted: CountRows( Filter(colProjectTasks, task_stage.Value <> "Not Started") ),
+                           nX: CountRows( Filter( taskmaster_transactions,
+                                                  transaction_project_id.Id = gSelProject.ID ) ),
+                           nI: CountRows( Filter( taskmaster_issues,
+                                                  issue_project_id.Id = gSelProject.ID ) ) },
+                       If( gPrjOpenIss > 0,          "Stalled",
+                           nStarted > 0 || nX > 0,   "Active",
+                           nT + nX + nI > 0,         "Planning",
+                                                     "Not Started" ) ) );
+              // COMPLETE AND ARCHIVED ARE TERMINAL. Complete is reachable only through the
+              // Mark complete button, and Archived only through the external cleanup flow —
+              // the derivation must never drag a project back out of either.
+              If( Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
+               && Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
+               && gPrjDerived <> Coalesce(gSelProject.project_phase.Value, ""),
+                  IfError( Set( gPrjPhaseScrap,
+                                Patch( taskmaster_projects,
+                                       LookUp(taskmaster_projects, ID = gSelProject.ID),
+                                       { project_phase: { Value: gPrjDerived } } ) ),
+                           // A failed re-phase is not worth interrupting a read-only screen
+                           // for: the next open retries it, and nothing downstream is wrong
+                           // in the meantime except a stale label.
+                           Set( gPrjPhaseErr, FirstError.Message ) );
+                  Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
+              // WEIGHTED COMPLETION IS DERIVED HERE TOO, for the same reason as the phase
+              // above: this screen already holds every task on the project, so the number
+              // costs nothing to compute and is always current — whereas the STORED value is
+              // only ever as fresh as the last task save whose STAGE MOVED. Saving a task
+              // without changing its stage deliberately skips the rollup, so the column can
+              // sit stale indefinitely, and it is blank outright on any project untouched
+              // since it was recreated. A screen that shows a ring should not depend on that.
+              // Written back only on a change, exactly like the phase, so opening a project
+              // repairs the stored copy the other screens read.
+              Set( gPrjPc,
+                   If( CountRows(colProjectTasks) = 0, 0,
+                       RoundDown( Average( AddColumns( colProjectTasks, wgt,
+                                      Coalesce( LookUp(gStageWeights,
+                                                       Stage = task_stage.Value, Weight), 0 ) ),
+                                  wgt ), 0 ) ) );
+              // HOW MANY TASKS CARRY A STAGE gStageWeights DOES NOT KNOW. Every weight lookup
+              // Coalesces a miss to 0, so a stale weights table and a project of genuinely
+              // unstarted work produce the SAME 0% and the screen cannot tell them apart.
+              // gStageWeights lives in App.OnStart — a formula-bar property no paste carries —
+              // so it is the one input to this number that can silently be a version behind.
+              // Stated below rather than left to inference; see issue #16.
+              Set( gPrjNoWgt,
+                   CountRows( Filter( colProjectTasks,
+                                      IsBlank( LookUp(gStageWeights, Stage = task_stage.Value, Weight) ) ) ) );
+              // The 500 cap matches scrTaskEdit's rollup so the two writers cannot disagree:
+              // past it the average is over a truncated fetch, and a wrong number written back
+              // is worse than a stale one left alone.
+              If( CountRows(colProjectTasks) < 500
+               && gPrjPc <> Coalesce(gSelProject.project_perc_completion, -1),
+                  IfError( Set( gPrjPcScrap,
+                                Patch( taskmaster_projects,
+                                       LookUp(taskmaster_projects, ID = gSelProject.ID),
+                                       { project_perc_completion: gPrjPc } ) ),
+                           Set( gPrjPcErr, FirstError.Message ) );
+                  Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
+              // NO gProjArchived. It counted this project's individually-archived TASKS, and
+              // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
+              // ever return 0 and the "N archived (hidden)" caption it fed could never show.
+              // Nothing is hidden from the task list any more: it is every task on the project.
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -1077,6 +1114,32 @@ Screens:
                                                         NotificationType.Error ),
                                                 Set( gEditMode, "Edit" );
                                                 Navigate( scrTaskEdit, ScreenTransition.Cover ) )
+                                    # DECLARED AFTER THE HIT BUTTON, AND THAT IS LOAD-BEARING. The transparent
+                                    # full-template button above covers the whole row; anything declared before it
+                                    # is underneath it and cannot be clicked at all. The icon renders either way,
+                                    # so getting this wrong looks like a dead control, not a z-order bug.
+                                    - icoDelTask:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Trash
+                                          Color: =gTheme.Color.Danger
+                                          HoverColor: =gTheme.Color.Danger
+                                          # A RED wash, matching icoDeleteProject — a blue tint behind a red
+                                          # destructive icon reads as a different control.
+                                          HoverFill: =RGBA(197, 58, 58, 0.08)
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: ="Delete this task"
+                                          X: =Parent.TemplateWidth - 34
+                                          Y: =(Parent.TemplateHeight - 24) / 2
+                                          Width: =24
+                                          Height: =24
+                                          # ARMS the dialog, deletes nothing. gDelRefs is counted HERE, while the row
+                                          # is in hand, so the dialog can say what else the delete will change.
+                                          OnSelect: |
+                                            =Set( gDelKind, "Task" );
+                                             Set( gDelId, ThisItem.ID );
+                                             Set( gDelName, ThisItem.task_name );
+                                             Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_task_name.Id = ThisItem.ID) ) )
                         - secTx:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -1324,6 +1387,32 @@ Screens:
                                                         NotificationType.Error ),
                                                 Set( gEditMode, "Edit" );
                                                 Navigate( scrTransactionEdit, ScreenTransition.Cover ) )
+                                    # DECLARED AFTER THE HIT BUTTON, AND THAT IS LOAD-BEARING. The transparent
+                                    # full-template button above covers the whole row; anything declared before it
+                                    # is underneath it and cannot be clicked at all. The icon renders either way,
+                                    # so getting this wrong looks like a dead control, not a z-order bug.
+                                    - icoDelTx:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Trash
+                                          Color: =gTheme.Color.Danger
+                                          HoverColor: =gTheme.Color.Danger
+                                          # A RED wash, matching icoDeleteProject — a blue tint behind a red
+                                          # destructive icon reads as a different control.
+                                          HoverFill: =RGBA(197, 58, 58, 0.08)
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: ="Delete this transaction"
+                                          X: =Parent.TemplateWidth - 34
+                                          Y: =(Parent.TemplateHeight - 24) / 2
+                                          Width: =24
+                                          Height: =24
+                                          # ARMS the dialog, deletes nothing. gDelRefs is counted HERE, while the row
+                                          # is in hand, so the dialog can say what else the delete will change.
+                                          OnSelect: |
+                                            =Set( gDelKind, "Transaction" );
+                                             Set( gDelId, ThisItem.ID );
+                                             Set( gDelName, ThisItem.transaction_name );
+                                             Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = ThisItem.ID) ) )
                         # Preserved from the tabbed version, decision and all: there is no
                         # cross-currency total to show, because since Q14 the app stores only
                         # the native notional. Totalling ONE currency at a time is the honest
@@ -1631,3 +1720,142 @@ Screens:
                                                    NotificationType.Error ),
                                            Set( gEditMode, "Edit" );
                                            Navigate( scrIssueEdit, ScreenTransition.Cover ) )
+
+                              # DECLARED AFTER THE HIT BUTTON, AND THAT IS LOAD-BEARING. The transparent
+                              # full-template button above covers the whole row; anything declared before it
+                              # is underneath it and cannot be clicked at all. The icon renders either way,
+                              # so getting this wrong looks like a dead control, not a z-order bug.
+                              - icoDelIss:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Trash
+                                    Color: =gTheme.Color.Danger
+                                    HoverColor: =gTheme.Color.Danger
+                                    # A RED wash, matching icoDeleteProject — a blue tint behind a red
+                                    # destructive icon reads as a different control.
+                                    HoverFill: =RGBA(197, 58, 58, 0.08)
+                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                    Tooltip: ="Delete this issue"
+                                    X: =Parent.TemplateWidth - 34
+                                    Y: =(Parent.TemplateHeight - 24) / 2
+                                    Width: =24
+                                    Height: =24
+                                    # ARMS the dialog, deletes nothing. gDelRefs is counted HERE, while the row
+                                    # is in hand, so the dialog can say what else the delete will change.
+                                    OnSelect: |
+                                      =Set( gDelKind, "Issue" );
+                                       Set( gDelId, ThisItem.ID );
+                                       Set( gDelName, ThisItem.issue_name );
+                                       Set( gDelRefs, 0 )      # =====================================================================
+      # DELETE CONFIRMATION — one instance serving all three galleries, keyed by
+      # gDelKind. Declared LAST so positional z-order floats it over the content.
+      #
+      # STUDIO CHECK BEFORE THIS SCREEN IS PASTED: cmpConfirmDialog had NO consumer
+      # anywhere in src/ until now, so its custom properties may never have been
+      # declared in Studio at all. A component crosses the gap in TWO parts and only
+      # the CONTROLS paste — every custom property is declared and typed BY HAND.
+      # That is exactly how cmpSelection silently returned blank for weeks. Confirm
+      # IsOpen / Title / Message / ConfirmLabel / CancelLabel / Destructive are
+      # INPUTS and OnConfirm / OnCancel are EVENTS before trusting this.
+      #
+      # Visible is gated as well as IsOpen: a component intercepts every click
+      # inside its bounds, so a full-screen instance left visible while closed would
+      # swallow every tap on the screen underneath it.
+      # =====================================================================
+      - cmpPrjConfirmDel:
+          Control: CanvasComponent
+          ComponentName: cmpConfirmDialog
+          Properties:
+            Visible: =Len( Coalesce(gDelKind, "") ) > 0
+            IsOpen: =Len( Coalesce(gDelKind, "") ) > 0
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: |
+              =Switch( gDelKind,
+                       "Task",        "Delete this task?",
+                       "Transaction", "Delete this transaction?",
+                       "Issue",       "Delete this issue?",
+                       "Delete?" )
+            # Says what ELSE changes, which is the whole reason this is a dialog and
+            # not the two-press arm the project delete uses. An arm cannot explain
+            # that issues are about to be detached.
+            Message: |
+              =Switch( gDelKind,
+                       "Task",
+                       "Delete " & gDelName & "? Its product links go with it." &
+                       If( gDelRefs > 0,
+                           " " & gDelRefs & " issue(s) raised against it will be KEPT — only the link to this task is cleared.",
+                           "" ) &
+                       " This cannot be undone.",
+                       "Transaction",
+                       "Delete " & gDelName & "?" &
+                       If( gDelRefs > 0,
+                           " " & gDelRefs & " issue(s) linked to it will be KEPT — only the link to this transaction is cleared.",
+                           "" ) &
+                       " This cannot be undone.",
+                       "Issue",
+                       "Delete " & gDelName & "? Nothing else references an issue. This cannot be undone.",
+                       "" )
+            ConfirmLabel: ="Delete"
+            CancelLabel: ="Cancel"
+            Destructive: =true
+            # Order is deliberate: DETACH the referencing issues first, then remove the
+            # row. The reverse leaves issues pointing at a row that no longer exists.
+            #
+            # IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED
+            # by Studio: Remove and ForAll/Patch return a TABLE while Notify and Set
+            # return a boolean, and IfError requires all arguments to be type-compatible.
+            # Hence Set-into-a-scrap on both arms, and a DIFFERENT scrap name per call
+            # site: a global's type unifies across every Set, so one name holding
+            # differently-shaped tables is a type conflict.
+            OnConfirm: |
+              =Set( gDelErr, "" );
+               Set( gDelBlock, false );
+               // COUNT, THEN REFUSE — never half-do it. The detach is a local ForAll over
+               // a delegable Filter, so past the data row limit it would clear SOME
+               // references, raise NO error, and then delete the parent anyway. Same
+               // shape as the project cascade above.
+               If( gDelRefs >= 500, Set( gDelBlock, true ) );
+               If( !gDelBlock && gDelKind = "Task" && gDelRefs > 0,
+                   IfError( Set( gDelScrapDT,
+                                 ForAll( Filter( taskmaster_issues, issue_task_name.Id = gDelId ) As iss,
+                                         Patch( taskmaster_issues, iss, { issue_task_name: Blank() } ) ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
+               If( !gDelBlock && gDelKind = "Transaction" && gDelRefs > 0,
+                   IfError( Set( gDelScrapDX,
+                                 ForAll( Filter( taskmaster_issues, issue_transaction_name.Id = gDelId ) As iss,
+                                         Patch( taskmaster_issues, iss, { issue_transaction_name: Blank() } ) ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
+               // LookUp, not the gallery record: colProjectTasks is a snapshot, and a
+               // task's product links are removed by SharePoint's own CASCADE on
+               // taskproduct_task_id — the app must not try to delete them itself.
+               If( Len(gDelErr) = 0 && !gDelBlock,
+                   Switch( gDelKind,
+                           "Task",
+                           IfError( Set( gDelScrapT,
+                                         Remove( taskmaster_tasks, LookUp(taskmaster_tasks, ID = gDelId) ) ),
+                                    Set( gDelErr, FirstError.Message ) ),
+                           "Transaction",
+                           IfError( Set( gDelScrapX,
+                                         Remove( taskmaster_transactions, LookUp(taskmaster_transactions, ID = gDelId) ) ),
+                                    Set( gDelErr, FirstError.Message ) ),
+                           "Issue",
+                           IfError( Set( gDelScrapI,
+                                         Remove( taskmaster_issues, LookUp(taskmaster_issues, ID = gDelId) ) ),
+                                    Set( gDelErr, FirstError.Message ) ) ) );
+               If( gDelBlock,
+                   Notify( "Too many issues reference this to detach in one pass. Nothing was deleted — ask for the cleanup workflow.",
+                           NotificationType.Error ),
+                   Len(gDelErr) > 0,
+                   // No transaction exists here: by the time the Remove fails, the detach
+                   // has already committed. Say so rather than implying nothing changed.
+                   Notify( "Couldn't delete it: " & gDelErr
+                             & " Some issue links may already have been cleared — reopen the project to check.",
+                           NotificationType.Error ),
+                   Notify( gDelKind & " deleted.", NotificationType.Success );
+                   // The ONE call that repairs project_phase and the completion rollup.
+                   Select( btnPrjRecompute ) );
+               Set( gDelKind, "" )
+            OnCancel: =Set( gDelKind, "" )

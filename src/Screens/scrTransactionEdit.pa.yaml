@@ -488,6 +488,29 @@ Screens:
             Width: =Parent.Width
             Height: =88
           Children:
+            # DESTRUCTIVE, so it sits hard left, away from Save. Edit mode only —
+            # there is nothing to delete while creating. Arms the dialog and deletes
+            # nothing; gDelRefs is counted here so the dialog can say what else changes.
+            - btnTxDelete:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Visible: =gEditMode = "Edit"
+                  Text: ="Delete"
+                  Fill: =gTheme.Color.Surface
+                  Color: =gTheme.Color.Danger
+                  BorderColor: =gTheme.Color.Danger
+                  BorderThickness: =1
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FillPortions: =0
+                  LayoutMinWidth: =140
+                  Width: =140
+                  Height: =48
+                  OnSelect: |
+                    =Set( gDelKind, "Transaction" );
+                     Set( gDelId, gEditTransaction.ID );
+                     Set( gDelName, gEditTransaction.transaction_name );
+                     Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = gEditTransaction.ID) ) )
             - lblTxFooterSpacer:
                 Control: Label@2.5.1
                 Properties:
@@ -658,3 +681,66 @@ Screens:
                    Set( gPdMode, "New" ); Set( gPdReturn, "TxProduct" ); Set( gTxPicker, "" );
                    Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gTxPicker, "" )
+      # =====================================================================
+      # DELETE CONFIRMATION. See scrProject's instance for the Studio check that
+      # must happen before this screen is pasted: cmpConfirmDialog had no consumer
+      # in src/ until issue #15, so its eight custom properties may never have been
+      # declared in Studio — and a component's properties do NOT come across in a
+      # paste. Visible is gated as well as IsOpen because a component intercepts
+      # every click inside its bounds.
+      # =====================================================================
+      - cmpTxConfirmDel:
+          Control: CanvasComponent
+          ComponentName: cmpConfirmDialog
+          Properties:
+            Visible: =Len( Coalesce(gDelKind, "") ) > 0
+            IsOpen: =Len( Coalesce(gDelKind, "") ) > 0
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: ="Delete this transaction?"
+            Message: |
+              ="Delete " & gDelName & "?" &
+                       If( gDelRefs > 0,
+                           " " & gDelRefs & " issue(s) linked to it will be KEPT — only the link to this transaction is cleared.",
+                           "" ) &
+                       " This cannot be undone."
+            ConfirmLabel: ="Delete"
+            CancelLabel: ="Cancel"
+            Destructive: =true
+            # IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED by
+            # Studio: Remove and ForAll/Patch return a TABLE while Notify and Set return a
+            # boolean, and IfError requires type-compatible arguments. Hence Set-into-a-scrap
+            # on both arms, with a DIFFERENT scrap name per call site.
+            OnConfirm: |
+              =Set( gDelErr, "" );
+               Set( gDelBlock, false );
+               If( gDelRefs >= 500, Set( gDelBlock, true ) );
+               // DETACH FIRST, then remove. The reverse leaves issues pointing at a row
+               // that is already gone. COUNT AND REFUSE rather than half-do it: this is a
+               // local ForAll over a delegable Filter, so past the data row limit it would
+               // clear SOME references, raise NO error, and delete the parent anyway.
+               If( !gDelBlock && gDelRefs > 0,
+                   IfError( Set( gDelScrapDX,
+                                 ForAll( Filter( taskmaster_issues, issue_transaction_name.Id = gDelId ) As iss,
+                                         Patch( taskmaster_issues, iss, { issue_transaction_name: Blank() } ) ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
+               If( Len(gDelErr) = 0 && !gDelBlock,
+                   IfError( Set( gDelScrapX,
+                                 Remove( taskmaster_transactions, LookUp(taskmaster_transactions, ID = gDelId) ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
+               If( gDelBlock,
+                   Notify( "Too many issues reference this to detach in one pass. Nothing was deleted — ask for the cleanup workflow.",
+                           NotificationType.Error ),
+                   Len(gDelErr) > 0,
+                   Notify( "Couldn't delete it: " & gDelErr
+                             & " Some issue links may already have been cleared — reopen the project to check.",
+                           NotificationType.Error ),
+                   Notify( "Transaction deleted.", NotificationType.Success );
+                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute —
+                   // so project_phase and the completion rollup repair themselves with no
+                   // second copy of that logic living here.
+                   Back() );
+               Set( gDelKind, "" )
+            OnCancel: =Set( gDelKind, "" )

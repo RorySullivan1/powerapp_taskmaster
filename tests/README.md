@@ -198,8 +198,8 @@ Delete the PROBE task row and any PROBE link afterwards.
 
 ## `scrProbeRerun.pa.yaml` + `scrProbeRerunB.pa.yaml` — how does a screen re-run a behaviour block in place?
 
-**Status: RUN 2026-08-18 by the user in Studio. `Select()` FIRES ON A HIDDEN CONTROL —
-sub-case C works, and that decides issue #15. Sub-case D was NOT readable; see below.**
+**Status: RUN 2026-08-18 by the user in Studio. BOTH ANSWERS ARE POSITIVE — `Select()` fires
+on a hidden control (A/B/C), and `Navigate()` to the current screen DOES re-run `OnVisible` (D).**
 
 ### Why this has to be settled before the code is written
 
@@ -294,21 +294,32 @@ smuggled onto the screen as a 1×1 transparent button. It can simply be hidden.
 That is what issue #15 needed, and it is reusable well beyond it: **a screen can now keep one
 copy of a behaviour block in a hidden control's `OnSelect` and call it from anywhere.**
 
-### Sub-case D was NOT settled, and that is a flaw in this probe
+### Sub-case D — settled on a second pass, after a probe-design flaw
 
-**`Navigate()` to the current screen remains unresolved.** The numbers cannot answer it, because
-`OnVisible fired` is incremented by *both* the round trip and (possibly) D, and this probe never
-recorded how many round trips were taken. With 9 fires and 5 presses of each button, both stories
-fit:
+**First run: unreadable.** D shared the `OnVisible` counter with the positive control, and the
+probe never recorded how many round trips were taken, so 9 fires fitted both "D works, 3 round
+trips" and "D does nothing, 8 round trips". Every other sub-case had its own counter and came
+back unambiguous.
 
-- D works → 1 initial load + 5 from D + 3 round trips = 9
-- D does nothing → 1 initial load + 8 round trips = 9
+**The design error is the durable lesson:** a positive control must not share an instrument with
+the thing being measured. Rule 4 above now says so.
 
-**The design error: D shared a counter with the positive control.** Every other sub-case got its
-own counter and is unambiguous; D was measured on the one counter that something else also moves.
-Rule 4 of this file says a probe needs a positive control — it should also say that the control
-must not share an instrument with the thing being measured.
+**Second run, using the one-press procedure — reset, press D once → `OnVisible fired: 1`.**
+So **`Navigate()` to the screen you are already on DOES re-run `OnVisible`.** MS Learn does not
+document this; it defines `Navigate` in terms of "the NEW screen". The behaviour is grounded by
+this probe, not by the docs, which matters if it ever changes.
 
-**Not worth a re-run for issue #15**, which is built on C. To settle D on its own later: press
-**reset counters**, then press **D once**, and read `OnVisible fired`. `1` means self-navigation
-re-runs `OnVisible`; `0` means it does not.
+### Why issue #15 still uses the hidden worker rather than D
+
+Both work, so this was a choice, not a constraint:
+
+- **No screen transition.** D repaints the whole screen on every delete; the worker is invisible.
+- **No back-stack perturbation.** `scrProject` already carries a comment explaining that it
+  navigates to an *explicit destination rather than `Back()`*, because `Back()` alternates
+  between the two most recently displayed screens and that caused a real bug on this screen.
+  Self-navigation pushes a screen onto its own history — the same class of hazard.
+- **The block gets a name.** `Select( btnPrjRecompute )` says what it does at each call site;
+  `Navigate( scrProject )` says "reload everything" and leaves the reader to infer why.
+
+D stays the cheaper option for any screen that genuinely wants a full reload, and the choice is
+reversible in one line.
