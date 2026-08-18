@@ -346,8 +346,19 @@ Screens:
                       With( { rw: Filter(colRptPersonSrc, Em = pp.Value) },
                           { Em:   pp.Value,
                             Nm:   First(rw).Nm,
-                            Owns: CountRows( Filter(rw, Role = "Owns"     && Op = 1) ),
-                            Sups: CountRows( Filter(rw, Role = "Supports" && Op = 1) ),
+                            // SUPPORTS IS EVERY TASK THE PERSON SUPPORTS, open or finished —
+                            // "a count of tasks where the person is the task supporter",
+                            // with no lifecycle qualifier (user, 2026-08-18). It previously
+                            // carried Op = 1 and so reported only open work, which reads as
+                            // zero for anyone whose supporting tasks have all completed.
+                            // OWNS DELIBERATELY KEEPS Op = 1 and still means open work; the
+                            // two columns answer different questions and the subtitle says so.
+                            // The reach is the fetch, not all of history: open tasks are
+                            // unbounded but completed ones come back only inside the selected
+                            // period, so this is supports still open plus supports finished
+                            // in the window.
+                            Owns: CountRows( Filter(rw, Role = "Owns" && Op = 1) ),
+                            Sups: CountRows( Filter(rw, Role = "Supports") ),
                             Ovd:  Sum(rw, Ovd),
                             Gc:   Sum(rw, Gc), Ac: Sum(rw, Ac), Rc: Sum(rw, Rc),
                             Dn:   Sum(rw, Dn),
@@ -1127,7 +1138,8 @@ Screens:
                       Properties:
                         Text: |
                           ="Task volume and elapsed time — the model holds no hours, so this is not effort. "
-                           & "Owns and supports are counted separately and never summed."
+                           & "Owns is open work; supports is every task supported, open or "
+                           & "finished in the period. Counted separately, never summed."
                            & If( gRptNoSup > 0,
                                  "   ·   " & gRptNoSup & " of " & CountRows(colRptOpen)
                                  & " open tasks record no supporter.", "" )
