@@ -951,11 +951,7 @@ Screens:
                                           PaddingRight: =8
                                           X: =0
                                           Y: =0
-                                          # 46px is RESERVED ON THE RIGHT for the row's delete icon, which positions itself
-# off THIS container's Width. 46 = 10 gap + 24 icon + 12 clear of the scrollbar;
-# shrink it and the icon lands under the scrollbar. Full TemplateWidth here
-                                          # puts this row underneath it and the two overlap.
-                                          Width: =Parent.TemplateWidth - 46
+                                          Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight - 1
                                         Children:
                                           # LIFECYCLE glyph, bound to task_stage — the same
@@ -1057,6 +1053,32 @@ Screens:
                                                 FillPortions: =2
                                                 LayoutMinWidth: =96
                                                 Height: =44
+                                          # LAST CHILD OF THE AUTO-LAYOUT ROW, CARRYING NO X AND NO Y AT ALL.
+                                          # X DID NOT SURVIVE A SCREEN PASTE in either absolute form — off
+                                          # Parent.TemplateWidth or off this container's Width — while Y and every other
+                                          # property came through (user, 2026-08-18). Pasting the icon ALONE worked, so
+                                          # whatever drops it is a property of the whole-screen paste, not of the value.
+                                          # Auto-layout is what the design skill already prescribes for this: a child with
+                                          # no X has nothing to lose. FillPortions 0, against the flexible columns to its
+                                          # left, parks it hard right inside the strip the hit button stops short of.
+                                          - icoDelTask:
+                                              Control: Classic/Icon@2.5.0
+                                              Properties:
+                                                Icon: =Icon.Trash
+                                                Color: =gTheme.Color.Danger
+                                                HoverColor: =gTheme.Color.Danger
+                                                HoverFill: =RGBA(197, 58, 58, 0.08)
+                                                HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                                Tooltip: ="Delete this task"
+                                                FillPortions: =0
+                                                LayoutMinWidth: =24
+                                                Width: =24
+                                                Height: =24
+                                                OnSelect: |
+                                                  =Set( gDelKind, "Task" );
+                                                   Set( gDelId, ThisItem.ID );
+                                                   Set( gDelName, ThisItem.task_name );
+                                                   Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_task_name.Id = ThisItem.ID) ) )
                                     - rowTasksLine:
                                         Control: Rectangle@2.3.0
                                         Properties:
@@ -1083,6 +1105,10 @@ Screens:
                                           Y: =0
                                           # Stops short of the delete icon's strip, so a tap aimed at delete
                                           # cannot fall through to "open the editor" instead.
+                                          # STOPS SHORT OF THE DELETE ICON. The icon is the row container's last
+                                          # auto-layout child, and this transparent button is declared AFTER that
+                                          # container — so at full width it would sit on top of the icon and swallow
+                                          # every tap meant for it.
                                           Width: =Parent.TemplateWidth - 46
                                           Height: =Parent.TemplateHeight
                                           # Goes STRAIGHT to the editor, exactly like the
@@ -1120,35 +1146,6 @@ Screens:
                                                         NotificationType.Error ),
                                                 Set( gEditMode, "Edit" );
                                                 Navigate( scrTaskEdit, ScreenTransition.Cover ) )
-                                    # DECLARED AFTER THE HIT BUTTON, AND THAT IS LOAD-BEARING. The transparent
-                                    # full-template button above covers the whole row; anything declared before it
-                                    # is underneath it and cannot be clicked at all. The icon renders either way,
-                                    # so getting this wrong looks like a dead control, not a z-order bug.
-                                    - icoDelTask:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Trash
-                                          Color: =gTheme.Color.Danger
-                                          HoverColor: =gTheme.Color.Danger
-                                          # A RED wash, matching icoDeleteProject — a blue tint behind a red
-                                          # destructive icon reads as a different control.
-                                          HoverFill: =RGBA(197, 58, 58, 0.08)
-                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                          Tooltip: ="Delete this task"
-                                          # ANCHORED TO THE ROW CONTAINER, not to TemplateWidth. The row is what
-                                          # actually occupies the width, so measuring from it is what keeps this
-                                          # icon clear of the status column — TemplateWidth arithmetic did not.
-                                          X: =rowTaskBody.Width + 10
-                                          Y: =(Parent.TemplateHeight - 24) / 2
-                                          Width: =24
-                                          Height: =24
-                                          # ARMS the dialog, deletes nothing. gDelRefs is counted HERE, while the row
-                                          # is in hand, so the dialog can say what else the delete will change.
-                                          OnSelect: |
-                                            =Set( gDelKind, "Task" );
-                                             Set( gDelId, ThisItem.ID );
-                                             Set( gDelName, ThisItem.task_name );
-                                             Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_task_name.Id = ThisItem.ID) ) )
                         - secTx:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -1263,11 +1260,7 @@ Screens:
                                           PaddingRight: =8
                                           X: =0
                                           Y: =0
-                                          # 46px is RESERVED ON THE RIGHT for the row's delete icon, which positions itself
-# off THIS container's Width. 46 = 10 gap + 24 icon + 12 clear of the scrollbar;
-# shrink it and the icon lands under the scrollbar. Full TemplateWidth here
-                                          # puts this row underneath it and the two overlap.
-                                          Width: =Parent.TemplateWidth - 46
+                                          Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight - 1
                                         Children:
                                           # DERIVED, NOT STORED. taskmaster_transactions has no
@@ -1354,6 +1347,32 @@ Screens:
                                                 FillPortions: =2
                                                 LayoutMinWidth: =104
                                                 Height: =44
+                                          # LAST CHILD OF THE AUTO-LAYOUT ROW, CARRYING NO X AND NO Y AT ALL.
+                                          # X DID NOT SURVIVE A SCREEN PASTE in either absolute form — off
+                                          # Parent.TemplateWidth or off this container's Width — while Y and every other
+                                          # property came through (user, 2026-08-18). Pasting the icon ALONE worked, so
+                                          # whatever drops it is a property of the whole-screen paste, not of the value.
+                                          # Auto-layout is what the design skill already prescribes for this: a child with
+                                          # no X has nothing to lose. FillPortions 0, against the flexible columns to its
+                                          # left, parks it hard right inside the strip the hit button stops short of.
+                                          - icoDelTx:
+                                              Control: Classic/Icon@2.5.0
+                                              Properties:
+                                                Icon: =Icon.Trash
+                                                Color: =gTheme.Color.Danger
+                                                HoverColor: =gTheme.Color.Danger
+                                                HoverFill: =RGBA(197, 58, 58, 0.08)
+                                                HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                                Tooltip: ="Delete this transaction"
+                                                FillPortions: =0
+                                                LayoutMinWidth: =24
+                                                Width: =24
+                                                Height: =24
+                                                OnSelect: |
+                                                  =Set( gDelKind, "Transaction" );
+                                                   Set( gDelId, ThisItem.ID );
+                                                   Set( gDelName, ThisItem.transaction_name );
+                                                   Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = ThisItem.ID) ) )
                                     - rowTxLine:
                                         Control: Rectangle@2.3.0
                                         Properties:
@@ -1380,6 +1399,10 @@ Screens:
                                           Y: =0
                                           # Stops short of the delete icon's strip, so a tap aimed at delete
                                           # cannot fall through to "open the editor" instead.
+                                          # STOPS SHORT OF THE DELETE ICON. The icon is the row container's last
+                                          # auto-layout child, and this transparent button is declared AFTER that
+                                          # container — so at full width it would sit on top of the icon and swallow
+                                          # every tap meant for it.
                                           Width: =Parent.TemplateWidth - 46
                                           Height: =Parent.TemplateHeight
                                           # Re-read on the way in, like the task row. This
@@ -1402,35 +1425,6 @@ Screens:
                                                         NotificationType.Error ),
                                                 Set( gEditMode, "Edit" );
                                                 Navigate( scrTransactionEdit, ScreenTransition.Cover ) )
-                                    # DECLARED AFTER THE HIT BUTTON, AND THAT IS LOAD-BEARING. The transparent
-                                    # full-template button above covers the whole row; anything declared before it
-                                    # is underneath it and cannot be clicked at all. The icon renders either way,
-                                    # so getting this wrong looks like a dead control, not a z-order bug.
-                                    - icoDelTx:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Trash
-                                          Color: =gTheme.Color.Danger
-                                          HoverColor: =gTheme.Color.Danger
-                                          # A RED wash, matching icoDeleteProject — a blue tint behind a red
-                                          # destructive icon reads as a different control.
-                                          HoverFill: =RGBA(197, 58, 58, 0.08)
-                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                          Tooltip: ="Delete this transaction"
-                                          # ANCHORED TO THE ROW CONTAINER, not to TemplateWidth. The row is what
-                                          # actually occupies the width, so measuring from it is what keeps this
-                                          # icon clear of the status column — TemplateWidth arithmetic did not.
-                                          X: =rowTxBody.Width + 10
-                                          Y: =(Parent.TemplateHeight - 24) / 2
-                                          Width: =24
-                                          Height: =24
-                                          # ARMS the dialog, deletes nothing. gDelRefs is counted HERE, while the row
-                                          # is in hand, so the dialog can say what else the delete will change.
-                                          OnSelect: |
-                                            =Set( gDelKind, "Transaction" );
-                                             Set( gDelId, ThisItem.ID );
-                                             Set( gDelName, ThisItem.transaction_name );
-                                             Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = ThisItem.ID) ) )
                         # Preserved from the tabbed version, decision and all: there is no
                         # cross-currency total to show, because since Q14 the app stores only
                         # the native notional. Totalling ONE currency at a time is the honest
@@ -1588,11 +1582,7 @@ Screens:
                                     PaddingRight: =6
                                     X: =0
                                     Y: =0
-                                    # 46px is RESERVED ON THE RIGHT for the row's delete icon, which positions itself
-# off THIS container's Width. 46 = 10 gap + 24 icon + 12 clear of the scrollbar;
-# shrink it and the icon lands under the scrollbar. Full TemplateWidth here
-                                    # puts this row underneath it and the two overlap.
-                                    Width: =Parent.TemplateWidth - 46
+                                    Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight - 1
                                   Children:
                                     # STATUS: open, or which way it closed.
@@ -1711,6 +1701,32 @@ Screens:
                                           FillPortions: =2
                                           LayoutMinWidth: =96
                                           Height: =38
+                                    # LAST CHILD OF THE AUTO-LAYOUT ROW, CARRYING NO X AND NO Y AT ALL.
+                                    # X DID NOT SURVIVE A SCREEN PASTE in either absolute form — off
+                                    # Parent.TemplateWidth or off this container's Width — while Y and every other
+                                    # property came through (user, 2026-08-18). Pasting the icon ALONE worked, so
+                                    # whatever drops it is a property of the whole-screen paste, not of the value.
+                                    # Auto-layout is what the design skill already prescribes for this: a child with
+                                    # no X has nothing to lose. FillPortions 0, against the flexible columns to its
+                                    # left, parks it hard right inside the strip the hit button stops short of.
+                                    - icoDelIss:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Trash
+                                          Color: =gTheme.Color.Danger
+                                          HoverColor: =gTheme.Color.Danger
+                                          HoverFill: =RGBA(197, 58, 58, 0.08)
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: ="Delete this issue"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =24
+                                          Width: =24
+                                          Height: =24
+                                          OnSelect: |
+                                            =Set( gDelKind, "Issue" );
+                                             Set( gDelId, ThisItem.ID );
+                                             Set( gDelName, ThisItem.issue_name );
+                                             Set( gDelRefs, 0 )
                               - rowIssLine:
                                   Control: Rectangle@2.3.0
                                   Properties:
@@ -1731,6 +1747,10 @@ Screens:
                                     Y: =0
                                     # Stops short of the delete icon's strip, so a tap aimed at delete
                                     # cannot fall through to "open the editor" instead.
+                                    # STOPS SHORT OF THE DELETE ICON. The icon is the row container's last
+                                    # auto-layout child, and this transparent button is declared AFTER that
+                                    # container — so at full width it would sit on top of the icon and swallow
+                                    # every tap meant for it.
                                     Width: =Parent.TemplateWidth - 46
                                     Height: =Parent.TemplateHeight
                                     # Re-read on the way in — see the transaction row for
@@ -1745,35 +1765,6 @@ Screens:
                                            Set( gEditMode, "Edit" );
                                            Navigate( scrIssueEdit, ScreenTransition.Cover ) )
 
-                              # DECLARED AFTER THE HIT BUTTON, AND THAT IS LOAD-BEARING. The transparent
-                              # full-template button above covers the whole row; anything declared before it
-                              # is underneath it and cannot be clicked at all. The icon renders either way,
-                              # so getting this wrong looks like a dead control, not a z-order bug.
-                              - icoDelIss:
-                                  Control: Classic/Icon@2.5.0
-                                  Properties:
-                                    Icon: =Icon.Trash
-                                    Color: =gTheme.Color.Danger
-                                    HoverColor: =gTheme.Color.Danger
-                                    # A RED wash, matching icoDeleteProject — a blue tint behind a red
-                                    # destructive icon reads as a different control.
-                                    HoverFill: =RGBA(197, 58, 58, 0.08)
-                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                    Tooltip: ="Delete this issue"
-                                    # ANCHORED TO THE ROW CONTAINER, not to TemplateWidth. The row is what
-                                    # actually occupies the width, so measuring from it is what keeps this
-                                    # icon clear of the status column — TemplateWidth arithmetic did not.
-                                    X: =rowIssBody.Width + 10
-                                    Y: =(Parent.TemplateHeight - 24) / 2
-                                    Width: =24
-                                    Height: =24
-                                    # ARMS the dialog, deletes nothing. gDelRefs is counted HERE, while the row
-                                    # is in hand, so the dialog can say what else the delete will change.
-                                    OnSelect: |
-                                      =Set( gDelKind, "Issue" );
-                                       Set( gDelId, ThisItem.ID );
-                                       Set( gDelName, ThisItem.issue_name );
-                                       Set( gDelRefs, 0 )
       # =====================================================================
       # DELETE CONFIRMATION — one instance serving all three galleries, keyed by
       # gDelKind. Declared LAST so positional z-order floats it over the content.

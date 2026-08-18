@@ -282,6 +282,31 @@ def stray_hash_errors(doc) -> list[str]:
     return out
 
 
+def stray_comment_indent(text: str) -> list[str]:
+    """A `#` comment at column 0 after the document has started.
+
+    YAML allows it, so nothing downstream complains — but in a file whose content
+    is nested 30+ columns deep it is always a botched multi-line edit, and it is
+    the kind of structural damage a human reading the paste will blame for a lost
+    property. Introduced twice by scripted comment edits that failed to indent
+    their continuation lines; found in scrProject when X stopped surviving a
+    screen paste.
+    """
+    out, started = [], False
+    for n, line in enumerate(text.split("\n"), 1):
+        stripped = line.strip()
+        if not started:
+            if stripped and not stripped.startswith("#"):
+                started = True
+            continue
+        if line.startswith("#"):
+            out.append(
+                f"line {n}: comment at column 0 inside the document — a multi-line "
+                f"comment edit that lost its indentation: {stripped[:60]}"
+            )
+    return out
+
+
 def token_errors(doc) -> list[str]:
     """Pass 2 — the values the schema leaves wide open."""
     out, warned = [], set()
@@ -673,7 +698,7 @@ def main() -> int:
                 print(f"    ... and {len(dups) - 12} more")
             print()
             continue
-        tok = token_errors(doc) + stray_hash_errors(doc)
+        tok = token_errors(doc) + stray_hash_errors(doc) + stray_comment_indent(text)
         errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
         hard_tok = [t for t in tok if "NOTE " not in t]
         if not errors and not hard_tok:
