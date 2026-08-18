@@ -23,6 +23,10 @@ adding probes does not move the `22/22` count. Validate one explicitly:
 4. **Carry a positive control** — a step known to produce the effect. Without one,
    "nothing happened" might mean the claim is false *or* that the instrument
    cannot see the effect at all, and those are very different answers.
+   **And give every sub-case its OWN instrument.** A positive control that moves
+   the same counter as the thing being measured makes the result unreadable no
+   matter how carefully the run is done — the two contributions cannot be told
+   apart afterwards. `scrProbeRerun`'s sub-case D was lost exactly this way.
 5. **Record the result in this file.** A probe with no recorded outcome is worse
    than no probe: the next session re-runs it, or worse, assumes it confirmed
    whatever the repo already believed.
@@ -194,7 +198,8 @@ Delete the PROBE task row and any PROBE link afterwards.
 
 ## `scrProbeRerun.pa.yaml` + `scrProbeRerunB.pa.yaml` — how does a screen re-run a behaviour block in place?
 
-**Status: NOT YET RUN.** Blocks the `scrProject` half of issue #15.
+**Status: RUN 2026-08-18 by the user in Studio. `Select()` FIRES ON A HIDDEN CONTROL —
+sub-case C works, and that decides issue #15. Sub-case D was NOT readable; see below.**
 
 ### Why this has to be settled before the code is written
 
@@ -268,3 +273,42 @@ both directions.
   a trimmed recompute, and accept the duplication with a comment saying why.
 
 This probe carries no data source, so it can be pasted onto a blank screen at any time.
+
+### Result — 2026-08-18, run by the user in Studio
+
+**Positive control passed.** The round trip raised `OnVisible fired` by 1, so the instrument
+could see `OnVisible` and the rest of the run is readable.
+
+```
+OnVisible fired:  9
+A · visible worker:      5
+B · 1x1 transparent:     5
+C · hidden worker:       5
+```
+
+**A, B and C are equal.** `Select()` fired every time on all three, including the worker with
+`Visible: =false`. So the folklore that `Select()` silently no-ops on an invisible control is
+**false here** — a worker control holding a reusable behaviour block does not have to be
+smuggled onto the screen as a 1×1 transparent button. It can simply be hidden.
+
+That is what issue #15 needed, and it is reusable well beyond it: **a screen can now keep one
+copy of a behaviour block in a hidden control's `OnSelect` and call it from anywhere.**
+
+### Sub-case D was NOT settled, and that is a flaw in this probe
+
+**`Navigate()` to the current screen remains unresolved.** The numbers cannot answer it, because
+`OnVisible fired` is incremented by *both* the round trip and (possibly) D, and this probe never
+recorded how many round trips were taken. With 9 fires and 5 presses of each button, both stories
+fit:
+
+- D works → 1 initial load + 5 from D + 3 round trips = 9
+- D does nothing → 1 initial load + 8 round trips = 9
+
+**The design error: D shared a counter with the positive control.** Every other sub-case got its
+own counter and is unambiguous; D was measured on the one counter that something else also moves.
+Rule 4 of this file says a probe needs a positive control — it should also say that the control
+must not share an instrument with the thing being measured.
+
+**Not worth a re-run for issue #15**, which is built on C. To settle D on its own later: press
+**reset counters**, then press **D once**, and read `OnVisible fired`. `1` means self-navigation
+re-runs `OnVisible`; `0` means it does not.
