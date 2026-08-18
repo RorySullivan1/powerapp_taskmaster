@@ -155,7 +155,7 @@ not know them will author something broken:
   an existing project. **If a user reports "New Project opened with my old draft in it", this
   is why** — do not re-diagnose it as a seeding bug. The fix, if wanted, is a key unique per
   entry rather than per context.
-- **PARKED BY THE USER 2026-08-18: `project_perc_completion` reads 0% everywhere.** Not
+- **ISSUE #16 — `project_perc_completion` reads 0% everywhere. PARKED by the user 2026-08-18.** Not
   diagnosed to a single cause; three candidates were live and at least two are certainly
   true. **Do not re-derive this chain — resume from here.** In order:
   (1) `gStageWeights` lives in `App.OnStart`, a FORMULA-BAR property that no paste carries,
