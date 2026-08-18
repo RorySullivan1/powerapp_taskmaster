@@ -11,29 +11,21 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **Paste in progress.** LANDED (all 2026-08-18): `App.OnStart`, `cmpAppBar`,
-  **`scrReports`**, **`scrTaskEdit`**, and **`scrProjectEdit` / `scrClientEdit` /
-  `scrProductEdit`** together as issue #12. Remaining: `cmpPicker`, `cmpLookupField`,
-  `cmpNestedSelect`, `cmpToast`, `scrHome`, `scrProjects`, `scrProject`, `scrIssueEdit`,
-  `scrTransactionEdit`. `scrHome` and `scrProjects` are full reworks; `scrProject` /
-  `scrIssueEdit` / `scrTransactionEdit` carry LOGIC fixes, so none of it is cosmetic.
-  The `scrProductEdit`-before-`scrTaskEdit` ordering constraint is DISCHARGED — both are in.
-  **BEFORE PASTING ANY SCREEN: check every list it names is in the Data pane** — a paste
-  never adds a data source, and that cost four rounds on `scrTaskEdit`.
-- **`scrTaskEdit` IS LANDED BUT ITS MULTI-PRODUCT SAVE IS BROKEN (issue #14).** The junction
-  is never written and the failure is silent. Diagnosed 2026-08-18; **all four fixes are now
-  WRITTEN AND UNPASTED (`cabb467`)** — error handling plus a verifying re-read, the summary
-  moved after the reconcile, products out of the output gate, and a delegable delete. Its
-  next paste carries them. **WHY the write is rejected is STILL UNKNOWN**: it compiles, so it
-  is a runtime rejection. `tests/scrProbe-junction-write.pa.yaml` returns SharePoint's actual
-  message in one paste. **ELIMINATED 2026-08-18: `Title` is NOT required on the junction**
-  (user-confirmed), which was the cleanest fit. Still unchecked: the display field on both
-  lookup columns, and write permission.
-- **BLOCKING SHAREPOINT WORK BEFORE THE NEXT `scrTaskEdit` PASTE (issue #13):** add Choice column
-  **`task_output_audience`** to live `taskmaster_tasks` — values Direct Retail · Indirect Retail ·
-  Client-Specific · Generic · Internal Only, no default, not required, not indexed. **Internal names
-  freeze at creation, so create it named exactly that.** A paste that writes to a column which does
-  not exist fails. That one paste now carries BOTH #13 and #14's four fixes.
+- **THE PASTE QUEUE IS ONE UNIT: a RE-paste of `scrTaskEdit` (user, 2026-08-18).** All 10
+  components and all 11 screens are otherwise in Studio, App object included. That single
+  crossing carries BOTH issue #14's four fixes and issue #13's audience work.
+  **FIRST, IN SHAREPOINT:** add Choice column `task_output_audience` to live `taskmaster_tasks`
+  (Direct Retail · Indirect Retail · Client-Specific · Generic · Internal Only; no default, not
+  required, not indexed) — **internal names freeze at creation, so name it exactly that**, and a
+  paste writing to a missing column fails. **THEN: check every list the screen names is in the
+  Data pane** — a paste never adds a data source, and that cost four rounds on this same screen.
+- **`scrTaskEdit`'s MULTI-PRODUCT SAVE IS BROKEN AND THE CAUSE IS STILL UNKNOWN (issue #14).**
+  The junction is never written and the failure is silent. The four fixes are in `main`, but they
+  harden the write — they do not explain it. It compiles, so the rejection is a RUNTIME one that
+  nothing on the repo side can see; `tests/scrProbe-junction-write.pa.yaml` returns SharePoint's
+  actual message in one paste. **ELIMINATED: `Title` is NOT required on the junction**
+  (user-confirmed), which was the cleanest fit. Still unchecked: the display field on both lookup
+  columns, and write permission.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -184,9 +176,6 @@ not know them will author something broken:
 - **Known edge, accepted:** an issue whose linked task/transaction belongs to a DIFFERENT project.
 - Open questions Q3–Q10, Q13 — see `.claude/context/open-questions.md`. Q2/Q2b are CLOSED (out of scope).
 
-- **`scrProjectEdit` IS UNPASTED AND CARRIES TWO NEWLY-BOUND CHOICE COMBOS** (`colNtPrioOpts`,
-  `colNxCcyOpts`) plus the modal quick-adds. Same class of change that cost four rounds on
-  `scrTaskEdit`; check `taskmaster_transactions` is in the Data pane before pasting it.
 - **ISSUE WORKFLOW: PLAN AND COMMENT ON THE ISSUE, DO NOT IMPLEMENT** (user, 2026-08-18).
   An issue is a request for a design and a written plan on the thread, not a branch of code.
   Implementing #12 unasked was accepted after the fact ("this is fine") but was not what was
@@ -199,22 +188,19 @@ not know them will author something broken:
 - **OWED IN SHAREPOINT (reporting):** index `task_date_completion` (DateTime, `taskmaster_tasks`) —
   the reports window filter rides on it. It is combined with two indexed predicates so it holds for
   now, but indexes CANNOT be added past 20,000 items.
-- **`scrReports` IS AUTHORED BUT UNPASTED — the single largest unverified thing in the repo.**
-  ~2,560 lines, 22/22 valid, two review passes, ZERO Studio confirmation. It is also the most
-  fold-heavy screen, so it is the most exposed to the ECS lineage trap. Expect the first paste to
-  return one sentence; plan the diagnosis before pasting, not after.
 
-- **ISSUE #14 IS DIAGNOSED AND UNFIXED — nothing was written.** Multi-product task links never
-  reach `taskmaster_taskproduct` and the failure is silent. Plan is on the issue: **probe first**
-  (a one-button `tests/` probe that returns SharePoint's ACTUAL error for a bare `Collect` into
-  the junction — the rejection is a RUNTIME one, so nothing on the repo side can see it), then
-  four `scrTaskEdit` fixes (guard + verify the reconcile; write the summary after it; take
-  products out of the output gate; replace the non-delegable `RemoveIf`). The fixes stand
-  whatever the probe says and land in the SAME paste, so they cost no extra crossing.
+- **ISSUE #14 IS DIAGNOSED AND THE FOUR FIXES ARE WRITTEN, UNPASTED.** Multi-product task links never
+  reach `taskmaster_taskproduct` and the failure is silent. All four fixes are in `main` (guard +
+  verify the reconcile; write the summary after it; take products out of the output gate; replace
+  the non-delegable `RemoveIf`) and ride the next `scrTaskEdit` paste alongside issue #13.
+  **WHY SharePoint rejects the write is still UNKNOWN** — it compiles, so it is a RUNTIME
+  rejection and nothing on the repo side can see it. `tests/scrProbe-junction-write.pa.yaml`
+  returns the actual message in one paste; the fixes stand whatever it says.
   **Do not re-derive the diagnosis** — it is in the session log with line numbers.
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-18 | issue #13: task_output_audience added; approval id required only at stage Completed, audience required whenever Output is on; enforcement is app-side only because SharePoint cannot hold a conditional requirement. Paste queue confirmed down to scrTaskEdit alone | sessions/2026-08-18-issue13-output-audience.md
 - 2026-08-13 | scrProjects rebuilt on auto-layout after the columns were found to collide below ~850px TemplateWidth; vertical stack now relative; status SVG inlined (a component cannot go in a gallery) | INDEX Decisions 2026-08-13
 - 2026-08-13 | scrProjects reworked: coverage filter + show-completed toggle + six-column rows; new SVG cmpProjectStatus; project_phase gains "Not Started" as default | INDEX Decisions 2026-08-13
 - 2026-08-13 | layout formulas SURVIVE a paste (probe run in Studio); design + transfer skills, validator check, build-history row and src comments all corrected | tests/README.md
