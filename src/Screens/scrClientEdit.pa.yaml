@@ -346,7 +346,12 @@ Screens:
               If( gClReturn = "TaskClient",
               Set( gTkClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ),
               gClReturn = "TxClient",
-              Set( gTxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ) );
+              Set( gTxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ),
+              // NxClient is the STAGED transaction inside scrProjectEdit, not the
+              // transaction editor. Same shape, different global — the staged row is
+              // written from gNx* when the project saves.
+              gClReturn = "NxClient",
+              Set( gNxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ) );
               Set( gClReturn, "" );
               Notify( If(gClMode = "Edit", "Client saved", "Client created"), NotificationType.Success );
               Back() ) );

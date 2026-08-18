@@ -403,6 +403,10 @@ Screens:
               Collect( colTkProducts, { Id: gPdSaved.ID, Uid: gPdSaved.product_uid } ) );
               If( gPdReturn = "TxProduct",
               Set( gTxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
+              // NxProduct is the STAGED transaction inside scrProjectEdit. A staged
+              // transaction takes ONE product, so this Sets rather than Collects.
+              If( gPdReturn = "NxProduct",
+              Set( gNxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
               Set( gPdReturn, "" );
               Notify( If(gPdMode = "Edit", "Product saved", "Product created"), NotificationType.Success );
               Back() ) ) );

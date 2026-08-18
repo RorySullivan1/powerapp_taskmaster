@@ -8,6 +8,16 @@ Screens:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnPrSave
+        // WHICH project this visit is for. Everything below is a SEED or a CLEAR, and
+        // returning from "+ New client/product" inside the staged-transaction modal must
+        // not run any of it — colNewTasks and colNewTransactions hold work that exists
+        // nowhere else until the project is saved. Keyed on identity rather than a bare
+        // boolean so a flag left armed by abandoning the create flow cannot match a
+        // different project and wipe it: "N" for a new project is a single context, so a
+        // leak there preserves the user's own draft rather than showing someone else's.
+        Set( gPrKey, If( gEditMode = "Edit", "E" & gEditProject.ID, "N" ) );
+        If( gPrResumeKey = gPrKey && Len(gPrKey) > 0,
+        Set( gPrResumeKey, "" ),
         Set( gPrManager,
               If( gEditMode = "Edit",
                   { DisplayName: Coalesce(gEditProject.project_manager.DisplayName, ""),
@@ -104,7 +114,7 @@ Screens:
         // Must come after the Set()s above, so DefaultPath is already cleared.
         Reset( pickPrRegion ); Reset( pickPrType );
         Reset( selPrCov );
-        Reset( cboNtPriority ); Reset( cboNxCcy )
+        Reset( cboNtPriority ); Reset( cboNxCcy ) )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -156,7 +166,9 @@ Screens:
             Width: =24
             X: =Parent.Width - 24 - gTheme.Space.Gutter
             Y: =(gTheme.Space.HeaderH - 24) / 2
-            OnSelect: =Back()
+            # Clears the resume key: leaving the form must not leave one armed for a
+            # project the user is walking away from.
+            OnSelect: =Set( gPrResumeKey, "" ); Back()
       # =======================================================================
       # FORM BAND  ·  64 .. Parent.Height - 88
       # =======================================================================
@@ -1096,7 +1108,9 @@ Screens:
                          "Discard", "Cancel" )
                   Width: =140
                   Height: =48
-                  OnSelect: =Back()
+                  # Clears the resume key: leaving the form must not leave one armed for a
+                  # project the user is walking away from.
+                  OnSelect: =Set( gPrResumeKey, "" ); Back()
             - btnPrSave:
                 Control: Classic/Button@2.2.0
                 Properties:
@@ -1408,6 +1422,7 @@ Screens:
                             Notify( "Project saved, but: " & gPrWarn, NotificationType.Warning ) );
                         If( IsEmpty(colChildErrors),
                             Notify("Project saved with everything attached.", NotificationType.Success);
+                            Set( gPrResumeKey, "" );
                             Navigate( scrProject, ScreenTransition.Cover ),
                             Notify( CountRows(colChildErrors) & " item(s) could not be created — they are still listed below, press Save to retry."
                                       & "   " & First(colChildErrors).Kind & " """ & First(colChildErrors).Name & """: "
@@ -1999,11 +2014,13 @@ Screens:
       # modals, and the staged transaction's client and product. Declared LAST,
       # after both modals, so the dialog paints above them.
       #
-      # AllowCreate is FALSE throughout on purpose: + New would navigate away,
-      # and this screen's OnVisible clears colNewTasks / colNewTransactions, so
-      # a return would destroy staged children — a much worse loss than the
-      # cleared inputs fixed on scrTaskEdit. Creating a client mid-project is
-      # available from the transaction editor, or from scrReference.
+      # AllowCreate is ON for the STAGED TRANSACTION'S CLIENT AND PRODUCT ONLY.
+      # + New navigates away, and this screen's OnVisible clears colNewTasks /
+      # colNewTransactions — staged children that exist nowhere else until the
+      # project is saved. What makes it safe is the resume guard at the top of
+      # OnVisible: a return matching gPrResumeKey skips every seed and clear, so
+      # the staged rows, the open modal and its half-filled inputs all survive.
+      # The five PERSON states stay false — there is no person to create.
       # See scrTaskEdit's instance for the full contract commentary.
       # =====================================================================
       - cmpPrPick:
@@ -2056,7 +2073,7 @@ Screens:
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )
             OnSearch: =Set( gPrQuery, cmpPrPick.Query )
-            AllowCreate: =false
+            AllowCreate: =gPrPicker = "NxClient" || gPrPicker = "NxProduct"
             OnConfirm: |
               =Switch( gPrPicker,
               "Manager",   Set( gPrManager,   { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),
@@ -2067,4 +2084,14 @@ Screens:
               "NxClient",  Set( gNxClient,    { Id: Value(cmpPrPick.Picked.Key), Value: cmpPrPick.Picked.Primary } ),
               "NxProduct", Set( gNxProduct,   { Id: Value(cmpPrPick.Picked.Key), Value: cmpPrPick.Picked.Primary } ) );
               Set( gPrPicker, "" )
+            # The staged transaction survives because the resume key makes OnVisible
+            # skip its clears. gPrPicker is cleared BEFORE navigating so the dialog is
+            # not still open underneath on return.
+            OnCreateNew: |
+              =Set( gPrResumeKey, gPrKey );
+               If( gPrPicker = "NxClient",
+                   Set( gClMode, "New" ); Set( gClReturn, "NxClient" ); Set( gPrPicker, "" );
+                   Navigate( scrClientEdit, ScreenTransition.Cover ),
+                   Set( gPdMode, "New" ); Set( gPdReturn, "NxProduct" ); Set( gPrPicker, "" );
+                   Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gPrPicker, "" )
