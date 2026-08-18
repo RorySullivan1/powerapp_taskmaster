@@ -36,8 +36,17 @@ Screens:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnTkSave
-        If( gTkResume,
-         Set( gTkResume, false ),
+        // WHICH task this visit is for. The resume guard below matches on it rather than
+        // on a bare boolean, because a boolean latch leaks: the picker sets it before
+        // navigating away to create a client or product, and NOTHING clears it unless the
+        // user comes back here. Leave that flow by any other route and the next task opened
+        // skips every seed and every Reset below — which is the whole screen, since they
+        // all live in this guard's else arm — and shows the PREVIOUS task's client and
+        // output data. Matching on identity makes a stale flag harmless: a different task
+        // cannot match, so it seeds normally.
+        Set( gTkKey, If( gEditMode = "Edit", "E" & gEditTask.ID, "N" & gSelProject.ID ) );
+        If( gTkResumeKey = gTkKey && Len(gTkKey) > 1,
+         Set( gTkResumeKey, "" ),
          Set( gTkProject,
               If( gEditMode = "Edit",
                   { Id: gEditTask.task_project_id.Id,
@@ -66,7 +75,7 @@ Screens:
         // taskmaster_taskproduct is only touched on save. Seeded from the junction on
         // Edit and left empty on New.
         //
-        // INSIDE THE gTkResume GUARD, like every other seed on this screen — coming
+        // INSIDE THE RESUME GUARD, like every other seed on this screen — coming
         // back from "create a new product" must not wipe what the user already staged.
         //
         // Shaped to {Id, Uid} on read: taskproduct_product_uid is the denormalised
@@ -1285,7 +1294,9 @@ Screens:
                   LayoutMinWidth: =140
                   Width: =140
                   Height: =48
-                  OnSelect: =Back()
+                  # Clears the resume key too: abandoning the form must not leave one armed
+                  # for a task the user is walking away from.
+                  OnSelect: =Set( gTkResumeKey, "" ); Back()
             - btnTkSave:
                 Control: Classic/Button@2.2.0
                 Properties:
@@ -1475,13 +1486,24 @@ Screens:
                     // denominator, so portfolio completion then reads high.
                     If( newPc <> Coalesce(gTkRollupProj.project_perc_completion, -1),
                     IfError(
-                    Set( gSelProject,
-                    Patch( taskmaster_projects, gTkRollupProj, { project_perc_completion: newPc } ) ),
+                    // PATCH, THEN RE-READ. Do NOT keep the Patch return: scrProject renders
+                    // entirely from gSelProject, and a record carried into a variable can come
+                    // back with columns trimmed, so the screen draws as a blank template with
+                    // every field empty. The LookUp is one delegable read on an indexed ID and
+                    // is the only thing that guarantees a full record.
+                    // gTkRollupSaved exists only to hold the discarded return — IfError's
+                    // arms must be type-compatible, so the Patch cannot stand bare beside a
+                    // Set. The ID comes from gTkRollupProj, which is untouched and came
+                    // straight from the data source, so it is a full record.
+                    Set( gTkRollupSaved,
+                    Patch( taskmaster_projects, gTkRollupProj, { project_perc_completion: newPc } ) );
+                    Set( gSelProject, LookUp( taskmaster_projects, ID = gTkRollupProj.ID ) ),
                     Set( gTkWarn, gTkWarn & "Task saved, but the project rollup didn't update: " & FirstError.Message & "   " )) ) ) ) );
                     If( Len(gTkWarn) > 0,
                     Notify( "Task saved, but: " & gTkWarn, NotificationType.Warning ) );
                     If( Len(gTkWarn) = 0,
                     Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
+                    Set( gTkResumeKey, "" );
                     Back() ) );
                     Set( gSaving, false ) )
       # =====================================================================
@@ -1585,7 +1607,7 @@ Screens:
                              Uid: cmpTkPick.Picked.Primary } ) );
               Set( gTkPicker, "" )
             OnCreateNew: |
-              =Set( gTkResume, true );
+              =Set( gTkResumeKey, gTkKey );
                If( gTkPicker = "Client",
                    Set( gClMode, "New" ); Set( gClReturn, "TaskClient" ); Set( gTkPicker, "" );
                    Navigate( scrClientEdit, ScreenTransition.Cover ),
