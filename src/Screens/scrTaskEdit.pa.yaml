@@ -1457,21 +1457,22 @@ Screens:
                     // The lookup pair is written as {Id, Value} — the shape SharePoint
                     // wants — and taskproduct_product_uid is the flat copy that can be
                     // sorted server-side, which a lookup column cannot.
-                    // WRAPPED, AND THEN VERIFIED. The reconcile used to be bare while the
-                    // rollup below it had an IfError, so a rejected junction write was
-                    // indistinguishable from success: the task saved, "Task created" fired,
-                    // Back() ran, and the links were simply absent.
-                    // Collect cannot sit bare in an IfError arm — the arms must be
-                    // type-compatible — so the return is captured and discarded.
-                    IfError(
+                    // THE ADDS CANNOT BE WRAPPED, SO THE ERROR IS READ AFTERWARDS.
+                    // Set() is not callable inside ForAll — Studio rejects it outright — and
+                    // IfError's arms must be type-compatible, so a bare Collect cannot sit
+                    // against a Set either. Between them those two rules leave no way to
+                    // catch this write in place. Errors() is the documented route: it
+                    // reports failures against a DATA SOURCE, after the fact, which is
+                    // exactly the shape a loop of writes needs.
                     ForAll( Filter( colTkWanted, !(Id in colTkLinksNow.ProdId) ) As add,
-                    Set( gTkLinkAdded,
                     Collect( taskmaster_taskproduct,
                     { taskproduct_task_id:     { Id: gTkSaved.ID, Value: gTkSaved.task_name },
                     taskproduct_product_id:  { Id: add.Id, Value: add.Uid },
                     taskproduct_product_uid: add.Uid,
-                    taskproduct_project_id:  gTkProject.Id } ) ) ),
-                    Set( gTkWarn, gTkWarn & "the product links didn't save: " & FirstError.Message & "   " ) );
+                    taskproduct_project_id:  gTkProject.Id } ) );
+                    If( !IsEmpty( Errors(taskmaster_taskproduct) ),
+                    Set( gTkWarn, gTkWarn & "the product links didn't save: "
+                    & First(Errors(taskmaster_taskproduct)).Message & "   " ) );
                     // RE-READ AND COUNT — this matters MORE than the IfError above, because
                     // it catches a write that was dropped without throwing as well as one
                     // that threw. Also the source for the summary, so the two cannot
