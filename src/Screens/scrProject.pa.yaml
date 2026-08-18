@@ -951,7 +951,9 @@ Screens:
                                           PaddingRight: =8
                                           X: =0
                                           Y: =0
-                                          Width: =Parent.TemplateWidth
+                                          # 36px is RESERVED ON THE RIGHT for the row's delete icon. Full TemplateWidth here
+                                          # puts this row underneath it and the two overlap.
+                                          Width: =Parent.TemplateWidth - 36
                                           Height: =Parent.TemplateHeight - 1
                                         Children:
                                           # LIFECYCLE glyph, bound to task_stage — the same
@@ -1077,7 +1079,9 @@ Screens:
                                           BorderThickness: =0
                                           X: =0
                                           Y: =0
-                                          Width: =Parent.TemplateWidth
+                                          # Stops short of the delete icon's strip, so a tap aimed at delete
+                                          # cannot fall through to "open the editor" instead.
+                                          Width: =Parent.TemplateWidth - 36
                                           Height: =Parent.TemplateHeight
                                           # Goes STRAIGHT to the editor, exactly like the
                                           # transaction and issue rows below. The old
@@ -1129,7 +1133,7 @@ Screens:
                                           HoverFill: =RGBA(197, 58, 58, 0.08)
                                           HoverBorderColor: =RGBA(0, 0, 0, 0)
                                           Tooltip: ="Delete this task"
-                                          X: =Parent.TemplateWidth - 34
+                                          X: =Parent.TemplateWidth - 32
                                           Y: =(Parent.TemplateHeight - 24) / 2
                                           Width: =24
                                           Height: =24
@@ -1254,7 +1258,9 @@ Screens:
                                           PaddingRight: =8
                                           X: =0
                                           Y: =0
-                                          Width: =Parent.TemplateWidth
+                                          # 36px is RESERVED ON THE RIGHT for the row's delete icon. Full TemplateWidth here
+                                          # puts this row underneath it and the two overlap.
+                                          Width: =Parent.TemplateWidth - 36
                                           Height: =Parent.TemplateHeight - 1
                                         Children:
                                           # DERIVED, NOT STORED. taskmaster_transactions has no
@@ -1365,7 +1371,9 @@ Screens:
                                           BorderThickness: =0
                                           X: =0
                                           Y: =0
-                                          Width: =Parent.TemplateWidth
+                                          # Stops short of the delete icon's strip, so a tap aimed at delete
+                                          # cannot fall through to "open the editor" instead.
+                                          Width: =Parent.TemplateWidth - 36
                                           Height: =Parent.TemplateHeight
                                           # Re-read on the way in, like the task row. This
                                           # gallery binds to a LIVE Filter rather than a
@@ -1402,7 +1410,7 @@ Screens:
                                           HoverFill: =RGBA(197, 58, 58, 0.08)
                                           HoverBorderColor: =RGBA(0, 0, 0, 0)
                                           Tooltip: ="Delete this transaction"
-                                          X: =Parent.TemplateWidth - 34
+                                          X: =Parent.TemplateWidth - 32
                                           Y: =(Parent.TemplateHeight - 24) / 2
                                           Width: =24
                                           Height: =24
@@ -1570,7 +1578,9 @@ Screens:
                                     PaddingRight: =6
                                     X: =0
                                     Y: =0
-                                    Width: =Parent.TemplateWidth
+                                    # 36px is RESERVED ON THE RIGHT for the row's delete icon. Full TemplateWidth here
+                                    # puts this row underneath it and the two overlap.
+                                    Width: =Parent.TemplateWidth - 36
                                     Height: =Parent.TemplateHeight - 1
                                   Children:
                                     # STATUS: open, or which way it closed.
@@ -1707,7 +1717,9 @@ Screens:
                                     BorderThickness: =0
                                     X: =0
                                     Y: =0
-                                    Width: =Parent.TemplateWidth
+                                    # Stops short of the delete icon's strip, so a tap aimed at delete
+                                    # cannot fall through to "open the editor" instead.
+                                    Width: =Parent.TemplateWidth - 36
                                     Height: =Parent.TemplateHeight
                                     # Re-read on the way in — see the transaction row for
                                     # why the live-Filter binding makes this a freshness
@@ -1736,7 +1748,7 @@ Screens:
                                     HoverFill: =RGBA(197, 58, 58, 0.08)
                                     HoverBorderColor: =RGBA(0, 0, 0, 0)
                                     Tooltip: ="Delete this issue"
-                                    X: =Parent.TemplateWidth - 34
+                                    X: =Parent.TemplateWidth - 32
                                     Y: =(Parent.TemplateHeight - 24) / 2
                                     Width: =24
                                     Height: =24
@@ -1746,7 +1758,8 @@ Screens:
                                       =Set( gDelKind, "Issue" );
                                        Set( gDelId, ThisItem.ID );
                                        Set( gDelName, ThisItem.issue_name );
-                                       Set( gDelRefs, 0 )      # =====================================================================
+                                       Set( gDelRefs, 0 )
+      # =====================================================================
       # DELETE CONFIRMATION — one instance serving all three galleries, keyed by
       # gDelKind. Declared LAST so positional z-order floats it over the content.
       #

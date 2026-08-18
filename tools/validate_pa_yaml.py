@@ -250,6 +250,38 @@ def walk(node, path=""):
             yield from walk(v, f"{path}/{i}")
 
 
+def stray_hash_errors(doc) -> list[str]:
+    """A `#` loose in a formula — almost always a YAML comment that got absorbed.
+
+    Power Fx has NO `#` comment: it uses `//` and `/* */`. So a bare `#` outside a
+    string literal is not a comment the way it looks, it is syntax the formula bar
+    will reject — and the whole paste with it.
+
+    It gets there when a `#` comment lands INSIDE a block scalar (`|`), where YAML
+    treats it as content rather than a comment. Everything downstream still parses,
+    the schema still passes, and the damage is only visible by reading the value.
+    Found in the wild on scrProject's icoDelIss, where an appended comment block was
+    glued onto the last line of an OnSelect.
+    """
+    out = []
+    for path, node in walk(doc):
+        for k, v in node.items():
+            if not isinstance(v, str) or not v.lstrip().startswith("="):
+                continue
+            body, in_str = strip_comments(v), False
+            for ch in body:
+                if ch == '"':
+                    in_str = not in_str
+                elif ch == "#" and not in_str:
+                    out.append(
+                        f"{path}/{k}: stray '#' in a formula — Power Fx has no '#' comment, "
+                        f"so this is a YAML comment absorbed into a block scalar and Studio "
+                        f"will reject the paste"
+                    )
+                    break
+    return out
+
+
 def token_errors(doc) -> list[str]:
     """Pass 2 — the values the schema leaves wide open."""
     out, warned = [], set()
@@ -641,7 +673,7 @@ def main() -> int:
                 print(f"    ... and {len(dups) - 12} more")
             print()
             continue
-        tok = token_errors(doc)
+        tok = token_errors(doc) + stray_hash_errors(doc)
         errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
         hard_tok = [t for t in tok if "NOTE " not in t]
         if not errors and not hard_tok:
