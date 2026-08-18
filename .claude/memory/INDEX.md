@@ -188,15 +188,17 @@ not know them will author something broken:
   different shapes. The ad-hoc version found two real bugs in one sitting. Note when
   building it that the column-token hook proposed in CLAUDE.md would NOT have caught either
   SharePoint name fault this session — scope it to authoring typos, not schema drift.
-- **EVERY `indexed: true` COLUMN IS LIVE IN SHAREPOINT (user, 2026-08-18)** — all 55 of them.
-  The label in `schema/schema.yaml` can now be trusted as provisioned fact, not intent.
-  **THREE COLUMNS WANT AN INDEX AND ARE NOT LABELLED, so the user's sweep did NOT cover them** —
-  the golden source has to declare it before SharePoint can apply it:
-  `task_date_completion` (the reports window filter rides on it), and
-  `issue_task_name` + `issue_transaction_name` (issue #15's detach query filters on both;
-  delegable but unindexed, and SharePoint refuses an unindexed filter past 5,000 items).
-  Label them in `schema.yaml` first, then provision. Per-list index counts are 9/9/5/6 against
-  SharePoint's cap of 20, so there is room. Indexes CANNOT be added past 20,000 items.
+- **OWED IN SHAREPOINT — THREE NEW INDEXES (labelled 2026-08-18, NOT yet provisioned).**
+  The user's sweep confirmed every `indexed: true` column live (55 of them), but these three were
+  unlabelled at the time so it could not have covered them; they are labelled NOW and are the only
+  gap between the golden source and SharePoint:
+  **`task_date_completion`** (scrReports' window filter rides on it),
+  **`issue_task_name`** and **`issue_transaction_name`** (issue #15's detach query filters on both).
+  All three are delegable but unindexed, and **SharePoint refuses an unindexed filter past 5,000
+  items** — so they fail exactly when the list is big enough for it to matter. Adding them takes
+  tasks to 10 and issues to 8 against SharePoint's cap of 20, so there is room.
+  **An index CANNOT be added past 20,000 items.**
+  Once provisioned, `indexed: true` is again trustworthy as provisioned fact across the whole file.
 
 - **ISSUE #14 IS DIAGNOSED AND THE FOUR FIXES ARE WRITTEN, UNPASTED.** Multi-product task links never
   reach `taskmaster_taskproduct` and the failure is silent. All four fixes are in `main` (guard +
