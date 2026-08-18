@@ -820,9 +820,19 @@ Screens:
                                           Text: |
                                             ="Tasks   " & CountRows( Filter(colProjectTasks, task_stage.Value = "Completed") )
                                             & " of " & CountRows(colProjectTasks) & " complete"
-                                            & If( gPrjNoWgt > 0,
+                                            // AN EMPTY WEIGHTS TABLE IS A DIFFERENT FAULT
+                                            // FROM AN UNKNOWN STAGE, and needs a different
+                                            // action, so it is reported separately. Every
+                                            // task missing at once means gStageWeights is
+                                            // blank, not that a value drifted — App.OnStart
+                                            // sets it and Studio only runs that on app open
+                                            // or on Run OnStart, so editing it is not enough.
+                                            & If( IsEmpty(gStageWeights),
+                                                  "   ·   stage weights not loaded — run App.OnStart",
+                                                  gPrjNoWgt > 0,
                                                   "   ·   " & gPrjNoWgt
-                                                  & " with an unrecognised stage, scored 0", "" )
+                                                  & " with an unrecognised stage, scored 0",
+                                                  "" )
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.H3
                                           FontWeight: =FontWeight.Semibold
