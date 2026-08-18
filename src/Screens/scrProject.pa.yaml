@@ -49,6 +49,32 @@ Screens:
                      // in the meantime except a stale label.
                      Set( gPrjPhaseErr, FirstError.Message ) );
             Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
+        // WEIGHTED COMPLETION IS DERIVED HERE TOO, for the same reason as the phase
+        // above: this screen already holds every task on the project, so the number
+        // costs nothing to compute and is always current — whereas the STORED value is
+        // only ever as fresh as the last task save whose STAGE MOVED. Saving a task
+        // without changing its stage deliberately skips the rollup, so the column can
+        // sit stale indefinitely, and it is blank outright on any project untouched
+        // since it was recreated. A screen that shows a ring should not depend on that.
+        // Written back only on a change, exactly like the phase, so opening a project
+        // repairs the stored copy the other screens read.
+        Set( gPrjPc,
+             If( CountRows(colProjectTasks) = 0, 0,
+                 RoundDown( Average( AddColumns( colProjectTasks, wgt,
+                                Coalesce( LookUp(gStageWeights,
+                                                 Stage = task_stage.Value, Weight), 0 ) ),
+                            wgt ), 0 ) ) );
+        // The 500 cap matches scrTaskEdit's rollup so the two writers cannot disagree:
+        // past it the average is over a truncated fetch, and a wrong number written back
+        // is worse than a stale one left alone.
+        If( CountRows(colProjectTasks) < 500
+         && gPrjPc <> Coalesce(gSelProject.project_perc_completion, -1),
+            IfError( Set( gPrjPcScrap,
+                          Patch( taskmaster_projects,
+                                 LookUp(taskmaster_projects, ID = gSelProject.ID),
+                                 { project_perc_completion: gPrjPc } ) ),
+                     Set( gPrjPcErr, FirstError.Message ) );
+            Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
         // NO gProjArchived. It counted this project's individually-archived TASKS, and
         // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
         // ever return 0 and the "N archived (hidden)" caption it fed could never show.
@@ -529,8 +555,10 @@ Screens:
                                         Properties:
                                           Width: =120
                                           Height: =120
-                                          Percent: =Coalesce(gSelProject.project_perc_completion, 0)
-                                          Label: =Coalesce(gSelProject.project_perc_completion, 0) & "%"
+                                          # The DERIVED value, not the stored one — the ring
+                                          # is then correct even when the write-back fails.
+                                          Percent: =Coalesce(gPrjPc, 0)
+                                          Label: =Coalesce(gPrjPc, 0) & "%"
                                           AccentHex: ="#005A9E"
                               - colActions:
                                   Control: GroupContainer@1.5.0
