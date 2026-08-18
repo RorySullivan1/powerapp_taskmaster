@@ -59,6 +59,19 @@ taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name)
 Health drives the RAG pill; stage drives the kanban columns. Both are Choice → **no join cost,
 delegable `=`, and sortable** (Managed Metadata was neither).
 
+## Constraints SharePoint cannot hold
+
+Some rules are conditional on *another* field, and a SharePoint column can only be required or
+not. Those rules live in the app, which means **the list will happily accept a row that violates
+them** — anything writing outside `scrTaskEdit` bypasses them entirely.
+
+- **`task_output_audience` → `task_output_approval_id`.** A task whose Output section is on must
+  carry an audience; if that audience is anything but `Internal Only` it must also carry an
+  approval id **before it can reach stage `Completed`**. The id is deliberately *not* demanded
+  earlier — the external approval portal issues it late in the lifecycle, so requiring it at
+  draft time would block ordinary work. Both columns stay `required: false` in the golden
+  source; `scrTaskEdit`'s `lblTkMissing` is the only enforcement.
+
 ---
 
 # The two hard limits this model lives under

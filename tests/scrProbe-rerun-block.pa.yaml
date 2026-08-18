@@ -1,0 +1,288 @@
+# =============================================================================
+# scrProbe-rerun-block — how does a screen re-run a behaviour block IN PLACE?
+#
+# Issue #15. Deleting a task/transaction/issue from scrProject invalidates every
+# derived value that screen computes in OnVisible — project_phase, the weighted
+# completion rollup, the open-issue and open-task counts. OnVisible does NOT
+# re-run after an in-screen delete, so the screen would keep showing, and keep
+# writing back, numbers that no longer match the data.
+#
+# Duplicating that ~45-line derivation into each of the three delete handlers is
+# the one thing that must not happen: it would create four writers of
+# project_phase and project_perc_completion that can disagree.
+#
+# So the block needs ONE home and several callers. MS Learn documents Navigate
+# as setting "the OnVisible property of the NEW screen" and says Back/Navigate
+# "change only which screen is displayed" — it never addresses the case where
+# the new screen IS the current screen, so self-navigation is undefined, not
+# supported. Select() is documented and this app already relies on it
+# (cmpSelection's `Select(Parent)`), but whether it fires on a control the user
+# cannot see is folklore either way.
+#
+# THE CLAIM: a screen can re-run its own setup block in place. Four mechanisms,
+# separated so a partial result is still readable.
+#
+# READING THE RESULT
+#   "OnVisible fired" counts every OnVisible run on this screen.
+#   Each worker counter counts only its own OnSelect.
+#   POSITIVE CONTROL is the round trip: leaving to the second screen and coming
+#   back MUST raise "OnVisible fired". If it does not, the instrument cannot see
+#   OnVisible at all and NOTHING else on this probe means anything.
+#
+# Rules kept: self-contained (no data source, no gTheme, no component), only
+# tokens this app has landed (Label@2.5.1, Classic/Button@2.2.0), literal
+# colours throughout, one claim, positive control, result recorded in README.md.
+# =============================================================================
+Screens:
+  scrProbeRerun:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+      # Coalesce, not a bare +1: nothing initialises these, because a probe that
+      # depended on App.OnStart would be testing App.OnStart.
+      OnVisible: |
+        =Set( gRrOnVisible, Coalesce(gRrOnVisible, 0) + 1 )
+    Children:
+      - lblRrTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Re-run a behaviour block in place  ·  issue #15"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =700
+            Height: =28
+      - lblRrHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="Run the ROUND TRIP first — it is the positive control. If it does not raise " &
+               """OnVisible fired"", stop: the probe cannot see OnVisible and no other result here is readable."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(90, 98, 108, 1)
+            X: =16
+            Y: =48
+            Width: =700
+            Height: =40
+      # ---- counters --------------------------------------------------------
+      - lblRrOnVisible:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="OnVisible fired:  " & Coalesce(gRrOnVisible, 0)
+            Font: =Font.'Segoe UI'
+            Size: =16
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =100
+            Width: =340
+            Height: =28
+      - lblRrWVis:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="A · visible worker:  " & Coalesce(gRrWVis, 0)
+            Font: =Font.'Segoe UI'
+            Size: =16
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =132
+            Width: =340
+            Height: =28
+      - lblRrWTiny:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="B · 1x1 transparent worker:  " & Coalesce(gRrWTiny, 0)
+            Font: =Font.'Segoe UI'
+            Size: =16
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =164
+            Width: =340
+            Height: =28
+      - lblRrWHidden:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="C · hidden worker:  " & Coalesce(gRrWHidden, 0)
+            Font: =Font.'Segoe UI'
+            Size: =16
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =196
+            Width: =340
+            Height: =28
+      # ---- the three workers ----------------------------------------------
+      # Identical OnSelect bodies. The ONLY difference between them is how
+      # visible they are, which is the whole sub-case.
+      - btnRrWorkVis:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="worker A (visible)"
+            Fill: =RGBA(225, 229, 235, 1)
+            Color: =RGBA(32, 38, 45, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =12
+            X: =390
+            Y: =132
+            Width: =160
+            Height: =28
+            OnSelect: =Set( gRrWVis, Coalesce(gRrWVis, 0) + 1 )
+      # 1x1 and transparent, but Visible stays TRUE. This is the shape a real
+      # worker control would take on scrProject.
+      - btnRrWorkTiny:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            Visible: =true
+            X: =390
+            Y: =164
+            Width: =1
+            Height: =1
+            OnSelect: =Set( gRrWTiny, Coalesce(gRrWTiny, 0) + 1 )
+      - btnRrWorkHidden:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            Visible: =false
+            X: =390
+            Y: =196
+            Width: =160
+            Height: =28
+            OnSelect: =Set( gRrWHidden, Coalesce(gRrWHidden, 0) + 1 )
+      # ---- the four mechanisms under test ---------------------------------
+      - btnRrSelVis:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="A · Select(visible worker)"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =16
+            Y: =248
+            Width: =260
+            Height: =40
+            OnSelect: =Select( btnRrWorkVis )
+      - btnRrSelTiny:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="B · Select(1x1 worker)"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =288
+            Y: =248
+            Width: =260
+            Height: =40
+            OnSelect: =Select( btnRrWorkTiny )
+      - btnRrSelHidden:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="C · Select(hidden worker)"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =560
+            Y: =248
+            Width: =260
+            Height: =40
+            OnSelect: =Select( btnRrWorkHidden )
+      # D. The construct proposed on issue #15, and the reason this probe exists.
+      # If this raises "OnVisible fired", self-navigation re-runs OnVisible and the
+      # one-line repair is real. If it does nothing, the worker-control result
+      # above decides the design instead.
+      - btnRrNavSelf:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="D · Navigate(this same screen)"
+            Fill: =RGBA(96, 62, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =16
+            Y: =300
+            Width: =260
+            Height: =40
+            OnSelect: =Navigate( scrProbeRerun )
+      # POSITIVE CONTROL. A real screen change and back — OnVisible MUST rise.
+      - btnRrRoundTrip:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="POSITIVE CONTROL · round trip"
+            Fill: =RGBA(20, 122, 84, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =288
+            Y: =300
+            Width: =260
+            Height: =40
+            OnSelect: =Navigate( scrProbeRerunB )
+      - btnRrReset:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="reset counters"
+            Fill: =RGBA(225, 229, 235, 1)
+            Color: =RGBA(32, 38, 45, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =560
+            Y: =300
+            Width: =260
+            Height: =40
+            OnSelect: |
+              =Set( gRrOnVisible, 0 );
+               Set( gRrWVis, 0 );
+               Set( gRrWTiny, 0 );
+               Set( gRrWHidden, 0 )
+  # ---------------------------------------------------------------------------
+  # Positive-control partner. Going here and back is a real screen change, so it
+  # must raise the OnVisible counter.
+  scrProbeRerunB:
+    Properties:
+      Fill: =RGBA(235, 242, 238, 1)
+    Children:
+      - lblRrBText:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Positive control. Go back — ""OnVisible fired"" must increase by 1."
+            Font: =Font.'Segoe UI'
+            Size: =16
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =700
+            Height: =40
+      - btnRrBBack:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="back to the probe"
+            Fill: =RGBA(20, 122, 84, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =13
+            X: =16
+            Y: =68
+            Width: =260
+            Height: =40
+            OnSelect: =Navigate( scrProbeRerun )

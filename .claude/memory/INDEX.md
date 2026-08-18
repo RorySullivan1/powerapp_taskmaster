@@ -11,24 +11,23 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **Paste in progress.** LANDED (all 2026-08-18): `App.OnStart`, `cmpAppBar`,
-  **`scrReports`**, **`scrTaskEdit`**, and **`scrProjectEdit` / `scrClientEdit` /
-  `scrProductEdit`** together as issue #12. Remaining: `cmpPicker`, `cmpLookupField`,
-  `cmpNestedSelect`, `cmpToast`, `scrHome`, `scrProjects`, `scrProject`, `scrIssueEdit`,
-  `scrTransactionEdit`. `scrHome` and `scrProjects` are full reworks; `scrProject` /
-  `scrIssueEdit` / `scrTransactionEdit` carry LOGIC fixes, so none of it is cosmetic.
-  The `scrProductEdit`-before-`scrTaskEdit` ordering constraint is DISCHARGED — both are in.
-  **BEFORE PASTING ANY SCREEN: check every list it names is in the Data pane** — a paste
-  never adds a data source, and that cost four rounds on `scrTaskEdit`.
-- **`scrTaskEdit` IS LANDED BUT ITS MULTI-PRODUCT SAVE IS BROKEN (issue #14).** The junction
-  is never written and the failure is silent. Diagnosed 2026-08-18; **all four fixes are now
-  WRITTEN AND UNPASTED (`cabb467`)** — error handling plus a verifying re-read, the summary
-  moved after the reconcile, products out of the output gate, and a delegable delete. Its
-  next paste carries them. **WHY the write is rejected is STILL UNKNOWN**: it compiles, so it
-  is a runtime rejection. `tests/scrProbe-junction-write.pa.yaml` returns SharePoint's actual
-  message in one paste. **ELIMINATED 2026-08-18: `Title` is NOT required on the junction**
-  (user-confirmed), which was the cleanest fit. Still unchecked: the display field on both
-  lookup columns, and write permission.
+- **THE PASTE QUEUE IS TWO SCREENS, both RE-pastes (2026-08-18).** All 10 components and all
+  11 screens are otherwise in Studio, App object included. (1) **`scrTaskEdit`** — carries BOTH
+  issue #14's four fixes and issue #13's audience work. (2) **`scrProjects`** — issue #17's lead
+  filter; needs NO new data source (`Office365Users` is already app-wide) and no schema change,
+  so it can cross independently of #13's SharePoint work.
+  **FIRST, IN SHAREPOINT:** add Choice column `task_output_audience` to live `taskmaster_tasks`
+  (Direct Retail · Indirect Retail · Client-Specific · Generic · Internal Only; no default, not
+  required, not indexed) — **internal names freeze at creation, so name it exactly that**, and a
+  paste writing to a missing column fails. **THEN: check every list the screen names is in the
+  Data pane** — a paste never adds a data source, and that cost four rounds on this same screen.
+- **`scrTaskEdit`'s MULTI-PRODUCT SAVE IS BROKEN AND THE CAUSE IS STILL UNKNOWN (issue #14).**
+  The junction is never written and the failure is silent. The four fixes are in `main`, but they
+  harden the write — they do not explain it. It compiles, so the rejection is a RUNTIME one that
+  nothing on the repo side can see; `tests/scrProbe-junction-write.pa.yaml` returns SharePoint's
+  actual message in one paste. **ELIMINATED: `Title` is NOT required on the junction**
+  (user-confirmed), which was the cleanest fit. Still unchecked: the display field on both lookup
+  columns, and write permission.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -103,6 +102,8 @@ not know them will author something broken:
 - [2026-08-18] **A WRITE WITH NO `IfError` AND NO RE-READ IS A WRITE THAT CANNOT FAIL VISIBLY.** `scrTaskEdit` guards the task `Patch` and the project rollup, but the `taskmaster_taskproduct` reconcile between them is bare — so a rejected junction write still ends in `Notify("Task saved")` and `Back()`, and issue #14 arrived as "it doesn't save" with no error text to work from. Across a one-way gap the ONLY diagnostic channel is what the app itself reports, so **every write to a data source needs an `IfError` AND a verifying re-read** — the re-read is the stronger half, because it catches a silent no-op as well as a throw. Same class as the 2026-08-06 scrProjectEdit lesson (trust the record, never the message), one level out: there the write was checked and the message was not trusted; here the write was not checked at all — INDEX Decisions
 - [2026-08-18] **A DERIVED SUMMARY COLUMN MUST BE WRITTEN AFTER THE THING IT SUMMARISES, NOT IN THE SAME PATCH.** `task_product_summary` is written inside the task `Patch` from the staging collection, before the junction is touched and regardless of whether the junction write succeeds — so the task row claims products that have no links behind it. The reopen then reads the JUNCTION, not the summary, and the products vanish. **Order denormalised copies after their source and gate them on its success**, or the two states disagree the moment the source write fails — INDEX Decisions
 - [2026-08-18] **A VISIBILITY TOGGLE MUST NOT DRIVE A DELETE.** On `scrTaskEdit` the product set is gated on `tglTkOutput.Value` for BOTH display and reconcile, so switching the Output section off deletes every task↔product link silently on the next save. The toggle's own `Default` already special-cases `!IsEmpty(colTkProducts)` to stop hiding them — the design saying products are a relationship, not an output attribute. **When a toggle hides a control, it may decide what is SHOWN; it must never decide what is KEPT** — INDEX Decisions
+- [2026-08-18] **CONDITIONAL REQUIREMENTS LIVE IN THE APP, AND THE LIST STAYS PERMISSIVE ON PURPOSE.** Issue #13 adds `task_output_audience` (Choice: Direct Retail · Indirect Retail · Client-Specific · Generic · Internal Only). Two forks in the issue's wording were settled with the user and must not be relitigated: **(1) the approval-id requirement bites ONLY at stage `Completed`**, not on every save — the external portal issues that id late in the lifecycle, so demanding it at draft time would block ordinary work; **(2) the audience itself IS required whenever the Output section is on**, which removes the blank third state the approval rule would otherwise have to reason about. Both columns stay `required: false` in `schema.yaml` because SharePoint cannot express "required only when another field is set" — marking either required there would reject every task that produces no output at all. **`scrTaskEdit`'s `lblTkMissing` is the ONLY enforcement, so anything writing outside that screen bypasses it.** Known consequence, accepted: an EXISTING task that has output data but no audience is blocked from saving at all until one is picked, not merely from completing — INDEX Decisions
+- [2026-08-18] **AN OPTIONAL FILTER COSTS ONE PREDICATE, NOT A DOUBLED BRANCH TREE — `StartsWith(col, "")` IS TRUE.** `galProjects.Items` was already four branches (show-completed x coverage), each carrying its own `Sort` because `Sort(If(...))` will not fold. Adding a lead filter as a third binary would have made it EIGHT. Instead the unset state is the empty string, which `StartsWith` matches for every row, so the predicate is a no-op and the branch count is unchanged — the same trick the name search on that screen already relied on. **Grounded in MS Learn, not guessed:** SharePoint delegates `StartsWith` on complex types by deferring to the subfield, **only `Email` and `DisplayName` are delegable on Person**, and the exclusion note names only Choice and Lookup subfields — Person is NOT excluded. `project_manager` is indexed, so the predicate is delegable AND indexed. **The cost is prefix semantics, not equality** (`a@b.com` also matches `a@b.com.au`) — accepted, because the alternative is the eight-branch explosion. Reach for this shape on any screen where a filter needs an "all" state — INDEX Decisions
 
 ## Threads          (open items; remove when closed)
 - **`product_assetclass` (required) and `product_esg` are LIVE (2026-08-14)** — columns
@@ -178,9 +179,6 @@ not know them will author something broken:
 - **Known edge, accepted:** an issue whose linked task/transaction belongs to a DIFFERENT project.
 - Open questions Q3–Q10, Q13 — see `.claude/context/open-questions.md`. Q2/Q2b are CLOSED (out of scope).
 
-- **`scrProjectEdit` IS UNPASTED AND CARRIES TWO NEWLY-BOUND CHOICE COMBOS** (`colNtPrioOpts`,
-  `colNxCcyOpts`) plus the modal quick-adds. Same class of change that cost four rounds on
-  `scrTaskEdit`; check `taskmaster_transactions` is in the Data pane before pasting it.
 - **ISSUE WORKFLOW: PLAN AND COMMENT ON THE ISSUE, DO NOT IMPLEMENT** (user, 2026-08-18).
   An issue is a request for a design and a written plan on the thread, not a branch of code.
   Implementing #12 unasked was accepted after the fact ("this is fine") but was not what was
@@ -190,25 +188,40 @@ not know them will author something broken:
   different shapes. The ad-hoc version found two real bugs in one sitting. Note when
   building it that the column-token hook proposed in CLAUDE.md would NOT have caught either
   SharePoint name fault this session — scope it to authoring typos, not schema drift.
-- **OWED IN SHAREPOINT (reporting):** index `task_date_completion` (DateTime, `taskmaster_tasks`) —
-  the reports window filter rides on it. It is combined with two indexed predicates so it holds for
-  now, but indexes CANNOT be added past 20,000 items.
-- **`scrReports` IS AUTHORED BUT UNPASTED — the single largest unverified thing in the repo.**
-  ~2,560 lines, 22/22 valid, two review passes, ZERO Studio confirmation. It is also the most
-  fold-heavy screen, so it is the most exposed to the ECS lineage trap. Expect the first paste to
-  return one sentence; plan the diagnosis before pasting, not after.
+- **OWED IN SHAREPOINT — THREE NEW INDEXES (labelled 2026-08-18, NOT yet provisioned).**
+  The user's sweep confirmed every `indexed: true` column live (55 of them), but these three were
+  unlabelled at the time so it could not have covered them; they are labelled NOW and are the only
+  gap between the golden source and SharePoint:
+  **`task_date_completion`** (scrReports' window filter rides on it),
+  **`issue_task_name`** and **`issue_transaction_name`** (issue #15's detach query filters on both).
+  All three are delegable but unindexed, and **SharePoint refuses an unindexed filter past 5,000
+  items** — so they fail exactly when the list is big enough for it to matter. Adding them takes
+  tasks to 10 and issues to 8 against SharePoint's cap of 20, so there is room.
+  **An index CANNOT be added past 20,000 items.**
+  Once provisioned, `indexed: true` is again trustworthy as provisioned fact across the whole file.
 
-- **ISSUE #14 IS DIAGNOSED AND UNFIXED — nothing was written.** Multi-product task links never
-  reach `taskmaster_taskproduct` and the failure is silent. Plan is on the issue: **probe first**
-  (a one-button `tests/` probe that returns SharePoint's ACTUAL error for a bare `Collect` into
-  the junction — the rejection is a RUNTIME one, so nothing on the repo side can see it), then
-  four `scrTaskEdit` fixes (guard + verify the reconcile; write the summary after it; take
-  products out of the output gate; replace the non-delegable `RemoveIf`). The fixes stand
-  whatever the probe says and land in the SAME paste, so they cost no extra crossing.
+- **ISSUE #14 IS DIAGNOSED AND THE FOUR FIXES ARE WRITTEN, UNPASTED.** Multi-product task links never
+  reach `taskmaster_taskproduct` and the failure is silent. All four fixes are in `main` (guard +
+  verify the reconcile; write the summary after it; take products out of the output gate; replace
+  the non-delegable `RemoveIf`) and ride the next `scrTaskEdit` paste alongside issue #13.
+  **WHY SharePoint rejects the write is still UNKNOWN** — it compiles, so it is a RUNTIME
+  rejection and nothing on the repo side can see it. `tests/scrProbe-junction-write.pa.yaml`
+  returns the actual message in one paste; the fixes stand whatever it says.
   **Do not re-derive the diagnosis** — it is in the session log with line numbers.
+- **`tests/scrProbe-rerun-block.pa.yaml` IS WRITTEN AND UNRUN — it BLOCKS the `scrProject` half
+  of issue #15.** Deleting a child invalidates `project_phase` and the completion rollup, but
+  `OnVisible` does not re-run in place, and copying its ~45-line derivation into three delete
+  handlers would create four writers of the same two columns that can disagree. **MS Learn does
+  NOT cover navigating to the screen you are already on** — it defines `Navigate` in terms of
+  "the NEW screen" — so the one-line repair proposed on #15 is undefined, not supported.
+  The probe tests four mechanisms (Select on a visible / 1x1 / hidden worker, and self-navigate)
+  with a round-trip positive control. It names NO data source, so it can be pasted any time.
+  `tests/README.md` carries the protocol and how to read each outcome.
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-18 | issue #17: scrProjects filters by project lead via cmpPicker; StartsWith(col,"") keeps the Items branch count at four instead of eight; filter row was full at 718/720 so a second row was forced and the gallery dropped 56px | sessions/2026-08-18-issue17-project-lead-filter.md
+- 2026-08-18 | issue #13: task_output_audience added; approval id required only at stage Completed, audience required whenever Output is on; enforcement is app-side only because SharePoint cannot hold a conditional requirement. Paste queue confirmed down to scrTaskEdit alone | sessions/2026-08-18-issue13-output-audience.md
 - 2026-08-13 | scrProjects rebuilt on auto-layout after the columns were found to collide below ~850px TemplateWidth; vertical stack now relative; status SVG inlined (a component cannot go in a gallery) | INDEX Decisions 2026-08-13
 - 2026-08-13 | scrProjects reworked: coverage filter + show-completed toggle + six-column rows; new SVG cmpProjectStatus; project_phase gains "Not Started" as default | INDEX Decisions 2026-08-13
 - 2026-08-13 | layout formulas SURVIVE a paste (probe run in Studio); design + transfer skills, validator check, build-history row and src comments all corrected | tests/README.md

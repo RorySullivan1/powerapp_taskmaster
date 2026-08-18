@@ -189,3 +189,64 @@ before pasting. A screen paste never adds a data source, and an unknown name mak
 under investigation.
 
 Delete the PROBE task row and any PROBE link afterwards.
+
+---
+
+## `scrProbe-rerun-block.pa.yaml` — how does a screen re-run a behaviour block in place?
+
+**Status: NOT YET RUN.** Blocks the `scrProject` half of issue #15.
+
+### Why this has to be settled before the code is written
+
+Deleting a task, transaction or issue from `scrProject` invalidates every derived
+value that screen computes in `OnVisible`: `project_phase`, the weighted completion
+rollup, and the open-issue / open-task counts. **`OnVisible` does not re-run after an
+in-screen delete**, so the screen would keep showing — and keep writing back — numbers
+that no longer match the data.
+
+Copying that ~45-line derivation into each of the three delete handlers is the one
+outcome to avoid: it would create four writers of `project_phase` and
+`project_perc_completion` that can disagree. The block needs **one home and several
+callers**, and there is no grounded way to do that yet.
+
+### The claim under test
+
+**A screen can re-run its own setup block in place.** Four mechanisms, separated so a
+partial result is still readable.
+
+MS Learn describes `Navigate` as setting *"the **OnVisible** property of the **new**
+screen"*, and says `Back` and `Navigate` *"change only which screen is displayed"*. It
+never addresses the case where the new screen **is** the current screen — so
+self-navigation is **undefined, not supported**, and shipping it would be a guess.
+`Select()` is documented and this app already depends on it (`Select(Parent)` inside
+`cmpSelection`), but whether it fires on a control the user cannot see is folklore in
+both directions.
+
+| Sub-case | Mechanism | Decides |
+|---|---|---|
+| A | `Select()` on a normal visible button | Whether the worker-control pattern works at all |
+| B | `Select()` on a 1×1 transparent button (`Visible: =true`) | The shape a real worker on `scrProject` would take |
+| C | `Select()` on a `Visible: =false` button | Whether the worker can be hidden outright |
+| D | `Navigate()` to the screen you are already on | The one-line repair proposed on issue #15 |
+
+### Protocol
+
+1. **Run the POSITIVE CONTROL first** — the green round-trip button, then "back to the
+   probe". `OnVisible fired` must increase by 1. If it does not, the probe cannot see
+   `OnVisible` at all and **no other result on the screen means anything**. Stop there.
+2. Reset the counters.
+3. Press A, B and C once each. Note which worker counters move.
+4. Press D once. If `OnVisible fired` rises, self-navigation re-runs `OnVisible`.
+
+### How to read it
+
+- **D works** → issue #15 uses the one-line `Navigate( scrProject )` repair.
+- **D does nothing, B or C works** → the derivation moves into a worker control's
+  `OnSelect`, called by both `OnVisible` and each delete handler. One copy, several
+  callers, no duplication.
+- **D does nothing and only A works** → the worker has to be a real visible control;
+  it gets parked in the action row rather than hidden.
+- **Nothing but A works** and a visible worker is unacceptable → fall back to inlining
+  a trimmed recompute, and accept the duplication with a comment saying why.
+
+This probe carries no data source, so it can be pasted onto a blank screen at any time.
