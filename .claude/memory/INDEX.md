@@ -133,6 +133,12 @@ not know them will author something broken:
   keeps reading the old control. Awaiting a Studio tree search for the name. A rename in source
   (`galProjects` → e.g. `galPrjList`, plus four `=galProjects.*` refs in `ProjectsEmptyLabel`)
   is the permanent fix if confirmed.
+- **`task_supporter` IS INDEXED AGAIN (2026-08-18) BUT ITS VALUES WERE NEVER BACK-FILLED.**
+  The 2026-08-17 delete-and-recreate discarded every stored supporter, so any task predating
+  it reads blank. **That is the first thing to check behind issue #10** ("support count not
+  working") — a low count is most likely correct reporting over empty data, not a bug in the
+  fold. Same for `project_perc_completion`, which self-heals via the C3 rollup on any save;
+  `task_supporter` does NOT self-heal and needs entering by hand.
 - **OWED IN SHAREPOINT:** set the `project_phase` column default to `Not Started` (the value
   itself already exists).
 - **`cmpSelection` is IN USE and WORKING** — issue status/type/impact, transaction currency,

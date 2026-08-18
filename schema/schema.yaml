@@ -228,8 +228,9 @@ lists:
       - { name: task_priority,         type: Choice,          required: true,                  desc: "Priority", values: [Low, Moderate, High, Critical] }
       - { name: task_lead,             type: Person, multi: false, required: true,  indexed: true,  desc: "Primary owner" }
       # Deleted and recreated 2026-08-17 to get the internal name right (it was
-      # created as task_other_resources and only renamed). A recreated column comes
-      # back EMPTY and UNINDEXED — see notes.renamed_not_recreated.
+      # created as task_other_resources and only renamed); INDEX RESTORED 2026-08-18.
+      # A recreated column also comes back EMPTY, and that has not been back-filled —
+      # see notes.recreated_columns_come_back_empty and issue #10.
       - { name: task_supporter,        type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside task_lead)" }
       - { name: task_date_start,       type: DateTime,        required: false, indexed: true,  desc: "Actual start date, written at creation (default = Created)" }
       - { name: task_date_target,      type: DateTime,        required: false, indexed: true,  desc: "Due date" }
@@ -671,8 +672,11 @@ migration:
     were recreated, not only the one that errored.
   recreated_columns_come_back_empty: >-
     Deleting and recreating a column to fix its internal name discards every stored
-    value and drops any index. task_supporter (2026-08-17) needs its index restored;
-    project_perc_completion does not carry one. project_perc_completion also comes
+    value and drops any index. task_supporter's index was restored 2026-08-18;
+    project_perc_completion does not carry one. THE VALUES ARE A SEPARATE DEBT and
+    neither column has been back-filled — task_supporter reads blank on every task
+    that predates the recreate, which is the first thing to check behind issue #10
+    before treating a low support count as a reporting bug. project_perc_completion also comes
     back EMPTY, so every project reads 0% until the app-side rollup (C3) next writes
     it — that happens on a project or task save, so it heals as people work rather
     than needing a back-fill, but the figure is wrong until then and the reports
