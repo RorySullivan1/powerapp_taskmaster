@@ -11,20 +11,13 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **THE PASTE QUEUE IS FOUR SCREENS, all RE-pastes (2026-08-18).** All 10 components and all
-  11 screens are otherwise in Studio, App object included. (1) **`scrTaskEdit`** — #14's four
-  fixes, #13's audience work AND #15's delete. (2) **`scrProjects`** — #17's lead filter.
-  (3) **`scrProject`** and (4) **`scrTransactionEdit`** / **`scrIssueEdit`** — #15's delete.
-  Only `scrTaskEdit` is blocked (it needs the SharePoint column below); the rest can cross now.
-  **`cmpConfirmDialog` HAD NO CONSUMER IN `src/` UNTIL #15**, so its eight custom properties may
-  never have been declared in Studio — and a component's properties do NOT come across in a
-  paste. **Verify them BEFORE pasting any of the four**, or every dialog reads blank and simply
-  never opens, exactly as `cmpSelection` did for weeks.
-  **FIRST, IN SHAREPOINT:** add Choice column `task_output_audience` to live `taskmaster_tasks`
-  (Direct Retail · Indirect Retail · Client-Specific · Generic · Internal Only; no default, not
-  required, not indexed) — **internal names freeze at creation, so name it exactly that**, and a
-  paste writing to a missing column fails. **THEN: check every list the screen names is in the
-  Data pane** — a paste never adds a data source, and that cost four rounds on this same screen.
+- **THE PASTE QUEUE IS EMPTY (user, 2026-08-18).** All 11 screens, all 10 components and the
+  App object are in Studio, and `scrProject` / `scrProjects` / `scrTaskEdit` /
+  `scrTransactionEdit` / `scrIssueEdit` all landed carrying issues #13, #15 and #17.
+  **`task_output_audience` IS LIVE** on `taskmaster_tasks`, so #13's gate has a column behind it.
+  **Landed is not the same as exercised** — see Threads for the three behaviours nobody has run
+  yet: the confirm dialog actually opening, the completion gate actually blocking, and #14's
+  junction write.
 - **`scrTaskEdit`'s MULTI-PRODUCT SAVE IS BROKEN AND THE CAUSE IS STILL UNKNOWN (issue #14).**
   The junction is never written and the failure is silent. The four fixes are in `main`, but they
   harden the write — they do not explain it. It compiles, so the rejection is a RUNTIME one that
@@ -112,6 +105,17 @@ not know them will author something broken:
 - [2026-08-18] **`Select()` FIRES ON A CONTROL WITH `Visible: =false` — CONFIRMED IN STUDIO.** `tests/scrProbeRerun` ran A/B/C (Select on a visible / 1x1 transparent / hidden button) and all three scored identically, with the round-trip positive control passing. **So a screen can keep ONE copy of a behaviour block in a hidden control's `OnSelect` and call it from anywhere** — no need to smuggle the worker on as a 1x1 transparent button, and no need to duplicate the block per caller. This is what issue #15's rollup repair is built on, and it generalises: any "re-run this in place" need now has a grounded answer. **ALSO CONFIRMED: `Navigate()` to the CURRENT screen DOES re-run `OnVisible`** (user, second pass: reset, press D once, counter read 1). **MS Learn does not document this** — it defines `Navigate` in terms of "the NEW screen" — so it is grounded by probe, not by docs. **Issue #15 still uses the hidden worker, by choice not necessity:** no screen transition, no back-stack perturbation on a screen that already documents a `Back()`-alternation bug, and the block gets a NAME at each call site. D stays the cheaper option for a genuine full reload. **The probe's first run could not read D because it shared the positive control's counter** — that lesson is now `tests/README.md` rule 4: a positive control must not share an instrument with the thing measured — INDEX Decisions
 - [2026-08-18] **A `#` COMMENT INSIDE A YAML BLOCK SCALAR BECOMES FORMULA TEXT, AND NOTHING CAUGHT IT.** Appending to `scrProject` glued a comment banner onto the last line of `icoDelIss.OnSelect` (`Set( gDelRefs, 0 )      # ====...`). **Power Fx has NO `#` comment** — it uses `//` and `/* */` — so that is syntax Studio rejects, and it would have failed the whole paste. The file still parsed, the schema still passed, `22/22 valid` still printed: **the damage was visible only by READING the value**, and the user found it, not the tooling. `tools/validate_pa_yaml.py` now carries `stray_hash_errors()`, which flags any `#` outside a string literal in an `=`-prefixed value (the `'@odata.type': "#Microsoft..."` strings are correctly ignored). **The general lesson: appending to a file whose last line is inside a block scalar is unsafe unless the trailing newline is guaranteed** — and a validator that only checks structure cannot see content damage — INDEX Decisions
 - [2026-08-18] **`X` DOES NOT SURVIVE A WHOLE-SCREEN PASTE; `Y` AND EVERY OTHER PROPERTY DO** (user, observed on `scrProject`). Pasting the SAME control on its own kept `X`, so whatever drops it belongs to the screen-scope paste, not to the value — it failed both as `Parent.TemplateWidth - 32` and as a sibling `rowTaskBody.Width + 10`. **This is NOT the 2026-08-13 layout-freeze result, which tested a CONTROL paste onto a blank screen and found formulas survive** — screen-scope was never probed, and the two are now known to differ. **THE FIX IS TO OWN NO `X` AT ALL:** the three delete icons became last children of their auto-layout rows (`FillPortions: 0` parks them hard right), exactly like `icoDeleteProject`, which has been landed and working on that same screen all along. A child with no X has nothing to lose. **The mechanism is still UNKNOWN** — the user suspects comment/structure damage in the pasted text, and `scrProject` did in fact carry six column-0 comment lines from a botched scripted edit at the time (now removed, and `stray_comment_indent()` added to the validator). Correlational, not proven. Prefer auto-layout over any absolute `X` in a screen that gets re-pasted — INDEX Decisions
+- **LANDED BUT NEVER EXERCISED (2026-08-18) — three behaviours nobody has actually run.**
+  A paste succeeding proves Studio ACCEPTED the YAML, not that the feature works.
+  (1) **The confirm dialog opening at all.** `cmpConfirmDialog` had no consumer in `src/`
+  before #15, so its eight custom properties may never have been declared in Studio — and
+  properties do NOT cross in a paste. If they are missing every dialog reads blank and the
+  delete simply does nothing, with NO error. Same silent shape as `cmpSelection`.
+  (2) **#13's completion gate.** It only speaks when a task with a non-`Internal Only`
+  audience is moved to `Completed` with no approval id. Nothing else exercises it.
+  (3) **#14's junction write.** `scrTaskEdit` now carries the error handling, so a
+  multi-product save either works or finally returns SharePoint's real message. **The cause
+  was never found** — this is the first run that can say what it is.
 
 ## Threads          (open items; remove when closed)
 - **`product_assetclass` (required) and `product_esg` are LIVE (2026-08-14)** — columns
