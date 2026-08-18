@@ -11,9 +11,11 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **THE PASTE QUEUE IS ONE UNIT: a RE-paste of `scrTaskEdit` (user, 2026-08-18).** All 10
-  components and all 11 screens are otherwise in Studio, App object included. That single
-  crossing carries BOTH issue #14's four fixes and issue #13's audience work.
+- **THE PASTE QUEUE IS TWO SCREENS, both RE-pastes (2026-08-18).** All 10 components and all
+  11 screens are otherwise in Studio, App object included. (1) **`scrTaskEdit`** — carries BOTH
+  issue #14's four fixes and issue #13's audience work. (2) **`scrProjects`** — issue #17's lead
+  filter; needs NO new data source (`Office365Users` is already app-wide) and no schema change,
+  so it can cross independently of #13's SharePoint work.
   **FIRST, IN SHAREPOINT:** add Choice column `task_output_audience` to live `taskmaster_tasks`
   (Direct Retail · Indirect Retail · Client-Specific · Generic · Internal Only; no default, not
   required, not indexed) — **internal names freeze at creation, so name it exactly that**, and a
@@ -101,6 +103,7 @@ not know them will author something broken:
 - [2026-08-18] **A DERIVED SUMMARY COLUMN MUST BE WRITTEN AFTER THE THING IT SUMMARISES, NOT IN THE SAME PATCH.** `task_product_summary` is written inside the task `Patch` from the staging collection, before the junction is touched and regardless of whether the junction write succeeds — so the task row claims products that have no links behind it. The reopen then reads the JUNCTION, not the summary, and the products vanish. **Order denormalised copies after their source and gate them on its success**, or the two states disagree the moment the source write fails — INDEX Decisions
 - [2026-08-18] **A VISIBILITY TOGGLE MUST NOT DRIVE A DELETE.** On `scrTaskEdit` the product set is gated on `tglTkOutput.Value` for BOTH display and reconcile, so switching the Output section off deletes every task↔product link silently on the next save. The toggle's own `Default` already special-cases `!IsEmpty(colTkProducts)` to stop hiding them — the design saying products are a relationship, not an output attribute. **When a toggle hides a control, it may decide what is SHOWN; it must never decide what is KEPT** — INDEX Decisions
 - [2026-08-18] **CONDITIONAL REQUIREMENTS LIVE IN THE APP, AND THE LIST STAYS PERMISSIVE ON PURPOSE.** Issue #13 adds `task_output_audience` (Choice: Direct Retail · Indirect Retail · Client-Specific · Generic · Internal Only). Two forks in the issue's wording were settled with the user and must not be relitigated: **(1) the approval-id requirement bites ONLY at stage `Completed`**, not on every save — the external portal issues that id late in the lifecycle, so demanding it at draft time would block ordinary work; **(2) the audience itself IS required whenever the Output section is on**, which removes the blank third state the approval rule would otherwise have to reason about. Both columns stay `required: false` in `schema.yaml` because SharePoint cannot express "required only when another field is set" — marking either required there would reject every task that produces no output at all. **`scrTaskEdit`'s `lblTkMissing` is the ONLY enforcement, so anything writing outside that screen bypasses it.** Known consequence, accepted: an EXISTING task that has output data but no audience is blocked from saving at all until one is picked, not merely from completing — INDEX Decisions
+- [2026-08-18] **AN OPTIONAL FILTER COSTS ONE PREDICATE, NOT A DOUBLED BRANCH TREE — `StartsWith(col, "")` IS TRUE.** `galProjects.Items` was already four branches (show-completed x coverage), each carrying its own `Sort` because `Sort(If(...))` will not fold. Adding a lead filter as a third binary would have made it EIGHT. Instead the unset state is the empty string, which `StartsWith` matches for every row, so the predicate is a no-op and the branch count is unchanged — the same trick the name search on that screen already relied on. **Grounded in MS Learn, not guessed:** SharePoint delegates `StartsWith` on complex types by deferring to the subfield, **only `Email` and `DisplayName` are delegable on Person**, and the exclusion note names only Choice and Lookup subfields — Person is NOT excluded. `project_manager` is indexed, so the predicate is delegable AND indexed. **The cost is prefix semantics, not equality** (`a@b.com` also matches `a@b.com.au`) — accepted, because the alternative is the eight-branch explosion. Reach for this shape on any screen where a filter needs an "all" state — INDEX Decisions
 
 ## Threads          (open items; remove when closed)
 - **`product_assetclass` (required) and `product_esg` are LIVE (2026-08-14)** — columns
@@ -200,6 +203,7 @@ not know them will author something broken:
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-18 | issue #17: scrProjects filters by project lead via cmpPicker; StartsWith(col,"") keeps the Items branch count at four instead of eight; filter row was full at 718/720 so a second row was forced and the gallery dropped 56px | sessions/2026-08-18-issue17-project-lead-filter.md
 - 2026-08-18 | issue #13: task_output_audience added; approval id required only at stage Completed, audience required whenever Output is on; enforcement is app-side only because SharePoint cannot hold a conditional requirement. Paste queue confirmed down to scrTaskEdit alone | sessions/2026-08-18-issue13-output-audience.md
 - 2026-08-13 | scrProjects rebuilt on auto-layout after the columns were found to collide below ~850px TemplateWidth; vertical stack now relative; status SVG inlined (a component cannot go in a gallery) | INDEX Decisions 2026-08-13
 - 2026-08-13 | scrProjects reworked: coverage filter + show-completed toggle + six-column rows; new SVG cmpProjectStatus; project_phase gains "Not Started" as default | INDEX Decisions 2026-08-13
