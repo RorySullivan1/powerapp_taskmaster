@@ -22,7 +22,7 @@ Screens:
                                 issue_project_id.Id = gSelProject.ID
                              && issue_status.Value = "Open" ) ) );
         Set( gPrjOpenTasks,
-             CountRows( Filter( colProjectTasks, task_stage.Value <> "Complete" ) ) );
+             CountRows( Filter( colProjectTasks, task_stage.Value <> "Completed" ) ) );
         Set( gPrjDerived,
              With( { nT: CountRows(colProjectTasks),
                      nStarted: CountRows( Filter(colProjectTasks, task_stage.Value <> "Not Started") ),
@@ -781,7 +781,7 @@ Screens:
                                         Control: Label@2.5.1
                                         Properties:
                                           Text: |
-                                            ="Tasks   " & CountRows( Filter(colProjectTasks, task_stage.Value = "Complete") )
+                                            ="Tasks   " & CountRows( Filter(colProjectTasks, task_stage.Value = "Completed") )
                                             & " of " & CountRows(colProjectTasks) & " complete"
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.H3
@@ -894,7 +894,7 @@ Screens:
                                                             "Finalizing",
                                                                 "<circle cx='18' cy='18' r='13' fill='none' stroke='#D69828' stroke-width='3'/>"
                                                               & "<circle cx='18' cy='18' r='9' fill='#D69828'/>",
-                                                            "Complete",
+                                                            "Completed",
                                                                 "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
                                                               & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
                                                               & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
@@ -959,7 +959,7 @@ Screens:
                                                 Color: |
                                                   =If( !IsBlank(ThisItem.task_date_target)
                                                     && ThisItem.task_date_target < Today()
-                                                    && ThisItem.task_stage.Value <> "Complete",
+                                                    && ThisItem.task_stage.Value <> "Completed",
                                                        gTheme.Color.Danger, gTheme.Color.TextMuted )
                                                 Align: =Align.Right
                                                 VerticalAlign: =VerticalAlign.Middle

@@ -70,10 +70,10 @@ Screens:
                  project_phase.Value <> "Complete"
               && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
         Set( gTaskLed,
-             CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
+             CountRows( Filter(colMyTasks, task_stage.Value <> "Completed") ) );
         Set( gTaskLedOverdue,
              CountRows( Filter( colMyTasks,
-                 task_stage.Value <> "Complete"
+                 task_stage.Value <> "Completed"
               && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
         // ONE DELEGABLE QUERY PER PROJECT, not one query over a set. There is no
         // "issue_project_manager" to filter on, and `issue_project_id.Id in
@@ -200,10 +200,10 @@ Screens:
                                          project_phase.Value <> "Complete"
                                       && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
                                 Set( gTaskLed,
-                                     CountRows( Filter(colMyTasks, task_stage.Value <> "Complete") ) );
+                                     CountRows( Filter(colMyTasks, task_stage.Value <> "Completed") ) );
                                 Set( gTaskLedOverdue,
                                      CountRows( Filter( colMyTasks,
-                                         task_stage.Value <> "Complete"
+                                         task_stage.Value <> "Completed"
                                       && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
                                 Set( gIssLed,
                                      Coalesce( Sum( ForAll( colMyProjects As p,
@@ -573,7 +573,7 @@ Screens:
                               # (negative) count positive. No target date sorts last inside
                               # its own priority band rather than first.
                               Items: |
-                                =Sort( Filter(colMyTasks, task_stage.Value <> "Complete"),
+                                =Sort( Filter(colMyTasks, task_stage.Value <> "Completed"),
                                        Switch( task_priority.Value,
                                                "Critical", 1, "High", 2,
                                                "Moderate", 3, "Low", 4, 5 ) * 100000
@@ -641,7 +641,7 @@ Screens:
                                                       "Finalizing",
                                                           "<circle cx='18' cy='18' r='13' fill='none' stroke='#D69828' stroke-width='3'/>"
                                                         & "<circle cx='18' cy='18' r='9' fill='#D69828'/>",
-                                                      "Complete",
+                                                      "Completed",
                                                           "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
                                                         & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
                                                         & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
@@ -1172,7 +1172,7 @@ Screens:
                                                        { i: 2, k: "Planning",    c: "#6E7882" },
                                                        { i: 3, k: "Drafting",    c: "#005A9E" },
                                                        { i: 4, k: "Finalizing",  c: "#D69828" },
-                                                       { i: 5, k: "Complete",    c: "#31825D" },
+                                                       { i: 5, k: "Completed",    c: "#31825D" },
                                                        { i: 6, k: "Other",       c: "#8A5AA8" } ) As cat,
                                                 n, If( cat.k = "Other",
                                                        CountRows( Filter( colMyTasks,
@@ -1180,7 +1180,7 @@ Screens:
                                                            || task_stage.Value = "Planning"
                                                            || task_stage.Value = "Drafting"
                                                            || task_stage.Value = "Finalizing"
-                                                           || task_stage.Value = "Complete" ) ) ),
+                                                           || task_stage.Value = "Completed" ) ) ),
                                                        CountRows( Filter(colMyTasks, task_stage.Value = cat.k) ) ) ) },
                                     With( { tot: Max(1, Sum(cats, n)) },
                                         With(
