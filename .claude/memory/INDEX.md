@@ -19,6 +19,9 @@
   `scrTransactionEdit` / `scrProjectEdit` carry LOGIC fixes, so none of it is cosmetic.
   **BEFORE PASTING ANY SCREEN: check every list it names is in the Data pane** — a paste
   never adds a data source, and that cost four rounds on `scrTaskEdit`.
+- **`scrTaskEdit` IS LANDED BUT ITS MULTI-PRODUCT SAVE IS BROKEN (issue #14).** The junction
+  is never written and the failure is silent. Diagnosed 2026-08-18, **fixes NOT yet written**
+  — see Threads and that session log. Its next paste carries them.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -86,6 +89,10 @@ not know them will author something broken:
 - [2026-08-17] **CONTROL NAMES AND COLLECTION NAMES SHARE ONE NAMESPACE, AND THIS REPO USES `col*` FOR BOTH.** On scrTaskEdit `colTkFormat` is a GroupContainer, so a collection of that name resolved to the CONTROL and every reader failed as "Incompatible type" one hop from the cause. A second collision the same day: `colTkStageOpts` already existed for `task_stage` with an `{Id, Label}` shape, and reusing it for `task_client_stage` would have redefined it and broken the selection strip. **Two different columns whose names both shorten to the same word is the trap.** Check both directions — a collection shadowing a control, and a collection seeded twice with different shapes — INDEX Decisions
 - [2026-08-17] **THE USER SAYING "IT IS CORRECTLY REFERENCED ELSEWHERE" IS EVIDENCE, NOT AN OBJECTION TO ANSWER.** I inferred from one reading that `project_name` lived in the built-in `Title`, wrote it into the golden source, and sent the user at their SharePoint columns. The columns were fine; the cause was `ShowColumns` losing the schema. **The counting test would have refuted the Title theory immediately** — every other screen reads that column and none of them failed. Retracted in `schema.yaml`; the Title conversion pattern is kept only for a list that genuinely needs it. **Do not write an unverified inference into the golden source: a false claim there outlives the conversation that produced it** — INDEX Decisions
 - [2026-08-15] **`pre_read_guard` exempts `src/` and `schema/`.** The only files over its 60KB cap are the three largest authored screens, so unmodified it would fire almost exclusively on the golden source. A screen read at 1500 of 3000 lines is how a truncated read becomes a wrong paste — and the gap returns only "it didn't work", so the cause is undiagnosable. **Any future write-time guard must fail open for the same reason** — a misfiring hook here costs a paste — INDEX Decisions
+
+- [2026-08-18] **A WRITE WITH NO `IfError` AND NO RE-READ IS A WRITE THAT CANNOT FAIL VISIBLY.** `scrTaskEdit` guards the task `Patch` and the project rollup, but the `taskmaster_taskproduct` reconcile between them is bare — so a rejected junction write still ends in `Notify("Task saved")` and `Back()`, and issue #14 arrived as "it doesn't save" with no error text to work from. Across a one-way gap the ONLY diagnostic channel is what the app itself reports, so **every write to a data source needs an `IfError` AND a verifying re-read** — the re-read is the stronger half, because it catches a silent no-op as well as a throw. Same class as the 2026-08-06 scrProjectEdit lesson (trust the record, never the message), one level out: there the write was checked and the message was not trusted; here the write was not checked at all — INDEX Decisions
+- [2026-08-18] **A DERIVED SUMMARY COLUMN MUST BE WRITTEN AFTER THE THING IT SUMMARISES, NOT IN THE SAME PATCH.** `task_product_summary` is written inside the task `Patch` from the staging collection, before the junction is touched and regardless of whether the junction write succeeds — so the task row claims products that have no links behind it. The reopen then reads the JUNCTION, not the summary, and the products vanish. **Order denormalised copies after their source and gate them on its success**, or the two states disagree the moment the source write fails — INDEX Decisions
+- [2026-08-18] **A VISIBILITY TOGGLE MUST NOT DRIVE A DELETE.** On `scrTaskEdit` the product set is gated on `tglTkOutput.Value` for BOTH display and reconcile, so switching the Output section off deletes every task↔product link silently on the next save. The toggle's own `Default` already special-cases `!IsEmpty(colTkProducts)` to stop hiding them — the design saying products are a relationship, not an output attribute. **When a toggle hides a control, it may decide what is SHOWN; it must never decide what is KEPT** — INDEX Decisions
 
 ## Threads          (open items; remove when closed)
 - **`product_assetclass` (required) and `product_esg` are LIVE (2026-08-14)** — columns
@@ -164,6 +171,15 @@ not know them will author something broken:
   fold-heavy screen, so it is the most exposed to the ECS lineage trap. Expect the first paste to
   return one sentence; plan the diagnosis before pasting, not after.
 
+- **ISSUE #14 IS DIAGNOSED AND UNFIXED — nothing was written.** Multi-product task links never
+  reach `taskmaster_taskproduct` and the failure is silent. Plan is on the issue: **probe first**
+  (a one-button `tests/` probe that returns SharePoint's ACTUAL error for a bare `Collect` into
+  the junction — the rejection is a RUNTIME one, so nothing on the repo side can see it), then
+  four `scrTaskEdit` fixes (guard + verify the reconcile; write the summary after it; take
+  products out of the output gate; replace the non-delegable `RemoveIf`). The fixes stand
+  whatever the probe says and land in the SAME paste, so they cost no extra crossing.
+  **Do not re-derive the diagnosis** — it is in the session log with line numbers.
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-13 | scrProjects rebuilt on auto-layout after the columns were found to collide below ~850px TemplateWidth; vertical stack now relative; status SVG inlined (a component cannot go in a gallery) | INDEX Decisions 2026-08-13
@@ -184,3 +200,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-17 | main fast-forwarded to the feature branch; cross-currency conversion settled as out of scope | INDEX Decisions 2026-08-17
 - 2026-08-17 | scrReports authored end to end (~2,560 lines, 6 bands + person overlay) on one Select()-queued load routine; two code-review passes, 17 findings, 16 fixed and the join cost accepted | sessions/2026-08-17-1448-scrreports-authoring-and-review.md
 - 2026-08-18 | scrReports AND scrTaskEdit both LANDED; period narrowed to 1W/1M/1QTR, scope became a manager combobox, five literal Choice arrays bound to Choices(); four paste defects diagnosed | sessions/2026-08-18-0311-scrreports-scrtaskedit-paste-defects.md
+- 2026-08-18 | issue #14 diagnosed read-only: the taskmaster_taskproduct reconcile is unguarded so a rejected write reports success, the summary is written before it and independently of it, the output toggle silently deletes links, and the RemoveIf does not delegate; probe-first plan posted, NOTHING written | sessions/2026-08-18-1118-issue14-multiproduct-diagnosis.md
