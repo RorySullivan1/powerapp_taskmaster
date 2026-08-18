@@ -1397,10 +1397,12 @@ Screens:
                     { Id: gTkClient.Id, Value: gTkClient.Value }, Blank() ),
                     // task_product_id is RETIRED — the junction replaced it and this
                     // screen no longer writes it. The column keeps its stored values.
-                    // A copy for galleries; taskmaster_taskproduct is the source of truth.
-                    // Both are rewritten from the same collection below, so they cannot drift.
-                    task_product_summary:
-                    If( tglTkOutput.Value, Concat(colTkProducts, Uid, ", "), "" ),
+                    // task_product_summary IS NOT WRITTEN HERE. It used to be, from the
+                    // staged collection, BEFORE the junction was touched and regardless of
+                    // whether the junction write succeeded — so the task row claimed
+                    // products with no links behind it, and reopening (which seeds from the
+                    // JUNCTION) showed none. It is written after the reconcile instead,
+                    // from what the junction actually holds.
                     task_output_language:
                     If( tglTkOutput.Value && gTkLanguage <> "(none)", { Value: gTkLanguage }, Blank() ),
                     task_output_format:
@@ -1422,19 +1424,28 @@ Screens:
                     // Gated on the same toggle as every other output field: with the
                     // section off the task keeps no products, so colTkWanted is empty and
                     // every existing link is removed.
+                    // NOT GATED ON tglTkOutput. It was, and that made the toggle a delete
+                    // button: switching the Output section off left colTkWanted empty and the
+                    // reconcile below removed every link, silently and on a save the user
+                    // thought was unrelated. The toggle governs VISIBILITY only. The design
+                    // already says products are not an output attribute — the toggle's own
+                    // Default special-cases a non-empty product list to stop hiding them.
                     Clear( colTkWanted );
-                    If( tglTkOutput.Value, Collect( colTkWanted, colTkProducts ) );
-                    // DELETE WITH RemoveIf. DO NOT PROJECT THE BUILT-IN ID INTO A
-                    // COLLECTION AND COMPARE IT BACK — Studio rejects `{ LinkId: lk.ID }`
-                    // out of a ForAll row and every use of it: ID unrecognized at the
-                    // projection, unrecognized in the LookUp that reads it, and the
-                    // comparison incompatible because the projected field never acquires a
-                    // type. A built-in does not travel that way; a real column does.
-                    // RemoveIf also needs one call rather than a LookUp and a Remove per
-                    // dropped link.
-                    RemoveIf( taskmaster_taskproduct,
-                    taskproduct_task_id.Id = gTkSaved.ID
-                    && !(taskproduct_product_id.Id in colTkWanted.Id) );
+                    Collect( colTkWanted, colTkProducts );
+                    // THE FILTER DELEGATES, THE TEST DOES NOT — so they are separated.
+                    // `in` against a local collection cannot be delegated, and as one
+                    // RemoveIf predicate it dragged the delegable FK test down with it, so
+                    // the delete only ever saw the first page of the WHOLE junction list and
+                    // would silently stop removing links as that list grew.
+                    // Filtering on the indexed FK delegates and returns one task's links;
+                    // the undelegable membership test then runs client-side over that
+                    // handful. Remove() takes the SCOPE RECORD itself — never `lk.ID`
+                    // projected into a collection, which is the construct that failed three
+                    // ways here and is why RemoveIf was reached for in the first place.
+                    ForAll( Filter( taskmaster_taskproduct,
+                    taskproduct_task_id.Id = gTkSaved.ID ) As lk,
+                    If( !(lk.taskproduct_product_id.Id in colTkWanted.Id),
+                    Remove( taskmaster_taskproduct, lk ) ) );
                     // Read AFTER the delete, so what is here is what survives and the add
                     // diff is against live state. Only the lookup subfield is projected —
                     // `<collection>.taskproduct_product_id.Id` is not a projection Power Fx
@@ -1446,12 +1457,40 @@ Screens:
                     // The lookup pair is written as {Id, Value} — the shape SharePoint
                     // wants — and taskproduct_product_uid is the flat copy that can be
                     // sorted server-side, which a lookup column cannot.
+                    // WRAPPED, AND THEN VERIFIED. The reconcile used to be bare while the
+                    // rollup below it had an IfError, so a rejected junction write was
+                    // indistinguishable from success: the task saved, "Task created" fired,
+                    // Back() ran, and the links were simply absent.
+                    // Collect cannot sit bare in an IfError arm — the arms must be
+                    // type-compatible — so the return is captured and discarded.
+                    IfError(
                     ForAll( Filter( colTkWanted, !(Id in colTkLinksNow.ProdId) ) As add,
+                    Set( gTkLinkAdded,
                     Collect( taskmaster_taskproduct,
                     { taskproduct_task_id:     { Id: gTkSaved.ID, Value: gTkSaved.task_name },
                     taskproduct_product_id:  { Id: add.Id, Value: add.Uid },
                     taskproduct_product_uid: add.Uid,
-                    taskproduct_project_id:  gTkProject.Id } ) );
+                    taskproduct_project_id:  gTkProject.Id } ) ) ),
+                    Set( gTkWarn, gTkWarn & "the product links didn't save: " & FirstError.Message & "   " ) );
+                    // RE-READ AND COUNT — this matters MORE than the IfError above, because
+                    // it catches a write that was dropped without throwing as well as one
+                    // that threw. Also the source for the summary, so the two cannot
+                    // disagree: one read, both uses.
+                    ClearCollect( colTkLinksAfter,
+                    ForAll( Filter( taskmaster_taskproduct,
+                    taskproduct_task_id.Id = gTkSaved.ID ) As lk,
+                    { Uid: lk.taskproduct_product_uid } ) );
+                    If( CountRows(colTkLinksAfter) <> CountRows(colTkWanted),
+                    Set( gTkWarn, gTkWarn & "the product links didn't save: expected "
+                    & CountRows(colTkWanted) & ", the list holds " & CountRows(colTkLinksAfter) & ".   " ) );
+                    // THE SUMMARY IS WRITTEN FROM THE JUNCTION, NOT FROM THE FORM, and only
+                    // now that the junction is settled. It is a denormalised copy for
+                    // galleries, so it must never claim a link the junction does not hold.
+                    IfError(
+                    Set( gTkSummarySaved,
+                    Patch( taskmaster_tasks, gTkSaved,
+                    { task_product_summary: Concat(colTkLinksAfter, Uid, ", ") } ) ),
+                    Set( gTkWarn, gTkWarn & "the product summary didn't update: " & FirstError.Message & "   " ) );
                     // --- C3: rewrite the parent project's weighted completion ---------
                     // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average
                     // over task STAGES, so editing a description, a date, a priority or any

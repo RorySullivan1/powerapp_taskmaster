@@ -1,0 +1,161 @@
+# =============================================================================
+# scrProbe-junction-write — why is Collect(taskmaster_taskproduct, …) rejected?
+#
+# Issue #14. scrTaskEdit writes the task row, then writes the junction, and the
+# junction never appears. The write COMPILES — the task saves, and a property in
+# compile error runs nothing at all — so this is a RUNTIME rejection, the one
+# class this repo has no instrument for. The reconcile is bare of IfError, so
+# SharePoint's message is thrown away where it happens.
+#
+# This probe does one thing: perform the write on its own and SHOW THE MESSAGE.
+#
+# BREAKS RULE 1 ON PURPOSE. Rule 1 says a probe names no data source, so that a
+# null result cannot be confused with the app being wrong. Here the data source
+# IS the claim — there is nothing else to test. Every other rule is kept: no
+# gTheme, no component, literal colours, one claim, positive control, and the
+# result goes in README.md.
+#
+# BEFORE PASTING: taskmaster_taskproduct and taskmaster_tasks must both be in the
+# Data pane. A screen paste never adds a data source, and an unknown name makes
+# OnSelect a compile error that runs nothing — which would look like the very
+# silence being investigated.
+# =============================================================================
+Screens:
+  scrProbeJunction:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblPjTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="Junction write probe  ·  issue #14"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =700
+            Height: =28
+      - lblPjHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="1. Type the ID of any existing task, and the ID of any existing product.
+              2. Press CONTROL first — it writes a row to taskmaster_tasks. If that fails the
+              instrument is broken, not the junction, and nothing below means anything.
+              3. Press JUNCTION. Whatever SharePoint says appears in the box, verbatim.
+              4. Press COUNT to see whether a row actually landed — a write can be rejected
+              with no message at all, and that is a different answer from an error."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =52
+            Width: =700
+            Height: =104
+      - txtPjTask:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="task ID"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =16
+            Y: =168
+            Width: =150
+            Height: =40
+      - txtPjProduct:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="product ID"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =180
+            Y: =168
+            Width: =150
+            Height: =40
+      # POSITIVE CONTROL. A write to a list that is KNOWN to accept writes, in the
+      # same formula shape. If this reports an error too, the fault is the probe,
+      # the connection or permissions — not taskmaster_taskproduct.
+      - btnPjControl:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="1 · CONTROL — write a task"
+            Fill: =RGBA(110, 120, 130, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =16
+            Y: =228
+            Width: =260
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  Set( vPjCtl,
+                       Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
+                              { task_name: "PROBE — delete me" } ) );
+                  Set( vPjMsg,
+                       "CONTROL wrote task ID " & Coalesce(Text(vPjCtl.ID), "(no ID returned)") ),
+                  Set( vPjMsg, "CONTROL FAILED: " & FirstError.Message ) )
+      # THE CLAIM. The same Collect scrTaskEdit runs, alone, with the message kept.
+      - btnPjJunction:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="2 · JUNCTION — write a link"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =292
+            Y: =228
+            Width: =260
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  Set( vPjLink,
+                  Collect( taskmaster_taskproduct,
+                           { taskproduct_task_id:     { Id: Value(txtPjTask.Text),    Value: "probe" },
+                             taskproduct_product_id:  { Id: Value(txtPjProduct.Text), Value: "probe" },
+                             taskproduct_product_uid: "PROBE",
+                             taskproduct_project_id:  0 } ) );
+                  Set( vPjMsg, "JUNCTION returned no error — press COUNT to see if a row landed" ),
+                  Set( vPjMsg, "JUNCTION FAILED: " & FirstError.Message ) )
+      # A REJECTED WRITE CAN BE SILENT. Counting is the only way to tell a write
+      # that threw from a write that was quietly dropped.
+      - btnPjCount:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="3 · COUNT links for that task"
+            Fill: =RGBA(49, 130, 93, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =568
+            Y: =228
+            Width: =260
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  Set( vPjMsg,
+                       "COUNT: taskmaster_taskproduct holds "
+                       & CountRows( Filter( taskmaster_taskproduct,
+                                            taskproduct_task_id.Id = Value(txtPjTask.Text) ) )
+                       & " link(s) for task " & txtPjTask.Text ),
+                  Set( vPjMsg, "COUNT FAILED: " & FirstError.Message ) )
+      - lblPjResult:
+          Control: Label@2.5.1
+          Properties:
+            Text: =Coalesce(vPjMsg, "— no result yet —")
+            Font: =Font.'Segoe UI'
+            Size: =14
+            Color: =RGBA(32, 38, 45, 1)
+            Fill: =RGBA(255, 255, 255, 1)
+            X: =16
+            Y: =292
+            Width: =812
+            Height: =120

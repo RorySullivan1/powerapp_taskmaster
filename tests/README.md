@@ -147,3 +147,45 @@ arithmetic is still correct and still readable; it is simply no longer *compulso
 Converting 11 screens to relative positioning is a real change with real regression
 risk across a one-way gap, and it buys responsiveness this fixed-canvas tablet app
 does not currently need. It is now available, not required.
+
+---
+
+## `scrProbe-junction-write.pa.yaml` — why is the junction write rejected?
+
+**Status: NOT YET RUN.** Written 2026-08-18 for issue #14.
+
+### The claim under test
+
+`scrTaskEdit` saves the task row and then writes task↔product links to
+`taskmaster_taskproduct`. The task saves; the links never appear. The write
+**compiles** — and a property in compile error runs nothing at all, so the task
+would not have saved either — which makes this a **runtime** rejection, the one
+class this repo has no instrument for. The reconcile carried no `IfError`, so
+SharePoint's message was discarded at the point it was produced.
+
+The probe performs that one `Collect` alone and shows the message verbatim.
+
+### Why this one names a data source
+
+Rule 1 says a probe names none, so that a null result cannot be confused with the
+app being wrong. Here **the data source is the claim** — there is nothing else to
+test. Every other rule is kept: no `gTheme`, no component, literal colours, one
+claim, a positive control, and this entry.
+
+### Reading the result
+
+Three buttons, in order. They answer different questions and the order matters:
+
+| Press | Result | Means |
+|---|---|---|
+| **1 CONTROL** | fails | the instrument, connection or permissions are broken — nothing below means anything |
+| **2 JUNCTION** | names an error | that message is the answer; fix SharePoint, not the app |
+| **2 JUNCTION** | "no error" | the write did not throw — which is **not** the same as landing |
+| **3 COUNT** | 0 after a clean 2 | the write is being **silently dropped**, the worst case and the one no `IfError` can catch |
+
+`taskmaster_taskproduct` and `taskmaster_tasks` must both be in the Data pane
+before pasting. A screen paste never adds a data source, and an unknown name makes
+`OnSelect` a compile error that runs nothing — which would imitate the very silence
+under investigation.
+
+Delete the PROBE task row and any PROBE link afterwards.
