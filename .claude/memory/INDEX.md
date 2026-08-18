@@ -158,6 +158,10 @@ not know them will author something broken:
 - **`scrProjectEdit` IS UNPASTED AND CARRIES TWO NEWLY-BOUND CHOICE COMBOS** (`colNtPrioOpts`,
   `colNxCcyOpts`) plus the modal quick-adds. Same class of change that cost four rounds on
   `scrTaskEdit`; check `taskmaster_transactions` is in the Data pane before pasting it.
+- **ISSUE WORKFLOW: PLAN AND COMMENT ON THE ISSUE, DO NOT IMPLEMENT** (user, 2026-08-18).
+  An issue is a request for a design and a written plan on the thread, not a branch of code.
+  Implementing #12 unasked was accepted after the fact ("this is fine") but was not what was
+  wanted. Post the plan as an issue comment, and wait to be told to build.
 - **A NAMES AUDIT IS WORTH BUILDING** — `tools/audit_names.py` beside `audit_globals.py`,
   checking collections that shadow a control name and collections seeded twice with
   different shapes. The ad-hoc version found two real bugs in one sitting. Note when
