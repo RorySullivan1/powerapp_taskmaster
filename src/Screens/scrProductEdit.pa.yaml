@@ -31,7 +31,32 @@ Screens:
         Set( gPdTypeId,   If( gPdMode = "Edit", Coalesce(gEditProduct.product_type_id, 0), 0 ) );
         Set( gPdTypePath, If( gPdMode = "Edit", Coalesce(gEditProduct.product_type_path, ""), "" ) );
         Set( gPdDesc,     If( gPdMode = "Edit", Coalesce(gEditProduct.product_description, ""), "" ) );
+        // gPdUnd IS THE UNDERLYING BOX'S Default, not just a copy of it. A suggestion
+        // chip appends to this global and Resets the control, which is the only way to
+        // write into a text input — there is no .Text setter.
+        Set( gPdUnd, If( gPdMode = "Edit", Coalesce(gEditProduct.product_underlying, ""), "" ) );
         ClearCollect( colMapProdType, mapping_producttype );
+        // THE TICKER VOCABULARY IS EMERGENT — every ticker any product already names,
+        // not a governed list, so typing a new one needs no schema change and no admin
+        // step. Concat joins every stored value into one comma-string and Split breaks
+        // it back into single tickers, which is what makes a multi-ticker product
+        // contribute each of its tickers separately.
+        //
+        // NOT DELEGABLE, and it does not need to be: Concat over a data source reads up
+        // to the data row limit. taskmaster_products is reference data — if it ever
+        // approaches 2000 rows the suggestions go stale silently, and nothing else on
+        // this screen breaks.
+        //
+        // A typo becomes a suggestion. That is the accepted cost of an emergent
+        // vocabulary and the reason the chips are a convenience, never a constraint.
+        ClearCollect( colPdUndAll,
+                      Sort( Distinct( Filter( ForAll( Split( Concat( taskmaster_products,
+                                                                     Coalesce(product_underlying, "") & "," ),
+                                                             "," ) As t,
+                                                      { Tk: Trim(Upper(t.Value)) } ),
+                                              Len(Tk) > 0 ),
+                                      Tk ),
+                            Value ) );
         // FROM Choices() ON THE COLUMN, never a literal list. product_assetclass ships
         // with PLACEHOLDER values in the golden source, so whatever is actually
         // provisioned appears here with no app change — and a label the Choice would
@@ -63,7 +88,8 @@ Screens:
         // without these the previous product's values survive into the next one, and the
         // control then DISAGREES WITH THE SAVE rather than failing visibly.
         Reset( txtPdUid ); Reset( txtPdDesc ); Reset( pickPdType );
-        Reset( tglPdEsg ); Reset( selPdAsset )
+        Reset( tglPdEsg ); Reset( selPdAsset );
+        Reset( txtPdUnd ); Reset( txtPdWrapper ); Reset( numPdMaturity ); Reset( txtPdFeatures )
     Children:
       - HeaderBar:
           Control: Rectangle@2.3.0
@@ -252,6 +278,185 @@ Screens:
                         FillPortions: =1
                         LayoutMinWidth: =140
                         Height: =34
+            # ---- #20 fields. All four OPTIONAL, so none of them appears in
+            # lblPdMissing and none can block a save. -------------------------------
+            - lblPdUndCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Underlying   (ticker, or several separated by commas)"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            # Default reads gPdUnd, NOT the record, because a suggestion chip has to be
+            # able to write into this box and a text input has no .Text setter — the chip
+            # sets the global and Resets the control. OnChange keeps the global in step
+            # while typing, so whichever way the text arrived, both agree.
+            - txtPdUnd:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: =gPdUnd
+                  Placeholder: ="e.g. AAPL, MSFT, SX5E"
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =Parent.Width - 48
+                  Height: =36
+                  OnChange: =Set( gPdUnd, txtPdUnd.Text )
+            # THE CHIPS ARE A CONVENIENCE, NOT A CONSTRAINT — the box takes anything.
+            # A ticker already in the box is filtered out, so the list shrinks as it is
+            # used and clicking twice cannot double an entry.
+            #
+            # BOTH SIDES ARE COMMA-WRAPPED AND DE-SPACED so the test is on a whole token.
+            # `in` is a SUBSTRING test, so the bare form would hide AA whenever AAPL was
+            # in the box — a chip silently missing for a ticker that is a prefix of
+            # another. Tickers carry no spaces, so stripping them is safe and saves
+            # splitting the text.
+            - galPdUndSug:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                Properties:
+                  Items: |
+                    =FirstN( Filter( colPdUndAll,
+                                     !( ("," & Value & ",")
+                                        in ( ","
+                                             & Substitute(Upper(Coalesce(gPdUnd, "")), " ", "")
+                                             & "," ) ) ),
+                             12 )
+                  # Horizontal strip: WrapCount high enough that the 12 rows lay out as
+                  # one line of chips rather than a column.
+                  WrapCount: =12
+                  TemplateSize: =28
+                  TemplatePadding: =0
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  ShowScrollbar: =false
+                  Visible: =CountRows(colPdUndAll) > 0
+                  FillPortions: =0
+                  LayoutMinHeight: =32
+                  Width: =Parent.Width - 48
+                  Height: =32
+                Children:
+                  - chipPdUnd:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: =ThisItem.Value
+                        Fill: =gTheme.Color.Bg
+                        Color: =gTheme.Color.Primary
+                        HoverFill: =gTheme.Color.Accent
+                        PressedFill: =gTheme.Color.Accent
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 6
+                        Height: =26
+                        # Strips ONE trailing comma before joining, so a box left reading
+                        # "AAPL," does not become "AAPL,, MSFT". Reset is what makes the
+                        # box re-read gPdUnd — without it the append is invisible.
+                        OnSelect: |
+                          =Set( gPdUnd,
+                                With( { b: Trim(Coalesce(gPdUnd, "")) },
+                                      If( Len(b) = 0,
+                                          ThisItem.Value,
+                                          If( Right(b, 1) = ",",
+                                              Trim(Left(b, Len(b) - 1)),
+                                              b ) & ", " & ThisItem.Value ) ) );
+                           Reset( txtPdUnd )
+            - lblPdWrapperCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Wrapper"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - txtPdWrapper:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: |
+                    =If( gPdMode = "Edit", Coalesce(gEditProduct.product_wrapper, ""), "" )
+                  Placeholder: ="e.g. Note, Certificate, Fund, Swap"
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =Parent.Width - 48
+                  Height: =36
+            - lblPdMatCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Maturity   (years — 0.25 is three months)"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            # CLASSIC, not modern, and that is deliberate: there is no grounded modern
+            # number-input token, and `TextInputType.Number` is a guess that would fail
+            # the whole paste. This is the same control and the same `Format` /
+            # `Value(.Text)` pair scrTransactionEdit uses for notional — HintText, not
+            # Placeholder, because the classic control names it differently.
+            - numPdMaturity:
+                Control: Classic/TextInput@2.3.2
+                Properties:
+                  # The NUMBER itself, not Text() of it — the same shape scrTransactionEdit
+                  # gives notional. A blank column stays blank rather than becoming "0".
+                  Default: |
+                    =If( gPdMode = "Edit", gEditProduct.product_maturity, Blank() )
+                  # Restricts typing to digits. Without it `Value(.Text)` on a non-numeric
+                  # entry is blank, and the save writes blank into an optional Number
+                  # column with nothing on screen to point at.
+                  Format: =TextFormat.Number
+                  HintText: ="e.g. 5"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =240
+                  Height: =36
+            - lblPdFeatCap:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Features"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+            - txtPdFeatures:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: |
+                    =If( gPdMode = "Edit", Coalesce(gEditProduct.product_features, ""), "" )
+                  Placeholder: ="Barriers, coupons, autocall triggers, capital protection…"
+                  Type: =TextInputType.Multiline
+                  TriggerOutput: =TriggerOutput.Delayed
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FillPortions: =0
+                  LayoutMinHeight: =84
+                  Width: =Parent.Width - 48
+                  Height: =84
             - lblPdDescCap:
                 Control: Label@2.5.1
                 Properties:
@@ -377,6 +582,21 @@ Screens:
               Notify( "A product with ID " & Trim(txtPdUid.Text) & " already exists.",
               NotificationType.Error ),
               Set( gPdDup, false );
+              // NORMALISED HERE, NOT IN THE BOX. Uppercasing as the user types would need
+              // a Reset on every keystroke and would fight the cursor; doing it at write
+              // time means the stored form is predictable and what was typed is left
+              // alone until Save. Per-token, so spacing is regular whatever was typed:
+              // each token trimmed and uppercased, empties dropped, rejoined with ", ".
+              // The trailing separator is cut afterwards rather than avoided — Concat's
+              // separator argument is not grounded in this dialect.
+              Set( gPdUndNorm,
+              Trim( Concat( ForAll( Split( Coalesce(txtPdUnd.Text, ""), "," ) As t,
+              { V: Trim(Upper(t.Value)) } ),
+              If( Len(V) > 0, V & ", ", "" ) ) ) );
+              Set( gPdUndNorm,
+              If( Right(gPdUndNorm, 1) = ",",
+              Left( gPdUndNorm, Len(gPdUndNorm) - 1 ),
+              gPdUndNorm ) );
               IfError(
               Set( gPdSaved,
               Patch( taskmaster_products,
@@ -386,7 +606,15 @@ Screens:
               product_type_path:   gPdTypePath,
               product_description: txtPdDesc.Text,
               product_assetclass:  { Value: gPdAsset },
-              product_esg:         tglPdEsg.Value } ) ),
+              product_esg:         tglPdEsg.Value,
+              product_underlying:  gPdUndNorm,
+              product_wrapper:     Trim(txtPdWrapper.Text),
+              // BLANK, NOT ZERO, WHEN THE BOX IS EMPTY. `Value("")` is blank already, but
+              // writing it explicitly says that an unset maturity is unknown rather than
+              // a zero-year tenor — the two would look identical in the list.
+              product_maturity:    If( Len(Trim(numPdMaturity.Text)) = 0, Blank(),
+              Value(numPdMaturity.Text) ),
+              product_features:    txtPdFeatures.Text } ) ),
               Set( gPdErr, FirstError.Message ) );
               // Trust the RECORD, never the message.
               If( IsBlank(gPdSaved.ID) && Len(gPdErr) = 0,

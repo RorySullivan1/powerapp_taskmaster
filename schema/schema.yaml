@@ -457,6 +457,23 @@ lists:
       # Indexed because the reason to flag ESG at all is to filter and group on it,
       # in the app and in any downstream report. Costs nothing on a list this small.
       - { name: product_esg,         type: Boolean,         required: false, indexed: true, default: false, desc: "TRUE when the product is flagged ESG" }
+      # ---- #20, ALL FOUR OPTIONAL. NOT YET IN SHAREPOINT -------------------------
+      # PROVISION THESE FOUR BEFORE PASTING scrProductEdit. A Patch that names a
+      # column the list does not have fails the WHOLE write, so the screen would stop
+      # saving products at all — not just the new fields.
+      #
+      # None is indexed. Nothing filters or sorts on them yet, and an index is the one
+      # thing here that CAN be added later without consequence — unlike these names,
+      # which freeze at creation.
+      #
+      # UPPERCASING IS THE APP'S JOB AND ONLY THE APP'S. SharePoint has no
+      # normalisation of its own, so a row written by a flow, a sync or a hand edit in
+      # the list UI arrives in whatever case it was typed. Treat the column as
+      # case-insensitive when reading it and never assume the stored form is upper.
+      - { name: product_underlying,  type: Text,            required: false,                desc: "Ticker, or several comma-separated. UPPERCASED by scrProductEdit on write. Free text on purpose — the pick list the form offers is EMERGENT, built from the values already stored, so a new ticker needs no schema or vocabulary change" }
+      - { name: product_wrapper,     type: Text,            required: false,                desc: "Product wrapper, e.g. Note / Certificate / Fund / Swap. Free text — no vocabulary was supplied, and one can be added later as a Choice without renaming this" }
+      - { name: product_maturity,    type: Number,          required: false,                desc: "Tenor in YEARS, decimals allowed (0.25 = three months). NOT a maturity date — user-confirmed 2026-08-19. A calendar maturity would be a separate DateTime column, not a reinterpretation of this one" }
+      - { name: product_features,    type: Note,            required: false,                desc: "Structural features, free text (display only)" }
 
   # ---------------------------------------------------------------------------
   # asset_approval — RETIRED 2026-08-09.  Approvals now live in a SEPARATE portal (out of scope);

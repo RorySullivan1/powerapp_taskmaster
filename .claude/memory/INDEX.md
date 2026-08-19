@@ -36,10 +36,14 @@
   **STANDING RISK, unverified: the contains-search is bounded by the DATA ROW LIMIT and fails
   SILENTLY.** Confirm Settings > General > Data row limit is 2000. It works today because the
   projects list is small; nothing in the app will say when that stops being true.
-- **THE REST OF THE BACKLOG IS #20 [Enhancement] - scrProductEdit** (four new optional product
-  columns: underlying, wrapper, maturity, features), filed 2026-08-19 and not started. **IT
-  NEEDS SCHEMA WORK FIRST** — `schema/schema.yaml` is the golden source and internal names
-  freeze at creation.
+- **#20 IS BUILT AND IS THE PASTE QUEUE (authored 2026-08-19, NOT landed):** four optional
+  columns on `taskmaster_products` — `product_underlying` (Text, app-uppercased, emergent chip
+  list), `product_wrapper` (Text), `product_maturity` (Number, YEARS not a date) and
+  `product_features` (Note) — plus scrProductEdit and the scrReference product rows.
+  **PROVISION THE FOUR COLUMNS IN SHAREPOINT FIRST.** A Patch naming a column the list lacks
+  fails the WHOLE write, so pasting the screen first stops products saving at all.
+  **`Split(...).Value` is the one ungrounded token in it** — see the session log; it sits in
+  exactly two places so a rejection is a one-token fix.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -317,3 +321,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #19 BUILT (authored, not landed): the #17 lead filter, its second filter row and its `cmpPicker` instance deleted; an "Only Show my Tasks" toggle joins coverage/search/show-completed on ONE row; `Items` is eight delegable branches because `person.Email = gUserEmail` has no neutral value where `StartsWith(…, "")` pretended to; gallery back to Y 220. The "720 usable" that forced the second row was the design HEIGHT — the width is 1318 | sessions/2026-08-19-issue19-scrprojects-mine-toggle.md
 - 2026-08-19 | #19 LANDED, then scrProjects re-authored: name search moved from delegable StartsWith to a LOCAL contains, as an outer Filter around the delegated eight-branch If — SharePoint delegates no substring op on Text. Ceiling is now the data row limit, silently | GitHub #19
 - 2026-08-19 | #19 CLOSED — scrProjects landed in two pastes (the rework, then the contains-search) and the search is exercised. The screen now carries the app's only row-limit-bounded query; everything else on it still folds | GitHub #19
+- 2026-08-19 | #20 built: 4 optional product columns. Two calls taken to the user first because names freeze — underlying is plain Text with an EMERGENT chip list (fill-in Choice rejected: Choices() cannot return fill-ins), maturity is YEARS not a date. Normalisation is at write time; maturity uses the classic number idiom because no modern number token is grounded | sessions/2026-08-19-issue20-product-columns.md

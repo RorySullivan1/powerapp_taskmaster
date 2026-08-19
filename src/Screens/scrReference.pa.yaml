@@ -206,7 +206,10 @@ Screens:
                              StartsWith(product_uid, txtAdminProductSearch.Text) ),
                      product_uid )
             WrapCount: =1
-            TemplateSize: =44
+            # 62, not 44: the #20 fields take a third line. Every Y below is measured
+            # against this number and the separator sits on the last pixel of it, so the
+            # four move together.
+            TemplateSize: =62
             TemplatePadding: =0
             TemplateFill: =RGBA(0, 0, 0, 0)
             BorderThickness: =0
@@ -240,12 +243,37 @@ Screens:
                   Y: =23
                   Width: =Parent.TemplateWidth - 24
                   Height: =18
+            # THE #20 LINE. Blank fields COLLAPSE rather than printing a dash each:
+            # three placeholders on a reference row read as damage, and a product with
+            # none of these is the normal case, not a defect. The separator is only
+            # emitted between two values that both exist, so the line never starts or
+            # ends with one. product_features is deliberately NOT here — it is free
+            # prose and would swamp a 651px row; it lives on the edit form.
+            - cellAdminPdSpec:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =With( { u: Coalesce(ThisItem.product_underlying, ""),
+                             w: Coalesce(ThisItem.product_wrapper, ""),
+                             m: If( IsBlank(ThisItem.product_maturity), "",
+                                    Text(ThisItem.product_maturity) & "y" ) },
+                           Trim( u
+                                 & If( Len(w) > 0, If(Len(u) > 0, "   ·   ", "") & w, "" )
+                                 & If( Len(m) > 0, If(Len(u & w) > 0, "   ·   ", "") & m, "" ) ) )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =41
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
             - lineAdminPd:
                 Control: Rectangle@2.3.0
                 Properties:
                   Fill: =gTheme.Color.Border
                   X: =0
-                  Y: =43
+                  Y: =61
                   Width: =Parent.TemplateWidth
                   Height: =1
             - hitAdminPd:
