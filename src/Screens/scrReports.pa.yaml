@@ -2,15 +2,10 @@
 # scrReports  —  native analytics. Power BI is OUT OF SCOPE; every chart here is
 # SVG in an Image control. Design note: docs/reports-screen-design.md.
 #
-# BUILT: band 0 (period + scope strips, coverage combo, refresh, truncation
-# banner), band 1 (desk pulse), band 2 (people, sortable, with an inline SVG
-# health bar).
-#
-# ALSO BUILT: band 3 (activity family, output format, median cycle time),
-# band 4 (started/completed/net-open combo + ageing), band 5 (activity trend,
-# per-currency tiles, coverage x product heatmap, ranked gap list), provenance.
-#
-# ALSO BUILT: the person overlay — a panel, not a screen, so the folds survive.
+# BANDS: 0 period + scope strips, refresh, truncation banner · 1 desk pulse ·
+# 2 people, sortable, with an inline SVG health bar · 3 where the work sits ·
+# 4 project trend + ageing · 5 transactions · provenance. The person overlay is
+# a panel, not a screen, so the folds survive it.
 #
 # ARCHITECTURE — fetch bounded, fold once, render from folds.
 #   * Every fact fetch is delegable and date- or state-bounded.
@@ -58,7 +53,6 @@ Screens:
         // "" is the All value and is itself blank — so it is set unconditionally.
         Set( gRptScope, Coalesce(gRptScope, "") );
         If( IsBlank(gRptSort),   Set( gRptSort, "Owns" ); Set( gRptSortDesc, true ) );
-        If( IsBlank(gRptCoverage), Set( gRptCoverage, "All coverage" ) );
         Set( gRptSelPerson, "" );
         // Refetch ONLY when the period changed, or on the first visit. A revisit with
         // the same window repaints from folds already in memory.
@@ -162,22 +156,12 @@ Screens:
                             project_supporter:       p.project_supporter } ) ),
                   ClearCollect( colRptIss, ShowColumns( OpenIssues, ID, issue_project_id ) )
               );
-              // ---- D1..D4 dimensions ----------------------------------------------
-              // THE VOCABULARIES COME FROM THE DIMENSION LISTS, never from the
-              // transactions. A gap is an ABSENT group — deriving the axes from the
-              // data would delete exactly the cells the gap grid exists to show.
-              // Bound with Choices() so the screen is agnostic to the values.
-              Concurrent(
-                  ClearCollect( colRptClients,  ShowColumns( taskmaster_clients, ID, client_name, client_coverage ) ),
-                  ClearCollect( colRptProducts, ShowColumns( taskmaster_products, ID, product_uid, product_type_path ) ),
-                  ClearCollect( colRptCoverage, Choices([@taskmaster_clients].client_coverage) ),
-                  ClearCollect( colRptProdL1,   Distinct( mapping_producttype, level1 ) )
-              );
-              // "All coverage" is Collected FIRST so it leads the list and makes the
-              // unfiltered view selectable without a separate clear button — the pattern
-              // scrProjects already lands.
-              ClearCollect( colRptCovOpts, { Value: "All coverage" } );
-              Collect( colRptCovOpts, ForAll( colRptCoverage As c, { Value: c.Value } ) );
+              // ---- D1 dimension ----------------------------------------------------
+              // product_type_path is the authoritative value and every product grouping on
+              // this screen splits it at " | ". Fetched whole because a transaction reaches
+              // a product by ID, not by path.
+              ClearCollect( colRptProducts,
+                  ShowColumns( taskmaster_products, ID, product_uid, product_type_path ) );
               // ---- truncation ------------------------------------------------------
               // Aggregates never delegate, so every figure is computed locally over
               // fetched rows. This is the ONLY place the app can notice it ran out.
@@ -187,16 +171,11 @@ Screens:
                      If( CountRows(colRptDone) >= 2000, "completed tasks  ", "" ) &
                      If( CountRows(colRptTx)   >= 2000, "transactions  ", "" ) &
                      If( CountRows(colRptPrj)  >= 2000, "projects  ", "" ) &
-                     // F5 and the two dimension fetches count too. Issues feed a tile of
-                     // their own, and a capped dimension list silently shrinks the gap
-                     // grid's vocabulary — both are exactly what this banner exists for.
+                     // F5 and the product fetch count too. Issues feed a tile of their
+                     // own, and a capped product list silently shortens the type-path
+                     // vocabulary every product grouping on this screen splits on.
                      If( CountRows(colRptIss)      >= 2000, "issues  ", "" ) &
-                     If( CountRows(colRptClients)  >= 2000, "clients  ", "" ) &
-                     If( CountRows(colRptProducts) >= 2000, "products  ", "" ) &
-                     // Distinct() over a data source does not delegate, and THIS is what
-                     // defines the grid's product axis — a capped product-type list
-                     // silently shortens the axis and invents gaps that are not gaps.
-                     If( CountRows(colRptProdL1)   >= 2000, "product types  ", "" ) ) );
+                     If( CountRows(colRptProducts) >= 2000, "products  ", "" ) ) );
               // Transactions inside the CURRENT window; colRptTx holds two windows.
               ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
               // ---- project map -----------------------------------------------------
@@ -334,11 +313,9 @@ Screens:
               // HOW MANY OPEN TASKS RECORD NO SUPPORTER AT ALL. Without this a support
               // count of zero means two entirely different things — nobody supports
               // anything, or the column is empty — and the screen cannot tell you which.
-              // That ambiguity is what made issue #10 hard to read: task_supporter was
-              // deleted and recreated on 2026-08-17, which discards every stored value, so
-              // a correct report over empty data looked identical to a broken one.
-              // Same rule as gRptUnmapped under the grid: state the gap rather than let a
-              // zero speak for it.
+              // task_supporter carries no stored value for older tasks, so a correct
+              // report over an empty column looks identical to a broken one. State the
+              // gap rather than let a zero speak for it.
               Set( gRptNoSup,
                    CountRows( Filter( colRptOpen, IsBlank(task_supporter.Email) ) ) );
               ClearCollect( colRptPerson,
@@ -433,25 +410,6 @@ Screens:
                     N: CountRows( Filter( colRptOpenTag,
                            Fmt <> "Unspecified" && !(Fmt in colRptFmtVocab.K) ) ) } );
               Set( gRptFmtMax, Max( 1, Coalesce(Max(colRptFmtBar, N), 0) ) );
-              // Median cycle time by family — the elapsed-time counterpart to the two
-              // volume charts, and the only genuine duration signal in the model.
-              ClearCollect( colRptDoneTag,
-                  ForAll( Filter(colRptDone, !IsBlank(task_date_start)) As t,
-                      { Fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
-                                       "Unclassified" ),
-                        D:   DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) } ) );
-              ClearCollect( colRptCycAll,
-                  ForAll( Distinct(colRptDoneTag, Fam) As f,
-                      With( { ds: Sort( Filter(colRptDoneTag, Fam = f.Value), D ) },
-                          With( { n: CountRows(ds) },
-                              { K: f.Value, N: n,
-                                Med: If( n = 0, -1, Index(ds, RoundUp(n / 2, 0)).D ) } ) ) ) );
-              Clear( colRptCycBar );
-              Collect( colRptCycBar,
-                  ForAll( Sequence( CountRows(colRptCycAll) ) As s,
-                      With( { r: Index( Sort(colRptCycAll, Med, SortOrder.Descending), s.Value ) },
-                          { Idx: s.Value, K: r.K, N: r.N, Med: r.Med } ) ) );
-              Set( gRptCycMax, Max( 1, Coalesce(Max(colRptCycBar, Med), 0) ) );
               // ---- BAND 4 folds: project trend -------------------------------------
               // BUCKETS KEYED ON A WHOLE NUMBER OF DAYS SINCE gRptFrom — not on date
               // comparison, and not on a calendar month, so one keying serves all three
@@ -526,10 +484,12 @@ Screens:
               Set( gRptNoTarget, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
                                      && IsBlank(project_date_target) ) ) );
               // ---- BAND 5 folds: transactions --------------------------------------
-              // Coverage reaches a transaction through its CLIENT, not its project
-              // (decided 2026-08-17): the grid reads "this coverage team has never traded
-              // that product type".
-              //
+              // ACCEPTED COST, NOT AN OVERSIGHT: a linear LookUp per transaction, so this
+              // is O(tx x products) and it re-runs on every period change. Power Fx has no
+              // hash join and no index on a collection, so there is no cheaper shape — and
+              // it is bounded by the same 2000-row cap the truncation banner reports. If it
+              // ever becomes the bottleneck, the fix is a denormalised product-type column
+              // on the transaction, not a smarter join here.
               // ACCEPTED COST, NOT AN OVERSIGHT: two linear LookUps per transaction, so
               // this is O(tx x clients) + O(tx x products) and it re-runs on every period
               // change. Power Fx has no hash join and no index on a collection, so there
@@ -538,10 +498,7 @@ Screens:
               // denormalised coverage column on the transaction, not a smarter join here.
               ClearCollect( colRptTxEnriched,
                   ForAll( colRptTxCur As x,
-                      { Cov: Coalesce( LookUp( colRptClients,
-                                           ID = x.transaction_client_name.Id ).client_coverage.Value,
-                                       "Unassigned" ),
-                        Prd: With( { sp: Trim( Coalesce( LookUp( colRptProducts,
+                      { Prd: With( { sp: Trim( Coalesce( LookUp( colRptProducts,
                                                    ID = x.transaction_product_id.Id ).product_type_path, "" ) ) },
                                  With( { i: Find(" | ", sp) },
                                      If( IsBlank(sp), "Unclassified",
@@ -555,35 +512,6 @@ Screens:
                       { K: c.Value,
                         N:   CountRows( Filter(colRptTxEnriched, Ccy = c.Value) ),
                         Tot: Coalesce( Sum( Filter(colRptTxEnriched, Ccy = c.Value), Amt ), 0 ) } ) );
-              ClearCollect( colRptCovClients,
-                  ForAll( colRptCoverage As c,
-                      { K: c.Value,
-                        N: CountRows( Filter(colRptClients, client_coverage.Value = c.Value) ) } ) );
-              // THE FULL CROSS PRODUCT, zero cells included. A gap is an ABSENT group, so
-              // the grid is built from the two VOCABULARIES rather than from the
-              // transactions — deriving it from the data would delete exactly the cells
-              // this section exists to show. Cell s maps to row/col with RoundDown and Mod,
-              // which also hands the SVG the coordinates it needs.
-              Set( gRptNCov, CountRows(colRptCoverage) );
-              Set( gRptNPrd, CountRows(colRptProdL1) );
-              ClearCollect( colRptGrid,
-                  ForAll( Sequence( gRptNCov * gRptNPrd ) As s,
-                      With( { ci: RoundDown( (s.Value - 1) / Max(1, gRptNPrd), 0 ) + 1,
-                              pi: Mod( s.Value - 1, Max(1, gRptNPrd) ) + 1 },
-                          With( { cv: Index(colRptCoverage, ci).Value,
-                                  pv: Index(colRptProdL1, pi).Value },
-                              { Ci: ci, Pi: pi, Cov: cv, Prd: pv,
-                                CN: Coalesce( LookUp(colRptCovClients, K = cv, N), 0 ),
-                                N:  CountRows( Filter(colRptTxEnriched, Cov = cv && Prd = pv) ) } ) ) ) );
-              Set( gRptGridMax, Max( 1, Coalesce(Max(colRptGrid, N), 0) ) );
-              // A client with no coverage, or a product with no type path, gets a fallback
-              // label that matches NO axis value — so those transactions sit in no cell
-              // while still counting in the KPI tile and the currency totals. Counted here
-              // and stated under the grid, because a total that does not reconcile is
-              // worse than one that explains itself.
-              Set( gRptUnmapped,
-                   CountRows( Filter( colRptTxEnriched,
-                                      Cov = "Unassigned" || Prd = "Unclassified" ) ) );
               // The people on the scoped manager's projects, resolved to a flat email
               // list so the gallery filters with `in` over ~40 rows rather than scanning
               // the unpivot on every repaint. Recomputed HERE as well as in the picker's
@@ -713,49 +641,6 @@ Screens:
                                                  PId in Filter( colRptPrjMap,
                                                                 Mgr = Coalesce(cboRptScope.Selected.Em, "") ).PId ),
                                          Em ) )
-            - wrapRptCov:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Vertical
-                  LayoutAlignItems: =LayoutAlignItems.Start
-                  LayoutGap: =2
-                  FillPortions: =0
-                  LayoutMinWidth: =220
-                  Width: =220
-                  Height: =56
-                Children:
-                  - lblRptCovCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Coverage"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        FillPortions: =0
-                        LayoutMinHeight: =16
-                        Width: =Parent.Width
-                        Height: =16
-                  # Filters the transaction bands ONLY, and never refetches — it
-                  # re-filters folds already in memory. Bound to Choices() via
-                  # colRptCovOpts, so the vocabulary is whatever the column holds.
-                  - cboRptCoverage:
-                      Control: ModernCombobox@1.1.1
-                      Properties:
-                        Items: =colRptCovOpts
-                        ItemDisplayText: =ThisItem.Value
-                        DefaultSelectedItems: |
-                          =Table( { Value: "All coverage" } )
-                        SelectMultiple: =false
-                        IsSearchable: =false
-                        InputTextPlaceholder: ="Coverage"
-                        FillPortions: =0
-                        LayoutMinWidth: =220
-                        Width: =220
-                        Height: =36
-                        OnChange: |
-                          =Set( gRptCoverage,
-                                Coalesce(cboRptCoverage.Selected.Value, "All coverage") )
             - lblRptAsAt:
                 Control: Label@2.5.1
                 Properties:
@@ -790,10 +675,9 @@ Screens:
                   OnSelect: |
                     =Refresh(taskmaster_tasks); Refresh(taskmaster_transactions);
                      Refresh(taskmaster_projects); Refresh(taskmaster_issues);
-                     // The dimensions too — the load re-collects them, so refreshing only
-                     // the fact lists lets a stale coverage or product vocabulary through.
-                     Refresh(taskmaster_clients); Refresh(taskmaster_products);
-                     Refresh(mapping_producttype);
+                     // Products too — the load re-collects the type-path vocabulary, so
+                     // refreshing only the fact lists lets a stale product path through.
+                     Refresh(taskmaster_products);
                      Set( gRptLoadedKey, "" );
                      Select( btnRptLoad )
       # =====================================================================
@@ -1810,80 +1694,6 @@ Screens:
                                         & "' text-anchor='end' font-size='16'"
                                         & " font-family='Segoe UI, sans-serif' fill='#6E7882'>" & N & "</text>" )
                                     & "</svg>" ) )
-            - pnlRptCyc:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  LayoutDirection: =LayoutDirection.Vertical
-                  LayoutAlignItems: =LayoutAlignItems.Start
-                  LayoutGap: =6
-                  PaddingTop: =12
-                  PaddingBottom: =12
-                  PaddingLeft: =16
-                  PaddingRight: =16
-                  Fill: =gTheme.Color.Surface
-                  BorderColor: =gTheme.Color.Border
-                  BorderThickness: =1
-                  FillPortions: =0
-                  LayoutMinHeight: =260
-                  Width: =Parent.Width - 48
-                  Height: =260
-                Children:
-                  - lblRptCycT:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Median cycle time by activity family"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.H3
-                        FontWeight: =FontWeight.Semibold
-                        Color: =gTheme.Color.Primary
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinHeight: =24
-                        Width: =Parent.Width - 32
-                        Height: =24
-                  - lblRptCycS:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Days from task start to completion, over the period's completions. Tasks with no start date are excluded."
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        FillPortions: =0
-                        LayoutMinHeight: =16
-                        Width: =Parent.Width - 32
-                        Height: =16
-                  - imgRptCyc:
-                      Control: Image@2.2.3
-                      Properties:
-                        ImagePosition: =ImagePosition.Fit
-                        FillPortions: =1
-                        LayoutMinHeight: =120
-                        Width: =Parent.Width - 32
-                        Height: =Parent.Height - 80
-                        Image: |
-                          =With( { n: CountRows(colRptCycBar) },
-                              "data:image/svg+xml;charset=utf-8," & EncodeUrl(
-                                  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 "
-                                & If(n = 0, 60, n * 40 + 8) & "'>"
-                                & Concat( colRptCycBar,
-                                      "<text x='0' y='" & ((Idx - 1) * 40 + 24)
-                                    & "' font-size='16' font-family='Segoe UI, sans-serif' fill='#20262D'>"
-                                    & EncodeHTML( If(Len(K) > 26, Left(K, 25) & "..", K) ) & "</text>"
-                                    & "<rect x='250' y='" & ((Idx - 1) * 40 + 10) & "' width='"
-                                    & Max(2, Round(Med / Max(1, gRptCycMax) * 520, 0))
-                                    & "' height='18' rx='9' fill='#D69828'/>"
-                                    & "<text x='790' y='" & ((Idx - 1) * 40 + 24)
-                                    & "' text-anchor='end' font-size='15'"
-                                    & " font-family='Segoe UI, sans-serif' fill='#20262D'>" & Med & "d</text>"
-                                    & "<text x='898' y='" & ((Idx - 1) * 40 + 24)
-                                    & "' text-anchor='end' font-size='14'"
-                                    & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>n=" & N & "</text>" )
-                                & If( n = 0,
-                                      "<text x='450' y='34' text-anchor='middle' font-size='16'"
-                                    & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                    & "Nothing completed with a start date in this window</text>", "" )
-                                & "</svg>" ) )
             # =============================================================
             # BAND 4 — how projects are trending
             # =============================================================
@@ -2032,9 +1842,9 @@ Screens:
                   BorderColor: =gTheme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =620
+                  LayoutMinHeight: =320
                   Width: =Parent.Width - 48
-                  Height: =620
+                  Height: =320
                 Children:
                   - lblRptTxT:
                       Control: Label@2.5.1
@@ -2136,183 +1946,6 @@ Screens:
                                     LayoutMinHeight: =26
                                     Width: =Parent.Width
                                     Height: =26
-                  - lblRptGridT:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          ="Coverage x product type" &
-                           If( gRptCoverage <> "All coverage", "   ·   " & gRptCoverage, "" )
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Body
-                        FontWeight: =FontWeight.Semibold
-                        Color: =gTheme.Color.TextPrimary
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinHeight: =22
-                        Width: =Parent.Width - 32
-                        Height: =22
-                  # LEGIBILITY CEILING ~60 CELLS. Past that the heatmap is suppressed and
-                  # the ranked gap list carries the section on its own — a grid nobody can
-                  # read is worse than no grid.
-                  - imgRptGrid:
-                      Control: Image@2.2.3
-                      Properties:
-                        Visible: =gRptNCov * gRptNPrd <= 60 && gRptNCov > 0 && gRptNPrd > 0
-                        ImagePosition: =ImagePosition.Fit
-                        FillPortions: =0
-                        LayoutMinHeight: =150
-                        Width: =Parent.Width - 32
-                        Height: =150
-                        # Zero cells are DRAWN, hollow with a hairline border, so a gap is
-                        # visible rather than absent. Shade is a whole-number alpha step.
-                        # THE COMBO FILTERS THIS TOO. Selecting one coverage leaves exactly
-                        # one row, so the row ordinal collapses to 1 rather than staying at
-                        # the cell's index in the full grid — otherwise the single row drew
-                        # at its original y and the chart looked empty. The heading said
-                        # "filtered" while the picture showed everything.
-                        Image: |
-                          =With( { cw: RoundDown(760 / Max(1, gRptNPrd), 0),
-                                   all: gRptCoverage = "All coverage" },
-                              "data:image/svg+xml;charset=utf-8," & EncodeUrl(
-                                  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 "
-                                & (30 + If(all, gRptNCov, 1) * 40 + 10) & "'>"
-                                & Concat( Filter(colRptGrid, Pi = 1 && (all || Cov = gRptCoverage)),
-                                      "<text x='0' y='" & (30 + If(all, Ci - 1, 0) * 40 + 26)
-                                    & "' font-size='15' font-family='Segoe UI, sans-serif' fill='#20262D'>"
-                                    & EncodeHTML( If(Len(Cov) > 16, Left(Cov, 15) & "..", Cov) ) & "</text>" )
-                                & Concat( Filter(colRptGrid, Ci = 1),
-                                      "<text x='" & (140 + (Pi - 1) * cw + RoundDown(cw / 2, 0))
-                                    & "' y='20' text-anchor='middle' font-size='13'"
-                                    & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                    & EncodeHTML( If(Len(Prd) > 10, Left(Prd, 9) & "..", Prd) ) & "</text>" )
-                                & Concat( Filter(colRptGrid, all || Cov = gRptCoverage),
-                                      "<rect x='" & (140 + (Pi - 1) * cw) & "' y='"
-                                    & (30 + If(all, Ci - 1, 0) * 40)
-                                    & "' width='" & Max(4, cw - 4) & "' height='36' rx='4' fill='"
-                                    & If(N = 0, "#FFFFFF", "#005A9E") & "' fill-opacity='"
-                                    // The "%" belongs to the NUMERIC branch only. Appended
-                                    // unconditionally it turned the empty-cell opacity into
-                                    // fill-opacity='1%' — 1 percent, not fully opaque — so a
-                                    // gap rendered as a near-invisible smudge rather than a
-                                    // white cell with a hairline border.
-                                    & If( N = 0, "1",
-                                          Text( Max(15, Round(N / Max(1, gRptGridMax) * 100, 0)) ) & "%" )
-                                    & "' stroke='" & If(N = 0, "#E1E5EB", "none")
-                                    & "' stroke-width='1'/>"
-                                    & "<text x='" & (140 + (Pi - 1) * cw + RoundDown(cw / 2, 0)) & "' y='"
-                                    & (30 + If(all, Ci - 1, 0) * 40 + 23) & "' text-anchor='middle' font-size='14'"
-                                    & " font-family='Segoe UI, sans-serif' fill='"
-                                    & If(N = 0, "#B9C0C8", "#20262D") & "'>" & N & "</text>" )
-                                & "</svg>" ) )
-                  - lblRptGridSup:
-                      Control: Label@2.5.1
-                      Properties:
-                        Visible: =gRptNCov * gRptNPrd > 60
-                        Text: |
-                          ="Grid suppressed — " & (gRptNCov * gRptNPrd)
-                           & " cells is past the legible ceiling. The gap list below carries the section."
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        FillPortions: =0
-                        LayoutMinHeight: =18
-                        Width: =Parent.Width - 32
-                        Height: =18
-                  - lblRptUnmapped:
-                      Control: Label@2.5.1
-                      Properties:
-                        Visible: =gRptUnmapped > 0
-                        Text: |
-                          =gRptUnmapped & If(gRptUnmapped = 1, " transaction has", " transactions have")
-                           & " no client coverage or no product type, so they appear in NO cell above"
-                           & " — the grid understates the period by that much."
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.Warning
-                        FillPortions: =0
-                        LayoutMinHeight: =18
-                        Width: =Parent.Width - 32
-                        Height: =18
-                  - lblRptGapT:
-                      Control: Label@2.5.1
-                      Properties:
-                        # SAME PREDICATE AS THE GALLERY BELOW. Counting every coverage while
-                        # the list showed one made the header contradict what was on screen.
-                        Text: |
-                          ="Offering gaps   ("
-                           & CountRows( Filter( colRptGrid,
-                                                N = 0
-                                             && ( gRptCoverage = "All coverage"
-                                               || Cov = gRptCoverage ) ) ) & ")"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Body
-                        FontWeight: =FontWeight.Semibold
-                        Color: =gTheme.Color.TextPrimary
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinHeight: =22
-                        Width: =Parent.Width - 32
-                        Height: =22
-                  - galRptGaps:
-                      Control: Gallery@2.15.0
-                      Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
-                      Properties:
-                        # SIZED BY CLIENT COUNT, so the opportunity is quantified rather
-                        # than merely listed. The coverage combo filters it and never
-                        # refetches — colRptGrid is already in memory.
-                        Items: |
-                          =Sort(
-                             Filter( colRptGrid,
-                                     N = 0
-                                  && ( gRptCoverage = "All coverage" || Cov = gRptCoverage ) ),
-                             CN, SortOrder.Descending )
-                        WrapCount: =1
-                        TemplateSize: =32
-                        TemplatePadding: =0
-                        TemplateFill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        ShowScrollbar: =true
-                        FillPortions: =1
-                        LayoutMinHeight: =90
-                        Width: =Parent.Width - 32
-                        Height: =Parent.Height - 480
-                      Children:
-                        - rowRptGapBody:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Horizontal
-                              LayoutAlignItems: =LayoutAlignItems.Center
-                              LayoutGap: =10
-                              PaddingLeft: =8
-                              PaddingRight: =8
-                              X: =0
-                              Y: =0
-                              Width: =Parent.TemplateWidth
-                              Height: =Parent.TemplateHeight - 1
-                            Children:
-                              - cellRptGapTxt:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: |
-                                      =ThisItem.Cov & " — " & ThisItem.CN
-                                       & If(ThisItem.CN = 1, " client", " clients")
-                                       & ", no " & ThisItem.Prd & " transactions"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextPrimary
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =1
-                                    LayoutMinWidth: =240
-                                    Height: =26
-                        - rowRptGapLine:
-                            Control: Rectangle@2.3.0
-                            Properties:
-                              Fill: =gTheme.Color.Border
-                              X: =0
-                              Y: =Parent.TemplateHeight - 1
-                              Width: =Parent.TemplateWidth
-                              Height: =1
             # ---- provenance --------------------------------------------------
             - lblRptProv:
                 Control: Label@2.5.1
