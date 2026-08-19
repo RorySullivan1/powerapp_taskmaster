@@ -76,3 +76,18 @@ Studio rejects it the fix is one token in two spots, not a redesign.
 
 ## State
 Authored, validated 22/22, **NOT landed**. Provision the four columns FIRST.
+
+## Outcome — LANDED AND WORKING, issue closed (user, 2026-08-19)
+The four columns are provisioned and both screens are in Studio.
+
+**The one ungrounded token is now grounded.** `Split(...).Value` shipped as a calculated risk
+and the paste landed, which settles it for this dialect — recorded in
+`tools/studio-enums.json` under `_powerFxNotes`, because a session log is not where the next
+author looks for a token. MS Learn's own Split page stays inconsistent (three example rows say
+`Value`, a fourth writes `.Result`); `Value` is the canvas-app form and must not be "corrected".
+
+**Still unexercised, and cheap to fix if it bites:** whether `Format: =TextFormat.Number` admits
+a DECIMAL POINT. A whole-number maturity proves nothing about `0.25`, and years with decimals is
+the unit the user chose. If it refuses, drop the `Format` line from `numPdMaturity` and validate
+with `IsNumeric` instead — the reason `Format` is there at all is that `Value(.Text)` on a
+non-numeric entry is blank, which would write blank with nothing on screen to point at.

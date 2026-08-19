@@ -36,14 +36,11 @@
   **STANDING RISK, unverified: the contains-search is bounded by the DATA ROW LIMIT and fails
   SILENTLY.** Confirm Settings > General > Data row limit is 2000. It works today because the
   projects list is small; nothing in the app will say when that stops being true.
-- **#20 IS BUILT AND IS THE PASTE QUEUE (authored 2026-08-19, NOT landed):** four optional
-  columns on `taskmaster_products` — `product_underlying` (Text, app-uppercased, emergent chip
-  list), `product_wrapper` (Text), `product_maturity` (Number, YEARS not a date) and
-  `product_features` (Note) — plus scrProductEdit and the scrReference product rows.
-  **PROVISION THE FOUR COLUMNS IN SHAREPOINT FIRST.** A Patch naming a column the list lacks
-  fails the WHOLE write, so pasting the screen first stops products saving at all.
-  **`Split(...).Value` is the one ungrounded token in it** — see the session log; it sits in
-  exactly two places so a rejection is a one-token fix.
+- **#20 IS DONE, LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** The four
+  optional product columns are live in SharePoint and both screens landed — the emergent ticker
+  chips, the write-time uppercasing, the classic number input and the four-line product row.
+  **`Split(...).Value` IS NOW GROUNDED** by that landing and is recorded in
+  `tools/studio-enums.json`, not just in a session log.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -322,3 +319,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #19 LANDED, then scrProjects re-authored: name search moved from delegable StartsWith to a LOCAL contains, as an outer Filter around the delegated eight-branch If — SharePoint delegates no substring op on Text. Ceiling is now the data row limit, silently | GitHub #19
 - 2026-08-19 | #19 CLOSED — scrProjects landed in two pastes (the rework, then the contains-search) and the search is exercised. The screen now carries the app's only row-limit-bounded query; everything else on it still folds | GitHub #19
 - 2026-08-19 | #20 built: 4 optional product columns. Two calls taken to the user first because names freeze — underlying is plain Text with an EMERGENT chip list (fill-in Choice rejected: Choices() cannot return fill-ins), maturity is YEARS not a date. Normalisation is at write time; maturity uses the classic number idiom because no modern number token is grounded | sessions/2026-08-19-issue20-product-columns.md
+- 2026-08-19 | #20 CLOSED — four optional product columns landed with scrProductEdit and the scrReference rows. The paste also settled Split(...).Value, which had shipped as the change's one ungrounded token | GitHub #20
