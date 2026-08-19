@@ -1,70 +1,42 @@
 # =============================================================================
-# scrReports  —  native analytics. Power BI is OUT OF SCOPE; every chart here is
-# SVG in an Image control. Design note: docs/reports-screen-design.md.
+# scrReports — native analytics. Every chart is SVG in an Image control.
+# Layout and chart choices: docs/reports-screen-design.md. Reasoning: .claude/memory/.
 #
-# BANDS: 0 period + scope strips, refresh, truncation banner · 1 desk pulse ·
-# 2 people, sortable, with an inline SVG health bar · 3 where the work sits ·
-# 4 project trend + ageing · 5 transactions · provenance. The person overlay is
-# a panel, not a screen, so the folds survive it.
+# FOUR RULES THIS SCREEN BREAKS IF THEY ARE IGNORED:
+#  1. Fold once in btnRptLoad.OnSelect, render from the folds. NO CountRows,
+#     LookUp or Filter over a fact collection in a gallery Items or row property.
+#  2. Every value Power Fx feeds an SVG attribute is a WHOLE NUMBER. A fraction
+#     goes through Text(), which drags the locale decimal separator into the
+#     attribute and renders it EMPTY. Fractions written as string literals are safe.
+#  3. Every denominator in a PROPERTY formula is wrapped Max(1, ...) at the point
+#     of use. The editor evaluates property formulas with every global blank, and
+#     blank divides as zero. Behaviour formulas inside btnRptLoad are exempt.
+#  4. Select() QUEUES btnRptLoad — nothing may read a fold in the formula that
+#     Selects it.
 #
-# ARCHITECTURE — fetch bounded, fold once, render from folds.
-#   * Every fact fetch is delegable and date- or state-bounded.
-#   * Everything renders from small pre-aggregated collections. NO CountRows,
-#     LookUp or Filter over a fact collection may appear in a gallery Items or
-#     row property — that is the N+1, and a 40-row people gallery each scanning
-#     800 tasks is 32,000 row-scans PER REPAINT.
-#
-# EVERY DENOMINATOR IN A PROPERTY FORMULA IS WRAPPED IN Max(1, ...) AT THE POINT
-# OF USE, even where the global was already Set with Max(1, ...). A property
-# formula is evaluated in the EDITOR, where the load has never run and every
-# global is BLANK — and blank divides as zero. Setting the guard at load time
-# protects the running app and does nothing for the editor. An `If(x = 0, ...)`
-# guard does not help either: blank is not reliably equal to 0 for an untyped
-# global, so the else arm is what runs. Max() ignores blanks and returns 1.
-# The divisions inside btnRptLoad.OnSelect are exempt — a behaviour formula runs
-# only when invoked, by which point the Sets above it have happened.
-#
-# THE LOAD LIVES IN ONE PLACE — btnRptLoad.OnSelect — and OnVisible, the refresh
-# icon and the period strip all reach it with Select(). MS Learn is explicit that
-# "Select QUEUES the target OnSelect for later processing... it does not cause it
-# to evaluate immediately, nor does it wait": so nothing may read a fold in the
-# same formula that Selects the loader. Nothing here does — the bands are
-# declarative over the collections and simply repaint when they fill.
-#
-# BANDS: header 0..64 absolute, control bar 64..136 absolute (fixed, outside the
-# scroll), bodyRoot 136..bottom vertical auto-layout with LayoutOverflowY Scroll.
-# Sections stack, so there is NO manual Y arithmetic below the control bar.
+# Header and control bar are absolute (0..136); bodyRoot below them is a vertical
+# auto-layout that scrolls, so no band does manual Y arithmetic.
 # =============================================================================
 Screens:
   scrReports:
     Properties:
       Fill: =gTheme.Color.Bg
-      # Defaults + the reload guard, and nothing else. The fetches are in
-      # btnRptLoad so that the period strip and the refresh icon run the same
-      # code rather than three copies that drift apart.
+      # Defaults and the reload guard only; the fetches live in btnRptLoad.
       OnVisible: |
         =
-        // SELF-HEAL. App.OnStart is NON-BLOCKING, so this screen can run before it
-        // finishes; a blank gUserEmail makes every "mine" test match nothing, and these
-        // are imperative Sets that never re-fire.
+        // App.OnStart is non-blocking, so this screen can run before gUserEmail is set.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
         If( IsBlank(gRptPeriod), Set( gRptPeriod, "1QTR" ) );
-        // Scope holds a project manager's EMAIL, or "" for All. IsBlank cannot seed it —
-        // "" is the All value and is itself blank — so it is set unconditionally.
+        // "" is the All value and is itself blank, so IsBlank cannot seed this.
         Set( gRptScope, Coalesce(gRptScope, "") );
         If( IsBlank(gRptSort),   Set( gRptSort, "Owns" ); Set( gRptSortDesc, true ) );
         Set( gRptSelPerson, "" );
-        // Refetch ONLY when the period changed, or on the first visit. A revisit with
-        // the same window repaints from folds already in memory.
+        // Refetch only when the period changed, or on the first visit.
         Set( gRptKey, gRptPeriod );
         If( gRptKey <> gRptLoadedKey, Select( btnRptLoad ) )
     Children:
-      # =====================================================================
-      # THE LOAD. One copy, reached with Select() from three places.
-      # =====================================================================
-      # Hidden, and Visible: =false is safe — Select fires regardless of
-      # visibility. It must NOT be disabled: Select does nothing on a control
-      # whose DisplayMode is Disabled.
+      # THE LOAD. One copy, reached with Select() from three places. Hidden is fine —
+      # Select fires regardless of Visible, but does NOTHING if DisplayMode is Disabled.
       - btnRptLoad:
           Control: Classic/Button@2.2.0
           Properties:
@@ -74,52 +46,29 @@ Screens:
             Y: =0
             Width: =1
             Height: =1
-            # EVERY ClearCollect NAMES ITS COLUMNS. Explicit Column Selection is on by
-            # default and trims retrieved columns to those it can prove are used;
-            # Microsoft documents that column lineage is occasionally lost when data
-            # moves through collections and variables, and ECS then drops the column.
-            # This is the most collection-heavy screen in the app. A dropped column
-            # renders as a blank number, which across the one-way gap comes back only
-            # as "it didn't work".
+            # EVERY ClearCollect NAMES ITS COLUMNS. Explicit Column Selection drops a column
+            # whose lineage it loses, and the loss renders as a blank number, not an error.
             OnSelect: |
               =Set( gRptBusy, true );
-              // ---- the window ------------------------------------------------------
-              // A QUARTER IS THE WIDEST USEFUL WINDOW: the archive flow takes work out of
-              // these lists at roughly 100 days, so a year-long window would report a
-              // year of history over rows that no longer exist and read as a collapse in
-              // activity. Three rolling windows, no calendar anchoring — a calendar
-              // quarter put gRptFrom ON Today() every 1 April, and every span derived
-              // from it collapsed to zero.
+              // A quarter is the widest useful window: the archive flow takes rows out of these
+              // lists at ~100 days. Rolling, never calendar-anchored — a calendar quarter put
+              // gRptFrom on Today() every 1 April and collapsed every span derived from it.
               Set( gRptSpanDays,
                    Switch( gRptPeriod, "1W", 7, "1M", 30, "1QTR", 90, 90 ) );
               Set( gRptFrom, DateAdd( Today(), -gRptSpanDays, TimeUnit.Days ) );
-              // Exactly ONE window before gRptFrom. The prior-period delta has to compare
-              // equal spans or it is measuring two differently sized things; the old
-              // 14-day floor silently made the 1W comparison the window 21-28 days back.
-              // One transaction fetch from here serves current, prior and the trend bars.
+              // Exactly ONE window before gRptFrom — the prior-period delta has to compare equal
+              // spans. One transaction fetch serves current, prior and the trend bars.
               Set( gRptFrom2x, DateAdd( gRptFrom, -gRptSpanDays, TimeUnit.Days ) );
-              // BAR GRANULARITY FOLLOWS THE WINDOW. Month buckets over a 7-day window
-              // give ONE bar, which is not a trend. Days for a week, weeks for a month
-              // or a quarter — 7, 5 and 13 bars, all within what the chart already sizes.
+              // Bar granularity follows the window: days for 1W, weeks otherwise.
               Set( gRptBucketDays, If( gRptPeriod = "1W", 1, 7 ) );
               Set( gRptBucketN, RoundUp( gRptSpanDays / gRptBucketDays, 0 ) );
-              // ---- F1..F5 ----------------------------------------------------------
-              // EVERY FILTER HERE DELEGATES; the ForAll around it is a LOCAL projection over
-              // the rows that come back, exactly as colRptPrj does below.
+              // EVERY FILTER HERE DELEGATES; the ForAll is a LOCAL projection over what returns.
               //
               // ShowColumns MUST NOT BE USED OVER ANYTHING ROOTED IN A NAMED FORMULA, and a
-              // Filter wrapped around one does NOT fix it. The collection is created, ID and
-              // the Choice/Person/date columns resolve, and then a plain TEXT column reads
-              // back as an ERROR type — `task_name` off LiveTasks, exactly as `project_name`
-              // off ActiveProjects did. Two independent instances, same symptom, same fix:
-              // write the record out by hand so the shape is stated rather than inferred.
+              // Filter wrapped around one does NOT fix it: text columns read back as an ERROR
+              // type. Burned twice — task_name off LiveTasks, project_name off ActiveProjects.
               // colRptTx below keeps ShowColumns because it filters a DATA SOURCE directly,
-              // which is the only form that is actually safe.
-              //
-              // F1 is unbounded but SELF-LIMITING: open work does not accumulate.
-              // The stages are ENUMERATED because a Text <> does not delegate.
-              // The Choice and Person columns are copied WHOLE, so task_stage.Value and
-              // task_lead.Email still resolve downstream.
+              // which is the only safe form. Stages are enumerated because Text <> won't delegate.
               Concurrent(
                   ClearCollect( colRptOpen,
                       ForAll(
@@ -136,12 +85,9 @@ Screens:
                             task_supporter:       s.task_supporter,
                             task_project_id:      s.task_project_id,
                             task_output_audience: s.task_output_audience } ) ),
-                  // BOUNDED ON STAGE ALONE; the period is applied locally below.
-                  // task_date_completion is optional and `>= gRptFrom` is FALSE for a blank
-                  // date, so a task that reached Completed without one never entered this
-                  // collection at all — Done, the median and the on-time rate then read
-                  // empty with nothing on screen to say why. Completed work DOES accumulate
-                  // where open work does not, which is what the truncation banner is for.
+                  // BOUNDED ON STAGE ALONE. task_date_completion is optional and `>= gRptFrom` is
+                  // FALSE for a blank date, so bounding the fetch on the period would drop every
+                  // dateless Completed task and leave Done and the medians silently empty.
                   ClearCollect( colRptDoneAll,
                       ForAll( Filter( LiveTasks, task_stage.Value = "Completed" ) As d,
                           { ID:                   d.ID,
@@ -161,10 +107,8 @@ Screens:
                                && transaction_date >= gRptFrom2x ),
                           ID, transaction_date, transaction_client_name, transaction_project_id,
                           transaction_product_id, transaction_currency, transaction_notional ) ),
-                  // AN EXPLICIT ForAll PROJECTION for the same reason F1 and F2 are: this
-                  // one reads `p.project_name` off ActiveProjects, a named formula.
-                  // The Choice and Person columns are copied WHOLE, so project_phase.Value
-                  // and project_manager.Email still resolve downstream.
+                  // Explicit projection for the same reason as F1: project_name off ActiveProjects,
+                  // a named formula. Choice and Person columns are copied WHOLE so .Value resolves.
                   ClearCollect( colRptPrj,
                       ForAll( ActiveProjects As p,
                           { ID:                      p.ID,
@@ -179,47 +123,33 @@ Screens:
                             project_requestor:       p.project_requestor,
                             project_manager:         p.project_manager,
                             project_supporter:       p.project_supporter } ) ),
-                  // ShowColumns over a named formula, and only safe because NOTHING EVER
-                  // READS A FIELD OFF THIS. It feeds one CountRows. Reading a text column
-                  // off it would hit the same error type F1 and F2 exist to avoid — project
-                  // it by hand first if that day comes.
+                  // ShowColumns over a named formula, safe ONLY because nothing reads a field off
+                  // this — it feeds one CountRows. Project it by hand before reading a column.
                   ClearCollect( colRptIss, ShowColumns( OpenIssues, ID, issue_project_id ) )
               );
-              // A completed task with NO completion date is in, in every window: the app
-              // cannot place it in time, and dropping it silently understates whoever did
-              // the work. The count is stated beside the people table instead, the same
-              // rule gRptNoSup follows — a total that does not reconcile is worse than one
-              // that explains itself.
+              // A completed task with NO completion date is in, in every window. The count is
+              // stated beside the people table rather than dropped.
               ClearCollect( colRptDone,
                   Filter( colRptDoneAll,
                           IsBlank(task_date_completion) || task_date_completion >= gRptFrom ) );
               Set( gRptDoneNoDate,
                    CountRows( Filter(colRptDoneAll, IsBlank(task_date_completion)) ) );
-              // ---- D1 dimension ----------------------------------------------------
-              // product_type_path is the authoritative value and every product grouping on
-              // this screen splits it at " | ". Fetched whole because a transaction reaches
-              // a product by ID, not by path.
+              // Fetched whole because a transaction reaches a product by ID, not by path.
               ClearCollect( colRptProducts,
                   ShowColumns( taskmaster_products, ID, product_uid, product_type_path ) );
-              // ---- truncation ------------------------------------------------------
-              // Aggregates never delegate, so every figure is computed locally over
-              // fetched rows. This is the ONLY place the app can notice it ran out.
+              // Aggregates never delegate, so this is the only place the app can notice it ran out.
               Set( gRptTrunc,
                    Trim(
                      If( CountRows(colRptOpen) >= 2000, "open tasks  ", "" ) &
                      If( CountRows(colRptDoneAll) >= 2000, "completed tasks  ", "" ) &
                      If( CountRows(colRptTx)   >= 2000, "transactions  ", "" ) &
                      If( CountRows(colRptPrj)  >= 2000, "projects  ", "" ) &
-                     // F5 and the product fetch count too. Issues feed a tile of their
-                     // own, and a capped product list silently shortens the type-path
-                     // vocabulary every product grouping on this screen splits on.
                      If( CountRows(colRptIss)      >= 2000, "issues  ", "" ) &
                      If( CountRows(colRptProducts) >= 2000, "products  ", "" ) ) );
               // Transactions inside the CURRENT window; colRptTx holds two windows.
               ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
-              // ---- project map -----------------------------------------------------
-              // Level 1 of a "A | B | C" path with Find/Left, NOT Split: the separator
-              // is part of the stored data and blanks need their own bucket.
+              // Level 1 of an "A | B | C" path with Find/Left, NOT Split — the separator is part
+              // of the stored data and blanks need their own bucket.
               ClearCollect( colRptPrjMap,
                   ForAll( colRptPrj As p,
                       { PId:  p.ID,
@@ -228,29 +158,21 @@ Screens:
                                   With( { i: Find(" | ", s) },
                                       If( IsBlank(s), "Unclassified",
                                           If( i > 0, Left(s, i - 1), s ) ) ) ),
-                        // Level 1 of the region path, split exactly as Fam is.
                         Rgn:  With( { s: Trim(Coalesce(p.project_region_path, "")) },
                                   With( { i: Find(" | ", s) },
                                       If( IsBlank(s), "Unassigned",
                                           If( i > 0, Left(s, i - 1), s ) ) ) ),
-                        // project_requestor is OPTIONAL, so it needs its own bucket rather
-                        // than a blank slice. Display name first, email as the fallback: a
-                        // person column can carry one without the other.
+                        // project_requestor is OPTIONAL and needs its own bucket. Display name first,
+                        // email as fallback: a Person column can carry one without the other.
                         Req:  With( { n: Coalesce(p.project_requestor.DisplayName, ""),
                                       e: Coalesce(p.project_requestor.Email, "") },
                                   If( Len(n) > 0, n, If( Len(e) > 0, e, "Unassigned" ) ) ),
                         Mgr:  Lower(Coalesce(p.project_manager.Email, "")),
-                        // The display name is carried alongside the email because the scope
-                        // picker lists PEOPLE and matches on IDENTITY: email is the key,
-                        // the name is only ever shown.
+                        // Email is the key, the name is only ever shown.
                         MgrNm: Coalesce(p.project_manager.DisplayName, ""),
                         Sup:  Lower(Coalesce(p.project_supporter.Email, "")) } ) );
-              // ---- scope options ---------------------------------------------------
-              // "All" plus one row per project manager, built from the projects actually
-              // in the window — so the list can never offer a manager with nothing to show.
-              // Em is the key and is BLANK for "All", which is what the filter tests; a
-              // manager with no display name falls back to the email rather than
-              // rendering an unpickable blank row.
+              // "All" plus one row per manager on a project in the window. Em is the key and is
+              // BLANK for "All", which is what the filter tests.
               ClearCollect( colRptMgrOpts, { Value: "All", Em: "" } );
               Collect( colRptMgrOpts,
                   Sort( ForAll( Distinct( Filter(colRptPrjMap, Len(Mgr) > 0), Mgr ) As m,
@@ -258,41 +180,23 @@ Screens:
                                          If( Len(Coalesce(n, "")) > 0, n, m.Value ) ),
                               Em:    m.Value } ),
                         Value ) );
-              // ---- person unpivot --------------------------------------------------
-              // TWO ATTRIBUTION PATHS, BOTH FROM TASKS: task_lead owns and
-              // task_supporter supports. They are counted separately and NEVER summed
-              // into one workload number — that double-counts the desk total.
-              // transaction_sales is NOT a third path (user-confirmed 2026-08-17): the
-              // person who sold the trade did not do the desk work measured here.
-              //
-              // Ungroup flattens the two-row table each task emits. Days and OnT carry
-              // -1 for "not applicable" so the medians and rates can exclude them
-              // without confusing a real zero with a missing value.
+              // TWO ATTRIBUTION PATHS, BOTH FROM TASKS: task_lead owns, task_supporter supports.
+              // Counted separately and NEVER summed into one workload number — that double-counts
+              // the desk. Days and OnT carry -1 for "not applicable" so the medians and rates can
+              // exclude them without confusing a real zero with a missing value.
               Clear( colRptPersonSrc );
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptOpen As t,
-                          // NO PROJECT LOOKUP HERE. These rows used to carry the activity
-                          // family and the output format for the overlay's mini-charts; the
-                          // overlay lists TASKS now and reads neither, so the join that fed
-                          // them is gone rather than merely unread. colRptOpenTag still does
-                          // that join, once, for the band-3 charts that need it.
                           With( { stg: Coalesce( t.task_stage.Value, "Unspecified" ),
-                                  // Carried on the row so the person overlay can list the
-                                  // TASKS themselves off this collection and refetch nothing.
-                                  //
-                                  // EFFECTIVE HEALTH, NOT THE STORED COLUMN. task_status holds
-                                  // only the issue-derived half; OVERDUE IS FOLDED IN HERE
-                                  // because it changes with no write — see rollups.task_health
-                                  // in schema.yaml. Reading task_status raw UNDER-REPORTS Red.
-                                  // No join: task_date_target is already on this row.
-                                  // colRptOpen is open stages only, so "not Completed" holds
-                                  // by construction and is not re-tested.
+                                  // EFFECTIVE HEALTH, NOT THE STORED COLUMN. task_status holds only
+                                  // the issue-derived half; OVERDUE IS FOLDED IN HERE because it
+                                  // changes with no write. Reading task_status raw UNDER-REPORTS Red.
+                                  // See rollups.task_health in schema.yaml.
                                   hth: If( !IsBlank(t.task_date_target)
                                         && t.task_date_target < Today(), "Red",
                                            Coalesce( t.task_status.Value, "—" ) ),
-                                  // Hoisted: this is compared on every measure of the supports
-                                  // row, and left inline it was six Lower/Coalesce pairs per task.
+                                  // Hoisted: compared on every measure of the supports row.
                                   dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")) },
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
@@ -305,16 +209,10 @@ Screens:
                                 Dn: 0, Days: -1, OnT: -1, Stg: stg,
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: false },
-                              // SAME PERSON ON BOTH COLUMNS IS COUNTED IN BOTH ROLES, ONCE
-                              // PER MEASURE. The schema permits lead = supporter, and this
-                              // row used to be DROPPED entirely — which kept Overdue honest
-                              // but also meant supporting a task you lead scored nothing at
-                              // all, understating the support count this screen exists to
-                              // report. The defect was never the row; it was that its
-                              // MEASURES double-counted. So the row stays and carries the
-                              // role, while dup zeroes every measure on it: Ovd/Gc/Ac/Rc/Dn
-                              // to 0, Days/OnT to -1, which the median and on-time folds
-                              // already read as "not applicable".
+                              // SAME PERSON ON BOTH COLUMNS IS COUNTED IN BOTH ROLES, ONCE PER
+                              // MEASURE. The row stays and carries the role; dup zeroes every
+                              // measure on it — Ovd/Gc/Ac/Rc/Dn to 0, Days/OnT to -1, which the
+                              // median and on-time folds already read as "not applicable".
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
                                 Role: "Supports",
@@ -331,14 +229,10 @@ Screens:
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptDone As t,
-                          // NO OVERDUE FOLD HERE, deliberately: these are COMPLETED tasks and
-                          // a finished task is not at risk for having landed late. Its Gc/Ac/Rc
-                          // are zero anyway — only the displayed Hth comes off this.
+                          // No overdue fold here: a finished task is not at risk for having landed late.
                           With( { hth: Coalesce( t.task_status.Value, "—" ),
-                                  // A COMPLETED TASK MAY CARRY NO COMPLETION DATE — that is
-                                  // exactly why colRptDoneAll is fetched on stage alone. Both
-                                  // durations need one, so both fall back to "not applicable"
-                                  // rather than measuring against a blank.
+                                  // A completed task may carry no completion date, so both durations
+                                  // fall back to "not applicable" rather than measuring against a blank.
                                   nod: IsBlank(t.task_date_completion),
                                   dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")) },
                           { r: Table(
@@ -357,11 +251,8 @@ Screens:
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
                                 Role: "Supports",
                                                                 PId: t.task_project_id.Id, Op: 0,
-                                // Dn is the measure that double-counts on a completed task,
-                                // and Days/OnT would pull the same task into the median and
-                                // the on-time rate twice. Zeroed on a duplicate, exactly as
-                                // on the open branch; the row itself survives so the role is
-                                // still counted.
+                                // Zeroed on a duplicate exactly as on the open branch; the row itself
+                                // survives so the role is still counted.
                                 Ovd: 0, Gc: 0, Ac: 0, Rc: 0,
                                 Dn: If( dup, 0, 1 ),
                                 Days: If( dup || nod, -1,
@@ -374,20 +265,12 @@ Screens:
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: dup } ) } ) ),
                       r ), Len(Em) > 0 ) );
-              // ---- person fold -----------------------------------------------------
-              // ~40 rows, every measure precomputed. This costs persons x rows ONCE per
-              // load; the rule it exists to obey is that no gallery row may scan a fact
-              // collection.
-              //
-              // MEDIAN is hand-rolled: Power Fx has no Median. Sort, then take the
-              // lower-middle element. On an even count that is the lower of the two
-              // central days rather than their mean — deliberate, on integer days.
-              // HOW MANY OPEN TASKS RECORD NO SUPPORTER AT ALL. Without this a support
-              // count of zero means two entirely different things — nobody supports
-              // anything, or the column is empty — and the screen cannot tell you which.
-              // task_supporter carries no stored value for older tasks, so a correct
-              // report over an empty column looks identical to a broken one. State the
-              // gap rather than let a zero speak for it.
+              // ~40 rows, every measure precomputed once per load — no gallery row may scan a
+              // fact collection.
+              // MEDIAN is hand-rolled because Power Fx has none: sort, take the lower-middle
+              // element. On an even count that is the lower of the two, deliberately.
+              // gRptNoSup states how many open tasks record NO supporter at all — without it a
+              // support count of zero means two different things and the screen cannot say which.
               Set( gRptNoSup,
                    CountRows( Filter( colRptOpen, IsBlank(task_supporter.Email) ) ) );
               ClearCollect( colRptPerson,
@@ -395,17 +278,9 @@ Screens:
                       With( { rw: Filter(colRptPersonSrc, Em = pp.Value) },
                           { Em:   pp.Value,
                             Nm:   First(rw).Nm,
-                            // BOTH COLUMNS COUNT EVERY TASK IN THE ROLE, open or finished
-                            // (user, 2026-08-18). Neither carries Op = 1 any more: that
-                            // restricted them to open work, so anyone whose tasks had all
-                            // completed read zero in a table meant to show what they do.
-                            // The reach is the fetch, not all of history: open tasks are
-                            // unbounded but completed ones come back only inside the selected
-                            // period, so both are "still open, plus finished in the window"
-                            // and both move with the period control.
-                            // The MEASURES beside them stay lifecycle-scoped and are not
-                            // affected — Ovd/Gc/Ac/Rc are zero on a completed row, Dn counts
-                            // only completed ones. Volume is what changed, not health.
+                            // BOTH COLUMNS COUNT EVERY TASK IN THE ROLE, open or finished.
+                            // The MEASURES beside them stay lifecycle-scoped: Ovd/Gc/Ac/Rc are
+                            // zero on a completed row, Dn counts only completed ones.
                             Owns: CountRows( Filter(rw, Role = "Owns") ),
                             Sups: CountRows( Filter(rw, Role = "Supports") ),
                             Ovd:  Sum(rw, Ovd),
@@ -424,12 +299,9 @@ Screens:
               Set( gRptTxN,    CountRows(colRptTxCur) );
               Set( gRptTxPrev, CountRows( Filter(colRptTx, transaction_date < gRptFrom) ) );
               Set( gRptIssN,   CountRows(colRptIss) );
-              // ---- BAND 3 folds: where the work sits --------------------------------
-              // Tag each open task ONCE with everything the breakdowns group on. Every
-              // chart below then reads a tagged collection instead of re-joining to the
-              // project map per category. The LookUp is HOISTED: family, region and
-              // requestor all come off the same project row, and three separate LookUps
-              // would triple a join that is already O(tasks x projects).
+              // Tag each open task ONCE with everything the breakdowns group on, so no chart
+              // re-joins per category. The LookUp is HOISTED — family, region and requestor all
+              // come off the same project row, and three LookUps would triple the join.
               ClearCollect( colRptOpenTag,
                   ForAll( colRptOpen As t,
                       With( { pm: LookUp(colRptPrjMap, PId = t.task_project_id.Id) },
@@ -452,14 +324,9 @@ Screens:
                   Collect( colRptFamBar,
                       { Idx: CountRows(colRptFam) + 1, K: "Other", N: gRptFamOther } ) );
               Set( gRptFamMax, Max( 1, Coalesce(Max(colRptFamBar, N), 0) ) );
-              // THE VOCABULARY COMES FROM THE COLUMN, via Choices(). A literal list here
-              // was a second copy of the column that drifts the moment someone edits it in
-              // SharePoint, and this chart would then under-count in silence.
-              // Choices() keeps the property this section actually needs — it returns EVERY
-              // value the column offers, including ones no task currently holds, so an
-              // unused format still draws a zero bar. That is the same reason the gap grid
-              // reads its axes from the dimension lists: a GroupBy over the facts would
-              // delete exactly the categories worth seeing.
+              // THE VOCABULARY COMES FROM THE COLUMN via Choices(), never a literal list that
+              // drifts when someone edits the column. It returns EVERY value the column offers,
+              // so a value no task holds still draws a zero bar — which a GroupBy would delete.
               ClearCollect( colRptAudVocab,
                   ForAll( Choices([@taskmaster_tasks].task_output_audience) As c,
                           { K: c.Value } ) );
@@ -469,28 +336,22 @@ Screens:
                       With( { k: Index(colRptAudVocab, s.Value).K },
                           { Idx: s.Value, K: k,
                             N: CountRows( Filter(colRptOpenTag, Aud = k) ) } ) ) );
-              // Blank is not a Choice value, so it needs its own bucket, and here it is the
-              // bucket that MATTERS: task_output_audience is younger than most of the open
-              // backlog, so Unspecified is mostly "predates the column", not "nobody bothered".
-              // scrTaskEdit blocks the save until an audience is picked whenever the Output
-              // section is on, so this bucket drains as tasks are touched — which is why the
-              // subtitle states its size rather than letting the pie imply the column is broken.
-              // "Other" means a value tasks still HOLD that the column no longer offers.
+              // Blank is not a Choice value and needs its own bucket. Unspecified is mostly
+              // "predates the column", not "nobody bothered"; "Other" means a value tasks still
+              // hold that the column no longer offers.
               Collect( colRptAudBar,
                   { Idx: CountRows(colRptAudVocab) + 1, K: "Unspecified",
                     N: CountRows( Filter(colRptOpenTag, Aud = "Unspecified") ) },
                   { Idx: CountRows(colRptAudVocab) + 2, K: "Other",
                     N: CountRows( Filter( colRptOpenTag,
                            Aud <> "Unspecified" && !(Aud in colRptAudVocab.K) ) ) } );
-              // THE AUDIENCE CHART IS A PIE, so it needs slice geometry rather than a bar
-              // maximum. Same fold shape as the three below it; see the pie note there.
+              // A PIE, so it needs slice geometry rather than a bar maximum.
               Set( gRptAudTot, Max( 1, Coalesce(Sum(colRptAudBar, N), 0) ) );
               ClearCollect( colRptAudPie,
                   ForAll( Filter(colRptAudBar, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptAudBar, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
-                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
-                            // a dropped zero-count row would leave a gap in the legend.
+                            // LEGEND ROW, not Idx — a dropped zero-count row would gap the legend.
                             Li:  CountRows( Filter(colRptAudBar, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptAudTot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptAudTot * 100, 0 )
@@ -500,9 +361,7 @@ Screens:
                                          Switch( Mod(r.Idx - 1, 6),
                                                  0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
                                                  3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) ) } ) ) );
-              // ---- open tasks by requestor (bar) -----------------------------------
-              // Top 6 + Other, exactly as the family chart: the requestor list is open-ended
-              // and a chart with forty rows is not a chart.
+              // Top 6 + Other: the requestor list is open-ended and forty rows is not a chart.
               ClearCollect( colRptReqAll,
                   ForAll( Distinct(colRptOpenTag, Req) As r,
                       { K: r.Value, N: CountRows( Filter(colRptOpenTag, Req = r.Value) ) } ) );
@@ -517,15 +376,10 @@ Screens:
                   Collect( colRptReqBar,
                       { Idx: CountRows(colRptReqTop) + 1, K: "Other", N: gRptReqOther } ) );
               Set( gRptReqMax, Max( 1, Coalesce(Max(colRptReqBar, N), 0) ) );
-              // ---- open tasks by region, level 1 (pie) -----------------------------
-              // PIE SLICES ARE WHOLE PERCENTAGES DERIVED FROM A RUNNING CUMULATIVE, never
-              // rounded one slice at a time: Pct = Cum(i) - Cum(i-1), so the rounding error
-              // stays inside a slice and the wedges always close the circle. Off is the same
-              // cumulative, which is the dashoffset the renderer needs. Both are INTEGERS
-              // and must stay that way — a computed fraction goes through Text(), drags the
-              // locale decimal separator into the SVG attribute, and the slice renders EMPTY.
-              // Zero-count slices are dropped: a Pct of 0 draws nothing but still consumes a
-              // legend row.
+              // PIE SLICES ARE WHOLE PERCENTAGES FROM A RUNNING CUMULATIVE, never rounded one
+              // slice at a time: Pct = Cum(i) - Cum(i-1), so the rounding error stays inside a
+              // slice and the wedges always close the circle. Off is that same cumulative.
+              // Zero-count slices are dropped — a Pct of 0 draws nothing but eats a legend row.
               ClearCollect( colRptRgnAll,
                   ForAll( Distinct(colRptOpenTag, Rgn) As r,
                       { K: r.Value, N: CountRows( Filter(colRptOpenTag, Rgn = r.Value) ) } ) );
@@ -544,8 +398,7 @@ Screens:
                   ForAll( Filter(colRptRgnSeq, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptRgnSeq, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
-                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
-                            // a dropped zero-count row would leave a gap in the legend.
+                            // LEGEND ROW, not Idx — a dropped zero-count row would gap the legend.
                             Li:  CountRows( Filter(colRptRgnSeq, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptRgnTot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptRgnTot * 100, 0 )
@@ -554,17 +407,12 @@ Screens:
                                      Switch( Mod(r.Idx - 1, 6),
                                              0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
                                              3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) } ) ) );
-              // ---- BAND 4 folds: project trend -------------------------------------
-              // BUCKETS KEYED ON A WHOLE NUMBER OF DAYS SINCE gRptFrom — not on date
-              // comparison, and not on a calendar month, so one keying serves all three
-              // windows and no month-length or timezone edge exists.
-              // EVERY BUCKET FILTER CARRIES ITS OWN LOWER BOUND. RoundDown truncates
-              // TOWARD ZERO, so a date BEFORE gRptFrom yields -0.4 -> 0 and would land in
-              // bucket 1. colRptPrj is not date-bounded — it holds every open project,
-              // most of them started long before the window — so without the bound the
-              // first bar absorbs the entire backlog.
-              // The prior window is aligned POSITIONALLY: bucket i of this window is
-              // compared with bucket i of the window before it.
+              // Buckets keyed on a whole number of DAYS since gRptFrom, so one keying serves all
+              // three windows with no month-length or timezone edge.
+              // EVERY BUCKET FILTER CARRIES ITS OWN LOWER BOUND: RoundDown truncates toward
+              // zero, so a date before gRptFrom yields -0.4 -> 0 and lands in bucket 1. colRptPrj
+              // is not date-bounded, so without the bound the first bar absorbs the whole backlog.
+              // The prior window is aligned POSITIONALLY: bucket i against bucket i.
               ClearCollect( colRptBucketsRaw,
                   ForAll( Sequence( gRptBucketN ) As s,
                       With( { d: DateAdd( gRptFrom, (s.Value - 1) * gRptBucketDays, TimeUnit.Days ),
@@ -594,9 +442,8 @@ Screens:
                                         transaction_date < gRptFrom
                                      && RoundDown( DateDiff(gRptFrom2x, transaction_date, TimeUnit.Days)
                                                    / gRptBucketDays, 0 ) = k ) ) } ) ) );
-              // CUMULATIVE NET OPEN — started minus completed, running. This is the direct
-              // answer to "how are projects trending" and it needs no snapshot list,
-              // because it is built from dated EVENTS rather than stateful columns.
+              // CUMULATIVE NET OPEN — started minus completed, running. Built from dated EVENTS,
+              // so it needs no snapshot list.
               ClearCollect( colRptBuckets,
                   ForAll( colRptBucketsRaw As m,
                       { Idx: m.Idx, Lbl: m.Lbl, St: m.St, Cp: m.Cp, Tx: m.Tx, TxP: m.TxP,
@@ -609,11 +456,9 @@ Screens:
               Set( gRptTxMax,
                    Max( 1, Coalesce(Max(colRptBuckets, Tx), 0),
                            Coalesce(Max(colRptBuckets, TxP), 0) ) );
-              // ---- projects by phase (pie) -----------------------------------------
               // A FIXED SEQUENCE, NOT Distinct. project_phase is a closed vocabulary, so
               // enumerating it holds lifecycle order and pins one colour per phase across
-              // refreshes; a Distinct would reorder both the moment a phase emptied.
-              // ActiveProjects excludes Archived, so these five are the whole set here.
+              // refreshes; Distinct would reorder both the moment a phase emptied.
               ClearCollect( colRptPhSeq,
                   ForAll( Sequence(5) As s,
                       With( { k: Switch( s.Value, 1, "Not Started", 2, "Planning",
@@ -624,8 +469,6 @@ Screens:
                             Hx: Switch( s.Value, 1, "#B9C0C8", 2, "#2E8B9A", 3, "#005A9E",
                                                  4, "#C05F3C", "#31825D" ) } ) ) );
               Set( gRptPhTot, Max( 1, Coalesce(Sum(colRptPhSeq, N), 0) ) );
-              // Same running-cumulative slice geometry as the region pie; see the note
-              // there for why the percentages are derived rather than rounded per slice.
               ClearCollect( colRptPhPie,
                   ForAll( Filter(colRptPhSeq, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptPhSeq, Idx < r.Idx), N ), 0 ) },
@@ -634,55 +477,40 @@ Screens:
                             Off: RoundDown( cb / gRptPhTot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptPhTot * 100, 0 )
                                  - RoundDown( cb / gRptPhTot * 100, 0 ) } ) ) );
-              // Kept when the ageing strip went: the phase pie shows Stalled itself, but
-              // nothing else on the screen counts open work with no date to be late by.
+              // Nothing else on the screen counts open work with no date to be late by.
               Set( gRptNoTarget, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
                                      && IsBlank(project_date_target) ) ) );
-              // ---- open tasks due in the next fortnight (bar) -----------------------
-              // FORWARD-LOOKING, AND DELIBERATELY OUTSIDE THE PERIOD WINDOW. Every other
-              // series on this screen looks back over gRptFrom..now; this one answers
-              // "what lands next", so it is keyed on Today() and the period strip does not
-              // move it. It reloads with the rest only because the load is one block.
-              // colRptOpen is every live task not yet Completed, so a task whose target has
-              // already passed is still open — counted as overdue beside the chart, not in
-              // a bar, because a bar for it would have no date to sit on.
+              // FORWARD-LOOKING AND DELIBERATELY OUTSIDE THE PERIOD WINDOW — keyed on Today(),
+              // so the period strip does not move it. A task whose target has already passed is
+              // still open and counts as overdue beside the chart, not in a bar.
               ClearCollect( colRptDueSrc,
                   ForAll( Filter(colRptOpen, !IsBlank(task_date_target)) As t,
                       { Dd: DateDiff( Today(), t.task_date_target, TimeUnit.Days ) } ) );
               Set( gRptDueOver,   CountRows( Filter(colRptDueSrc, Dd < 0) ) );
               Set( gRptDueBeyond, CountRows( Filter(colRptDueSrc, Dd > 14) ) );
               Set( gRptDueNone,   CountRows( Filter(colRptOpen, IsBlank(task_date_target)) ) );
-              // 15 bars: today plus a fortnight. WEEKEND IS READ OFF THE FORMATTED DAY
-              // NAME, not Weekday() — that function appears nowhere else in this app and
-              // there is no way to confirm its numbering here, whereas "[$-en-US]ddd" is
-              // already the format the trend bucket labels use.
+              // Weekend is read off the FORMATTED day name, not Weekday() — that function appears
+              // nowhere else in this app and its numbering cannot be confirmed here. "[$-en-US]ddd"
+              // is already the format the trend bucket labels use.
               ClearCollect( colRptDueBars,
                   ForAll( Sequence(15) As s,
                       With( { dv: s.Value - 1 },
                           With( { dt: DateAdd( Today(), s.Value - 1, TimeUnit.Days ) },
                               { Idx: s.Value,
                                 Lbl: Text( dt, "[$-en-US]d" ),
-                                // Month only where it changes, so the day numbers stay
-                                // readable when the fortnight crosses a month end.
+                                // Month only where it changes, so the day numbers stay readable.
                                 Mon: If( s.Value = 1 || Text(dt, "[$-en-US]d") = "1",
                                          Text(dt, "[$-en-US]mmm"), "" ),
                                 We:  With( { w: Text(dt, "[$-en-US]ddd") },
                                          If( w = "Sat" || w = "Sun", 1, 0 ) ),
                                 N:   CountRows( Filter(colRptDueSrc, Dd = dv) ) } ) ) ) );
               Set( gRptDueMax, Max( 1, Coalesce(Max(colRptDueBars, N), 0) ) );
-              // ---- BAND 5 folds: transactions --------------------------------------
-              // ACCEPTED COST, NOT AN OVERSIGHT: a linear LookUp per transaction, so this
-              // is O(tx x products) + O(tx x projects) and it re-runs on every period change.
-              // Power Fx has no hash join and no index on a collection, so there is no cheaper
-              // shape — and it is bounded by the same 2000-row cap the truncation banner
-              // reports. If it ever becomes the bottleneck, the fix is denormalised columns on
-              // the transaction, not a smarter join here.
-              // ONE LookUp PER DIMENSION, both levels of the path off the product one and the
-              // lead off the project one. Splitting the path twice, or reading the manager's
-              // name and email separately, would double a join the note above already calls
-              // the accepted cost. Level 2 is the segment after the first " | "; a path with
-              // only one segment has none, which is its own bucket and not "Unclassified" —
-              // the product IS classified, just not that deep.
+              // ACCEPTED COST, NOT AN OVERSIGHT: a linear LookUp per transaction, so this is
+              // O(tx x products) + O(tx x projects) and re-runs on every period change. Power Fx
+              // has no hash join and no index on a collection. If it ever becomes the bottleneck
+              // the fix is denormalised columns on the transaction, not a smarter join here.
+              // ONE LookUp PER DIMENSION. Level 2 is the segment after the first " | "; a path
+              // with only one segment has none, which is its own bucket and NOT "Unclassified".
               ClearCollect( colRptTxEnriched,
                   ForAll( colRptTxCur As x,
                       With( { sp: Trim( Coalesce( LookUp( colRptProducts,
@@ -690,17 +518,14 @@ Screens:
                               pm: LookUp( colRptPrjMap, PId = x.transaction_project_id.Id ) },
                           With( { i: Find(" | ", sp) },
                               // Right, not Mid: the " | " separator is 3 characters, so the
-                              // remainder starts at i + 3 and runs to the end. Left is the
-                              // idiom this file already uses for the other half of the split.
+                              // remainder starts at i + 3 and runs to the end.
                               With( { rest: If( i > 0, Trim(Right(sp, Len(sp) - i - 2)), "" ) },
                                   With( { j: Find(" | ", rest) },
                                       { Prd: If( IsBlank(sp), "Unclassified",
                                                  If( i > 0, Left(sp, i - 1), sp ) ),
                                         Pr2: If( Len(rest) = 0, "Top level only",
                                                  If( j > 0, Left(rest, j - 1), rest ) ),
-                                        // THE PROJECT'S MANAGER, and the label is resolved
-                                        // here rather than in the chart fold so the display
-                                        // name and the email fallback travel together.
+                                        // Resolved here so the display name and the email fallback travel together.
                                         Ld:  With( { n: Coalesce(pm.MgrNm, ""),
                                                      e: Coalesce(pm.Mgr, "") },
                                                  If( Len(n) > 0, n,
@@ -708,18 +533,14 @@ Screens:
                                         Dt:  x.transaction_date,
                                         Ccy: Coalesce(x.transaction_currency.Value, "—"),
                                         Amt: Coalesce(x.transaction_notional, 0) } ) ) ) ) ) );
-              // PER CURRENCY, NEVER SUMMED ACROSS THEM. Cross-currency conversion is out
-              // of scope for this project, so there is no blended figure to show.
+              // PER CURRENCY, NEVER SUMMED ACROSS THEM — cross-currency conversion is out of scope.
               ClearCollect( colRptCcy,
                   ForAll( Distinct(colRptTxEnriched, Ccy) As c,
                       { K: c.Value,
                         N:   CountRows( Filter(colRptTxEnriched, Ccy = c.Value) ),
                         Tot: Coalesce( Sum( Filter(colRptTxEnriched, Ccy = c.Value), Amt ), 0 ) } ) );
-              // ---- transactions by project lead (bar) ------------------------------
-              // ATTRIBUTION IS PROJECT-LEVEL AND SAYS SO ON THE PANEL. This counts
-              // transactions on projects the person MANAGES; it is not task work and it is
-              // not sales credit, which is why it belongs in the transactions band and not
-              // beside the per-person task measures where it used to sit.
+              // ATTRIBUTION IS PROJECT-LEVEL AND SAYS SO ON THE PANEL: transactions on projects
+              // the person MANAGES. Neither their own task work nor sales credit.
               ClearCollect( colRptLdAll,
                   ForAll( Distinct(colRptTxEnriched, Ld) As d,
                       { K: d.Value, N: CountRows( Filter(colRptTxEnriched, Ld = d.Value) ) } ) );
@@ -734,9 +555,7 @@ Screens:
                   Collect( colRptLdBar,
                       { Idx: CountRows(colRptLdTop) + 1, K: "Other", N: gRptLdOther } ) );
               Set( gRptLdMax, Max( 1, Coalesce(Max(colRptLdBar, N), 0) ) );
-              // ---- transactions by product type, levels 1 and 2 (pies) -------------
-              // Same running-cumulative slice geometry as the region pie; see the note
-              // there for why the percentages are derived rather than rounded per slice.
+              // Same running-cumulative slice geometry as the region pie above.
               ClearCollect( colRptPrdAll,
                   ForAll( Distinct(colRptTxEnriched, Prd) As d,
                       { K: d.Value, N: CountRows( Filter(colRptTxEnriched, Prd = d.Value) ) } ) );
@@ -755,8 +574,7 @@ Screens:
                   ForAll( Filter(colRptPrdSeq, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptPrdSeq, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
-                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
-                            // a dropped zero-count row would leave a gap in the legend.
+                            // LEGEND ROW, not Idx — a dropped zero-count row would gap the legend.
                             Li:  CountRows( Filter(colRptPrdSeq, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptPrdTot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptPrdTot * 100, 0 )
@@ -783,8 +601,7 @@ Screens:
                   ForAll( Filter(colRptPr2Seq, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptPr2Seq, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
-                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
-                            // a dropped zero-count row would leave a gap in the legend.
+                            // LEGEND ROW, not Idx — a dropped zero-count row would gap the legend.
                             Li:  CountRows( Filter(colRptPr2Seq, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptPr2Tot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptPr2Tot * 100, 0 )
@@ -793,11 +610,8 @@ Screens:
                                      Switch( Mod(r.Idx - 1, 6),
                                              0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
                                              3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) } ) ) );
-              // ---- currency segments for the trend bars ----------------------------
-              // The bar chart stacks by currency, and an SVG Concat cannot carry a running
-              // total — so the base each segment sits on is computed HERE. Bucketed once per
-              // transaction rather than once per bucket-currency cell, which turns a
-              // DateDiff per cell into a DateDiff per row.
+              // An SVG Concat cannot carry a running total, so the base each segment sits on is
+              // computed HERE. Bucketed once per transaction, not once per bucket-currency cell.
               ClearCollect( colRptTxBk,
                   ForAll( colRptTxEnriched As e,
                       { Bi: RoundDown( DateDiff(gRptFrom, e.Dt, TimeUnit.Days)
@@ -816,19 +630,17 @@ Screens:
                           With( { k: Index(colRptCcyKeys, ci).K },
                               { Bi: bi, Ci: ci, K: k,
                                 N: CountRows( Filter(colRptTxBk, Bi = bi && K = k) ) } ) ) ) );
-              // FIXED BY VALUE, NOT BY POSITION: EUR is the same colour whatever its share
-              // is this period, so two loads can be compared by eye.
+              // FIXED BY VALUE, NOT BY POSITION: EUR is the same colour whatever its share, so
+              // two loads can be compared by eye.
               ClearCollect( colRptTxSeg,
                   ForAll( Filter(colRptTxSegRaw, N > 0) As g,
                       { Bi: g.Bi, Ci: g.Ci, K: g.K, N: g.N,
                         Base: Coalesce( Sum( Filter(colRptTxSegRaw, Bi = g.Bi && Ci < g.Ci), N ), 0 ),
                         Hx: Switch( g.K, "EUR", "#005A9E", "USD", "#2E8B9A", "GBP", "#D69828",
                                          "JPY", "#7A6FB0", "CHF", "#C05F3C", "#4A9E63" ) } ) );
-              // The people on the scoped manager's projects, resolved to a flat email
-              // list so the gallery filters with `in` over ~40 rows rather than scanning
-              // the unpivot on every repaint. Recomputed HERE as well as in the picker's
-              // OnChange because a period change rebuilds colRptPersonSrc underneath a
-              // scope that is already set — the two must stay identical.
+              // Flat email list so the gallery filters with `in` over ~40 rows rather than scanning
+              // the unpivot on every repaint. Recomputed here AND in the picker's OnChange — a
+              // period change rebuilds colRptPersonSrc under a scope already set. Keep them identical.
               ClearCollect( colRptScopeEm,
                   Distinct( Filter( colRptPersonSrc,
                                     PId in Filter(colRptPrjMap, Mgr = Coalesce(gRptScope, "")).PId ),
@@ -836,9 +648,7 @@ Screens:
               Set( gRptAsAt,   Text(Now(), "[$-en-US]hh:mm") );
               Set( gRptLoadedKey, gRptKey );
               Set( gRptBusy, false )
-      # =====================================================================
-      # BAND 0 — control bar. FIXED, outside the scroll body.
-      # =====================================================================
+      # BAND 0 — control bar. Fixed, outside the scroll body.
       - rowRptControl:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -879,9 +689,8 @@ Screens:
                         LayoutMinHeight: =16
                         Width: =Parent.Width
                         Height: =16
-                  # A LITERAL option list is right here and nowhere else on this screen:
-                  # these are app concepts, not a SharePoint column, so there is no
-                  # Choices() to bind and no vocabulary that can drift.
+                  # A literal option list is right here and nowhere else on this screen: these are app
+                  # concepts, not a SharePoint column, so there is no Choices() to bind.
                   - selRptPeriod:
                       Control: CanvasComponent
                       ComponentName: cmpSelection
@@ -894,8 +703,8 @@ Screens:
                                   { Id: 3, Label: "1QTR" } )
                         DefaultId: |
                           =Switch( gRptPeriod, "1W", 1, "1M", 2, "1QTR", 3, 3 )
-                        # The ONLY interaction that refetches. Select() queues the load;
-                        # nothing after it may read a fold, and nothing does.
+                        # The ONLY interaction that refetches. Select() queues the load; nothing after it
+                        # may read a fold, and nothing does.
                         OnChange: |
                           =Set( gRptPeriod, selRptPeriod.Selected.Label );
                            Set( gRptKey, selRptPeriod.Selected.Label );
@@ -923,18 +732,14 @@ Screens:
                         LayoutMinHeight: =16
                         Width: =Parent.Width
                         Height: =16
-                  # Scope NEVER refetches — it re-filters a ~40-row collection.
-                  # A COMBOBOX, not a cmpSelection strip: the option list is one row per
-                  # project manager and grows with the desk, so it cannot be a fixed-width
-                  # strip of buttons. Bound to colRptMgrOpts rather than a literal table
-                  # for the same reason.
+                  # Scope NEVER refetches — it re-filters a ~40-row collection. A combobox, not a
+                  # cmpSelection strip: one row per manager, so the list grows with the desk.
                   - cboRptScope:
                       Control: ModernCombobox@1.1.1
                       Properties:
                         Items: =colRptMgrOpts
                         ItemDisplayText: =ThisItem.Value
-                        # Matched on Em, never on the display name: two people can share a
-                        # name and neither would select reliably.
+                        # Matched on Em, never on the display name — two people can share a name.
                         DefaultSelectedItems: |
                           =Filter( colRptMgrOpts, Em = Coalesce(gRptScope, "") )
                         SelectMultiple: =false
@@ -944,8 +749,7 @@ Screens:
                         LayoutMinWidth: =Parent.Width
                         Width: =Parent.Width
                         Height: =36
-                        # Re-folds the scoped email list. Same fold as the one at the end
-                        # of btnRptLoad.OnSelect — keep the two identical.
+                        # Same fold as the end of btnRptLoad.OnSelect. Keep the two identical.
                         OnChange: |
                           =Set( gRptScope, Coalesce(cboRptScope.Selected.Em, "") );
                            ClearCollect( colRptScopeEm,
@@ -981,20 +785,15 @@ Screens:
                   LayoutMinWidth: =28
                   Width: =28
                   Height: =28
-                  # Refresh(...) first so the connector does not serve the same page
-                  # back, THEN the load. Both are queued behaviours, so the order here
-                  # is the order they are issued in, not a guarantee of completion.
+                  # Refresh() first so the connector does not serve the same page back, THEN the load.
                   OnSelect: |
                     =Refresh(taskmaster_tasks); Refresh(taskmaster_transactions);
                      Refresh(taskmaster_projects); Refresh(taskmaster_issues);
-                     // Products too — the load re-collects the type-path vocabulary, so
-                     // refreshing only the fact lists lets a stale product path through.
+                     // Products too — refreshing only the fact lists lets a stale product path through.
                      Refresh(taskmaster_products);
                      Set( gRptLoadedKey, "" );
                      Select( btnRptLoad )
-      # =====================================================================
       # BODY — everything below the control bar stacks and scrolls.
-      # =====================================================================
       - bodyRoot:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -1012,7 +811,6 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height - gTheme.Space.HeaderH - 72
           Children:
-            # ---- truncation banner ------------------------------------------
             # A report that silently undercounts is worse than no report.
             - barRptTrunc:
                 Control: GroupContainer@1.5.0
@@ -1046,9 +844,7 @@ Screens:
                         FillPortions: =1
                         LayoutMinWidth: =200
                         Height: =44
-            # =============================================================
             # BAND 1 — desk pulse
-            # =============================================================
             - rowRptPulse:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1159,12 +955,7 @@ Screens:
                         - lblRptOvdSub:
                             Control: Label@2.5.1
                             Properties:
-                              # A GUARD IS NOT A DIVISION FIX. Before the load runs these
-                              # globals are BLANK, not 0, so `= 0` does not reliably take
-                              # the safe branch and the else arm divides blank by blank.
-                              # Max() ignores blanks and returns 1, so the denominator
-                              # cannot be zero whatever the comparison does; the If stays
-                              # because it chooses the wording, not because it protects.
+                              # The If chooses the wording; Max() is what prevents the division. See rule 3.
                               Text: |
                                 =If( Coalesce(gRptOpenN, 0) = 0, "none open",
                                      RoundDown(gRptOvdN / Max(1, gRptOpenN) * 100, 0) & "% of open work" )
@@ -1217,9 +1008,8 @@ Screens:
                               LayoutMinHeight: =34
                               Width: =Parent.Width - 32
                               Height: =34
-                        # THE ONLY PRIOR-PERIOD DELTA ON THE SCREEN. The task tiles get
-                        # none and do not pretend to: there is no task history to
-                        # compare against, only current state.
+                        # THE ONLY PRIOR-PERIOD DELTA ON THE SCREEN. The task tiles get none and do not
+                        # pretend to — there is no task history to compare against, only current state.
                         - lblRptTxSub:
                             Control: Label@2.5.1
                             Properties:
@@ -1291,9 +1081,7 @@ Screens:
                               LayoutMinHeight: =16
                               Width: =Parent.Width - 32
                               Height: =16
-            # =============================================================
             # BAND 2 — people (primary)
-            # =============================================================
             - secRptPeople:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1326,9 +1114,8 @@ Screens:
                         LayoutMinHeight: =26
                         Width: =Parent.Width - 32
                         Height: =26
-                  # THE BASIS IS ON THE FACE OF THE SCREEN. The model has no hours and
-                  # no effort column, so this is volume and elapsed time — it is never
-                  # called effort.
+                  # THE BASIS IS ON THE FACE OF THE SCREEN. The model has no hours and no effort
+                  # column, so this is volume and elapsed time. It is never called effort.
                   - lblRptPeopleSub:
                       Control: Label@2.5.1
                       Properties:
@@ -1339,9 +1126,8 @@ Screens:
                            & If( gRptNoSup > 0,
                                  "   ·   " & gRptNoSup & " of " & CountRows(colRptOpen)
                                  & " open tasks record no supporter.", "" )
-                           // A completed task with no date cannot be placed in a period, so
-                           // it counts in EVERY one. Stated rather than left to explain a
-                           // Done total that does not move with the window.
+                           // A completed task with no date cannot be placed in a period, so it
+                           // counts in every one.
                            & If( gRptDoneNoDate > 0,
                                  "   ·   " & gRptDoneNoDate
                                  & " completed tasks record no completion date and count in "
@@ -1385,8 +1171,8 @@ Screens:
                               FillPortions: =3
                               LayoutMinWidth: =140
                               Height: =26
-                              # Toggles direction on the active column, otherwise switches
-                              # column and starts descending — the useful default for counts.
+                              # Toggles direction on the active column, otherwise switches column and starts
+                              # descending. Same shape on all seven sort buttons.
                               OnSelect: |
                                 =Set( gRptSortDesc, If(gRptSort = "Nm", !gRptSortDesc, true) );
                                  Set( gRptSort, "Nm" )
@@ -1407,8 +1193,6 @@ Screens:
                               FillPortions: =1
                               LayoutMinWidth: =52
                               Height: =26
-                              # Toggles direction on the active column, otherwise switches
-                              # column and starts descending — the useful default for counts.
                               OnSelect: |
                                 =Set( gRptSortDesc, If(gRptSort = "Owns", !gRptSortDesc, true) );
                                  Set( gRptSort, "Owns" )
@@ -1429,8 +1213,6 @@ Screens:
                               FillPortions: =1
                               LayoutMinWidth: =66
                               Height: =26
-                              # Toggles direction on the active column, otherwise switches
-                              # column and starts descending — the useful default for counts.
                               OnSelect: |
                                 =Set( gRptSortDesc, If(gRptSort = "Sups", !gRptSortDesc, true) );
                                  Set( gRptSort, "Sups" )
@@ -1451,8 +1233,6 @@ Screens:
                               FillPortions: =1
                               LayoutMinWidth: =62
                               Height: =26
-                              # Toggles direction on the active column, otherwise switches
-                              # column and starts descending — the useful default for counts.
                               OnSelect: |
                                 =Set( gRptSortDesc, If(gRptSort = "Ovd", !gRptSortDesc, true) );
                                  Set( gRptSort, "Ovd" )
@@ -1485,8 +1265,6 @@ Screens:
                               FillPortions: =1
                               LayoutMinWidth: =52
                               Height: =26
-                              # Toggles direction on the active column, otherwise switches
-                              # column and starts descending — the useful default for counts.
                               OnSelect: |
                                 =Set( gRptSortDesc, If(gRptSort = "Dn", !gRptSortDesc, true) );
                                  Set( gRptSort, "Dn" )
@@ -1507,8 +1285,6 @@ Screens:
                               FillPortions: =1
                               LayoutMinWidth: =70
                               Height: =26
-                              # Toggles direction on the active column, otherwise switches
-                              # column and starts descending — the useful default for counts.
                               OnSelect: |
                                 =Set( gRptSortDesc, If(gRptSort = "Med", !gRptSortDesc, true) );
                                  Set( gRptSort, "Med" )
@@ -1529,8 +1305,6 @@ Screens:
                               FillPortions: =1
                               LayoutMinWidth: =64
                               Height: =26
-                              # Toggles direction on the active column, otherwise switches
-                              # column and starts descending — the useful default for counts.
                               OnSelect: |
                                 =Set( gRptSortDesc, If(gRptSort = "OnTp", !gRptSortDesc, true) );
                                  Set( gRptSort, "OnTp" )
@@ -1553,13 +1327,11 @@ Screens:
                       Control: Gallery@2.15.0
                       Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                       Properties:
-                        # SCOPE RE-FILTERS A ~40-ROW FOLD. It never refetches, and no row
-                        # property here touches a fact collection.
-                        # TWO BRANCHES, because Name is text and every other key is a
-                        # number: one Switch returning both would be a type conflict.
-                        # SortByColumns takes a column NAME and would collapse this to one
-                        # line, but whether it still accepts a string post-3.24042 is not
-                        # grounded here, and a wrong guess fails the whole paste.
+                        # SCOPE RE-FILTERS A ~40-ROW FOLD; it never refetches.
+                        # TWO BRANCHES, because Name is text and every other key is a number — one Switch
+                        # returning both would be a type conflict. SortByColumns would collapse this to
+                        # one line, but whether it still accepts a string post-3.24042 is not grounded
+                        # here, and a wrong guess fails the whole paste.
                         Items: |
                           =With( { sc: If( Len(Coalesce(gRptScope, "")) = 0,
                                            colRptPerson,
@@ -1571,10 +1343,7 @@ Screens:
                                          Switch( gRptSort,
                                                  "Owns", Owns, "Sups", Sups, "Ovd",  Ovd,
                                                  "Dn",   Dn,   "Med",  Med,  "OnTp", OnTp,
-                                                 // Owns, NOT Owns + Sups. This fallback is
-                                                 // unreachable while gRptSort holds one of the
-                                                 // keys above, but it must not sum the two —
-                                                 // which this band's own subtitle forbids.
+                                                 // Owns, NOT Owns + Sups — this band's own subtitle forbids summing them.
                                                  Owns ),
                                          dr ) ) )
                         WrapCount: =1
@@ -1653,14 +1422,8 @@ Screens:
                                     FillPortions: =1
                                     LayoutMinWidth: =62
                                     Height: =32
-                              # A PLAIN Image, NOT cmpKpiRing. A canvas component cannot be
-                              # inserted into a gallery (MS Learn known limitation #4) and the
-                              # validator hard-fails on it.
-                              #
-                              # Whole numbers only: a fraction would have to go through Text(),
-                              # which drags the locale decimal separator into an SVG attribute,
-                              # and an attribute Power Fx cannot render comes out EMPTY — a
-                              # width='' rect is not a thin rect, it is no rect.
+                              # A PLAIN Image, NOT cmpKpiRing. A canvas component cannot be inserted into a
+                              # gallery (MS Learn known limitation #4) and the validator hard-fails on it.
                               - cellRptHealth:
                                   Control: Image@2.2.3
                                   Properties:
@@ -1668,16 +1431,11 @@ Screens:
                                     FillPortions: =2
                                     LayoutMinWidth: =90
                                     Height: =18
-                                    # CUMULATIVE BOUNDARIES, NOT INDEPENDENT WIDTHS. Rounding each
-                                    # segment separately overflows — Gc=3, Ac=5, Rc=0 gives
-                                    # Round(112.5)=113 and Round(187.5)=188, so the red segment came
-                                    # out width='-1', an SVG error that kills the whole drawing.
-                                    # Rounding the running boundary instead is monotonic, so every
-                                    # width is >= 0 by construction and they always total 300.
-                                    #
-                                    # NO OPEN TASKS DRAWS THE EMPTY TRACK. Max(1, 0) used to make the
-                                    # denominator 1 with a zero numerator, painting a solid RED bar
-                                    # for anyone who had finished all their work.
+                                    # CUMULATIVE BOUNDARIES, NOT INDEPENDENT WIDTHS. Rounding each segment
+                                    # separately overflows — Gc=3, Ac=5, Rc=0 gave a red segment of width='-1',
+                                    # an SVG error that kills the whole drawing. Rounding the running boundary
+                                    # is monotonic, so every width is >= 0 and they always total 300.
+                                    # NO OPEN TASKS DRAWS THE EMPTY TRACK, not a solid red bar.
                                     Image: |
                                       =With( { tot: ThisItem.Gc + ThisItem.Ac + ThisItem.Rc },
                                           With( { g:  If( tot = 0, 0, Round(ThisItem.Gc / Max(1, tot) * 300, 0) ),
@@ -1706,8 +1464,7 @@ Screens:
                                     FillPortions: =1
                                     LayoutMinWidth: =52
                                     Height: =32
-                              # -1 is "not applicable", not zero: a dash where no completed
-                              # task carried a start date, so a real 0-day turnaround is not
+                              # -1 is "not applicable", not zero: a dash, so a real 0-day turnaround is not
                               # confused with a missing one.
                               - cellRptMed:
                                   Control: Label@2.5.1
@@ -1757,15 +1514,10 @@ Screens:
                               Y: =0
                               Width: =Parent.TemplateWidth
                               Height: =Parent.TemplateHeight
-                              # Selects, never navigates. The detail is an OVERLAY on this
-                              # screen: a Navigate would cost a fresh OnVisible and throw
-                              # away every fold, which is the whole point of folding.
-                              # THE OVERLAY LISTS THE TASKS THEMSELVES, off colRptPersonSrc,
-                              # which is already in memory — no refetch, which is the whole
-                              # payoff for folding at person grain. Built INLINE rather than
-                              # through Select() on a hidden button: Select queues, and a
-                              # queued build would paint the previous person's list for a
-                              # frame. This is one pass over one person's rows.
+                              # Selects, never navigates. The detail is an OVERLAY on this screen — a
+                              # Navigate would cost a fresh OnVisible and throw away every fold.
+                              # Built INLINE rather than through Select() on a hidden button: Select
+                              # queues, and a queued build would paint the previous person's list for a frame.
                               OnSelect: |
                                 =Select(Parent);
                                  If( gRptSelPerson = ThisItem.Em,
@@ -1773,13 +1525,9 @@ Screens:
                                      Set( gRptSelPerson, ThisItem.Em );
                                      Set( gRptSelName, Coalesce(ThisItem.Nm, ThisItem.Em) );
                                      Set( gRptSelRow, ThisItem );
-                                     // DUP ROWS DROPPED. A person who is both lead and
-                                     // supporter on a task has two rows here; listing the task
-                                     // twice reads as a defect, and the measures beside it
-                                     // already zero the duplicate.
-                                     // Sk IS THE WHOLE SORT, because Sort takes ONE column:
-                                     // open work ranks by days-to-due so overdue leads, undated
-                                     // open work sits after it, and completed work lands last.
+                                     // DUP ROWS DROPPED — a person who both leads and supports a task
+                                     // has two rows here, and listing it twice reads as a defect.
+                                     // Sk IS THE WHOLE SORT, because Sort takes ONE column.
                                      ClearCollect( colRptPTask,
                                          Sort(
                                              ForAll( Filter( colRptPersonSrc,
@@ -1790,18 +1538,9 @@ Screens:
                                                            If( IsBlank(r.Dtl), 90000,
                                                                DateDiff(Today(), r.Dtl, TimeUnit.Days) ) ) } ),
                                              Sk, SortOrder.Ascending ) ) )
-            # =============================================================
             # BAND 3 — where the work sits
-            # =============================================================
-            # EVERY COORDINATE POWER FX SUPPLIES IS A WHOLE NUMBER. A fraction would have
-            # to go through Text(), which drags the locale decimal separator into an SVG
-            # attribute, and an attribute Power Fx cannot render comes out EMPTY — a
-            # width='' rect is not a thin rect, it is no rect. The viewBoxes are scaled up
-            # instead. Fractions that appear as STRING LITERALS (the pie radius) never pass
-            # through Text() and are safe.
-            #
-            # FOUR COLUMNS AT LayoutMinWidth 260 need ~1100px before they overflow. Raising
-            # a panel's minimum without dropping one from the row is what breaks this band.
+            # FOUR COLUMNS AT LayoutMinWidth 260 need ~1100px before they overflow. Raising a
+            # panel's minimum without dropping one from the row is what breaks this band.
             - rowRptWork:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1917,12 +1656,10 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        # THE SUBTITLE CARRIES BOTH GAPS, because a slice cannot. A large
-                        # Unspecified wedge here means the column is YOUNGER than the backlog,
-                        # not that the report is broken — and those two look identical on a
-                        # pie. Other outranks it: a value tasks still hold that the column no
-                        # longer offers is a data question and rarer, so it must not be hidden
-                        # behind the commoner message.
+                        # THE SUBTITLE CARRIES BOTH GAPS, because a slice cannot. A large Unspecified
+                        # wedge means the column is YOUNGER than the backlog, not that the report is
+                        # broken, and those two look identical on a pie. Other outranks it: rarer, and
+                        # a data question.
                         - lblRptAudS:
                             Control: Label@2.5.1
                             Properties:
@@ -1954,17 +1691,11 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 80
-                              # A PIE IS N STACKED CIRCLES, not arc paths: circumference 100 at
-                              # r 15.9155, so a slice IS its percentage and no Cos/Sin appears
-                              # anywhere. stroke-width 31.831 is 2r, which fills the stroke to
-                              # the centre and makes the ring a disc. The fractions here are
-                              # STRING LITERALS and never computed — a computed fraction goes
-                              # through Text(), drags the locale decimal separator into the
-                              # attribute, and the slice renders EMPTY. Everything Power Fx
-                              # supplies (Pct, Off, the legend coordinates) is a whole number.
-                              # dashoffset 125 - Off, not 25 - Off: the pattern repeats every
-                              # 100 units so the two are the same rotation, and this one can
-                              # never go negative.
+                              # A PIE IS N STACKED CIRCLES, not arc paths: circumference 100 at r 15.9155, so
+                              # a slice IS its percentage and no Cos/Sin appears anywhere. stroke-width 31.831
+                              # is 2r, which fills the stroke to the centre and makes the ring a disc.
+                              # dashoffset 125 - Off, not 25 - Off: the pattern repeats every 100 units so the
+                              # two are the same rotation, and this one can never go negative.
                               Image: |
                                 =With( { n: CountRows(colRptAudPie) },
                                     "data:image/svg+xml;charset=utf-8," & EncodeUrl(
@@ -2030,10 +1761,8 @@ Screens:
                             Properties:
                               Text: |
                                 ="Top 6, from the parent project. "
-                                 // colRptReqAll, NOT colRptReqBar: the bar collection holds
-                                 // only the top six, so a large Unassigned bucket that fell
-                                 // outside them would report as zero — the exact silence this
-                                 // line exists to break.
+                                 // colRptReqAll, NOT colRptReqBar: the bar collection holds only the
+                                 // top six, so a large Unassigned outside them would report as zero.
                                  & If( LookUp(colRptReqAll, K = "Unassigned", N) > 0,
                                        LookUp(colRptReqAll, K = "Unassigned", N)
                                        & " record no requestor.",
@@ -2053,9 +1782,8 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 80
-                              # SAME SHAPE AS THE FAMILY CHART, and the viewBox height is
-                              # COMPUTED for the same reason: the row count is top-6-plus-Other
-                              # and is not known at author time.
+                              # viewBox height is COMPUTED — the row count is top-6-plus-Other and is
+                              # not known at author time.
                               Image: |
                                 =With( { n: Max(1, CountRows(colRptReqBar)) },
                                   "data:image/svg+xml;charset=utf-8," & EncodeUrl(
@@ -2125,17 +1853,7 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 80
-                              # A PIE IS N STACKED CIRCLES, not arc paths: circumference 100 at
-                              # r 15.9155, so a slice IS its percentage and no Cos/Sin appears
-                              # anywhere. stroke-width 31.831 is 2r, which fills the stroke to
-                              # the centre and makes the ring a disc. The fractions here are
-                              # STRING LITERALS and never computed — a computed fraction goes
-                              # through Text(), drags the locale decimal separator into the
-                              # attribute, and the slice renders EMPTY. Everything Power Fx
-                              # supplies (Pct, Off, the legend coordinates) is a whole number.
-                              # dashoffset 125 - Off, not 25 - Off: the pattern repeats every
-                              # 100 units so the two are the same rotation, and this one can
-                              # never go negative.
+                              # Same pie construction as the audience chart above.
                               Image: |
                                 =With( { n: CountRows(colRptRgnPie) },
                                     "data:image/svg+xml;charset=utf-8," & EncodeUrl(
@@ -2165,22 +1883,11 @@ Screens:
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                           & "No open tasks</text>", "" )
                                       & "</svg>" ) )
-            # =============================================================
             # BAND 4 — how projects are trending
-            # =============================================================
-            # THE TREND SERIES ARE BUILT ENTIRELY FROM DATED EVENTS.
-            # project_perc_completion, task_stage and project_phase are CURRENT STATE with
-            # no snapshot anywhere, so "completion over time" is impossible natively —
-            # the left chart comes from project_date_start / project_date_complete instead.
-            #
-            # THREE COLUMNS, READ LEFT TO RIGHT AS PAST, PRESENT, FUTURE: what opened and
-            # closed across the window, where the open book stands right now, and what
-            # falls due next. ONLY THE LEFT PANEL IS BOUND BY THE PERIOD STRIP — the pie
-            # is a snapshot and the due chart is keyed on Today(); each says so on its face.
-            #
-            # FillPortions 2 : 1 : 2 — the two bar charts carry up to 13 and 15 categories
-            # and need the room; the pie is a 320x150 box and does not. The minimums add to
-            # ~950px, under both band 3 and band 5, so this band never sets the scroll width.
+            # Past · present · future, and ONLY THE LEFT PANEL IS BOUND BY THE PERIOD STRIP:
+            # the pie is a snapshot, the due chart is keyed on Today(). Each says so on its face.
+            # FillPortions 2 : 1 : 2, minimums ~950px — under bands 3 and 5, so this band
+            # never sets the scroll width.
             - rowRptTrend:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -2237,8 +1944,7 @@ Screens:
                               LayoutMinHeight: =32
                               Width: =Parent.Width - 32
                               Height: =32
-                        # ONE SCALE for all three series — they are all project counts, so a
-                        # second axis would only make the line look bigger than it is.
+                        # ONE SCALE for all three series — they are all project counts.
                         - imgRptTrend:
                             Control: Image@2.2.3
                             Properties:
@@ -2247,11 +1953,9 @@ Screens:
                               LayoutMinHeight: =160
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 90
-                              # 480-WIDE viewBox, NOT the 900 this chart carried while it had
-                              # the whole band. ImagePosition.Fit scales the box to the control,
-                              # so a 900-unit box in a third-width column would shrink a 15pt
-                              # label to about 7px on screen. Halving the box halves the
-                              # downscale instead of shrinking the type.
+                              # 480-WIDE viewBox, not the 900 this carried while it had the whole band.
+                              # ImagePosition.Fit scales the box to the control, so a 900-unit box in a
+                              # third-width column shrinks a 15pt label to about 7px on screen.
                               Image: |
                                 =With( { n: Max(1, CountRows(colRptBuckets)) },
                                     With( { w: RoundDown(460 / n, 0),
@@ -2273,9 +1977,8 @@ Screens:
                                               & (250 - Round(Cp / Max(1, gRptTrendMax) * 210, 0)) & "' width='"
                                               & Max(3, RoundDown(w / 2, 0) - 3) & "' height='"
                                               & Round(Cp / Max(1, gRptTrendMax) * 210, 0) & "' fill='#31825D'/>"
-                                              // EVERY OTHER LABEL once the window gives more than 8
-                                              // buckets: a "d mmm" label runs about 42 units at this
-                                              // font and a quarter's buckets are only 35 apart.
+                                              // EVERY OTHER LABEL past 8 buckets: a "d mmm" label runs ~42 units
+                                              // and a quarter's buckets are only 35 apart.
                                               & If( Mod(Idx - 1, sk) = 0,
                                                     "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='272'"
                                                   & " text-anchor='middle' font-size='14'"
@@ -2288,9 +1991,8 @@ Screens:
                                               & (250 - Round(Net / Max(1, gRptTrendMax) * 210, 0)) & " " )
                                           & "'/>"
                                           & "</svg>" ) ) )
-                  # A SNAPSHOT, NOT A WINDOW. project_phase is current state with no history
-                  # behind it, so this counts the open book as it stands and the period strip
-                  # leaves it alone. That is the point of it sitting between the two.
+                  # A SNAPSHOT, NOT A WINDOW — project_phase is current state, so the period strip
+                  # leaves this alone.
                   - pnlRptPhase:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -2344,9 +2046,6 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 90
-                              # Same construction as the band-3 and band-5 pies — circumference
-                              # 100 at r 15.9155, stroke-width 2r so the ring is a disc, and
-                              # every value Power Fx supplies is a whole number.
                               Image: |
                                 =With( { n: CountRows(colRptPhPie) },
                                     "data:image/svg+xml;charset=utf-8," & EncodeUrl(
@@ -2376,8 +2075,7 @@ Screens:
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                           & "No live projects</text>", "" )
                                       & "</svg>" ) )
-                  # KEYED ON Today(), NOT gRptFrom — see the fold. This is the one series on
-                  # the screen that looks forward, which is why it is the right-hand column.
+                  # KEYED ON Today(), NOT gRptFrom. The one series on the screen that looks forward.
                   - pnlRptDue:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -2409,9 +2107,8 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        # THE THREE TASKS THAT ARE NOT IN A BAR ARE STATED, for the same reason
-                        # gRptDoneNoDate and gRptNoSup are: a total that does not reconcile is
-                        # worse than one that explains itself.
+                        # THE THREE TASKS THAT ARE NOT IN A BAR ARE STATED — a total that does not
+                        # reconcile is worse than one that explains itself.
                         - lblRptDueS:
                             Control: Label@2.5.1
                             Properties:
@@ -2434,8 +2131,8 @@ Screens:
                               LayoutMinHeight: =160
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 90
-                              # FIFTEEN FIXED BARS 30 UNITS APART, so no bar-width arithmetic is
-                              # needed: unlike the trend chart the category count cannot change.
+                              # FIFTEEN FIXED BARS 30 UNITS APART, so no bar-width arithmetic: unlike the
+                              # trend chart the category count cannot change.
                               Image: |
                                 =With( { t: Coalesce(Sum(colRptDueBars, N), 0) },
                                     "data:image/svg+xml;charset=utf-8," & EncodeUrl(
@@ -2475,16 +2172,10 @@ Screens:
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                           & "Nothing due in the next two weeks</text>", "" )
                                       & "</svg>" ) )
-            # =============================================================
             # BAND 5 — transactions (secondary)
-            # =============================================================
-            # THREE COLUMNS, READ LEFT TO RIGHT AS WHO, WHEN, WHAT: the leads who own the
-            # desks the trades sit on, the trend over the window, the product mix. Reading
-            # one against the others is the point of the band.
-            #
-            # FillPortions 1 : 2 : 2 — the trend and the pies carry 900- and 320-wide
-            # viewBoxes and need the room; the lead bars are a six-row list and do not. The
-            # minimums add to ~1120px before the row overflows, in line with band 3.
+            # Who · when · what: the leads who own the desks, the trend, the product mix.
+            # FillPortions 1 : 2 : 2, minimums ~1120px — this is the row that sets the
+            # horizontal scroll width.
             - rowRptTx:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -2528,10 +2219,8 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        # THE BASIS IS ON THE FACE OF THE PANEL. This is the measure that was
-                        # wrong beside the per-person TASK figures and is right here: it counts
-                        # trades booked to projects the person MANAGES, which is neither their
-                        # own task work nor sales credit.
+                        # THE BASIS IS ON THE FACE OF THE PANEL: trades booked to projects the person
+                        # MANAGES, which is neither their own task work nor sales credit.
                         - lblRptLdS:
                             Control: Label@2.5.1
                             Properties:
@@ -2553,9 +2242,7 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 90
-                              # Same bar shape as the requestor chart, and the viewBox height is
-                              # COMPUTED for the same reason: the row count is top-6-plus-Other
-                              # and is not known at author time.
+                              # viewBox height is COMPUTED — top-6-plus-Other is not known at author time.
                               Image: |
                                 =With( { n: Max(1, CountRows(colRptLdBar)) },
                                   "data:image/svg+xml;charset=utf-8," & EncodeUrl(
@@ -2618,14 +2305,12 @@ Screens:
                               LayoutMinHeight: =130
                               Width: =Parent.Width - 32
                               Height: =130
-                              # Current window SPLIT BY CURRENCY, prior window greyed BEHIND it.
-                              # THE SEGMENTS ARE A SEPARATE Concat over colRptTxSeg, not one nested
-                              # inside the bucket Concat: colRptTxSeg carries its own bucket index
-                              # Bi, so the x position is computed from the row rather than from an
-                              # outer record scope. A nested Concat would have to reach the outer
-                              # Idx, and that is exactly the ambiguity that fails at paste time.
-                              # Each segment's height is the DIFFERENCE of two rounded tops, so the
-                              # stack cannot drift past the total the bar is scaled to.
+                              # THE SEGMENTS ARE A SEPARATE Concat over colRptTxSeg, not one nested inside the
+                              # bucket Concat: colRptTxSeg carries its own bucket index Bi, so x comes off the
+                              # row. A nested Concat would have to reach the outer Idx, and that ambiguity
+                              # fails at paste time.
+                              # Each segment's height is the DIFFERENCE of two rounded tops, so the stack
+                              # cannot drift past the total the bar is scaled to.
                               Image: |
                                 =With( { n: Max(1, CountRows(colRptBuckets)) },
                                     With( { w: RoundDown(880 / n, 0) },
@@ -2653,17 +2338,15 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              # NEVER SUMMED ACROSS CURRENCIES — one tile each. Cross-currency
-                              # conversion is out of scope, so there is no blended total.
+                              # NEVER SUMMED ACROSS CURRENCIES — one tile each.
                               Items: =Sort(colRptCcy, N, SortOrder.Descending)
                               WrapCount: =5
                               TemplateSize: =56
                               TemplatePadding: =0
                               TemplateFill: =RGBA(0, 0, 0, 0)
                               BorderThickness: =0
-                              # SCROLLS, and two rows deep. The column has five values today, so
-                              # WrapCount 5 fits exactly — which is precisely why a sixth added in
-                              # SharePoint would have gone silently unreachable.
+                              # SCROLLS, two rows deep. WrapCount 5 fits the column's five values EXACTLY —
+                              # which is why a sixth added in SharePoint would go silently unreachable.
                               ShowScrollbar: =true
                               FillPortions: =0
                               LayoutMinHeight: =120
@@ -2684,9 +2367,8 @@ Screens:
                                     Width: =Parent.TemplateWidth - 8
                                     Height: =Parent.TemplateHeight - 4
                                   Children:
-                                    # THE TILE IS THE CHART'S LEGEND. Same Switch as colRptTxSeg's
-                                    # Hx, keyed on the currency value so the two cannot drift apart
-                                    # — a swatch that disagrees with the bar is worse than none.
+                                    # Same Switch as colRptTxSeg's Hx — a swatch that disagrees with the bar is
+                                    # worse than none.
                                     - lblRptCcyK:
                                         Control: Label@2.5.1
                                         Properties:
@@ -2749,9 +2431,8 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        # Unclassified is A REAL SLICE, not a dropped row: a product with no
-                        # type path still traded, and hiding it would make the pie disagree
-                        # with the transaction count beside it.
+                        # Unclassified is A REAL SLICE, not a dropped row: hiding it would make the pie
+                        # disagree with the transaction count beside it.
                         - lblRptPrdS:
                             Control: Label@2.5.1
                             Properties:
@@ -2766,10 +2447,7 @@ Screens:
                               LayoutMinHeight: =32
                               Width: =Parent.Width - 32
                               Height: =32
-                        # SIDE BY SIDE, not stacked: two 320x150 charts read as a pair at a
-                        # glance, and stacked they wasted the panel's width while cramping its
-                        # height. Each takes half the row, and ImagePosition.Fit keeps the
-                        # aspect — so they shrink together rather than distorting.
+                        # SIDE BY SIDE, not stacked: two 320x150 charts read as a pair at a glance.
                         - rowRptPrdPies:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -2790,9 +2468,7 @@ Screens:
                                     LayoutMinWidth: =150
                                     Width: =(Parent.Width - 8) / 2
                                     Height: =Parent.Height
-                                    # Same construction as the band-3 pies — circumference 100 at
-                                    # r 15.9155, stroke-width 2r so the ring is a disc, and every
-                                    # value Power Fx supplies is a whole number.
+                                    # Same pie construction as the audience chart.
                                     Image: |
                                       =With( { n: CountRows(colRptPrdPie) },
                                           "data:image/svg+xml;charset=utf-8," & EncodeUrl(
