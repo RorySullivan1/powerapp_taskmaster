@@ -1224,60 +1224,75 @@ Screens:
                         // requires ALL its arguments to be type-compatible. Text(Patch(...).ID) forces
                         // the success arm to text; an empty Message means the row was written.
                         Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
-                        ForAll( colNewTasks As t,
-                            Collect( colChildResult,
-                                { Kind: "Task", Sid: t.sid, Name: t.t_name,
-                                  Message:
-                                    IfError( Text(
-                                        Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
-                                               // This screen cannot archive a project, so a child staged
-                                               // here is never archived.
-                                               { task_project_archived: false },
-                                            { task_name:       t.t_name,
-                                              task_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
-                                              task_stage:      { Value: t.t_stage },
-                                              // GREEN IS DERIVED, NOT PICKED — a task created
-                                              // here has no issues yet. Not a default to
-                                              // "correct" into a control.
-                                              task_status:     { Value: "Green" },
-                                              task_priority:   { Value: t.t_priority },
-                                              task_lead:
-                                                  { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                    Claims:      gClaimPrefix & Lower(t.t_leadMail),
-                                                    DisplayName: t.t_leadName,
-                                                    Email:       t.t_leadMail,
-                                                    Department: "", JobTitle: "", Picture: "" },
-                                              task_date_start:  Now(),
-                                              task_date_target: t.t_target } )
-                                    .ID ),
-                                    FirstError.Message,
-                                    "" ) } ) );
-                        ForAll( colNewTransactions As x,
-                            Collect( colChildResult,
-                                { Kind: "Transaction", Sid: x.sid, Name: x.x_name,
-                                  Message:
-                                    IfError( Text(
-                                        Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
-                                               // This screen cannot archive a project, so a child staged
-                                               // here is never archived.
-                                               { transaction_project_archived: false },
-                                            { transaction_name:        x.x_name,
-                                              transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
-                                              transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
-                                              transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
-                                              transaction_sales:
-                                                  { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                    Claims:      gClaimPrefix & Lower(x.x_salesMail),
-                                                    DisplayName: x.x_salesName,
-                                                    Email:       x.x_salesMail,
-                                                    Department: "", JobTitle: "", Picture: "" },
-                                              transaction_currency:    { Value: x.x_ccy },
-                                              transaction_notional:
-                                                  x.x_notional,
-                                              transaction_date:        x.x_date } )
-                                    .ID ),
-                                    FirstError.Message,
-                                    "" ) } ) );
+                        Clear( colChildResultT ); Clear( colChildResultX );
+                        // TWO INDEPENDENT UPLOADS. Both depend only on gPrSaved and neither reads the
+                        // other's rows, so they are issued together rather than back to back.
+                        //
+                        // THE SEPARATE RESULT COLLECTIONS ARE THE POINT, not a tidier split: the arms of
+                        // Concurrent must not touch shared state, and one colChildResult written by both
+                        // loops is exactly that. They are merged below; everything downstream reads the
+                        // merge. Collect is also what keeps these bodies legal — ForAll may run its rows
+                        // in any order, so it sanctions Patch and Collect and rules out Set.
+                        Concurrent(
+                            ForAll( colNewTasks As t,
+                                Collect( colChildResultT,
+                                    { Kind: "Task", Sid: t.sid, Name: t.t_name,
+                                      Message:
+                                        IfError( Text(
+                                            Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
+                                                   // This screen cannot archive a project, so a child staged
+                                                   // here is never archived.
+                                                   { task_project_archived: false },
+                                                { task_name:       t.t_name,
+                                                  task_project_id: { Id: gPrSaved.ID, Value: gPrNameSaved },
+                                                  task_stage:      { Value: t.t_stage },
+                                                  // GREEN IS DERIVED, NOT PICKED — a task created
+                                                  // here has no issues yet. Not a default to
+                                                  // "correct" into a control.
+                                                  task_status:     { Value: "Green" },
+                                                  task_priority:   { Value: t.t_priority },
+                                                  task_lead:
+                                                      { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                                        Claims:      gClaimPrefix & Lower(t.t_leadMail),
+                                                        DisplayName: t.t_leadName,
+                                                        Email:       t.t_leadMail,
+                                                        Department: "", JobTitle: "", Picture: "" },
+                                                  task_date_start:  Now(),
+                                                  task_date_target: t.t_target } )
+                                        .ID ),
+                                        FirstError.Message,
+                                        "" ) } ) ),
+                            ForAll( colNewTransactions As x,
+                                Collect( colChildResultX,
+                                    { Kind: "Transaction", Sid: x.sid, Name: x.x_name,
+                                      Message:
+                                        IfError( Text(
+                                            Patch( taskmaster_transactions, Defaults(taskmaster_transactions),
+                                                   // This screen cannot archive a project, so a child staged
+                                                   // here is never archived.
+                                                   { transaction_project_archived: false },
+                                                { transaction_name:        x.x_name,
+                                                  transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
+                                                  transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
+                                                  transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
+                                                  transaction_sales:
+                                                      { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                                        Claims:      gClaimPrefix & Lower(x.x_salesMail),
+                                                        DisplayName: x.x_salesName,
+                                                        Email:       x.x_salesMail,
+                                                        Department: "", JobTitle: "", Picture: "" },
+                                                  transaction_currency:    { Value: x.x_ccy },
+                                                  transaction_notional:
+                                                      x.x_notional,
+                                                  transaction_date:        x.x_date } )
+                                        .ID ),
+                                        FirstError.Message,
+                                        "" ) } ) ) );
+                        // Order is not guaranteed within a loop and now not between them either. Nothing
+                        // downstream depends on it: the error/ok splits filter on Message, and the
+                        // Save-to-retry RemoveIf matches on Sid.
+                        Collect( colChildResult, colChildResultT );
+                        Collect( colChildResult, colChildResultX );
                         Collect( colChildErrors,
                                  ShowColumns( Filter(colChildResult, Len(Message) > 0), Kind, Name, Message ) );
                         Collect( colChildOk,
