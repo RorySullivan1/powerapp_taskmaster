@@ -196,6 +196,83 @@ Delete the PROBE task row and any PROBE link afterwards.
 
 ---
 
+## `scrProbe-date-null-delegation.pa.yaml` — does `dateColumn = Blank()` delegate?
+
+**Status: NOT YET RUN.** Written 2026-08-19 for issue #35.
+
+### The claim under test
+
+`scrReports` fetches **every** live completed task and bounds the report window locally.
+The stated reason is sound: `task_date_completion` is optional and `>= gRptFrom` is false
+for a blank date, so a bare server-side bound would silently drop every dateless completed
+task out of Done and the medians.
+
+But that rules out a bare `>=`, not a bound that **keeps** the blanks:
+
+```
+   task_stage.Value = "Completed"
+&& ( task_date_completion >= gPbCutoff || task_date_completion = Blank() )
+```
+
+`= Blank()` delegates for several SharePoint column types where `IsBlank()` never does.
+Whether a **DateTime** column's null test folds is the open question, and it decides #35
+outright — bound the heaviest of the five report fetches, or close won't-fix.
+
+### Why there are two instruments, and which one is the verdict
+
+**Delegation is invisible below the data row limit.** On a small list a non-delegating query
+returns exactly the right rows, so counts cannot settle this on their own — this is the trap
+to avoid, not a detail. The reading that counts is **Studio's own delegation warning**, one
+per label, which is static and needs no data at all. The row-limit-1 count is corroboration.
+
+### The sub-cases
+
+| Label | Filter | Decides |
+|---|---|---|
+| **A** | `task_stage.Value = "Completed"` on the data source | **Positive control.** Must be clean |
+| **B** | `Len(task_name) > 3` | **Negative control.** Must warn |
+| **C** | `task_date_completion = Blank()` alone | Whether the null test is the problem by itself |
+| **D** | the full predicate over `taskmaster_tasks` | Whether the Or-arm costs delegation |
+| **E** | the full predicate over `LiveTasks` | **The shipping shape** — scrReports filters the named formula, not the source |
+| **F** | today's unbounded count vs the windowed count | Whether #35 is worth anything even if it delegates |
+
+A and B are the pair that makes the run readable: **if A warns or B does not, Studio is not
+flagging what it claims to and nothing else on the screen means anything.** Each sub-case is
+its own label, so no two share an instrument.
+
+**D vs E is not redundant.** This repo has already been burned by a named formula behaving
+differently from the data source underneath it — `ShowColumns` over one reads text columns
+back as an ERROR type — so "delegates over the source" would not license the shipping shape.
+
+### Protocol
+
+1. Paste onto a blank screen named `scrProbeDateNull`. `taskmaster_tasks` must be in the
+   Data pane; `LiveTasks` is an App named formula and already exists.
+2. **Read the warnings.** Click each of A–F and check the formula bar and the App checker.
+   Check A and B first and stop if either is wrong.
+3. Optional corroboration: set Data row limit to 1, press SET CUTOFF, read the counts. A
+   delegable filter still finds a matching row; a non-delegable one downloads one row and
+   tests it locally, so it usually shows 0.
+4. **Put the data row limit back to 2000** — and `gDataRowLimit` in `App.OnStart` must match
+   whatever it ends on, or every truncation sentinel in the app goes dead.
+
+### How to read it
+
+- **C, D and E all clean** → bound the fetch on `gRptFrom` in `btnRptLoad`, keeping the
+  dateless rows. `colRptDone` and `gRptDoneNoDate` keep working unchanged.
+- **C clean but D or E warns** → the Or-arm is the cost, not the null test. Record it; the
+  fix would have to be shaped differently, and #35 as written does not apply.
+- **C warns** → `= Blank()` does not fold on DateTime. Close #35 won't-fix with this as the
+  evidence; the current unbounded shape is already optimal and `gRptTrunc` remains the guard.
+- **F shows the two counts close together** → #35 buys little either way, which is worth
+  knowing before authoring anything.
+
+### Result
+
+*(not yet run)*
+
+---
+
 ## `scrProbeRerun.pa.yaml` + `scrProbeRerunB.pa.yaml` — how does a screen re-run a behaviour block in place?
 
 **Status: RUN 2026-08-18 by the user in Studio. BOTH ANSWERS ARE POSITIVE — `Select()` fires
