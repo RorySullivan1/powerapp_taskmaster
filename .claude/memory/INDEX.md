@@ -13,9 +13,9 @@
   is indexed on the live list, so schema and SharePoint agree.
 - **#40 LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** `App.OnStart` went
   through the formula bar, `scrReports` and `scrHome` through code view, all clean.
-- **#34 is BLOCKED ON A USER DECISION** (prefix search vs substring + a truncation banner);
-  **#35 is BLOCKED ON A PROBE** that must be pasted first; **#38 is deferred to its own pass**
-  (rewrites the destructive path).
+- **#34 IS UNBLOCKED — the user chose PREFIX SEARCH (2026-08-19).** #34 and #38 are both
+  authorable now; **#35 still needs its probe written, pasted and read** before its fix can be
+  designed, and may end as won't-fix.
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -382,6 +382,8 @@ not know them will author something broken:
 - 2026-08-19 | **PAREN-BALANCE CHECKING NEEDS A CHARACTER STATE MACHINE, NOT A REGEX** — now `tools/balance_check.py`. Stripping `//` comments before string literals eats `http://www.w3.org/2000/svg` in every SVG Image property and reports false unbalanced; stripping `'...'` first eats prose apostrophes ("the fold's") and the parens after them. Both wrong answers were produced against known-good committed source before the state machine agreed the whole repo balances. Do not re-derive a regex version | tools/balance_check.py
 
 - 2026-08-19 | #40 LANDED and CLOSED (user) — App.OnStart via the FORMULA BAR plus scrReports and scrHome via code view, all clean. `gDataRowLimit` is live and no `>= 2000` literal remains in src/. **The perf backlog's buildable half is finished: #27–#33, #36, #37, #39, #40 are all done and closed.** What remains is blocked, not unstarted: #34 on a user decision, #35 on a probe, #38 deferred to its own pass. **A wrong gDataRowLimit is STILL UNDETECTABLE** — Power Fx cannot read the Studio setting — and the checklist guarding it lives in gitignored CLAUDE.local.md, so it would not survive a fresh clone; move it to docs/ if that matters. Neither the OnVisible seeds nor any sentinel has been observed firing (the latter needs a 2,000-row dataset) | GitHub #40
+
+- 2026-08-19 | **#34 DECIDED BY THE USER: PREFIX SEARCH, DELEGABLE** — push `StartsWith(project_name, Trim(txtProjSearch.Text))` inside each existing branch of `galProjects.Items`, accepting that mid-word matching is lost ("Rollout" will no longer find "Alpha Rollout"). **DO NOT RELITIGATE.** The substring-plus-truncation-banner alternative was offered and declined. **It is cheaper than the issue body implies**: `StartsWith(col, "")` returns true, which is ALREADY a landed technique on this screen (from #17, where it kept the branch count at four instead of eight), so the predicate goes in unconditionally — one extra clause per branch, NOT a doubled branch count. The screen's own comment already grounds the delegability: SharePoint delegates `=`, `StartsWith`, `Filter` and `Sort` on Text and nothing else. **KEEP THE EXPLICIT PHASE GROUPS** — a bare `Filter(ActiveProjects, StartsWith(...))` without one drew "the query is not valid" from SharePoint, so the StartsWith goes INSIDE the existing shapes, never in place of them | GitHub #34
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
