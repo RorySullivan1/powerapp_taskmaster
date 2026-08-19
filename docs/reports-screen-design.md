@@ -98,7 +98,7 @@ over a fact collection may appear in any gallery `Items` or row property** — t
 | `colRptPersonSrc` | ~2× tasks | tasks unpivoted on `task_lead` / `task_supporter`, each row carrying its measures **and the task itself** — name, health, start, due — plus a `Dup` flag. **No project lookup**: the family and format it used to carry fed overlay mini-charts that no longer exist |
 | `colRptPerson` | ~20–50 | one row per person, every measure precomputed |
 | `colRptPTask` | one person's tasks | built on row tap, feeds the overlay, refetches nothing |
-| `colRptTxEnriched` | ≤ F3 | each transaction tagged with product type L1 **and L2**, currency, date, notional |
+| `colRptTxEnriched` | ≤ F3 | each transaction tagged with product type L1 **and L2**, its project's lead, currency, date, notional — two lookups, one per dimension |
 | `*Pie` folds | ≤7 each | slice `Pct` and `Off` as whole percentages from a running cumulative |
 | `colRptTxSeg` | buckets × currencies | per-bar currency segments with the running `Base` each stacks on |
 | `colRptCcy` | ≤5 | per-currency notional totals |
@@ -247,15 +247,21 @@ provenance line.
 
 ### Band 5 — Transactions *(secondary)*
 
-Two columns. Left, the trend and the currency tiles; right, the product pies — the trend answers
-"how many, when" and the pies answer "of what".
+Three columns, read left to right as **who · when · what**. `FillPortions` 1 : 2 : 2 — the trend
+and the pies carry 900- and 320-wide viewBoxes and need the room; the lead bars are a six-row list
+and do not.
 
+- **By project lead** — bars, top 6 + Other, count of transactions on projects that person
+  **manages**. This is the measure that was wrong beside the per-person *task* figures and is right
+  here: project-level attribution, in the transactions band, labelled as such on the panel. A count,
+  never a notional.
 - **Trend bars** — the current window **split into currency segments**, the prior window greyed
   behind it. Colours are keyed on the currency *value*, never on rank, so EUR is the same colour on
   every load and two periods can be compared by eye.
 - **Per-currency notional** — up to five small tiles, one per currency, never summed. The tiles carry
   the same colour Switch as the bars, which makes them the chart's legend.
-- **By product type** — two pies, level 1 and level 2 of `product_type_path`, top 5 + Other on each.
+- **By product type** — two pies **side by side**, level 1 and level 2 of `product_type_path`, top
+  5 + Other on each.
   A product whose path has one segment counts under *Top level only* rather than being dropped, so
   the pies reconcile with the transaction count beside them.
 
