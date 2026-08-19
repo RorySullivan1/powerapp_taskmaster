@@ -100,6 +100,12 @@ IfError( Set(gTmp, Patch(list, rec, {…})), Set(gErr, FirstError.Message) );
 If( Len(gErr) > 0, Notify("Couldn't save: " & gErr, NotificationType.Error) )
 ```
 
+**Every call site needs its OWN scrap name.** A global's type unifies across every `Set`, so one
+`gTmp` holding a record from one `Patch` and a table from a `Remove` is a type conflict that
+reports far from its cause. A cascade that removes three lists needs three scrap names.
+`Remove`/`RemoveIf`/`ForAll` return **tables**, not records, so they cannot share a scrap with a
+`Patch` either.
+
 `FirstError` is only in scope *inside* the replacement, so stash it and act afterwards. Inside
 `ForAll` — where `Set` is unsafe because iteration order is not guaranteed — force the arms to
 text instead: `IfError( Text(Patch(…).ID), FirstError.Message, "" )`.
@@ -137,6 +143,39 @@ Put the action on a transparent full-template `Classic/Button` declared LAST in 
 
 The validator rejects any gallery that still carries its own `OnSelect`.
 
+## Reusing a behaviour block: a hidden control, invoked with `Select()`
+
+Power Fx cannot name a behaviour block. There is no procedure to call, so logic needed in more
+than one place gets copied — and copies of a block that WRITES are how a screen ends up with two
+writers of the same column that quietly disagree.
+
+**A control's `OnSelect` is the one reusable behaviour unit the language offers**, and `Select()`
+invokes it. The control can be hidden: `Select()` fires on a control with `Visible: =false` —
+confirmed in Studio 2026-08-18 (`tests/scrProbeRerun`, scoring a visible, a 1×1 transparent and a
+hidden button identically against a passing positive control). The common folklore that it
+no-ops on an invisible control is false here. Do not smuggle the worker in as a 1×1 transparent
+button; hide it.
+
+```yaml
+- btnRecompute:
+    Control: Classic/Button@2.2.0
+    Properties:
+      Visible: =false
+      Width: =1
+      Height: =1
+      OnSelect: |
+        =Set( gDerivedA, … );
+         Set( gDerivedB, … )
+```
+
+`OnVisible` calls `Select( btnRecompute )`; so does every handler that invalidates those values.
+One copy, several callers.
+
+`Navigate( <the current screen> )` also re-runs `OnVisible` — also confirmed, also undocumented,
+MS Learn defines `Navigate` in terms of "the NEW screen". Prefer the worker anyway: no screen
+transition, no pushing a screen onto its own history, and `Select( btnRecompute )` says at each
+call site what it actually does.
+
 ## YAML traps specific to Power Fx
 
 A plain YAML scalar **cannot contain `: `** — and Power Fx is full of it (record literals,
@@ -148,6 +187,23 @@ Items: |
 ```
 
 Same for anything multi-line, anything containing ` #`, and anything ending in `:`.
+
+**And the inverse, which is worse because nothing complains.** Inside a block scalar a `#` is
+**content, not a comment** — YAML only treats it as a comment outside one. So a comment that
+drifts into a `|` block becomes part of the formula, and **Power Fx has no `#` comment at all**
+(it uses `//` and `/* */`), which means Studio rejects the paste. The file still parses, the
+schema still validates, and the damage is visible only by reading the value back. This happened
+here by appending to a file whose last line was inside a block scalar and which had no trailing
+newline, so a comment banner glued onto the end of an `OnSelect`.
+
+Two rules fall out, both now enforced by `tools/validate_pa_yaml.py`:
+
+- **No `#` outside a string literal in an `=`-prefixed value** (`stray_hash_errors`).
+- **No comment at column 0 once the document has started** (`stray_comment_indent`) — in a file
+  nested 30+ columns deep that is always a multi-line edit that lost its indentation.
+
+Scripted edits are where both arise. Guarantee the trailing newline before appending, and indent
+*every* line of a multi-line comment, not just the first.
 
 ## Behaviour vs property formulas
 

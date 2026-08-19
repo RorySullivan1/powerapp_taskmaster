@@ -139,7 +139,7 @@ Still inferred (never non-default in either photo, so Studio never printed them)
 expands the column when it opens and collapses when it closes — no overlay, no z-order, no
 one-picker-at-a-time gate. In a scrolling form that replaces the whole absolute-overlay pattern.
 
-## LAYOUT FORMULAS DO NOT SURVIVE THE PASTE
+## Layout formulas DO survive a control paste — but `X` does not survive a SCREEN paste
 
 First-party, from *Create responsive layouts in canvas apps*:
 
@@ -170,6 +170,29 @@ What follows from the corrected reading:
 **Authoring rule:** plain integers are still fine where a value is static anyway — they are
 simpler to read and to check against the band table. Use a formula wherever the relationship is
 the point; it will survive.
+
+### The probe tested ONE paste scope. The other behaves differently (2026-08-18)
+
+`scrProbe-layout-freeze` pasted **controls** onto a blank screen. Pasting a **whole screen** is a
+different event, and the difference is not cosmetic: a control's `X` was **lost** in a screen-scope
+paste while `Y`, `Width`, `Height` and everything else came through. It was lost both as
+`Parent.TemplateWidth - 32` and as a sibling `rowTaskBody.Width + 10`; pasting the same control on
+its own kept it. **The mechanism is unexplained.**
+
+- **Do not extend "formulas survive a paste" to screen scope.** It is a control-scope result.
+- **For anything re-pasted as a whole screen, prefer owning no `X`:** make the control an
+  auto-layout child and let the container place it. A child with no `X` has nothing to lose —
+  which is why one icon on that screen survived every paste that dropped its absolutely-positioned
+  siblings.
+- If you must debug this, the report to ask for is *which* properties came through, not whether
+  "it worked". A property-level answer is what separated `X` from the rest here.
+
+### Designing a probe, when you get one crossing to settle a claim
+
+`tests/README.md` holds the full rules. The one that is easy to get wrong, and did get got wrong:
+**a positive control must not share an instrument with the thing being measured.** A probe whose
+control and whose sub-case both move the same counter produces a number that fits several stories,
+and no amount of care during the run recovers it. Give every sub-case its own readout.
 
 ## Refinement: don't re-paste a screen to change a property (2026-08-05)
 

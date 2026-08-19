@@ -67,6 +67,12 @@ First child = bottom, last = top. There is no `ZIndex`.
 - **A component instance intercepts every click inside its bounds.** A transparent `Fill` does
   not help. A full-screen instance with no `Visible` makes the entire screen dead — that is a
   real bug this app shipped. Gate the *instance*, not just what it draws inside.
+- **A transparent full-template button makes every control declared BEFORE it unclickable.**
+  Galleries here end each row template with one, because a gallery's own `OnSelect` does not
+  fire reliably when the click lands on a child. It covers the whole row, so a per-row icon —
+  delete, flag, anything — must be declared **after** it, or shrunk out from under it. The icon
+  still RENDERS either way, so getting this wrong looks like a dead control rather than a
+  layering bug, and you can stare at the geometry for a long time before suspecting z-order.
 - A dynamic height is the other legitimate gate:
   `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)` — full-screen only while open,
   when swallowing the click is the point.
@@ -98,8 +104,20 @@ So:
 - **Once a property is a formula, set it only through the formula bar.** This is the real hazard,
   and it is invisible: a nudge or a spinner silently replaces the formula with the number it
   happened to be at.
-- A wrong position is still fixed **in the formula bar**. Re-pasting is fine too — it does not
-  re-freeze anything.
+- A wrong position is still fixed **in the formula bar**.
+
+**BUT THE PROBE ONLY TESTED ONE PASTE SCOPE, AND THE OTHER BEHAVES DIFFERENTLY.**
+`scrProbe-layout-freeze` pasted CONTROLS onto a blank screen. Pasting a WHOLE SCREEN is not the
+same event: on 2026-08-18 a control's `X` was **lost** in a screen-scope paste while `Y`, `Width`,
+`Height` and every other property came through — and it was lost both as `Parent.TemplateWidth - 32`
+and as a sibling `rowTaskBody.Width + 10`. Pasting that same control on its own kept `X`. The
+mechanism is unexplained; what is established is that **"formulas survive a paste" is a
+control-scope result and must not be assumed at screen scope.**
+
+So for anything that will be re-pasted as a whole screen: **prefer owning no `X` at all.** Make the
+control an auto-layout child and let the container place it (§5). A child with no `X` has nothing
+to lose, which is why `icoDeleteProject` survived every paste that dropped its absolutely-positioned
+siblings. Absolute `X` is still fine on a screen you only ever paste control-by-control.
 
 **The one paste hazard that IS real, and is a different mechanism:** if a control lands with a
 suffixed name (`txtProjSearch_1`), every reference to `txtProjSearch` in that same paste
