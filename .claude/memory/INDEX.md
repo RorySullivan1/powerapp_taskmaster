@@ -28,11 +28,14 @@
   overlay at 1200 wide. **Landed is not the same as exercised** — on scrReports nobody has yet
   seen the truncation banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the
   audience pie, or a multi-currency stack in the trend bars.
-- **#19 LANDED (user, 2026-08-19)** — one filter row, "Only show my projects", eight branches,
-  gallery back to 220. **`scrProjects` IS THE PASTE QUEUE AGAIN, authored not landed:** the name
-  search became CONTAINS, as an outer local `Filter` wrapping the delegated `If`.
-  **THIS PUT A ROW-LIMIT DEPENDENCY ON THE SCREEN** — confirm Settings > General > Data row
-  limit is 2000, or the search silently misses matches past the cap.
+- **#19 IS DONE, LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** scrProjects
+  landed across two pastes and **the contains-search is EXERCISED and working** — the one
+  behaviour that mattered, since it is the only search this app has that no delegation covers.
+  Shipped: one filter row (coverage · search · "Only show my projects" · show completed), the
+  lead picker and its second row deleted, eight delegable branches, gallery back to 220.
+  **STANDING RISK, unverified: the contains-search is bounded by the DATA ROW LIMIT and fails
+  SILENTLY.** Confirm Settings > General > Data row limit is 2000. It works today because the
+  projects list is small; nothing in the app will say when that stops being true.
 - **THE REST OF THE BACKLOG IS #20 [Enhancement] - scrProductEdit** (four new optional product
   columns: underlying, wrapper, maturity, features), filed 2026-08-19 and not started. **IT
   NEEDS SCHEMA WORK FIRST** — `schema/schema.yaml` is the golden source and internal names
@@ -313,3 +316,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #11 COMPLETE — scrReports rework landed end to end across five pastes: the subtraction, the data layer, the people section, four-column band 3, three-column band 5, then the overlay geometry, width and font refinements | GitHub #11
 - 2026-08-19 | #19 BUILT (authored, not landed): the #17 lead filter, its second filter row and its `cmpPicker` instance deleted; an "Only Show my Tasks" toggle joins coverage/search/show-completed on ONE row; `Items` is eight delegable branches because `person.Email = gUserEmail` has no neutral value where `StartsWith(…, "")` pretended to; gallery back to Y 220. The "720 usable" that forced the second row was the design HEIGHT — the width is 1318 | sessions/2026-08-19-issue19-scrprojects-mine-toggle.md
 - 2026-08-19 | #19 LANDED, then scrProjects re-authored: name search moved from delegable StartsWith to a LOCAL contains, as an outer Filter around the delegated eight-branch If — SharePoint delegates no substring op on Text. Ceiling is now the data row limit, silently | GitHub #19
+- 2026-08-19 | #19 CLOSED — scrProjects landed in two pastes (the rework, then the contains-search) and the search is exercised. The screen now carries the app's only row-limit-bounded query; everything else on it still folds | GitHub #19

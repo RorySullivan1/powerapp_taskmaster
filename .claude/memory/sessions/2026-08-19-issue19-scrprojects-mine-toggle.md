@@ -87,3 +87,12 @@ the search's completeness is bounded by the **data row limit**, and it fails sil
 survivable only because the schema keeps every list "safely under 2000 rows in scope" — the
 limit must actually be set to 2000. Empty search is tested explicitly rather than relying on
 `"" in text` matching everything, for the reason recorded above.
+
+## Outcome — LANDED AND EXERCISED, issue closed (user, 2026-08-19)
+Both pastes are in Studio and the contains-search is confirmed working. #19 closed.
+
+What the screen now carries that nothing else in the app does: **one query whose completeness
+depends on the data row limit rather than on delegation.** Every other query in this app folds,
+so a truncation would show as a delegation warning at author time. This one shows as nothing —
+a search that quietly stops finding things. The under-2000-in-scope schema rule is the only
+guard, and it is a design intention, not an enforced constraint.
