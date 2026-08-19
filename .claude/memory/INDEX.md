@@ -13,9 +13,10 @@
   is indexed on the live list, so schema and SharePoint agree.
 - **#40 LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** `App.OnStart` went
   through the formula bar, `scrReports` and `scrHome` through code view, all clean.
-- **#34 IS UNBLOCKED — the user chose PREFIX SEARCH (2026-08-19).** #34 and #38 are both
-  authorable now; **#35 still needs its probe written, pasted and read** before its fix can be
-  designed, and may end as won't-fix.
+- **#34 AND #38 ARE BUILT AND UNLANDED; #35 IS THE LAST OPEN ISSUE** and cannot move until its
+  probe is pasted and read — it may end as won't-fix.
+- **PASTE QUEUE: `scrProjects` (#34), `scrProject` (#38), and the #35 probe onto a blank screen
+  named `scrProbeDateNull`.**
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -385,8 +386,15 @@ not know them will author something broken:
 
 - 2026-08-19 | **#34 DECIDED BY THE USER: PREFIX SEARCH, DELEGABLE** — push `StartsWith(project_name, Trim(txtProjSearch.Text))` inside each existing branch of `galProjects.Items`, accepting that mid-word matching is lost ("Rollout" will no longer find "Alpha Rollout"). **DO NOT RELITIGATE.** The substring-plus-truncation-banner alternative was offered and declined. **It is cheaper than the issue body implies**: `StartsWith(col, "")` returns true, which is ALREADY a landed technique on this screen (from #17, where it kept the branch count at four instead of eight), so the predicate goes in unconditionally — one extra clause per branch, NOT a doubled branch count. The screen's own comment already grounds the delegability: SharePoint delegates `=`, `StartsWith`, `Filter` and `Sort` on Text and nothing else. **KEEP THE EXPLICIT PHASE GROUPS** — a bare `Filter(ActiveProjects, StartsWith(...))` without one drew "the query is not valid" from SharePoint, so the StartsWith goes INSIDE the existing shapes, never in place of them | GitHub #34
 
+- 2026-08-19 | #34 BUILT, AND IT COST DOUBLE WHAT I TOLD THE USER. The outer local `Filter(..., Trim(txt) in project_name)` is gone and `StartsWith( project_name, ... )` sits inside each branch, so the whole query folds and a match past the data row limit is findable again. **I claimed it would add one predicate per branch on the strength of `StartsWith(col, "")` being a landed technique here. IT IS BANNED HERE** — #17 built the lead filter on it, it returned NOTHING for every choice in the app (#19), and the standing rule is that an "off" state must be a BRANCH. So the empty-search case is its own branch and `Items` is **16 branches** (search × show-completed × coverage × only-mine). Corrected to the user before building. A ~10-branch variant where a search OVERRIDES the other filters was offered and not taken — today's outer filter COMPOSES with them, and preserving that is the faithful choice | GitHub #34
+
+- 2026-08-19 | #38 BUILT: the project delete cascade's independent stages now run together. Three guard counts in one `Concurrent` (they could NOT stay in the `With` — Concurrent takes behaviour formulas, so each count must land in a global before the threshold test reads it); issues still delete alone and first because `issue_task_name` / `issue_transaction_name` point at the other two children; transactions and tasks are the arms of a second `Concurrent` with **per-arm error globals**, since Concurrent's arms must not write the same state and both previously wrote `gPrDelErr`. `Coalesce` skips an EMPTY STRING as well as a blank, which is what lets the three be seeded `""` without masking a real message. Serial depth 6 stages -> 4. COUNT-THEN-REFUSE and children-before-parent untouched | GitHub #38
+
+- 2026-08-19 | **A ` #` INSIDE A PLAIN (NON-BLOCK) YAML SCALAR IS EATEN AS A YAML COMMENT, AND `tools/validate_pa_yaml.py` DOES NOT CATCH IT.** `Text: ="… issue #35"` parsed to `="… issue` — closing quote and all — and the validator reported `ok`: by the time it inspects the parsed doc the `#` is gone, so `stray_hash_errors` only ever finds a `#` that SURVIVED parsing, i.e. one inside a block scalar. `tools/balance_check.py` caught it as an unterminated string. **Put any formula containing `#` in a block scalar.** The validator gap is real and NOT fixed — a source-text scan beside `stray_comment_indent` would close it | tools/validate_pa_yaml.py
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-19 | issues #34 and #38 built and the #35 probe written: scrProjects search delegated as a prefix match at the cost of 16 branches, scrProject's delete cascade parallelised with per-arm error globals, tests/scrProbe-date-null-delegation.pa.yaml added | sessions/2026-08-19-2130-issues-34-38-probe35.md
 - 2026-08-19 | issue #40: the data row limit named once as gDataRowLimit in App.OnStart, seven sentinels repointed, seeded in two OnVisible handlers because OnStart is non-blocking and blank compares as zero; rebuild checklist added to (gitignored) CLAUDE.local.md; tools/balance_check.py added | sessions/2026-08-19-2105-issue-40-datarowlimit.md
 - 2026-08-19 | issues #39, #33, #37 built: transaction_product_id indexed in the golden source (no paste); scrProjectEdit's two child-creation loops issued concurrently with split result collections; scrProductEdit's three reference fetches cached per session with a local ticker merge on save | sessions/2026-08-19-2047-issues-39-33-37-built.md
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
