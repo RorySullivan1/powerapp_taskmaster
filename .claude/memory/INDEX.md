@@ -13,11 +13,10 @@
   is indexed on the live list, so schema and SharePoint agree.
 - **#40 LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** `App.OnStart` went
   through the formula bar, `scrReports` and `scrHome` through code view, all clean.
-- **#34 AND #38 ARE BUILT AND UNLANDED. #35 IS THE LAST OPEN ISSUE AND ITS PROBE HAS RUN
-  (2026-08-19): `= Blank()` DELEGATES, `IsBlank()` does not** — so the bound is buildable, NOT
-  won't-fix. Corroboration with data-row-limit-1 recommended before shipping it.
-- **PASTE QUEUE: `scrProjects` (#34), `scrProject` (#38), and the #35 probe onto a blank screen
-  named `scrProbeDateNull`.**
+- **THE WHOLE PERF BACKLOG #27–#40 IS BUILT.** #34, #35 and #38 are BUILT AND UNLANDED;
+  everything else is landed and closed.
+- **PASTE QUEUE: `scrProjects` (#34), `scrProject` (#38), `scrReports` (#35).**
+- The `scrProbeDateNull` probe HAS RUN and can be deleted from Studio.
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -394,6 +393,8 @@ not know them will author something broken:
 - 2026-08-19 | **A ` #` INSIDE A PLAIN (NON-BLOCK) YAML SCALAR IS EATEN AS A YAML COMMENT, AND `tools/validate_pa_yaml.py` DOES NOT CATCH IT.** `Text: ="… issue #35"` parsed to `="… issue` — closing quote and all — and the validator reported `ok`: by the time it inspects the parsed doc the `#` is gone, so `stray_hash_errors` only ever finds a `#` that SURVIVED parsing, i.e. one inside a block scalar. `tools/balance_check.py` caught it as an unterminated string. **Put any formula containing `#` in a block scalar.** **CLOSED THE SAME DAY: `eaten_comment_errors()` in tools/validate_pa_yaml.py** scans the SOURCE TEXT, skipping block scalars (where `#` is content, already covered) and quoted scalars (where `#` is literal), tracking block regions by indentation so formula bodies cannot false-positive. **It found two pre-existing instances on its first run**, both probe titles — `scrProbe-junction-write` (never pasted) and `scrProbeRerun` (pasted 2026-08-18, so its title label landed with an unterminated string and nobody noticed). `src/` was clean | tools/validate_pa_yaml.py
 
 - 2026-08-19 | **PROBE RUN (#35): `task_date_completion = Blank()` DELEGATES on a DateTime column; `IsBlank(task_date_completion)` DOES NOT.** The asymmetry the issue was written on, confirmed. **THE PROBE WAS BADLY DESIGNED AND NEARLY UNREADABLE**: every sub-case is wrapped in `CountRows`, which is itself non-delegable, so all six labels carried an identical "CountRows Operation not supported" that says nothing about the Filter inside — **rule 4 again, the same instrument-sharing error that lost `scrProbeRerun` sub-case D.** It was saved by sub-case F, which was written to measure SCALE and happens to use `IsBlank()` where C/D/E use `= Blank()`: F returned "CountRows not supported **& task_date_completion - large dataset**", proving the checker reports predicate warnings ALONGSIDE the aggregate warning on the same label and is actively examining this column — which is what makes C/D/E's silence evidence of absence. **Next probe: no aggregate in the instrument** — a gallery `Items` or `First(Filter(...)).col` carries none. **RESIDUAL RISK IS NOT ZERO**: if the predicate does not fold, the fetch degrades from "completed tasks" to "first 2000 LIVE tasks then filtered", and `gRptTrunc` would NOT catch it because it counts AFTER the local filter | tests/README.md
+
+- 2026-08-19 | #35 BUILT: `colRptDoneAll` is bounded on `gRptFrom` with `|| task_date_completion = Blank()` beside it, on the probe result above. **Corroborated at data row limit 1: the count went 0 -> 1 on SET CUTOFF** — a non-delegating filter would have tested one locally-fetched row and shown 0. That is corroboration, not proof: one row could match by chance, so the WARNINGS remain the evidence. `gRptFrom`, not `gRptFrom2x` — only transactions need the prior window. **`colRptDone` still re-applies the window LOCALLY and that is not redundant**: a SharePoint DateTime is compared server-side in the LIST's timezone, so the fetch boundary can sit up to a day off the client's; the local pass is the boundary every figure uses and can only narrow, never widen. `IsBlank()` is correct there because a collection has no query behind it. **THE IN-FILE COMMENT WARNS AGAINST "TIDYING" `= Blank()` INTO `IsBlank()`** — same-looking test, un-delegates the whole fetch, fails silently, and gRptTrunc cannot see it | GitHub #35
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.

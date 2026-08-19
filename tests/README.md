@@ -322,6 +322,23 @@ filtered* — and **`gRptTrunc` would not catch it**, because it tests `CountRow
 *after* that local filter, which can sit well under the limit. Corroborate with the
 data-row-limit-1 count before shipping the bound.
 
+#### Corroboration — run 2026-08-19, data row limit = 1
+
+**The count went 0 → 1 when SET CUTOFF was pressed.** With the limit at 1, a non-delegating
+filter downloads one row and tests it locally, which for this predicate lands on 0 unless that
+single row happens to match; a delegating one asks the server for a match and gets 1. The two
+instruments agree, so the bound was shipped.
+
+**What this does NOT rule out:** one row matching by chance. It is corroboration of the
+warning reading, not an independent proof — the warnings, and F in particular, remain the
+evidence this rests on.
+
+#### What changed as a result
+
+`scrReports.btnRptLoad` now bounds `colRptDoneAll` on `gRptFrom` with the null arm beside it.
+**The comment there tells the next reader not to "tidy" `= Blank()` into `IsBlank()`** — it
+reads as the same test, un-delegates the whole fetch, and fails silently.
+
 ---
 
 ## `scrProbeRerun.pa.yaml` + `scrProbeRerunB.pa.yaml` — how does a screen re-run a behaviour block in place?
