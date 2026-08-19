@@ -18,13 +18,11 @@
   **Landed is not the same as exercised** — see Threads for the three behaviours nobody has run
   yet: the confirm dialog actually opening, the completion gate actually blocking, and #14's
   junction write.
-- **`scrTaskEdit`'s MULTI-PRODUCT SAVE IS BROKEN AND THE CAUSE IS STILL UNKNOWN (issue #14).**
-  The junction is never written and the failure is silent. The four fixes are in `main`, but they
-  harden the write — they do not explain it. It compiles, so the rejection is a RUNTIME one that
-  nothing on the repo side can see; `tests/scrProbe-junction-write.pa.yaml` returns SharePoint's
-  actual message in one paste. **ELIMINATED: `Title` is NOT required on the junction**
-  (user-confirmed), which was the cleanest fit. Still unchecked: the display field on both lookup
-  columns, and write permission.
+- **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
+  no longer an open defect; do not reopen the diagnosis.
+- **THE BACKLOG IS DOWN TO TWO: #9 (scrIssueEdit trim) and #11 (scrReports rework).** Everything
+  else — #10, #12-#17 — is closed. Agreed order is **#9 first**, then #11 in five steps
+  (subtract, extend the data layer, people, task grouping, transactions). See Decisions.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -214,6 +212,33 @@ not know them will author something broken:
   returns the actual message in one paste; the fixes stand whatever it says.
   **Do not re-derive the diagnosis** — it is in the session log with line numbers.
 
+- **BACKLOG ORDER SETTLED (2026-08-19): #9 BEFORE #11, and #11 SUBTRACTS BEFORE IT ADDS.**
+  #9 leads because it is the only WRITE-PATH change on the board and #11 is entirely read-path —
+  every day `issue_date_close` is hand-entered or forgotten poisons the data any future
+  issue-cycle report reads. Fix the writer before reworking the readers.
+  #11's five steps: (1) drop median-cycle-time and the coverage-gap grid *including their folds*,
+  which frees the band-3 column slot the new charts move into so the grid geometry is computed
+  once; (2) extend `btnRptLoad` in ONE paste — invisible by design, so the only signal is "nothing
+  regressed", which is what you want from the riskiest region; (3) people, because it is flagged
+  WRONG rather than missing and a misleading number beats an absent one; (4) task grouping;
+  (5) transactions LAST, so the pie renderer is proven in the simpler section before it has to
+  carry a two-level path and a join.
+
+- **PIE CHARTS USE THE `cmpKpiRing` DASHARRAY TRICK — NEVER ARC PATHS.** `scrReports.pa.yaml:1645`
+  requires whole-number SVG coordinates: a fraction goes through `Text()`, which drags the locale
+  decimal separator into an attribute, and an attribute Power Fx cannot render comes out EMPTY.
+  `Cos`/`Sin` arc endpoints are exactly that hazard. `cmpKpiRing.pa.yaml:65` already dodges it with
+  `stroke-dasharray` on a circumference-100 circle (`r=15.9155`), integer percentages only — a pie
+  is N stacked circles with a running `stroke-dashoffset`. The technique is already landed in Studio.
+
+- **`issue_date_close` BECOMES DERIVED, AND `StartsWith` IS THE RIGHT TEST HERE.** #9 removes the
+  picker and the save stamps the date from the status transition instead. This repo's convention is
+  to ENUMERATE Choice values rather than compare them — but that rule exists for DELEGATION, and
+  this is a local expression on a text global with no query behind it. `StartsWith(gIssStatus,
+  "Closed")` fails OPEN in the right direction: a future `Closed - Duplicate` gets stamped
+  automatically, where an enumerated list would silently never stamp it. Opposite trade-off from
+  the App.Formulas allow-lists, deliberately.
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-18 | issue #15: delete for tasks/transactions/issues from scrProject and the three edit screens; issues DETACHED not cascaded; the OnVisible derivation moved into a hidden btnPrjRecompute called by four sites after the probe confirmed Select() fires on an invisible control | sessions/2026-08-18-issue15-delete-children.md
@@ -240,3 +265,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-18 | issue #12 LANDED: create a client or product from a staged transaction; scrProjectEdit gains an identity-keyed resume guard, scrClientEdit and scrProductEdit gain NxClient/NxProduct return arms | GitHub #12
 - 2026-08-18 | issue #16 CLOSED: project_perc_completion read 0% because gStageWeights was never loaded; task_stage corrected to "Completed" across 22 sites, scrProject now derives and back-fills the value | GitHub #16
 - 2026-08-18 | issue #14 diagnosed read-only: the taskmaster_taskproduct reconcile is unguarded so a rejected write reports success, the summary is written before it and independently of it, the output toggle silently deletes links, and the RemoveIf does not delegate; probe-first plan posted, NOTHING written | sessions/2026-08-18-1118-issue14-multiproduct-diagnosis.md
+- 2026-08-19 | backlog reviewed and ordered: only #9 and #11 remain; #14 confirmed closed and the stale State block corrected; #9 planned in full (not a pure deletion — the resolution date becomes a derived stamp) | sessions/2026-08-19-0019-backlog-ordering.md
