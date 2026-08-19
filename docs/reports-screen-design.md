@@ -1,12 +1,12 @@
 # scrReports — design
 
 The reporting screen, rebuilt as **native analytics for every user**. Primary purpose: understand
-**where people spend their time and how their projects are trending**. Secondary: **transactions by
-client coverage, broken down by product type level 1**, and the **offering gaps** that fall out of
-that grid.
+**where people spend their time and how their projects are trending**. Secondary: **transactions
+broken down by product type and currency**.
 
 This is a design note, not source. The authored screen is `src/Screens/scrReports.pa.yaml`; every
-field token below resolves to a `name:` in `schema/schema.yaml`.
+field token below resolves to a `name:` in `schema/schema.yaml`. Where the two disagree the source
+wins — parts of this note predate the current screen.
 
 ---
 
@@ -14,18 +14,19 @@ field token below resolves to a `name:` in `schema/schema.yaml`.
 
 Three were settled with the user on 2026-08-17 and belong in the Decisions ledger:
 
-1. **Coverage axis = `client_coverage`.** A transaction reaches coverage through its client
-   (`transaction_client_name` → `taskmaster_clients.client_coverage`), not through its project. The
-   gap grid therefore reads "this coverage team has never traded that product type".
+1. **Coverage is not a reporting axis.** The coverage × product-type grid, the ranked offering-gap
+   list and the coverage filter that fed them are all gone. Nothing on the screen groups by
+   `client_coverage` any more, so `taskmaster_clients` is not fetched at all.
 2. **Power BI is OUT OF SCOPE entirely (2026-08-17).** Not demoted — dropped. `scrReports` is
    the analytics surface, full stop, and every chart on it is SVG. **This voids the
    `app-structure.md` rule** "do not rebuild the aggregate dashboard as native charts to dodge the
    licence gap": native charts are the design now, not a dodge. `gHasPowerBiLicence`,
    `NeedsLicence` and `cmpAppBar.HasLicence` are all deleted from the source.
 3. **Effort is proxied, and labelled as such.** The model has no hours or effort column. "Where time
-   goes" is measured as **task volume** by activity family and output format, plus **median cycle
-   time** (`task_date_start` → `task_date_completion`) as a genuine elapsed-duration signal. The
-   screen says "volume and elapsed time" on its face and never calls either "effort".
+   goes" is measured as **task volume** — by activity family, output format, requestor and region —
+   with elapsed duration surviving only as the per-person **median days** and **on-time %**. The
+   standalone median-cycle-time-by-family chart is gone. The screen says "volume and elapsed time"
+   on its face and never calls either "effort".
 
 ---
 
@@ -60,7 +61,7 @@ that can't be date-bounded is self-limiting. That is what makes this screen scal
 | # | Collection | Query | Delegable? |
 |---|---|---|---|
 | F1 | `colRptOpen` | `Filter(LiveTasks, task_stage.Value = "Not Started" \|\| … \|\| "Finalizing")` | Yes — Boolean `=` + indexed Choice `=` Or-chain. Unbounded but self-limiting: open work does not accumulate. |
-| F2 | `colRptDone` | `Filter(LiveTasks, task_stage.Value = "Complete" && task_date_completion >= gRptFrom)` | Yes. **`task_date_completion` is not indexed** — see schema asks. |
+| F2 | `colRptDoneAll` | `Filter(LiveTasks, task_stage.Value = "Completed")` | Yes — indexed Choice `=`. **Bounded on stage alone**; the period is applied locally into `colRptDone`. The old `&& task_date_completion >= gRptFrom` was false for a blank date, so a task completed without one never entered the collection and every completion measure read empty. Completed work accumulates, so this fetch is the one the truncation banner has to watch. |
 | F3 | `colRptTx` | `Filter(taskmaster_transactions, transaction_project_archived = false && transaction_date >= gRptFrom2x)` | Yes — both indexed. **This is the load-bearing bound**; transactions grow fastest. |
 | F4 | `colRptPrj` | `ActiveProjects` | Yes (named formula). Bounded in the hundreds. |
 | F5 | `colRptIss` | `OpenIssues` | Yes (named formula). Small. |
@@ -73,19 +74,15 @@ Dimensions load **once per session**, not per period change:
 
 | # | Collection | Source |
 |---|---|---|
-| D1 | `colRptClients` | `taskmaster_clients` — gives `client_name` + `client_coverage` |
-| D2 | `colRptProducts` | `taskmaster_products` — gives `product_uid` + `product_type_path` |
-| D3 | `colRptCoverage` | `Choices([@taskmaster_clients].client_coverage)` |
-| D4 | `colRptProdL1` | `Distinct(mapping_producttype, level1)` |
+| D1 | `colRptProducts` | `taskmaster_products` — gives `product_uid` + `product_type_path` |
 
-**D3 and D4 are the vocabularies, and they must come from the dimension lists rather than from the
-transactions.** A gap is an *absent* group. Deriving the axes from the data would delete exactly the
-cells you are looking for. This is the same lesson `scrHome`'s donut already records — a category
-only exists when a row has that value.
+One dimension, because only one is still joined to. The product pies derive their slices from the
+transactions themselves and no longer need a vocabulary list: they answer "what did we trade", not
+"what have we never traded", so an absent group is correctly absent.
 
-`project_coverage` and `client_coverage` still carry PLACEHOLDER values in the golden source, so
-coverage is bound with `Choices()` at runtime and never a literal — the pattern `scrProjects`
-already lands.
+The output-format chart is the exception and still binds `Choices([@taskmaster_tasks].task_output_format)`
+inline, because a format nobody currently uses should still show as a zero — the same lesson
+`scrHome`'s donut records.
 
 ### 2. Fold once, at the finest grain
 
@@ -95,12 +92,14 @@ over a fact collection may appear in any gallery `Items` or row property** — t
 
 | Fold | Rows | Built from |
 |---|---|---|
-| `colRptPrjMap` | ~hundreds | project ID → activity family L1, coverage, manager, supporter |
-| `colRptPersonSrc` | ~2× tasks | tasks unpivoted on `task_lead` / `task_supporter`, each row already tagged with activity family via `colRptPrjMap` |
+| `colRptPrjMap` | ~hundreds | project ID → activity family L1, region L1, requestor, manager, supporter |
+| `colRptOpenTag` | = F1 | each open task tagged with family, region, requestor and format off **one** hoisted project lookup |
+| `colRptPersonSrc` | ~2× tasks | tasks unpivoted on `task_lead` / `task_supporter`, each row carrying its measures **and the task itself** — name, health, start, due — plus a `Dup` flag |
 | `colRptPerson` | ~20–50 | one row per person, every measure precomputed |
-| `colRptTxEnriched` | ≤ F3 | each transaction tagged with `client_coverage` + product type L1 |
-| `colRptMonths` | 12–24 | written-out month buckets |
-| `colRptGrid` | nCov × nProd | full cross product, counts joined in |
+| `colRptPTask` | one person's tasks | built on row tap, feeds the overlay, refetches nothing |
+| `colRptTxEnriched` | ≤ F3 | each transaction tagged with product type L1 **and L2**, currency, date, notional |
+| `*Pie` folds | ≤7 each | slice `Pct` and `Off` as whole percentages from a running cumulative |
+| `colRptTxSeg` | buckets × currencies | per-bar currency segments with the running `Base` each stacks on |
 | `colRptCcy` | ≤5 | per-currency notional totals |
 
 **Person attribution: exactly two paths, both from tasks.** A task counts once for its
@@ -192,8 +191,8 @@ Transactions carries a prior-period delta; the task tiles do not, and do not pre
 The tallest band. Section header states the measurement basis in its subtitle. One gallery row per
 person (~40 max), tappable column headers sorting a ~40-row collection:
 
-| Person | Owns | Supports | Overdue | Health | Done | Median days | On-time % | Tx |
-|---|---|---|---|---|---|---|---|---|
+| Person | Owns | Supports | Overdue | Health | Done | Median days | On-time % |
+|---|---|---|---|---|---|---|---|
 
 - **Health** is an inline stacked G/A/R bar — a plain `Image` + SVG data URI, **not** `cmpKpiRing`.
   A canvas component cannot be inserted into a gallery (MS Learn, known limitations #4) and the
@@ -202,23 +201,31 @@ person (~40 max), tappable column headers sorting a ~40-row collection:
   completions. The one real duration signal in the model.
 - **On-time %** = completions where `task_date_completion <= task_date_target`, of those with a
   target set. The denominator excludes blank targets and the caption says so.
-- **Tx** = transactions on projects the person manages or supports — impact as a **count**, because
-  C5 forbids a blended notional.
+- **No Tx column.** It counted transactions on projects the person *manages*, which is project-level
+  attribution in a row of task-level measures. Band 5 carries transaction volume properly.
+- **The subtitle states two gaps**: open tasks with no supporter, and completed tasks with no
+  completion date. The second cannot be placed in a period, so it counts in every one — a Done total
+  that does not move with the window has to say why.
 
-Tapping a row opens the **person overlay**: their activity-family mix, output-format mix, open-by-
-stage, their projects with completion %, their transaction count. Every figure comes from folds
-already in memory — zero refetch. That is the payoff for folding at person grain.
+Tapping a row opens the **person overlay**: a plain list of their tasks — name, stage, health, date
+opened, and due date with days left or overdue in parentheses on open work only. It reads
+`colRptPersonSrc`, already in memory, and drops the duplicate row a person holds when they are both
+lead and supporter. Zero refetch — that is the payoff for folding at person grain.
 
 ### Band 3 — Where the work sits
 
-Two 50% panels, then a full-width strip:
+Four panels in one row, each `FillPortions: =1` at `LayoutMinWidth: =260` — about 1100px before the
+row overflows:
 
 - **By activity family** — horizontal bars, top 6 + Other, share of open tasks. Joined through the
   parent project.
-- **By output format** — same, fixed vocabulary + Unspecified + Other. Direct on the task, no join.
-- **Median cycle time by activity family** — the elapsed-time counterpart to the two volume charts.
-
-Scope-aware, and filtered further when a person is selected.
+- **By output format** — a **pie**, fixed vocabulary + Unspecified + Other. Direct on the task, no
+  join. A non-zero Other stays in the subtitle as well as the slice: it means tasks hold a format the
+  column no longer offers, and a red wedge alone is too easy to miss.
+- **By requestor** — bars, top 6 + Other, `project_requestor` through the parent project. The
+  column is optional, so `Unassigned` is a real bucket and its size is stated even when it falls
+  outside the top six.
+- **By region** — a **pie** on level 1 of `project_region_path`.
 
 ### Band 4 — How projects are trending
 
@@ -235,15 +242,17 @@ provenance line.
 
 ### Band 5 — Transactions *(secondary)*
 
-- **Monthly trend** — count bars, current window solid, prior window greyed.
-- **Per-currency notional** — up to five small tiles, one per currency. Never summed.
-- **Coverage × product-type-L1 heatmap** — one SVG `Image`, cell shade by count, zero cells drawn
-  empty with a hairline border so a gap is visible rather than absent. **Legibility ceiling: about
-  60 cells** (e.g. 6 coverage × 10 product types). Past that the heatmap is suppressed and the gap
-  list carries the section alone.
-- **Ranked gap list** — every zero cell, sorted, each row carrying the number of clients in that
-  coverage group so the opportunity is sized: *"Coverage B — 14 clients, no Rates transactions."*
-  This is what makes the section actionable rather than decorative.
+Two columns. Left, the trend and the currency tiles; right, the product pies — the trend answers
+"how many, when" and the pies answer "of what".
+
+- **Trend bars** — the current window **split into currency segments**, the prior window greyed
+  behind it. Colours are keyed on the currency *value*, never on rank, so EUR is the same colour on
+  every load and two periods can be compared by eye.
+- **Per-currency notional** — up to five small tiles, one per currency, never summed. The tiles carry
+  the same colour Switch as the bars, which makes them the chart's legend.
+- **By product type** — two pies, level 1 and level 2 of `product_type_path`, top 5 + Other on each.
+  A product whose path has one segment counts under *Top level only* rather than being dropped, so
+  the pies reconcile with the transaction count beside them.
 
 ### Band 6 — Footer
 

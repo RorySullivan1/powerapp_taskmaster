@@ -614,7 +614,10 @@ Screens:
                       With( { sp: Trim( Coalesce( LookUp( colRptProducts,
                                             ID = x.transaction_product_id.Id ).product_type_path, "" ) ) },
                           With( { i: Find(" | ", sp) },
-                              With( { rest: If( i > 0, Trim(Mid(sp, i + 3)), "" ) },
+                              // Right, not Mid: the " | " separator is 3 characters, so the
+                              // remainder starts at i + 3 and runs to the end. Left is the
+                              // idiom this file already uses for the other half of the split.
+                              With( { rest: If( i > 0, Trim(Right(sp, Len(sp) - i - 2)), "" ) },
                                   With( { j: Find(" | ", rest) },
                                       { Prd: If( IsBlank(sp), "Unclassified",
                                                  If( i > 0, Left(sp, i - 1), sp ) ),
@@ -1680,8 +1683,8 @@ Screens:
                                          Sort(
                                              ForAll( Filter( colRptPersonSrc,
                                                              Em = ThisItem.Em && Dup = false ) As r,
-                                                 { TNm: r.TNm, Role: r.Role, Stg: r.Stg,
-                                                   Hth: r.Hth, Dst: r.Dst, Dtl: r.Dtl, Op: r.Op,
+                                                 { TNm: r.TNm, Stg: r.Stg, Hth: r.Hth,
+                                                   Dst: r.Dst, Dtl: r.Dtl, Op: r.Op,
                                                    Sk: If( r.Op <> 1, 100000,
                                                            If( IsBlank(r.Dtl), 90000,
                                                                DateDiff(Today(), r.Dtl, TimeUnit.Days) ) ) } ),
@@ -1916,8 +1919,12 @@ Screens:
                             Properties:
                               Text: |
                                 ="Top 6, from the parent project. "
-                                 & If( LookUp(colRptReqBar, K = "Unassigned", N) > 0,
-                                       LookUp(colRptReqBar, K = "Unassigned", N)
+                                 // colRptReqAll, NOT colRptReqBar: the bar collection holds
+                                 // only the top six, so a large Unassigned bucket that fell
+                                 // outside them would report as zero — the exact silence this
+                                 // line exists to break.
+                                 & If( LookUp(colRptReqAll, K = "Unassigned", N) > 0,
+                                       LookUp(colRptReqAll, K = "Unassigned", N)
                                        & " record no requestor.",
                                        "The column is optional." )
                               Font: =gTheme.Font
@@ -2312,12 +2319,12 @@ Screens:
                                           FontWeight: =FontWeight.Semibold
                                           Color: |
                                             =Switch( ThisItem.K,
-                                                     "EUR", ColorValue("#005A9E"),
-                                                     "USD", ColorValue("#2E8B9A"),
-                                                     "GBP", ColorValue("#D69828"),
-                                                     "JPY", ColorValue("#7A6FB0"),
-                                                     "CHF", ColorValue("#C05F3C"),
-                                                            ColorValue("#4A9E63") )
+                                                     "EUR", RGBA(0, 90, 158, 1),
+                                                     "USD", RGBA(46, 139, 154, 1),
+                                                     "GBP", RGBA(214, 152, 40, 1),
+                                                     "JPY", RGBA(122, 111, 176, 1),
+                                                     "CHF", RGBA(192, 95, 60, 1),
+                                                            RGBA(74, 158, 99, 1) )
                                           FillPortions: =0
                                           LayoutMinHeight: =18
                                           Width: =Parent.Width
@@ -2373,8 +2380,8 @@ Screens:
                             Properties:
                               Text: |
                                 ="Level 1 above, level 2 below — top 5 and Other on each. "
-                                 & "A product whose path has one segment counts under "
-                                 & Char(34) & "Top level only" & Char(34) & "."
+                                 & "A product whose path has only one segment counts under "
+                                 & "Top level only rather than being dropped."
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
