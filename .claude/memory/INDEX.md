@@ -24,7 +24,8 @@
   no longer an open defect; do not reopen the diagnosis.
 - **#11 HAS LANDED (user, 2026-08-19): pastes clean, ALL CHARTS RENDER.** Two paste defects
   found and fixed since: the `task_name` error type (see Decisions) and the person-overlay task
-  row overlapping. **The overlay fix is authored but NOT yet pasted.** The rest of the backlog
+  row overlapping. **The overlay fix and a 20% wider overlay card are authored but NOT yet
+  pasted.** The rest of the backlog
   is empty — #9, #10 and #12-#17 are all closed.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
