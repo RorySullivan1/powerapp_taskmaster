@@ -90,7 +90,13 @@ Screens:
                   // anything rooted in a named formula reads text columns back as an ERROR type,
                   // and project_name is exactly the column that burned it before.
                   ClearCollect( colPrjNames,
-                      ForAll( ActiveProjects As p, { ID: p.ID, project_name: p.project_name } ) )
+                      ForAll( ActiveProjects As p, { ID: p.ID, project_name: p.project_name } ) ),
+                  // THE OPEN-ISSUE -> PROJECT MAP, so gIssLed below can be counted locally instead
+                  // of with one server query per project managed. OpenIssues is already the app's
+                  // narrowest issue set, so this is as small as the fetch gets. ForAll projection
+                  // rather than ShowColumns, for the reason given on colPrjNames.
+                  ClearCollect( colIssByPrj,
+                      ForAll( OpenIssues As i, { PId: i.issue_project_id.Id } ) )
               );
               Set( gPrjLed,
                    CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
@@ -104,16 +110,30 @@ Screens:
                    CountRows( Filter( colMyTasks,
                        task_stage.Value <> "Completed"
                     && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
-              // ONE DELEGABLE QUERY PER PROJECT, not one query over a set. There is no
-              // "issue_project_manager" to filter on, and `issue_project_id.Id in colMyProjects.ID`
-              // does NOT delegate — it would cap at the data row limit and undercount silently.
-              // The cost is one round trip per project managed, not one per issue.
+              // COUNTED LOCALLY OFF colIssByPrj, with the per-project queries kept as the OVERFLOW
+              // FALLBACK — both arms are here on purpose and neither is dead.
+              //
+              // There is no "issue_project_manager" to filter on, and
+              // `issue_project_id.Id in colMyProjects.ID` does NOT delegate, so the only exact
+              // server-side shape is one delegable query PER PROJECT MANAGED — on the dashboard's
+              // critical path, on every open and every refresh. colIssByPrj answers the same
+              // question in one fetch.
+              //
+              // But a delegable Filter still returns at most the DATA ROW LIMIT, so once open
+              // issues reach 2000 the map is a partial page and a local count would UNDERCOUNT
+              // WITH NO SIGN OF IT. At the limit, pay the queries rather than report a wrong
+              // number. If arms are lazily evaluated, so the fallback costs nothing below it.
               Set( gIssLed,
-                   Coalesce( Sum( ForAll( colMyProjects As p,
-                                          CountRows( Filter( OpenIssues,
-                                                             issue_project_id.Id = p.ID ) ) ),
-                                  Value ),
-                             0 ) );
+                   If( CountRows(colIssByPrj) >= 2000,
+                       Coalesce( Sum( ForAll( colMyProjects As p,
+                                              CountRows( Filter( OpenIssues,
+                                                                 issue_project_id.Id = p.ID ) ) ),
+                                      Value ),
+                                 0 ),
+                       Coalesce( Sum( ForAll( colMyProjects As p,
+                                              CountRows( Filter( colIssByPrj, PId = p.ID ) ) ),
+                                      Value ),
+                                 0 ) ) );
               Set( gIssMine, CountRows(colMyIssues) );
               Set( gMyPercent,
                    If( CountRows(colMyTasks) = 0, 0,
