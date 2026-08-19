@@ -97,3 +97,18 @@
   its raw `transaction_date` / `transaction_notional` reads have been working, which is what
   isolates the fault to the named-formula root rather than to ShowColumns itself.
 - Commit `3818e40`. **NOT yet confirmed in Studio.**
+
+## Band 5 extension (user, 2026-08-19)
+- **Third column added, LEFT of the trend: "Project leads by transaction count".** Top 6 + Other,
+  counting transactions on projects the person MANAGES. This is the same measure dropped from the
+  people table in step 3 — it was wrong there (project attribution among task measures) and is
+  right here, in the transactions band, with the basis stated on the panel.
+- `colRptTxEnriched` gains `Ld` from a second `LookUp`, hoisted into the SAME pass as the product
+  lookup so the display name and its email fallback come off one join rather than two. Cost note
+  updated to O(tx x products) + O(tx x projects).
+- **The two product-type pies are side by side, not stacked.** They are children of a HORIZONTAL
+  container now, so the flexible dimension is WIDTH: `LayoutMinWidth`, not `LayoutMinHeight`, and
+  `Height: =Parent.Height` with the row set to `LayoutAlignItems.Stretch`. Getting that backwards
+  is the easy mistake — the container notes say the minimum is "along the parent's Direction".
+- Row is `FillPortions` 1 : 2 : 2 and 360 high (was 420, two columns). Minimums ~1120px, matching
+  band 3's ~1100.
