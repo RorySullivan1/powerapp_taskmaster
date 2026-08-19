@@ -2686,13 +2686,13 @@ Screens:
             Fill: =gTheme.Color.Surface
             BorderColor: =gTheme.Color.Border
             BorderThickness: =1
-            # 912 IS 760 + 20%. Both guards matter now that the card is wide enough to
-            # approach a narrow window: Min stops it overflowing the screen, and Max stops
-            # the centring arithmetic pushing X negative and hanging it off the left edge.
-            # Neither reads Self, so there is no circular reference between X and Width.
-            X: =Max(0, (Parent.Width - 912) / 2)
+            # Both guards matter at this width: Min stops the card overflowing a narrow
+            # window, and Max stops the centring arithmetic pushing X negative and hanging
+            # it off the left edge. Neither reads Self, so there is no circular reference
+            # between X and Width.
+            X: =Max(0, (Parent.Width - 1000) / 2)
             Y: =80
-            Width: =Min(912, Parent.Width)
+            Width: =Min(1000, Parent.Width)
             Height: =Parent.Height - 160
           Children:
             - rowRptOvlHead:
@@ -2799,8 +2799,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =4
-                        LayoutMinWidth: =180
+                        FillPortions: =3
+                        LayoutMinWidth: =200
                         Height: =24
                   - hdRptOvlStg:
                       Control: Label@2.5.1
@@ -2810,9 +2810,15 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =1
-                        LayoutMinWidth: =80
+                        FillPortions: =0
+                        LayoutMinWidth: =92
                         Height: =24
+                  # ONLY TASK AND DUE STRETCH. Status, health and opened hold BOUNDED
+                  # content — the longest values are "Not Started", "Amber" and a d mmm yy
+                  # date — so a FillPortions above zero on them just takes width from the two
+                  # columns that carry arbitrary-length text. Their minimums are sized to
+                  # their widest real value and they take no share of the slack.
+                  #
                   # A BLANK CAPTION OVER THE HEALTH DOT. The dot is its own column so the
                   # row needs no nested container, and pairing stays one caption to one cell —
                   # which is the whole guarantee. "Health" sits over the word beside it.
@@ -2835,8 +2841,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =1
-                        LayoutMinWidth: =62
+                        FillPortions: =0
+                        LayoutMinWidth: =56
                         Height: =24
                   - hdRptOvlDst:
                       Control: Label@2.5.1
@@ -2846,8 +2852,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =1
-                        LayoutMinWidth: =80
+                        FillPortions: =0
+                        LayoutMinWidth: =84
                         Height: =24
                   - hdRptOvlDtl:
                       Control: Label@2.5.1
@@ -2857,8 +2863,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =2
-                        LayoutMinWidth: =150
+                        FillPortions: =1
+                        LayoutMinWidth: =200
                         Height: =24
             - galRptOvlTask:
                 Control: Gallery@2.15.0
@@ -2903,8 +2909,8 @@ Screens:
                               Size: =gTheme.Size.Body
                               Color: =gTheme.Color.TextPrimary
                               VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =4
-                              LayoutMinWidth: =180
+                              FillPortions: =3
+                              LayoutMinWidth: =200
                               Height: =32
                         - cellRptOvlStg:
                             Control: Label@2.5.1
@@ -2914,8 +2920,8 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =1
-                              LayoutMinWidth: =80
+                              FillPortions: =0
+                              LayoutMinWidth: =92
                               Height: =32
                         # A DOT, not a coloured word: the health vocabulary IS colour names,
                         # and "Green" printed in green says the same thing twice.
@@ -2939,8 +2945,8 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =1
-                              LayoutMinWidth: =62
+                              FillPortions: =0
+                              LayoutMinWidth: =56
                               Height: =32
                         - cellRptOvlDst:
                             Control: Label@2.5.1
@@ -2952,8 +2958,8 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =1
-                              LayoutMinWidth: =80
+                              FillPortions: =0
+                              LayoutMinWidth: =84
                               Height: =32
                         # THE PARENTHETICAL IS ONLY ON OPEN WORK. Days left against today is
                         # meaningless once a task is finished, and printing it there would
@@ -2976,8 +2982,8 @@ Screens:
                                      && ThisItem.Dtl < Today(),
                                      gTheme.Color.Danger, gTheme.Color.TextMuted )
                               VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =2
-                              LayoutMinWidth: =150
+                              FillPortions: =1
+                              LayoutMinWidth: =200
                               Height: =32
                   - rowRptOvlTaskLine:
                       Control: Rectangle@2.3.0
