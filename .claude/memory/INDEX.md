@@ -6,10 +6,12 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. #27, #28, #29, #30, #31, #32, #36 ARE LANDED AND CLOSED; the
-  other 7 (#33, #34, #35, #37, #38, #39, #40) are not started.** Ranked in
-  sessions/2026-08-19-1853-perf-review-issues.md.
-- **THE PASTE QUEUE IS EMPTY (user, 2026-08-19)** — `scrHome` landed clean.
+- **PERF BACKLOG — GitHub #27–#40. #27, #28, #29, #30, #31, #32, #36 ARE LANDED AND CLOSED.
+  #33, #37 and #39 are BUILT AND UNLANDED. #34, #35, #38 and #40 are not started.** Ranked in
+  sessions/2026-08-19-1853-perf-review-issues.md; the take-next assessment is in
+  sessions/2026-08-19-2047-issues-39-33-37-built.md.
+- **PASTE QUEUE: `scrProjectEdit` (#33) and `scrProductEdit` (#37).** #39 needs NO paste — it
+  needs `transaction_product_id` indexed in SharePoint List settings; the schema already says so.
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -357,8 +359,17 @@ not know them will author something broken:
 
 - 2026-08-19 | #32, #28 and #30 LANDED and CLOSED (user) — `scrHome` pasted clean. The dashboard perf work is live: one copy of the fold reached by Select from two callers, three Refreshes in parallel, project names resolved from a local map instead of per visible row, and gIssLed counted off one open-issues fetch. **AS WITH #27/#31 AND #29/#36, LANDING IS A PASTE CONFIRMATION, NOT A MEASUREMENT** — #30's "Done when" asked for a Live Monitor count and that step was NOT performed. **THE `>= 2000` FALLBACK ARM HAS NEVER RUN** (needs a 2000+ open-issue tenant), and the toast-before-numbers ordering introduced by Select's queueing has not been judged in use | GitHub #28, #30, #32
 
+- 2026-08-19 | **TAKE-NEXT ASSESSMENT of the 7 remaining perf issues.** The gate is not effort, it is how many air-gap round trips stand between authored and known-good. #39/#33/#37 authorable now. **#40 is ready but must NOT be batched with behaviour changes**: it touches App.OnStart (formula-bar-only, a different transfer mechanism) plus two screens for ZERO behaviour change, and a batched paste returns ONE binary works/doesn't — bundling a silent guard with real changes makes a failure signal ambiguous about its cause. #38 deferred (rewrites the destructive path, lowest frequency, needs a disposable project to verify — its own pass). #35 blocked on a probe that must be pasted first. #34 blocked on a USER DECISION: prefix search (delegable, option 1) vs substring plus a truncation banner (option 2). **#40's body is stale — it says six `>= 2000` literals; #30 landed a seventh at scrHome:127** — and #40 should precede #34 so an option-2 sentinel uses the constant | GitHub #33–#40
+
+- 2026-08-19 | #39 BUILT: `transaction_product_id` gains `indexed: true` in schema.yaml — the only child-list FK on taskmaster_transactions without one. **REPO-ONLY, NO PASTE**: the live list still needs the index set in List settings, which the in-file comment records. Prevention, not a live defect — nothing leads on the column today, but transactions is the fastest-growing list and **SharePoint refuses to add an index past 20,000 items**, so the decision has an expiry date. `issue_type` / `issue_impact` stay unindexed deliberately (worked around, not overlooked) | GitHub #39
+
+- 2026-08-19 | #33 BUILT: `scrProjectEdit.btnPrSave` created staged tasks and staged transactions in two back-to-back ForAll loops though both depend only on `gPrSaved`; they are now the two arms of one `Concurrent`. **THE SPLIT RESULT COLLECTIONS ARE FORCED, NOT COSMETIC** — Concurrent's arms must not touch shared state and both loops collected into `colChildResult`; each now writes `colChildResultT` / `colChildResultX`, merged straight after, so colChildErrors, colChildOk and the Save-to-retry RemoveIf pair are untouched. **Legal only because the bodies `Collect`**: the 2026-08-19 ForAll rule sanctions Patch and Collect and rules out Set, so a later "simplification" to Set would break it — the comment says so in place | GitHub #33
+
+- 2026-08-19 | #37 BUILT: `scrProductEdit.OnVisible` rebuilt three reference collections per visit, one of them (`colPdUndAll`) a non-delegable `Concat` over the WHOLE products list — paid at the deepest point of another workflow, since the pickers open this screen mid-save. All three now `If(IsEmpty(...))`-guarded in one Concurrent (the #31 pattern, sixth application). **`btnPdSave` merges the tickers it just wrote into the cache LOCALLY rather than refetching**, staged through `colPdUndMerge` because the obvious shape would ClearCollect over the collection it is reading — unverifiable across the gap, so not used. **THE SORT IN THAT MERGE IS LOAD-BEARING**: `galPdUndSug.Items` is `FirstN(..., 12)` over the order, so an appended tail would never be seen. Staleness moves from per-visit to per-session for OTHER people's additions only | GitHub #37
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-19 | issues #39, #33, #37 built: transaction_product_id indexed in the golden source (no paste); scrProjectEdit's two child-creation loops issued concurrently with split result collections; scrProductEdit's three reference fetches cached per session with a local ticker merge on save | sessions/2026-08-19-2047-issues-39-33-37-built.md
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
 - 2026-08-19 | issue #26: scrReports band 4 reworked to three columns — trend chart moved left and its viewBox cut 900->480, NEW projects-by-phase pie (enumerated, not Distinct), NEW open-tasks-due bars keyed on Today() + 14 days; rowRptAge and gRptAgeA..D/gRptStalled deleted, gRptNoTarget kept on the pie subtitle | INDEX Decisions 2026-08-19
 - 2026-08-18 | issue #15: delete for tasks/transactions/issues from scrProject and the three edit screens; issues DETACHED not cascaded; the OnVisible derivation moved into a hidden btnPrjRecompute called by four sites after the probe confirmed Select() fires on an invisible control | sessions/2026-08-18-issue15-delete-children.md
