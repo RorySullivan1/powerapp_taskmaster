@@ -112,15 +112,21 @@ Screens:
                           Filter( LiveTasks,
                                   task_stage.Value = "Not Started" || task_stage.Value = "Planning"
                                || task_stage.Value = "Drafting"    || task_stage.Value = "Finalizing" ),
-                          ID, task_name, task_stage, task_status, task_date_target,
-                          task_lead, task_supporter, task_project_id, task_output_format ) ),
-                  ClearCollect( colRptDone,
+                          ID, task_name, task_stage, task_status, task_date_start,
+                          task_date_target, task_lead, task_supporter, task_project_id,
+                          task_output_format ) ),
+                  // BOUNDED ON STAGE ALONE; the period is applied locally below.
+                  // task_date_completion is optional and `>= gRptFrom` is FALSE for a blank
+                  // date, so a task that reached Completed without one never entered this
+                  // collection at all — Done, the median and the on-time rate then read
+                  // empty with nothing on screen to say why. Completed work DOES accumulate
+                  // where open work does not, which is what the truncation banner is for.
+                  ClearCollect( colRptDoneAll,
                       ShowColumns(
-                          Filter( LiveTasks,
-                                  task_stage.Value = "Completed"
-                               && task_date_completion >= gRptFrom ),
-                          ID, task_date_start, task_date_completion, task_date_target,
-                          task_lead, task_supporter, task_project_id, task_output_format ) ),
+                          Filter( LiveTasks, task_stage.Value = "Completed" ),
+                          ID, task_name, task_status, task_date_start, task_date_completion,
+                          task_date_target, task_lead, task_supporter, task_project_id,
+                          task_output_format ) ),
                   // F3 is the LOAD-BEARING bound — transactions grow fastest.
                   ClearCollect( colRptTx,
                       ShowColumns(
@@ -152,10 +158,22 @@ Screens:
                             project_date_target:     p.project_date_target,
                             project_date_complete:   p.project_date_complete,
                             project_type_path:       p.project_type_path,
+                            project_region_path:     p.project_region_path,
+                            project_requestor:       p.project_requestor,
                             project_manager:         p.project_manager,
                             project_supporter:       p.project_supporter } ) ),
                   ClearCollect( colRptIss, ShowColumns( OpenIssues, ID, issue_project_id ) )
               );
+              // A completed task with NO completion date is in, in every window: the app
+              // cannot place it in time, and dropping it silently understates whoever did
+              // the work. The count is stated beside the people table instead, the same
+              // rule gRptNoSup follows — a total that does not reconcile is worse than one
+              // that explains itself.
+              ClearCollect( colRptDone,
+                  Filter( colRptDoneAll,
+                          IsBlank(task_date_completion) || task_date_completion >= gRptFrom ) );
+              Set( gRptDoneNoDate,
+                   CountRows( Filter(colRptDoneAll, IsBlank(task_date_completion)) ) );
               // ---- D1 dimension ----------------------------------------------------
               // product_type_path is the authoritative value and every product grouping on
               // this screen splits it at " | ". Fetched whole because a transaction reaches
@@ -168,7 +186,7 @@ Screens:
               Set( gRptTrunc,
                    Trim(
                      If( CountRows(colRptOpen) >= 2000, "open tasks  ", "" ) &
-                     If( CountRows(colRptDone) >= 2000, "completed tasks  ", "" ) &
+                     If( CountRows(colRptDoneAll) >= 2000, "completed tasks  ", "" ) &
                      If( CountRows(colRptTx)   >= 2000, "transactions  ", "" ) &
                      If( CountRows(colRptPrj)  >= 2000, "projects  ", "" ) &
                      // F5 and the product fetch count too. Issues feed a tile of their
@@ -189,6 +207,17 @@ Screens:
                                   With( { i: Find(" | ", s) },
                                       If( IsBlank(s), "Unclassified",
                                           If( i > 0, Left(s, i - 1), s ) ) ) ),
+                        // Level 1 of the region path, split exactly as Fam is.
+                        Rgn:  With( { s: Trim(Coalesce(p.project_region_path, "")) },
+                                  With( { i: Find(" | ", s) },
+                                      If( IsBlank(s), "Unassigned",
+                                          If( i > 0, Left(s, i - 1), s ) ) ) ),
+                        // project_requestor is OPTIONAL, so it needs its own bucket rather
+                        // than a blank slice. Display name first, email as the fallback: a
+                        // person column can carry one without the other.
+                        Req:  With( { n: Coalesce(p.project_requestor.DisplayName, ""),
+                                      e: Coalesce(p.project_requestor.Email, "") },
+                                  If( Len(n) > 0, n, If( Len(e) > 0, e, "Unassigned" ) ) ),
                         Mgr:  Lower(Coalesce(p.project_manager.Email, "")),
                         // The display name is carried alongside the email because the scope
                         // picker lists PEOPLE and matches on IDENTITY: email is the key,
@@ -229,6 +258,9 @@ Screens:
                                                  "Unclassified" ),
                                   fmt: Coalesce( t.task_output_format.Value, "Unspecified" ),
                                   stg: Coalesce( t.task_stage.Value, "Unspecified" ),
+                                  // Carried on the row so the person overlay can list the
+                                  // TASKS themselves off this collection and refetch nothing.
+                                  hth: Coalesce( t.task_status.Value, "—" ),
                                   // Hoisted for the same reason fam is: this is compared on
                                   // every measure of the supports row, and left inline it
                                   // was six Lower/Coalesce pairs per task.
@@ -241,7 +273,9 @@ Screens:
                                 Gc: If(t.task_status.Value = "Green", 1, 0),
                                 Ac: If(t.task_status.Value = "Amber", 1, 0),
                                 Rc: If(t.task_status.Value = "Red",   1, 0),
-                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg },
+                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg,
+                                TId: t.ID, TNm: t.task_name, Hth: hth,
+                                Dst: t.task_date_start, Dtl: t.task_date_target, Dup: false },
                               // SAME PERSON ON BOTH COLUMNS IS COUNTED IN BOTH ROLES, ONCE
                               // PER MEASURE. The schema permits lead = supporter, and this
                               // row used to be DROPPED entirely — which kept Overdue honest
@@ -264,7 +298,9 @@ Screens:
                                         If(t.task_status.Value = "Amber", 1, 0) ),
                                 Rc: If( dup, 0,
                                         If(t.task_status.Value = "Red",   1, 0) ),
-                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg } ) } ) ),
+                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg,
+                                TId: t.ID, TNm: t.task_name, Hth: hth,
+                                Dst: t.task_date_start, Dtl: t.task_date_target, Dup: dup } ) } ) ),
                       r ), Len(Em) > 0 ) );
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
@@ -272,17 +308,25 @@ Screens:
                           With( { fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
                                                  "Unclassified" ),
                                   fmt: Coalesce( t.task_output_format.Value, "Unspecified" ),
+                                  hth: Coalesce( t.task_status.Value, "—" ),
+                                  // A COMPLETED TASK MAY CARRY NO COMPLETION DATE — that is
+                                  // exactly why colRptDoneAll is fetched on stage alone. Both
+                                  // durations need one, so both fall back to "not applicable"
+                                  // rather than measuring against a blank.
+                                  nod: IsBlank(t.task_date_completion),
                                   dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")) },
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
                                 Role: "Owns", PId: t.task_project_id.Id, Op: 0,
                                 Ovd: 0, Gc: 0, Ac: 0, Rc: 0, Dn: 1,
-                                Days: If( IsBlank(t.task_date_start), -1,
+                                Days: If( nod || IsBlank(t.task_date_start), -1,
                                           DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
-                                OnT:  If( IsBlank(t.task_date_target), -1,
+                                OnT:  If( nod || IsBlank(t.task_date_target), -1,
                                           If(t.task_date_completion <= t.task_date_target, 1, 0) ),
-                                Fam: fam, Fmt: fmt, Stg: "Completed" },
+                                Fam: fam, Fmt: fmt, Stg: "Completed",
+                                TId: t.ID, TNm: t.task_name, Hth: hth,
+                                Dst: t.task_date_start, Dtl: t.task_date_target, Dup: false },
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
                                 Nm: Coalesce(t.task_supporter.DisplayName, ""),
                                 Role: "Supports",
@@ -294,13 +338,15 @@ Screens:
                                 // still counted.
                                 Ovd: 0, Gc: 0, Ac: 0, Rc: 0,
                                 Dn: If( dup, 0, 1 ),
-                                Days: If( dup, -1,
+                                Days: If( dup || nod, -1,
                                           If( IsBlank(t.task_date_start), -1,
                                           DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ) ),
-                                OnT:  If( dup, -1,
+                                OnT:  If( dup || nod, -1,
                                           If( IsBlank(t.task_date_target), -1,
                                           If(t.task_date_completion <= t.task_date_target, 1, 0) ) ),
-                                Fam: fam, Fmt: fmt, Stg: "Completed" } ) } ) ),
+                                Fam: fam, Fmt: fmt, Stg: "Completed",
+                                TId: t.ID, TNm: t.task_name, Hth: hth,
+                                Dst: t.task_date_start, Dtl: t.task_date_target, Dup: dup } ) } ) ),
                       r ), Len(Em) > 0 ) );
               // ---- person fold -----------------------------------------------------
               // ~40 rows, every measure precomputed. This costs persons x rows ONCE per
@@ -359,14 +405,18 @@ Screens:
               Set( gRptTxPrev, CountRows( Filter(colRptTx, transaction_date < gRptFrom) ) );
               Set( gRptIssN,   CountRows(colRptIss) );
               // ---- BAND 3 folds: where the work sits --------------------------------
-              // Tag each open task ONCE with its activity family and output format.
-              // Every breakdown below then reads a tagged collection instead of
-              // re-joining to the project map per category.
+              // Tag each open task ONCE with everything the breakdowns group on. Every
+              // chart below then reads a tagged collection instead of re-joining to the
+              // project map per category. The LookUp is HOISTED: family, region and
+              // requestor all come off the same project row, and three separate LookUps
+              // would triple a join that is already O(tasks x projects).
               ClearCollect( colRptOpenTag,
                   ForAll( colRptOpen As t,
-                      { Fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
-                                       "Unclassified" ),
-                        Fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) } ) );
+                      With( { pm: LookUp(colRptPrjMap, PId = t.task_project_id.Id) },
+                          { Fam: Coalesce( pm.Fam, "Unclassified" ),
+                            Rgn: Coalesce( pm.Rgn, "Unassigned" ),
+                            Req: Coalesce( pm.Req, "Unassigned" ),
+                            Fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) } ) ) );
               ClearCollect( colRptFamAll,
                   ForAll( Distinct(colRptOpenTag, Fam) As f,
                       { K: f.Value, N: CountRows( Filter(colRptOpenTag, Fam = f.Value) ) } ) );
@@ -410,6 +460,72 @@ Screens:
                     N: CountRows( Filter( colRptOpenTag,
                            Fmt <> "Unspecified" && !(Fmt in colRptFmtVocab.K) ) ) } );
               Set( gRptFmtMax, Max( 1, Coalesce(Max(colRptFmtBar, N), 0) ) );
+              // THE FORMAT CHART IS A PIE, so it also needs slice geometry. Same fold shape
+              // as the three below it; see the pie note there.
+              Set( gRptFmtTot, Max( 1, Coalesce(Sum(colRptFmtBar, N), 0) ) );
+              ClearCollect( colRptFmtPie,
+                  ForAll( Filter(colRptFmtBar, N > 0) As r,
+                      With( { cb: Coalesce( Sum( Filter(colRptFmtBar, Idx < r.Idx), N ), 0 ) },
+                          { Idx: r.Idx, K: r.K, N: r.N,
+                            Off: RoundDown( cb / gRptFmtTot * 100, 0 ),
+                            Pct: RoundDown( (cb + r.N) / gRptFmtTot * 100, 0 )
+                                 - RoundDown( cb / gRptFmtTot * 100, 0 ),
+                            Hx:  If( r.K = "Other", "#C53A3A",
+                                     If( r.K = "Unspecified", "#B9C0C8",
+                                         Switch( Mod(r.Idx - 1, 6),
+                                                 0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
+                                                 3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) ) } ) ) );
+              // ---- open tasks by requestor (bar) -----------------------------------
+              // Top 6 + Other, exactly as the family chart: the requestor list is open-ended
+              // and a chart with forty rows is not a chart.
+              ClearCollect( colRptReqAll,
+                  ForAll( Distinct(colRptOpenTag, Req) As r,
+                      { K: r.Value, N: CountRows( Filter(colRptOpenTag, Req = r.Value) ) } ) );
+              ClearCollect( colRptReqTop, FirstN( Sort(colRptReqAll, N, SortOrder.Descending), 6 ) );
+              Set( gRptReqOther, CountRows(colRptOpenTag) - Coalesce(Sum(colRptReqTop, N), 0) );
+              Clear( colRptReqBar );
+              Collect( colRptReqBar,
+                  ForAll( Sequence( CountRows(colRptReqTop) ) As s,
+                      With( { r: Index(colRptReqTop, s.Value) },
+                          { Idx: s.Value, K: r.K, N: r.N } ) ) );
+              If( gRptReqOther > 0,
+                  Collect( colRptReqBar,
+                      { Idx: CountRows(colRptReqTop) + 1, K: "Other", N: gRptReqOther } ) );
+              Set( gRptReqMax, Max( 1, Coalesce(Max(colRptReqBar, N), 0) ) );
+              // ---- open tasks by region, level 1 (pie) -----------------------------
+              // PIE SLICES ARE WHOLE PERCENTAGES DERIVED FROM A RUNNING CUMULATIVE, never
+              // rounded one slice at a time: Pct = Cum(i) - Cum(i-1), so the rounding error
+              // stays inside a slice and the wedges always close the circle. Off is the same
+              // cumulative, which is the dashoffset the renderer needs. Both are INTEGERS
+              // and must stay that way — a computed fraction goes through Text(), drags the
+              // locale decimal separator into the SVG attribute, and the slice renders EMPTY.
+              // Zero-count slices are dropped: a Pct of 0 draws nothing but still consumes a
+              // legend row.
+              ClearCollect( colRptRgnAll,
+                  ForAll( Distinct(colRptOpenTag, Rgn) As r,
+                      { K: r.Value, N: CountRows( Filter(colRptOpenTag, Rgn = r.Value) ) } ) );
+              ClearCollect( colRptRgnTop, FirstN( Sort(colRptRgnAll, N, SortOrder.Descending), 5 ) );
+              Set( gRptRgnOther, CountRows(colRptOpenTag) - Coalesce(Sum(colRptRgnTop, N), 0) );
+              Clear( colRptRgnSeq );
+              Collect( colRptRgnSeq,
+                  ForAll( Sequence( CountRows(colRptRgnTop) ) As s,
+                      With( { r: Index(colRptRgnTop, s.Value) },
+                          { Idx: s.Value, K: r.K, N: r.N } ) ) );
+              If( gRptRgnOther > 0,
+                  Collect( colRptRgnSeq,
+                      { Idx: CountRows(colRptRgnTop) + 1, K: "Other", N: gRptRgnOther } ) );
+              Set( gRptRgnTot, Max( 1, Coalesce(Sum(colRptRgnSeq, N), 0) ) );
+              ClearCollect( colRptRgnPie,
+                  ForAll( Filter(colRptRgnSeq, N > 0) As r,
+                      With( { cb: Coalesce( Sum( Filter(colRptRgnSeq, Idx < r.Idx), N ), 0 ) },
+                          { Idx: r.Idx, K: r.K, N: r.N,
+                            Off: RoundDown( cb / gRptRgnTot * 100, 0 ),
+                            Pct: RoundDown( (cb + r.N) / gRptRgnTot * 100, 0 )
+                                 - RoundDown( cb / gRptRgnTot * 100, 0 ),
+                            Hx:  If( r.K = "Other" || r.K = "Unassigned", "#B9C0C8",
+                                     Switch( Mod(r.Idx - 1, 6),
+                                             0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
+                                             3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) } ) ) );
               // ---- BAND 4 folds: project trend -------------------------------------
               // BUCKETS KEYED ON A WHOLE NUMBER OF DAYS SINCE gRptFrom — not on date
               // comparison, and not on a calendar month, so one keying serves all three
@@ -490,21 +606,24 @@ Screens:
               // it is bounded by the same 2000-row cap the truncation banner reports. If it
               // ever becomes the bottleneck, the fix is a denormalised product-type column
               // on the transaction, not a smarter join here.
-              // ACCEPTED COST, NOT AN OVERSIGHT: two linear LookUps per transaction, so
-              // this is O(tx x clients) + O(tx x products) and it re-runs on every period
-              // change. Power Fx has no hash join and no index on a collection, so there
-              // is no cheaper shape — and it is bounded by the same 2000-row cap the
-              // truncation banner reports. If it ever becomes the bottleneck, the fix is a
-              // denormalised coverage column on the transaction, not a smarter join here.
+              // ONE LookUp, BOTH LEVELS. Splitting the path twice would double a join the
+              // note above already calls the accepted cost. Level 2 is the segment after the
+              // first " | "; a path with only one segment has none, which is its own bucket
+              // and not "Unclassified" — the product IS classified, just not that deep.
               ClearCollect( colRptTxEnriched,
                   ForAll( colRptTxCur As x,
-                      { Prd: With( { sp: Trim( Coalesce( LookUp( colRptProducts,
-                                                   ID = x.transaction_product_id.Id ).product_type_path, "" ) ) },
-                                 With( { i: Find(" | ", sp) },
-                                     If( IsBlank(sp), "Unclassified",
-                                         If( i > 0, Left(sp, i - 1), sp ) ) ) ),
-                        Ccy: Coalesce(x.transaction_currency.Value, "—"),
-                        Amt: Coalesce(x.transaction_notional, 0) } ) );
+                      With( { sp: Trim( Coalesce( LookUp( colRptProducts,
+                                            ID = x.transaction_product_id.Id ).product_type_path, "" ) ) },
+                          With( { i: Find(" | ", sp) },
+                              With( { rest: If( i > 0, Trim(Mid(sp, i + 3)), "" ) },
+                                  With( { j: Find(" | ", rest) },
+                                      { Prd: If( IsBlank(sp), "Unclassified",
+                                                 If( i > 0, Left(sp, i - 1), sp ) ),
+                                        Pr2: If( Len(rest) = 0, "Top level only",
+                                                 If( j > 0, Left(rest, j - 1), rest ) ),
+                                        Dt:  x.transaction_date,
+                                        Ccy: Coalesce(x.transaction_currency.Value, "—"),
+                                        Amt: Coalesce(x.transaction_notional, 0) } ) ) ) ) ) );
               // PER CURRENCY, NEVER SUMMED ACROSS THEM. Cross-currency conversion is out
               // of scope for this project, so there is no blended figure to show.
               ClearCollect( colRptCcy,
@@ -512,6 +631,90 @@ Screens:
                       { K: c.Value,
                         N:   CountRows( Filter(colRptTxEnriched, Ccy = c.Value) ),
                         Tot: Coalesce( Sum( Filter(colRptTxEnriched, Ccy = c.Value), Amt ), 0 ) } ) );
+              // ---- transactions by product type, levels 1 and 2 (pies) -------------
+              // Same running-cumulative slice geometry as the region pie; see the note
+              // there for why the percentages are derived rather than rounded per slice.
+              ClearCollect( colRptPrdAll,
+                  ForAll( Distinct(colRptTxEnriched, Prd) As d,
+                      { K: d.Value, N: CountRows( Filter(colRptTxEnriched, Prd = d.Value) ) } ) );
+              ClearCollect( colRptPrdTop, FirstN( Sort(colRptPrdAll, N, SortOrder.Descending), 5 ) );
+              Set( gRptPrdOther, CountRows(colRptTxEnriched) - Coalesce(Sum(colRptPrdTop, N), 0) );
+              Clear( colRptPrdSeq );
+              Collect( colRptPrdSeq,
+                  ForAll( Sequence( CountRows(colRptPrdTop) ) As s,
+                      With( { r: Index(colRptPrdTop, s.Value) },
+                          { Idx: s.Value, K: r.K, N: r.N } ) ) );
+              If( gRptPrdOther > 0,
+                  Collect( colRptPrdSeq,
+                      { Idx: CountRows(colRptPrdTop) + 1, K: "Other", N: gRptPrdOther } ) );
+              Set( gRptPrdTot, Max( 1, Coalesce(Sum(colRptPrdSeq, N), 0) ) );
+              ClearCollect( colRptPrdPie,
+                  ForAll( Filter(colRptPrdSeq, N > 0) As r,
+                      With( { cb: Coalesce( Sum( Filter(colRptPrdSeq, Idx < r.Idx), N ), 0 ) },
+                          { Idx: r.Idx, K: r.K, N: r.N,
+                            Off: RoundDown( cb / gRptPrdTot * 100, 0 ),
+                            Pct: RoundDown( (cb + r.N) / gRptPrdTot * 100, 0 )
+                                 - RoundDown( cb / gRptPrdTot * 100, 0 ),
+                            Hx:  If( r.K = "Other" || r.K = "Unclassified", "#B9C0C8",
+                                     Switch( Mod(r.Idx - 1, 6),
+                                             0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
+                                             3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) } ) ) );
+              ClearCollect( colRptPr2All,
+                  ForAll( Distinct(colRptTxEnriched, Pr2) As d,
+                      { K: d.Value, N: CountRows( Filter(colRptTxEnriched, Pr2 = d.Value) ) } ) );
+              ClearCollect( colRptPr2Top, FirstN( Sort(colRptPr2All, N, SortOrder.Descending), 5 ) );
+              Set( gRptPr2Other, CountRows(colRptTxEnriched) - Coalesce(Sum(colRptPr2Top, N), 0) );
+              Clear( colRptPr2Seq );
+              Collect( colRptPr2Seq,
+                  ForAll( Sequence( CountRows(colRptPr2Top) ) As s,
+                      With( { r: Index(colRptPr2Top, s.Value) },
+                          { Idx: s.Value, K: r.K, N: r.N } ) ) );
+              If( gRptPr2Other > 0,
+                  Collect( colRptPr2Seq,
+                      { Idx: CountRows(colRptPr2Top) + 1, K: "Other", N: gRptPr2Other } ) );
+              Set( gRptPr2Tot, Max( 1, Coalesce(Sum(colRptPr2Seq, N), 0) ) );
+              ClearCollect( colRptPr2Pie,
+                  ForAll( Filter(colRptPr2Seq, N > 0) As r,
+                      With( { cb: Coalesce( Sum( Filter(colRptPr2Seq, Idx < r.Idx), N ), 0 ) },
+                          { Idx: r.Idx, K: r.K, N: r.N,
+                            Off: RoundDown( cb / gRptPr2Tot * 100, 0 ),
+                            Pct: RoundDown( (cb + r.N) / gRptPr2Tot * 100, 0 )
+                                 - RoundDown( cb / gRptPr2Tot * 100, 0 ),
+                            Hx:  If( r.K = "Other" || r.K = "Top level only", "#B9C0C8",
+                                     Switch( Mod(r.Idx - 1, 6),
+                                             0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
+                                             3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) } ) ) );
+              // ---- currency segments for the trend bars ----------------------------
+              // The bar chart stacks by currency, and an SVG Concat cannot carry a running
+              // total — so the base each segment sits on is computed HERE. Bucketed once per
+              // transaction rather than once per bucket-currency cell, which turns a
+              // DateDiff per cell into a DateDiff per row.
+              ClearCollect( colRptTxBk,
+                  ForAll( colRptTxEnriched As e,
+                      { Bi: RoundDown( DateDiff(gRptFrom, e.Dt, TimeUnit.Days)
+                                       / Max(1, gRptBucketDays), 0 ) + 1,
+                        K:  e.Ccy } ) );
+              // ORDERED ONCE, so a currency keeps the same stacking position in every bar.
+              ClearCollect( colRptCcyKeys,
+                  ForAll( Sequence( CountRows(colRptCcy) ) As s,
+                      With( { r: Index( Sort(colRptCcy, N, SortOrder.Descending), s.Value ) },
+                          { Ord: s.Value, K: r.K } ) ) );
+              ClearCollect( colRptTxSegRaw,
+                  ForAll( Sequence( gRptBucketN * Max(1, CountRows(colRptCcyKeys)) ) As s,
+                      With( { bi: RoundDown( (s.Value - 1)
+                                             / Max(1, CountRows(colRptCcyKeys)), 0 ) + 1,
+                              ci: Mod( s.Value - 1, Max(1, CountRows(colRptCcyKeys)) ) + 1 },
+                          With( { k: Index(colRptCcyKeys, ci).K },
+                              { Bi: bi, Ci: ci, K: k,
+                                N: CountRows( Filter(colRptTxBk, Bi = bi && K = k) ) } ) ) ) );
+              // FIXED BY VALUE, NOT BY POSITION: EUR is the same colour whatever its share
+              // is this period, so two loads can be compared by eye.
+              ClearCollect( colRptTxSeg,
+                  ForAll( Filter(colRptTxSegRaw, N > 0) As g,
+                      { Bi: g.Bi, Ci: g.Ci, K: g.K, N: g.N,
+                        Base: Coalesce( Sum( Filter(colRptTxSegRaw, Bi = g.Bi && Ci < g.Ci), N ), 0 ),
+                        Hx: Switch( g.K, "EUR", "#005A9E", "USD", "#2E8B9A", "GBP", "#D69828",
+                                         "JPY", "#7A6FB0", "CHF", "#C05F3C", "#4A9E63" ) } ) );
               // The people on the scoped manager's projects, resolved to a flat email
               // list so the gallery filters with `in` over ~40 rows rather than scanning
               // the unpivot on every repaint. Recomputed HERE as well as in the picker's
