@@ -22,11 +22,13 @@
   junction write.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **#11 HAS LANDED (user, 2026-08-19): pastes clean, ALL CHARTS RENDER.** Two paste defects
-  found and fixed since: the `task_name` error type (see Decisions) and the person-overlay task
-  row overlapping — both LANDED. **Authored and unpasted: the overlay card at 1200 wide,
-  only its free-text columns elastic, task name dropped to Small.** The rest of the backlog
-  is empty — #9, #10 and #12-#17 are all closed.
+- **#11 IS DONE AND THE PASTE QUEUE IS EMPTY AGAIN (user, 2026-08-19).** scrReports landed in
+  full: all five rework steps, both paste defects fixed (`task_name` error type, overlay row
+  overlap), band 5 extended to three columns, and the person overlay at 1200 wide. **THE BACKLOG
+  IS EMPTY** — #9, #10 and #12-#17 are closed and #11 is finished but still OPEN on GitHub.
+  **Landed is not the same as exercised**: on scrReports nobody has yet seen the truncation
+  banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the audience pie, or a
+  multi-currency stack in the trend bars.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -295,3 +297,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | outbound port #2 to claudeBrain: the canvas-app family (7 skills, 2 agents, the air-gap brief) plus 4 generic corrections, opened as claudeBrain#36. Nothing imported — the factory's Power Platform copies remain downstream of this repo. Open question asked in the PR: whether the ported skills' `tools/` and `schema/` path references should be genericised | sessions/2026-08-19-0258-claudebrain-canvas-port.md
 - 2026-08-19 | #11 LANDED — pastes clean, all charts render. Two paste defects: the task_name error type (ShowColumns over a named formula) and the overlay task row overlapping (absolute cells vs the auto-layout idiom); both fixed, the second unpasted | GitHub #11
 - 2026-08-19 | overlay geometry: absolute cells replaced by the auto-layout idiom (LANDED), then the card widened to 1000 with status/health/opened set to zero FillPortions — a bounded vocabulary should never take a share of the slack from a free-text column | GitHub #11
+- 2026-08-19 | #11 COMPLETE — scrReports rework landed end to end across five pastes: the subtraction, the data layer, the people section, four-column band 3, three-column band 5, then the overlay geometry, width and font refinements | GitHub #11

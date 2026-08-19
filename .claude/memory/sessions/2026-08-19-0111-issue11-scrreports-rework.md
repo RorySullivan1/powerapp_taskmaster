@@ -131,3 +131,14 @@
   caption to one cell without nesting a second container inside a gallery template — nesting is
   proven container-in-container (band 5) but NOT container-in-template.
 - Commit `dc463a7`.
+
+## Outcome — #11 COMPLETE (user, 2026-08-19)
+- Everything landed. Five pastes in total: the rework itself, the `task_name` fix, the band 5
+  extension, the overlay geometry rebuild, and the width/font refinements.
+- **What the sequence cost, and why:** two of those five pastes were defects, and BOTH came from
+  an untested assumption written down as fact — "a Filter expression makes ShowColumns immune"
+  and "absolute X on a hand-computed grid holds". Neither was ever verifiable from this side of
+  the gap; both are now Decisions with the counter-evidence attached.
+- **Still unexercised on this screen** (do not claim these work): the truncation banner firing,
+  `gRptDoneNoDate > 0`, a non-zero `Other` slice on the audience pie, and a trend bar carrying
+  more than one currency segment.
