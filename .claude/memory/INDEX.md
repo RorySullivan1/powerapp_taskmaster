@@ -27,6 +27,9 @@
   paste and nothing else in `src/` changed. **THE BACKLOG IS OTHERWISE EMPTY** — #9, #10 and
   #12-#17 are all closed. The real #11 people bug was in the FETCH, not the fold: see the
   session log before re-diagnosing anything about Done / median / on-time.
+  **The output pie groups by `task_output_audience`, NOT `task_output_format`** (user,
+  2026-08-19) — audience is enforced by `scrTaskEdit`, format never is. Format is now
+  reported nowhere.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -274,3 +277,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #9 LANDED AND EXERCISED — all four checks clear. The re-save check passing is the one that matters: it proves the derived `issue_date_close` reads the STORED value, so the ECS/snapshot hardening was necessary and correct | GitHub #9
 - 2026-08-19 | #11 planned in full and posted to the issue for review, nothing written. Five findings reshaped it: dropping the coverage grid orphans the Coverage combo; the people measures fail UPSTREAM (a Completed task with a blank task_date_completion never enters colRptDone at all, so Done/median/on-time read empty and the screen cannot say why); Tx is project-attributed among task measures; the overlay replacement can read colRptPersonSrc and refetch nothing if it gains 4 fields + a Dup flag; the pie is cmpKpiRing's stroke-dasharray, not arc math | GitHub #11
 - 2026-08-19 | #11 BUILT in five commits: the coverage grid, the gap list, the median-cycle chart and the now-orphaned Coverage combo dropped; completed tasks fetched on stage alone because `task_date_completion >= gRptFrom` is FALSE for a blank date and silently emptied every completion measure; Tx dropped from the people table; the person overlay became a task list; band 3 is four columns with two pies; the transaction bars stack by currency beside product-type L1/L2 pies | sessions/2026-08-19-0111-issue11-scrreports-rework.md
+- 2026-08-19 | #11 follow-up: the output pie switched from task_output_format to task_output_audience because scrTaskEdit ENFORCES the audience whenever the Output section is on and never enforces the format — so audience stays complete and format accumulates blanks; the young column's Unspecified count is stated in the subtitle because on a pie that case and a broken report look identical. Fam/Fmt dropped from colRptPersonSrc, taking a per-task project LookUp with them | GitHub #11

@@ -63,3 +63,19 @@
   existing `task_output_format` chart converted to a pie, per the numbering in the issue.
 - `task_supporter` was deleted and recreated on 2026-08-17, so the supports column may still be
   largely empty — a correct report over an empty column looks identical to a broken one.
+
+## Follow-up (same day, user-directed)
+- **The output pie now groups by `task_output_audience`, not `task_output_format`.** The deciding
+  fact is enforcement, not recency: `scrTaskEdit`'s `lblTkMissing` blocks the save until an
+  audience is picked whenever the Output toggle is on, and there is NO equivalent rule for format.
+  So audience stays complete and format accumulates blanks indefinitely. **`task_output_format` is
+  now reported nowhere in the app.**
+- The audience column is younger than the open backlog, so Unspecified will dominate at first.
+  Stated in the subtitle deliberately — on a pie, "the column is new" and "the report is broken"
+  look identical. Other outranks Unspecified in that subtitle: rarer, and a real data question.
+  The bucket drains as tasks are touched, because an existing task with output data cannot be
+  saved at all until an audience is picked.
+- **`Fam` and `Fmt` dropped from `colRptPersonSrc`.** They fed the overlay mini-charts that step 3
+  replaced, and nothing read them after. Removing `Fam` removed the per-task
+  `LookUp(colRptPrjMap, ...)` behind it, so `colRptOpenTag` is now the ONLY place that join runs.
+  `colRptDoneAll` stopped fetching `task_output_format` for the same reason.
