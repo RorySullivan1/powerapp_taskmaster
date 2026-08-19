@@ -50,8 +50,7 @@ Screens:
         Set( gPrTypePath,   If( gEditMode = "Edit", Coalesce(gEditProject.project_type_path, ""), "" ) );
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY: Sequence() numbers the rows, Index() reads the nth
-        // choice back out. Priority is REQUIRED so it has no blank row; coverage is
-        // optional, so row 1 is "(none)" and the real choices start at Id 2. The Ids mean
+        // choice back out. BOTH are REQUIRED, so neither carries a blank row. The Ids mean
         // nothing beyond "which row" — each DefaultId looks its value up by Label.
         ClearCollect( colPrPriorityOpts,
                       With( { ch: Choices([@taskmaster_projects].project_priority) },
@@ -59,11 +58,20 @@ Screens:
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         ClearCollect( colPrCovOpts,
                       With( { ch: Choices([@taskmaster_projects].project_coverage) },
-                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
-                                    { Id:    n.Value,
-                                      Label: If( n.Value = 1, "(none)",
-                                                 Index(ch, n.Value - 1).Value ) } ) ) );
-        Set( gPrCov, If( gEditMode = "Edit", Coalesce(gEditProject.project_coverage.Value, "(none)"), "(none)" ) );
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+        // THREE BRANCHES, AND THE THIRD IS NOT PARANOIA. project_coverage is the ONE column
+        // whose real vocabulary this repo has never been told — schema.yaml still carries a
+        // PLACEHOLDER beside the one confirmed value — so "Internal" is a literal the app
+        // cannot verify. Take the stored value when the column still offers it; else the
+        // default when the column offers THAT; else whatever the column does offer, so a
+        // wrong guess degrades to a real member instead of writing one the connector will
+        // reject. Same vocabulary test scrIssueEdit uses, with one more rung under it.
+        Set( gPrCov,
+             With( { v: If( gEditMode = "Edit", Coalesce(gEditProject.project_coverage.Value, ""), "" ) },
+                 If( Len(v) > 0 && v in colPrCovOpts.Label, v,
+                     "Internal" in colPrCovOpts.Label,          "Internal",
+                                                                First(colPrCovOpts).Label ) ) );
         Clear( colNewTasks ); Clear( colNewTransactions );
         If( gEditMode = "Edit",
             ClearCollect( colLinkedTasks, Filter(taskmaster_tasks, task_project_id.Id = gEditProject.ID) );
@@ -1087,7 +1095,11 @@ Screens:
                        If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
                        If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
                        If( gEditMode = "New" && Len(gPrRegionPath) = 0, "Region   ", "" ) &
-                       If( gEditMode = "New" && Len(gPrTypePath) = 0,   "Project type   ", "" ) )
+                       If( gEditMode = "New" && Len(gPrTypePath) = 0,   "Project type   ", "" ) &
+                       // Reachable only if Choices() came back empty — the seed cannot
+                       // otherwise leave this blank. That is exactly the case worth catching:
+                       // an empty vocabulary would send {Value: ""} and lose the whole insert.
+                       If( Len(gPrCov) = 0,                             "Coverage   ", "" ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.Danger
@@ -1226,17 +1238,12 @@ Screens:
                                   project_region_path: gPrRegionPath,
                                   project_type_id:     gPrTypeId,
                                   project_type_path:   gPrTypePath,
-                                  // GUARDED. This was a bare { Value: gPrCov } on the insert
-                                  // path while the Edit path guarded the identical write, and
-                                  // gPrCov seeds to "" on New with no required-field gate —
-                                  // so an unpicked Coverage sent an empty Choice member, which
-                                  // is not a member, and the connector rejected the insert.
-                                  // "(none)" is the strip's clearable row, and Blank() is the
-                                  // only legal way to write an unset Choice — {Value: ""} is
-                                  // not a member and the connector rejects the whole insert.
-                                  project_coverage:
-                                      If( gPrCov <> "(none)" && Len(gPrCov) > 0,
-                                          { Value: gPrCov }, Blank() ),
+                                  // UNGUARDED since #25: coverage is required, the strip has
+                                  // no blank row, and the seed always lands on a member the
+                                  // column actually offers. lblPrMissing still nets an empty
+                                  // gPrCov, because {Value: ""} is not a member and the
+                                  // connector rejects the whole insert rather than the field.
+                                  project_coverage: { Value: gPrCov },
                                   project_date_start:    dtpPrStart.SelectedDate,
                                   project_date_target:   dtpPrTarget.SelectedDate,
                                   // Written by the Mark complete button on scrProject, which is
