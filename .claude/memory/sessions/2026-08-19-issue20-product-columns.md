@@ -53,10 +53,18 @@ readers must treat the column as case-insensitive.
   An empty box writes `Blank()`, not 0: unknown and a zero-year tenor must not look alike.
 
 ## scrReference — the product list
-Row grows 44 → 62 for a third line carrying underlying · wrapper · maturity. Blank fields
-COLLAPSE rather than printing a dash each — three placeholders read as damage, and a product
-with none of these is the normal case. `product_features` is deliberately NOT on the row: it is
-free prose and would swamp a 651px cell.
+Row grows 44 → 80: a third line carrying underlying · wrapper · maturity, and a fourth for
+features. Blank spec fields COLLAPSE rather than printing a dash each — three placeholders read
+as damage, and a product with none of these is the normal case.
+
+Features were left off the row first and **added on the user's instruction**. Prose in a fixed
+row needs two things: stored NEWLINES become spaces (a Note's line break would render here and
+push the rest of the sentence out of an 18px box, so the row would appear truncated at a random
+word), and a 100-character cap with an ellipsis so a long entry ENDS rather than clipping
+mid-glyph. It takes its own line — prose beside three short tokens reads as one run-on string.
+**The cost is rows on screen:** the 466px viewport holds ~5.8 products where the 44px row held
+~10. Accepted deliberately; the compact alternative is to append a shortened features string to
+the spec line and stay at 62.
 
 ## The one ungrounded token — `Split(...).Value`
 `Distinct()` naming its column `Value` is confirmed in this app (`cmpNestedSelect` comment), but

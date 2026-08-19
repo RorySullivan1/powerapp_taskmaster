@@ -206,10 +206,11 @@ Screens:
                              StartsWith(product_uid, txtAdminProductSearch.Text) ),
                      product_uid )
             WrapCount: =1
-            # 62, not 44: the #20 fields take a third line. Every Y below is measured
-            # against this number and the separator sits on the last pixel of it, so the
-            # four move together.
-            TemplateSize: =62
+            # 80, not 44: the #20 fields take a third line and features a fourth. Every Y
+            # below is measured against this number and the separator sits on the last
+            # pixel of it, so the five move together. THE COST IS ROWS ON SCREEN — the
+            # 466px viewport holds ~5.8 products where the 44px row held ~10.
+            TemplateSize: =80
             TemplatePadding: =0
             TemplateFill: =RGBA(0, 0, 0, 0)
             BorderThickness: =0
@@ -247,8 +248,8 @@ Screens:
             # three placeholders on a reference row read as damage, and a product with
             # none of these is the normal case, not a defect. The separator is only
             # emitted between two values that both exist, so the line never starts or
-            # ends with one. product_features is deliberately NOT here — it is free
-            # prose and would swamp a 651px row; it lives on the edit form.
+            # ends with one. Features get their OWN line below rather than joining this
+            # one — prose beside three short tokens reads as one run-on string.
             - cellAdminPdSpec:
                 Control: Label@2.5.1
                 Properties:
@@ -268,12 +269,38 @@ Screens:
                   Y: =41
                   Width: =Parent.TemplateWidth - 24
                   Height: =18
+            # FEATURES, ONE LINE, TRUNCATED. Two things have to happen to free text
+            # before it can sit in a fixed-height row:
+            #   * LINE BREAKS BECOME SPACES. product_features is a Note — a stored
+            #     newline would render as one here and push the rest of the sentence out
+            #     of the 18px box, so the row would look truncated at a random word.
+            #   * A LENGTH CAP with an ellipsis, so a long entry ENDS rather than being
+            #     clipped mid-glyph. 100 characters is what fits 627px at Size.Small;
+            #     the ellipsis is the signal that the edit form holds the rest.
+            - cellAdminPdFeat:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =With( { f: Trim( Substitute( Substitute( Coalesce(ThisItem.product_features, ""),
+                                                              Char(13), " " ),
+                                                  Char(10), " " ) ) },
+                           If( Len(f) = 0,      "",
+                               Len(f) <= 100,   f,
+                                                Left(f, 99) & "…" ) )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =12
+                  Y: =59
+                  Width: =Parent.TemplateWidth - 24
+                  Height: =18
             - lineAdminPd:
                 Control: Rectangle@2.3.0
                 Properties:
                   Fill: =gTheme.Color.Border
                   X: =0
-                  Y: =61
+                  Y: =79
                   Width: =Parent.TemplateWidth
                   Height: =1
             - hitAdminPd:
