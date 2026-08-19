@@ -1,59 +1,34 @@
-# scrTaskEdit — REWORKED 2026-08-07.  Tabs removed, layout moved to containers.
+# scrTaskEdit — one task, on containers. Output is an optional section behind a
+# toggle; switching it OFF on an edit CLEARS every output field on save, or the
+# section would hide values that are still stored.
 #
-# WHAT CHANGED, and why each one is not just cosmetic:
+# DERIVED, WITH NO CONTROL ON THIS SCREEN: the project (from the task on Edit, from
+# gSelProject on New), the completion date (Complete stamps it, anything else clears
+# it), and health — see rollups.task_health in schema.yaml.
 #
-#  - NO TAB LIST.  Output was a second tab; it is now an optional SECTION behind a
-#    toggle.  On an existing task the toggle opens already on when the task has an
-#    output format, so the record itself says whether the section is relevant.
-#    Switching it OFF on an edit CLEARS every output field on save — otherwise the
-#    section would hide values that are still stored.
-#
-#  - PROJECT IS GONE FROM THE FORM.  A task is always created against a project, so
-#    `gTkProject` is derived in OnVisible (from the task on Edit, from gSelProject on
-#    New) and never asked for.  It is still WRITTEN, and it still drives the C3
-#    rollup at the end of Save.
-#
-#  - COMPLETION DATE IS DERIVED, NOT ENTERED.  Picking Complete stamps it; anything
-#    else clears it.  (The "Archived keeps whatever was there" arm went with the stage
-#    itself on 2026-08-12 — task_stage no longer has an Archived value.)  It is shown
-#    read-only so the value is visible without being editable.
-#
-#  - STAGE / PRIORITY are combo boxes whose text colour follows the value.
-#    HEALTH IS DERIVED and has no control — see rollups.task_health in schema.yaml.
-#    `Color` is the current modern combo box's text colour (it was `FontColor` before
-#    the revision).
-#
-#  - DUE DATE flags itself.  A date picker has no grounded colour property, so the
-#    CAPTION carries the warning — a Label's Color is beyond doubt.
-#
-# LAYOUT IS CONTAINERS.  Every auto-layout child sets FillPortions EXPLICITLY; it
-# defaults to 1 at every nesting level and one unset child silently steals space from
-# its siblings.  The action bar and the picker panel stay absolute: the bar is a fixed
-# footer on the screen, and the panel has to float ABOVE the form rather than sit in
-# its flow.
+# EVERY AUTO-LAYOUT CHILD SETS FillPortions EXPLICITLY. It defaults to 1 at every
+# nesting level, and one unset child silently steals space from its siblings.
+# The action bar and the picker panel stay absolute: the bar is a fixed footer, and
+# the panel has to float ABOVE the form rather than sit in its flow.
 Screens:
   scrTaskEdit:
     Properties:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnTkSave
-        // WHICH task this visit is for. The resume guard below matches on it rather than
-        // on a bare boolean, because a boolean latch leaks: the picker sets it before
-        // navigating away to create a client or product, and NOTHING clears it unless the
-        // user comes back here. Leave that flow by any other route and the next task opened
-        // skips every seed and every Reset below — which is the whole screen, since they
-        // all live in this guard's else arm — and shows the PREVIOUS task's client and
-        // output data. Matching on identity makes a stale flag harmless: a different task
-        // cannot match, so it seeds normally.
+        // WHICH task this visit is for. The resume guard matches on identity, not on a bare
+        // boolean: a boolean latch leaks — the picker sets it before navigating away to create
+        // a client or product, and nothing clears it unless the user comes back. Leaving by any
+        // other route would make the next task skip every seed and Reset in this guard's else
+        // arm, showing the PREVIOUS task's data. A stale key simply cannot match.
         Set( gTkKey, If( gEditMode = "Edit", "E" & gEditTask.ID, "N" & gSelProject.ID ) );
         If( gTkResumeKey = gTkKey && Len(gTkKey) > 1,
          Set( gTkResumeKey, "" ),
          Set( gTkProject,
               If( gEditMode = "Edit",
                   { Id: gEditTask.task_project_id.Id,
-                    // NOT redundant. The lookup column's live display field is the target's ID,
-                    // so `.Value` is a NUMBER — see schema.yaml on this column. Resolving the
-                    // name app-side is the fix from 2026-08-09; do not "optimise" it away.
+                    // NOT redundant. The lookup column's live display field is the target's ID, so
+                    // `.Value` is a NUMBER — see schema.yaml. Do not "optimise" this away.
                     Value: LookUp(taskmaster_projects, ID = gEditTask.task_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
@@ -72,15 +47,12 @@ Screens:
               If( gEditMode = "Edit" && gEditTask.task_client_name.Id > 0,
                   { Id: gEditTask.task_client_name.Id, Value: gEditTask.task_client_name.Value },
                   { Id: 0, Value: "" } ) );
-        // PRODUCTS ARE MULTI NOW. colTkProducts is the staging set the form edits;
-        // taskmaster_taskproduct is only touched on save. Seeded from the junction on
-        // Edit and left empty on New.
-        //
-        // INSIDE THE RESUME GUARD, like every other seed on this screen — coming
-        // back from "create a new product" must not wipe what the user already staged.
-        //
-        // Shaped to {Id, Uid} on read: taskproduct_product_uid is the denormalised
-        // copy, and reading it here avoids a LookUp per link just to show a name.
+        // PRODUCTS ARE MULTI. colTkProducts is the staging set the form edits;
+        // taskmaster_taskproduct is only touched on save.
+        // INSIDE THE RESUME GUARD, like every other seed here — coming back from
+        // "create a new product" must not wipe what the user already staged.
+        // Shaped to {Id, Uid} on read: taskproduct_product_uid is the denormalised copy,
+        // which avoids a LookUp per link just to show a name.
         Clear( colTkProducts );
         If( gEditMode = "Edit",
             Collect( colTkProducts,
@@ -88,14 +60,10 @@ Screens:
                                      taskproduct_task_id.Id = gEditTask.ID ) As lk,
                              { Id:  lk.taskproduct_product_id.Id,
                                Uid: lk.taskproduct_product_uid } ) ) );
-        // OPTION TABLES FOR THE TWO STRIPS. cmpSelection needs {Id, Label} and
-        // Choices() returns only Value, so the Id is synthesised POSITIONALLY:
-        // Sequence() numbers the rows and Index() reads the nth choice back out.
-        // The Ids mean nothing beyond "which row" — never hard-code one, look it up
-        // by Label, which is what each DefaultId does.
-        //
-        // Both columns are REQUIRED with a default (C9), so neither gets a
-        // "(none)" row: there is no legal blank to write back.
+        // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
+        // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — never
+        // hard-code one, look it up by Label, which is what each DefaultId does.
+        // Both columns are REQUIRED with a default, so neither gets a "(none)" row.
         ClearCollect( colTkStageOpts,
                       With( { ch: Choices([@taskmaster_tasks].task_stage) },
                             ForAll( Sequence( CountRows(ch) ) As n,
@@ -116,19 +84,18 @@ Screens:
         Reset( cmpTkPick );
         Set( gTkQuery, "" );
         Reset( txtTkApprovalId );
-        // THE OPTION LISTS LOAD HERE, AFTER the modal and query state is cleared and
-        // before the combo Resets that read them. Order is defensive: a Choices() call
-        // that errors stops the whole OnVisible, and anything left above it never runs —
-        // so nothing that decides whether the screen is USABLE may sit below this block.
-        // EVERY OPTION LIST COMES FROM ITS COLUMN, not a literal copy of it. A literal
-        // drifts the moment someone edits the Choice in SharePoint, and the failure is
-        // silent both ways: a removed value stays offered and will not save, a new one
-        // never appears. "(none)" is Collected FIRST so it sorts to the top; it is an
-        // app concept, not a column value, and the save maps it back to Blank().
-        // THE Opts SUFFIX IS LOAD-BEARING. This screen names its column containers col*
-        // too — colTkFormat, colTkLang, colTkBrand are CONTROLS — so a collection named
-        // after the container it sits in resolves to the control instead, and every
-        // reader of it fails as an incompatible type one hop away from the cause.
+        // THE OPTION LISTS LOAD HERE, after the modal and query state is cleared and before
+        // the combo Resets that read them. Order is defensive: a Choices() call that errors
+        // stops the whole OnVisible, so nothing that decides whether the screen is USABLE may
+        // sit below this block.
+        // EVERY OPTION LIST COMES FROM ITS COLUMN, not a literal copy — a literal drifts
+        // silently both ways when someone edits the Choice in SharePoint. "(none)" is
+        // Collected FIRST so it sorts to the top; it is an app concept, and the save maps it
+        // back to Blank().
+        // THE Opts SUFFIX IS LOAD-BEARING. This screen names its column containers col* too
+        // (colTkFormat, colTkLang, colTkBrand are CONTROLS), so a collection named after the
+        // container it sits in resolves to the control instead, and every reader of it fails
+        // as an incompatible type one hop from the cause.
         ClearCollect( colTkFmtOpts, { Value: "(none)" } );
         Collect( colTkFmtOpts,
                  ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
@@ -149,16 +116,14 @@ Screens:
         Collect( colTkCliStageOpts,
                  ForAll( Choices([@taskmaster_tasks].task_client_stage) As c,
                          { Value: c.Value } ) );
-        // cmpSelection re-reads its DefaultId ONLY on Reset — without these the
-        // previous task's stage/priority survive into the next one, and the
-        // strip then DISAGREES WITH THE SAVE rather than failing visibly.
+        // cmpSelection re-reads its DefaultId ONLY on Reset — without these the previous
+        // task's stage/priority survive and the strip DISAGREES WITH THE SAVE.
         Reset( selTkStage ); Reset( selTkPriority );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset.
         Reset( cboTkLanguage ); Reset( cboTkFormat ); Reset( cboTkBranding ); Reset( cboTkAudience ); Reset( cboTkClientStage );
         Reset( tglTkOutput ); Reset( tglTkClient ); Reset( tglTkApprovalReq );
-        // A date picker re-reads DefaultDate ONLY on Reset. Without these the seeds
-        // never take on a second visit and the Patch writes Blank() over the stored
-        // dates. The completion date is derived on save and has no picker at all.
+        // A date picker re-reads DefaultDate ONLY on Reset. Without these the seeds never
+        // take on a second visit and the Patch writes Blank() over the stored dates.
         Reset( dtpTkStart ); Reset( dtpTkTarget )
         )
     Children:
@@ -373,12 +338,10 @@ Screens:
                         LayoutMinHeight: =26
                         Width: =Parent.Width - 40
                         Height: =26
-                  # STAGE ON ITS OWN ROW, priority on the next. Health has no control:
-                  # it is derived, so there is nothing here for a user to set.
-                  # A five-option strip in a third-width cell gives each label about
-                  # 60px, and "Not Started" does not fit in 60px at any legible size.
-                  # A vertical stack rather than a two-row grid because a GridLayout
-                  # span did not render full width when scrIssueEdit tried it.
+                  # STAGE ON ITS OWN ROW, priority on the next. A five-option strip in a
+                  # third-width cell gives each label ~60px, and "Not Started" does not fit.
+                  # A vertical stack rather than a GridLayout — a grid span did not render
+                  # full width when scrIssueEdit tried it.
                   - stackTkState:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -851,9 +814,8 @@ Screens:
                                   || !IsBlank(gEditTask.task_output_audience.Value)
                                   || !IsBlank(gEditTask.task_output_approval_id)
                                   || Coalesce(gEditTask.task_output_approval_flag, false)
-                                  // colTkProducts, not the retired task_product_id. OnVisible
-                                  // seeds it from the junction before this Default is read, so
-                                  // a task whose ONLY output data is its products still opens
+                                  // OnVisible seeds colTkProducts from the junction before this Default
+                                  // is read, so a task whose only output data is its products still opens
                                   // the section instead of hiding them.
                                   || !IsEmpty(colTkProducts),
                                      false )
@@ -910,8 +872,8 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              # Descriptive only — the approval gate is tglTkApprovalReq, not a
-                              # value in this list. Every audience value behaves the same way.
+                              # Descriptive only — the approval gate is tglTkApprovalReq, not a value in
+                              # this list. Every audience value behaves the same way.
                               - cboTkAudience:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
@@ -928,9 +890,8 @@ Screens:
                                     Width: =Parent.Width
                                     Height: =36
                                     OnChange: =Set(gTkAudience, cboTkAudience.Selected.Value)
-                        # SITS BETWEEN THE AUDIENCE AND THE ID so the flag reads as part of
-                        # the approval pair rather than of the audience. Pinned at 150 and
-                        # FillPortions 0 — only the two text columns flex.
+                        # SITS BETWEEN THE AUDIENCE AND THE ID so the flag reads as part of the
+                        # approval pair. Pinned at 150, FillPortions 0 — only the text columns flex.
                         - colTkApprovalReq:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -955,10 +916,9 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              # THE GATE IS THIS FLAG, per task, not the audience value. While it
-                              # is on, lblTkMissing blocks stage Completed until the id beside it
-                              # is filled — that label is the only thing that stops the save and
-                              # says why.
+                              # THE GATE IS THIS FLAG, per task, not the audience value. While it is on,
+                              # lblTkMissing blocks stage Completed until the id beside it is filled — that
+                              # label is the only thing that stops the save and says why.
                               - tglTkApprovalReq:
                                   Control: Classic/Toggle@2.1.0
                                   Properties:
@@ -998,9 +958,8 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              # Approvals live in a SEPARATE portal (out of scope). This is a plain
-                              # free-text pointer to that approval task's id — no lookup, no picker,
-                              # no results gallery. Seeded via Default; re-read on Reset in OnVisible.
+                              # Approvals live in a SEPARATE portal (out of scope). A plain free-text
+                              # pointer to that approval task's id — no lookup, no picker, no gallery.
                               - txtTkApprovalId:
                                   Control: ModernTextInput@1.1.1
                                   Properties:
@@ -1012,10 +971,9 @@ Screens:
                                     LayoutMinHeight: =36
                                     Width: =Parent.Width
                                     Height: =36
-                  # PRODUCTS ARE 1:n. A task is 1:1 with a client but can carry several
-                  # products, so this is a staged LIST plus an add button rather than the
-                  # single cmpLookupField it replaced. It gets a full-width block of its
-                  # own because a chip row cannot share a 62px row with the approval id.
+                  # PRODUCTS ARE 1:n. A task is 1:1 with a client but can carry several products,
+                  # so this is a staged LIST plus an add button, in a full-width block of its own —
+                  # a chip row cannot share a 62px row with the approval id.
                   - blkTkProducts:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1142,8 +1100,7 @@ Screens:
                                           LayoutMinWidth: =20
                                           Width: =20
                                           Height: =20
-                                          # Staging only — the junction is not touched
-                                          # until Save reconciles it.
+                                          # Staging only — the junction is not touched until Save reconciles it.
                                           OnSelect: =Remove( colTkProducts, ThisItem )
                               - rowTkProdLine:
                                   Control: Rectangle@2.3.0
@@ -1321,9 +1278,9 @@ Screens:
             Width: =Parent.Width
             Height: =88
           Children:
-            # DESTRUCTIVE, so it sits hard left, away from Save. Edit mode only —
-            # there is nothing to delete while creating. Arms the dialog and deletes
-            # nothing; gDelRefs is counted here so the dialog can say what else changes.
+            # DESTRUCTIVE, so it sits hard left, away from Save. Edit mode only. Arms the
+            # dialog and deletes nothing; gDelRefs is counted here so the dialog can say
+            # what else changes.
             - btnTkDelete:
                 Control: Classic/Button@2.2.0
                 Properties:
@@ -1355,10 +1312,10 @@ Screens:
                     If( gTkProject.Id = 0,             "a parent project   ", "" ) &
                     If( Len(gTkStage) = 0,             "a stage   ", "" ) &
                     If( Len(gTkPriority) = 0,          "a priority   ", "" ) &
-                    // A task that produces output must say who for. A task FLAGGED as
-                    // needing approval must also carry the external id, but only once it
-                    // is being COMPLETED — the approval portal issues that id late in the
-                    // lifecycle, so requiring it earlier would block ordinary drafting.
+                    // A task that produces output must say who for. A task FLAGGED as needing
+                    // approval must also carry the external id, but only once it is being
+                    // COMPLETED — the portal issues that id late, so requiring it earlier would
+                    // block ordinary drafting.
                     If( tglTkOutput.Value && gTkAudience = "(none)",
                         "an output audience   ", "" ) &
                     If( tglTkOutput.Value && gTkStage = "Completed"
@@ -1386,8 +1343,7 @@ Screens:
                   LayoutMinWidth: =140
                   Width: =140
                   Height: =48
-                  # Clears the resume key too: abandoning the form must not leave one armed
-                  # for a task the user is walking away from.
+                  # Clears the resume key: abandoning the form must not leave one armed.
                   OnSelect: =Set( gTkResumeKey, "" ); Back()
             - btnTkSave:
                 Control: Classic/Button@2.2.0
@@ -1401,63 +1357,47 @@ Screens:
                   Text: |
                     =If( gSaving, "Saving…",
                          If(gEditMode = "Edit", "Save task", "Create task") )
-                  # DELIBERATELY ALWAYS ENABLED — do not put the DisplayMode gate back.
-                  # It used to read `If(Len(lblTkMissing.Text) = 0, Edit, Disabled)`, and a
-                  # DISABLED BUTTON CANNOT FIRE OnSelect, so a task missing a required
-                  # field produced a click that did NOTHING: no Notify, no Back(), no
-                  # error. Reported 2026-08-10 as "I clicked Save task and nothing
-                  # happened". The gate could only ever trip on an EDIT — in New mode
-                  # gTkLead defaults to User() and gTkProject to gSelProject, so both are
-                  # always populated. The requirement is still enforced, one line down in
-                  # OnSelect, where it can actually SPEAK.
+                  # DELIBERATELY ALWAYS ENABLED — do not put a DisplayMode gate back. A DISABLED
+                  # BUTTON CANNOT FIRE OnSelect, so a task missing a required field produced a
+                  # click that did nothing at all: no Notify, no Back(), no error. The requirement
+                  # is enforced one line down in OnSelect, where it can actually SPEAK.
                   FillPortions: =0
                   LayoutMinWidth: =200
                   Width: =200
                   Height: =48
                   OnSelect: |
                     =If( gSaving,
-                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
-                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
-                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
-                    // record. `Set` applies immediately within a behaviour chain, so the flag is
-                    // already true by the time the second tap is evaluated.
-                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
-                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
-                    // instead, and the guard below is what actually blocks the duplicate.
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing. A SharePoint
+                    // Patch takes seconds and the button stays live, so a double-tap ran the whole
+                    // handler twice and Defaults() built a SECOND record. `Set` applies immediately
+                    // within a behaviour chain, so the flag is already true by the second tap.
                     false,
                     Set( gSaving, true );
                     If( Len(lblTkMissing.Text) > 0,
-                    // The requirement that used to disable the button. Enforced HERE so a
-                    // blocked save says which field is blocking it. All three are
-                    // `required: true` in schema.yaml, so SharePoint would reject the
-                    // write anyway — this only decides whether the user is TOLD.
+                    // Enforced HERE so a blocked save says which field is blocking it. All three are
+                    // `required: true`, so SharePoint would reject the write anyway — this only
+                    // decides whether the user is TOLD.
                     Notify( "Can't save yet — this task still needs: " & lblTkMissing.Text,
                     NotificationType.Error ),
                     Set( gTkSaved, Blank() );
                     Set( gTkErr, "" );
                     Set( gTkWarn, "" );
-                    // HEALTH IS DERIVED, NEVER CHOSEN — this screen has no health control.
-                    // Only the ISSUE-DERIVED half is stored; overdue is folded in by readers
-                    // because it changes with no write. See rollups.task_health in schema.yaml.
-                    //
-                    // A NEW TASK IS GREEN WITHOUT A QUERY, and that guard is load-bearing: in
-                    // New mode there is no ID yet, and `issue_task_name.Id = Blank()` matches
-                    // every issue that has NO task — which would open a brand-new task at Red.
-                    //
-                    // The RAW list, not OpenIssues: this is already scoped to one task, and
-                    // the named formula also excludes archived projects, which would force
-                    // every task under an archived project to Green instead of leaving it be.
+                    // HEALTH IS DERIVED, NEVER CHOSEN. Only the ISSUE-DERIVED half is stored; overdue
+                    // is folded in by readers because it changes with no write. See rollups.task_health.
+                    // A NEW TASK IS GREEN WITHOUT A QUERY, and that guard is load-bearing: in New mode
+                    // there is no ID, and `issue_task_name.Id = Blank()` matches every issue with NO
+                    // task — which would open a brand-new task at Red.
+                    // The RAW list, not OpenIssues: this is already scoped to one task, and that named
+                    // formula also excludes archived projects, forcing every task under one to Green.
                     If( gEditMode = "Edit",
                     ClearCollect( colTkHlIss,
                     Filter( taskmaster_issues,
                     issue_task_name.Id = gEditTask.ID
                     && issue_status.Value = "Open" ) ),
                     Clear( colTkHlIss ) );
-                    // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four amber
-                    // types enumerated. Enumerated, a type added in SharePoint and not added
-                    // here falls through to GREEN: an allow-list failing closed, silently, on
-                    // the one signal that exists to warn people. As a residual it fails SAFE
-                    // — an unknown or blank type reads Amber, which is visible and fixable.
+                    // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four amber types
+                    // enumerated. Enumerated, a type added in SharePoint and not added here falls
+                    // through to GREEN: an allow-list failing closed, silently, on a warning signal.
                     Set( gTkHealth,
                     If( CountRows( Filter( colTkHlIss,
                     issue_impact.Value = "Critical"
@@ -1470,12 +1410,10 @@ Screens:
                     Set( gTkSaved,
                     Patch( taskmaster_tasks,
                     If( gEditMode = "Edit", gEditTask, Defaults(taskmaster_tasks) ),
-                    // Mirrors the PARENT's phase so cross-project queries can exclude
-                    // archived work with a delegable `= false`. Written on every save, not
-                    // just on insert. Read LIVE from the list, not from `gSelProject`: that
-                    // global is a gallery snapshot taken when the project was opened, so a
-                    // project archived since then would stamp `false` here and the row would
-                    // stay in scope forever. One delegable LookUp on ID.
+                    // Mirrors the PARENT's phase so cross-project queries can exclude archived work
+                    // with a delegable `= false`. Written on every save. Read LIVE from the list, not
+                    // from `gSelProject` — that global is a gallery snapshot, so a project archived
+                    // since then would stamp `false` and the row would stay in scope forever.
                     { task_project_archived:
                           Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
                                             project_phase.Value ), "" ) = "Archived",
@@ -1488,19 +1426,12 @@ Screens:
                     task_lead: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gTkLead.Mail),   DisplayName: gTkLead.DisplayName,   Email:       gTkLead.Mail,   Department: "", JobTitle: "", Picture: "" },
                     task_date_start:  dtpTkStart.SelectedDate,
                     task_date_target: dtpTkTarget.SelectedDate,
-                    // DERIVED, not entered. Complete stamps it and keeps the original on a
-                    // re-save; anything else CLEARS it. The "Archived" arm that used to
-                    // preserve the date is gone with the stage itself (2026-08-12).
-                    //
-                    // THE NEW BRANCH IS SEPARATE, AND THAT IS THE WHOLE POINT.
-                    // `gEditTask` IS NEVER CLEARED ON NEW — this screen only ever reads it
-                    // under a `gEditMode = "Edit"` guard, and every other read here has one.
-                    // This was the one that did not, so a task CREATED straight after editing
-                    // a completed task inherited that task's completion date: Coalesce found
-                    // the stale value and kept it instead of stamping Now(). Same defect
-                    // class as `project_date_complete` on scrProjectEdit, fixed 2026-08-11 —
-                    // and fixed the same way, by splitting insert from update explicitly
-                    // rather than trusting a Coalesce to notice.
+                    // DERIVED, not entered. Complete stamps it and keeps the original on a re-save;
+                    // anything else CLEARS it.
+                    // THE NEW BRANCH IS SEPARATE, AND THAT IS THE WHOLE POINT. `gEditTask` is never
+                    // cleared on New, so a Coalesce here let a task created straight after editing a
+                    // completed one inherit that task's completion date. Insert and update are split
+                    // explicitly rather than trusting a Coalesce to notice.
                     task_date_completion:
                     If( gEditMode <> "Edit",
                     If( gTkStage = "Completed", Now(), Blank() ),
@@ -1511,9 +1442,8 @@ Screens:
                     If( Len(gTkSupporter.Mail) > 0,
                     { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" },
                     Blank() ),
-                    // FALSE, never Blank(), when Output is off: this is a Yes/No column and
-                    // a blank one reads as No everywhere anyway, so writing the boolean keeps
-                    // the stored value and the toggle saying the same thing.
+                    // FALSE, never Blank(), when Output is off: a blank Yes/No reads as No anyway, so
+                    // writing the boolean keeps the stored value and the toggle saying the same thing.
                     task_output_approval_flag:
                     tglTkOutput.Value && tglTkApprovalReq.Value,
                     task_output_approval_id:
@@ -1522,14 +1452,10 @@ Screens:
                     task_client_name:
                     If( tglTkClient.Value && gTkClient.Id > 0,
                     { Id: gTkClient.Id, Value: gTkClient.Value }, Blank() ),
-                    // task_product_id is RETIRED — the junction replaced it and this
-                    // screen no longer writes it. The column keeps its stored values.
-                    // task_product_summary IS NOT WRITTEN HERE. It used to be, from the
-                    // staged collection, BEFORE the junction was touched and regardless of
-                    // whether the junction write succeeded — so the task row claimed
-                    // products with no links behind it, and reopening (which seeds from the
-                    // JUNCTION) showed none. It is written after the reconcile instead,
-                    // from what the junction actually holds.
+                    // task_product_summary IS NOT WRITTEN HERE. It is written after the reconcile,
+                    // from what the junction actually holds — written before, the task row could claim
+                    // products with no links behind it, and reopening (which seeds from the JUNCTION)
+                    // showed none.
                     task_output_language:
                     If( tglTkOutput.Value && gTkLanguage <> "(none)", { Value: gTkLanguage }, Blank() ),
                     task_output_format:
@@ -1542,57 +1468,42 @@ Screens:
                     If( tglTkClient.Value && gTkClientStage <> "(none)", { Value: gTkClientStage }, Blank() ) } ) ),
                     Set( gTkErr, FirstError.Message ) );
                     // Trust the RECORD, never the message — a write can fail and still leave
-                    // FirstError.Message empty, and reading that as success is what corrupted
-                    // scrProjectEdit's state on 2026-08-06.
+                    // FirstError.Message empty.
                     If( IsBlank(gTkSaved.ID) && Len(gTkErr) = 0,
                     Set( gTkErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                     If( Len(gTkErr) > 0,
                     Notify("Couldn't save the task: " & gTkErr, NotificationType.Error) );
                     If( Len(gTkErr) = 0 && !IsBlank(gTkSaved.ID),
                     // --- reconcile taskmaster_taskproduct against the staged set -------
-                    // Gated on the same toggle as every other output field: with the
-                    // section off the task keeps no products, so colTkWanted is empty and
-                    // every existing link is removed.
-                    // NOT GATED ON tglTkOutput. It was, and that made the toggle a delete
-                    // button: switching the Output section off left colTkWanted empty and the
-                    // reconcile below removed every link, silently and on a save the user
-                    // thought was unrelated. The toggle governs VISIBILITY only. The design
-                    // already says products are not an output attribute — the toggle's own
-                    // Default special-cases a non-empty product list to stop hiding them.
+                    // NOT GATED ON tglTkOutput. It was, and that made the toggle a DELETE BUTTON:
+                    // switching the Output section off left colTkWanted empty and the reconcile removed
+                    // every link, silently, on a save the user thought was unrelated. The toggle governs
+                    // VISIBILITY only.
                     Clear( colTkWanted );
                     Collect( colTkWanted, colTkProducts );
-                    // THE FILTER DELEGATES, THE TEST DOES NOT — so they are separated.
-                    // `in` against a local collection cannot be delegated, and as one
-                    // RemoveIf predicate it dragged the delegable FK test down with it, so
-                    // the delete only ever saw the first page of the WHOLE junction list and
-                    // would silently stop removing links as that list grew.
-                    // Filtering on the indexed FK delegates and returns one task's links;
-                    // the undelegable membership test then runs client-side over that
-                    // handful. Remove() takes the SCOPE RECORD itself — never `lk.ID`
-                    // projected into a collection, which is the construct that failed three
-                    // ways here and is why RemoveIf was reached for in the first place.
+                    // THE FILTER DELEGATES, THE TEST DOES NOT — so they are separated. `in` against a
+                    // local collection cannot delegate, and as one RemoveIf predicate it dragged the
+                    // delegable FK test down with it, so the delete only ever saw the first page of the
+                    // WHOLE junction list. Filtering on the indexed FK returns one task's links; the
+                    // membership test then runs client-side over that handful.
+                    // Remove() takes the SCOPE RECORD itself — never `lk.ID` projected into a collection.
                     ForAll( Filter( taskmaster_taskproduct,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
                     If( !(lk.taskproduct_product_id.Id in colTkWanted.Id),
                     Remove( taskmaster_taskproduct, lk ) ) );
-                    // Read AFTER the delete, so what is here is what survives and the add
-                    // diff is against live state. Only the lookup subfield is projected —
-                    // `<collection>.taskproduct_product_id.Id` is not a projection Power Fx
-                    // will give you, which is why the shaping exists at all.
+                    // Read AFTER the delete, so the add diff is against live state. Only the lookup
+                    // subfield is projected — `<collection>.taskproduct_product_id.Id` is not a
+                    // projection Power Fx will give you, which is why the shaping exists at all.
                     ClearCollect( colTkLinksNow,
                     ForAll( Filter( taskmaster_taskproduct,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
                     { ProdId: lk.taskproduct_product_id.Id } ) );
-                    // The lookup pair is written as {Id, Value} — the shape SharePoint
-                    // wants — and taskproduct_product_uid is the flat copy that can be
-                    // sorted server-side, which a lookup column cannot.
-                    // THE ADDS CANNOT BE WRAPPED, SO THE ERROR IS READ AFTERWARDS.
-                    // Set() is not callable inside ForAll — Studio rejects it outright — and
-                    // IfError's arms must be type-compatible, so a bare Collect cannot sit
-                    // against a Set either. Between them those two rules leave no way to
-                    // catch this write in place. Errors() is the documented route: it
-                    // reports failures against a DATA SOURCE, after the fact, which is
-                    // exactly the shape a loop of writes needs.
+                    // The lookup pair is written as {Id, Value}, and taskproduct_product_uid is the
+                    // flat copy that can be sorted server-side, which a lookup column cannot.
+                    // THE ADDS CANNOT BE WRAPPED, SO THE ERROR IS READ AFTERWARDS. Set() is not callable
+                    // inside ForAll and IfError's arms must be type-compatible, so a bare Collect cannot
+                    // sit against a Set either. Errors() reports failures against a DATA SOURCE after
+                    // the fact, which is the shape a loop of writes needs.
                     ForAll( Filter( colTkWanted, !(Id in colTkLinksNow.ProdId) ) As add,
                     Collect( taskmaster_taskproduct,
                     { taskproduct_task_id:     { Id: gTkSaved.ID, Value: gTkSaved.task_name },
@@ -1602,10 +1513,9 @@ Screens:
                     If( !IsEmpty( Errors(taskmaster_taskproduct) ),
                     Set( gTkWarn, gTkWarn & "the product links didn't save: "
                     & First(Errors(taskmaster_taskproduct)).Message & "   " ) );
-                    // RE-READ AND COUNT — this matters MORE than the IfError above, because
-                    // it catches a write that was dropped without throwing as well as one
-                    // that threw. Also the source for the summary, so the two cannot
-                    // disagree: one read, both uses.
+                    // RE-READ AND COUNT — this matters MORE than the IfError above, because it catches
+                    // a write dropped without throwing as well as one that threw. Also the source for
+                    // the summary, so one read serves both and they cannot disagree.
                     ClearCollect( colTkLinksAfter,
                     ForAll( Filter( taskmaster_taskproduct,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
@@ -1613,31 +1523,25 @@ Screens:
                     If( CountRows(colTkLinksAfter) <> CountRows(colTkWanted),
                     Set( gTkWarn, gTkWarn & "the product links didn't save: expected "
                     & CountRows(colTkWanted) & ", the list holds " & CountRows(colTkLinksAfter) & ".   " ) );
-                    // THE SUMMARY IS WRITTEN FROM THE JUNCTION, NOT FROM THE FORM, and only
-                    // now that the junction is settled. It is a denormalised copy for
-                    // galleries, so it must never claim a link the junction does not hold.
+                    // THE SUMMARY IS WRITTEN FROM THE JUNCTION, NOT FROM THE FORM, and only now that
+                    // the junction is settled. It must never claim a link the junction does not hold.
                     IfError(
                     Set( gTkSummarySaved,
                     Patch( taskmaster_tasks, gTkSaved,
                     { task_product_summary: Concat(colTkLinksAfter, Uid, ", ") } ) ),
                     Set( gTkWarn, gTkWarn & "the product summary didn't update: " & FirstError.Message & "   " ) );
                     // --- C3: rewrite the parent project's weighted completion ---------
-                    // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average
-                    // over task STAGES, so editing a description, a date, a priority or any
-                    // output field cannot change it — and computing it costs a LookUp, a fetch of
-                    // up to 500 task rows and a write. On New there is no previous stage, so the
-                    // test is false and it always runs.
+                    // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average over
+                    // task STAGES, so any other edit cannot change it — and computing it costs a LookUp,
+                    // a fetch of up to 500 rows and a write.
                     If( !(gEditMode = "Edit" && gTkStage = gEditTask.task_stage.Value),
-                    // The two reads are independent, so issue them together instead of in
-                    // series. They have to be Sets — Concurrent takes behaviour formulas, so a
-                    // With() scope cannot carry the results out.
+                    // Independent reads, issued together. They have to be Sets — Concurrent takes
+                    // behaviour formulas, so a With() scope cannot carry the results out.
                     Concurrent(
                     Set( gTkRollupProj, LookUp(taskmaster_projects, ID = gTkProject.Id) ),
                     Set( gTkRollupScored,
                     AddColumns(
                     // Delegable: `=` on an indexed Lookup FK, and nothing else needed.
-                    // The six-stage Or-chain that used to sit here is gone — task_stage
-                    // has no "Archived" value to exclude any more.
                     Filter( taskmaster_tasks,
                     task_project_id.Id = gTkProject.Id ),
                     wgt, Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ) ) );
@@ -1648,22 +1552,18 @@ Screens:
                     Notify("Task saved. This project has too many tasks to compute completion accurately, so it was left unchanged.",
                     NotificationType.Warning),
                     With( { newPc: If( CountRows(gTkRollupScored) = 0, 0, RoundDown(Average(gTkRollupScored, wgt), 0) ) },
-                    // Don't spend a write on a number that has not moved. Most stage changes
-                    // inside a big project leave the rounded average where it was.
-                    // Coalesce to -1: a just-inserted row holds NULL and newPc is 0, so a bare
-                    // compare can skip the write and leave NULL. Average() drops blanks from the
+                    // Don't spend a write on a number that has not moved.
+                    // Coalesce to -1: a just-inserted row holds NULL and newPc is 0, so a bare compare
+                    // would skip the write and leave NULL — and Average() drops blanks from the
                     // denominator, so portfolio completion then reads high.
                     If( newPc <> Coalesce(gTkRollupProj.project_perc_completion, -1),
                     IfError(
-                    // PATCH, THEN RE-READ. Do NOT keep the Patch return: scrProject renders
-                    // entirely from gSelProject, and a record carried into a variable can come
-                    // back with columns trimmed, so the screen draws as a blank template with
-                    // every field empty. The LookUp is one delegable read on an indexed ID and
-                    // is the only thing that guarantees a full record.
-                    // gTkRollupSaved exists only to hold the discarded return — IfError's
-                    // arms must be type-compatible, so the Patch cannot stand bare beside a
-                    // Set. The ID comes from gTkRollupProj, which is untouched and came
-                    // straight from the data source, so it is a full record.
+                    // PATCH, THEN RE-READ. Do NOT keep the Patch return: scrProject renders entirely
+                    // from gSelProject, and a record carried into a variable can come back with columns
+                    // trimmed, drawing the screen as a blank template. The LookUp is one delegable read
+                    // on an indexed ID and is the only thing that guarantees a full record.
+                    // gTkRollupSaved exists only to hold the discarded return — IfError's arms must be
+                    // type-compatible, so the Patch cannot stand bare beside a Set.
                     Set( gTkRollupSaved,
                     Patch( taskmaster_projects, gTkRollupProj, { project_perc_completion: newPc } ) );
                     Set( gSelProject, LookUp( taskmaster_projects, ID = gTkRollupProj.ID ) ),
@@ -1676,18 +1576,13 @@ Screens:
                     Back() ) );
                     Set( gSaving, false ) )
       # =====================================================================
-      # PICKER — ONE cmpPicker instance for BOTH person fields AND both
-      # lookups. Declared LAST so the dialog paints above the fixed footer.
-      #
-      # Was two instances of two near-identical components. gTkPicker already
-      # named the field being filled; now it also selects which KIND of row the
-      # one dialog lists, so Visible, Title, Results and OnConfirm all branch on
-      # the same global and there is one Reset target instead of two.
-      #
-      # Screen-sized and absolute. A component clips its children to its own
-      # bounds, so a field-sized instance could not paint a dialog over the
-      # form — which is why the person BOX stays on the screen (the cmpLookupField
-      # rows) and only the dialog lives in here.
+      # PICKER — ONE cmpPicker instance for BOTH person fields AND both lookups.
+      # Declared LAST so the dialog paints above the fixed footer. gTkPicker names the
+      # field being filled AND selects which KIND of row to list, so Visible, Title,
+      # Results and OnConfirm all branch on the same global.
+      # Screen-sized and absolute: a component clips its children to its own bounds, so a
+      # field-sized instance could not paint a dialog over the form — which is why the
+      # person BOX stays on the screen and only the dialog lives in here.
       # =====================================================================
       - cmpTkPick:
           Control: CanvasComponent
@@ -1704,32 +1599,20 @@ Screens:
                        "Supporter", "Select supporter",
                        "Client",    "Select client",
                        "Product",   "Select product" )
-            # THE QUERIES RUN HERE, NOT IN THE COMPONENT. With AccessAppScope
-            # false it cannot reach Office365Users or a list any more than it can
-            # reach gTheme, so it takes rows in.
-            #
-            # Bound to gTkQuery, which OnSearch sets — NOT to cmpTkPick.Query
-            # directly. Feeding an instance's own output into its own input is a
-            # same-instance cycle Studio may reject; the global sidesteps it, and
-            # it keeps the call on SUBMIT: this only re-evaluates when OnSearch
-            # hands over a new query.
-            #
-            # ForAll(... As alias, {record}) on EVERY branch, people included, so
-            # all four yield the same {Key, Primary, Secondary} the component
-            # declares and the If chain type-checks. ShowColumns cannot be used
-            # here: it can only keep the source's own column names, and there is
-            # no `Key` column in either a directory row or a list row.
-            # Key is TEXT for both kinds — Mail for a person, Text(ID) for a
-            # record. That single change is what let the two pickers become one.
-            # Each branch repeats the >= 2 guard and there is NO else branch, so
-            # an unmatched state yields blank of the right shape.
-            # FirstN caps the record pages: Filter delegates, ForAll does not.
-            # THE RECORD BRANCHES ARE NOT GATED ON QUERY LENGTH — StartsWith(col, "")
-            # is true for every row, so one branch serves both the default page and
-            # the search. FirstN is what makes it 10 with nothing typed and 50 with a
-            # query. Sort is INSIDE the Filter, on an indexed column, so it folds.
-            # The directory branches keep the >= 2 gate: there is no "first 10 people"
-            # to show, so their default is the current user — one tap to self-assign.
+            # THE QUERIES RUN HERE, NOT IN THE COMPONENT. With AccessAppScope false it cannot
+            # reach Office365Users or a list any more than it can reach gTheme, so it takes rows in.
+            # Bound to gTkQuery, which OnSearch sets — NOT to cmpTkPick.Query directly. Feeding
+            # an instance's own output into its own input is a same-instance cycle Studio may
+            # reject, and the global keeps the call on SUBMIT.
+            # ForAll(... As alias, {record}) on EVERY branch, people included, so all four yield
+            # the same {Key, Primary, Secondary} and the If chain type-checks. ShowColumns cannot
+            # be used here: it can only keep the source's own column names, and there is no `Key`
+            # column in a directory row or a list row. Key is TEXT for both kinds.
+            # THE RECORD BRANCHES ARE NOT GATED ON QUERY LENGTH — StartsWith(col, "") is true for
+            # every row, so one branch serves the default page and the search; FirstN makes it 10
+            # with nothing typed and 50 with a query. Sort is INSIDE the Filter, on an indexed
+            # column, so it folds. The directory branches keep the >= 2 gate: there is no "first
+            # 10 people" to show, so their default is the current user.
             Results: |
               =If( (gTkPicker = "Lead" || gTkPicker = "Supporter") && Len(gTkQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gTkQuery, top: 25 }).value As u,
@@ -1761,14 +1644,10 @@ Screens:
               "Lead",      Set( gTkLead,      { DisplayName: cmpTkPick.Picked.Primary, Mail: cmpTkPick.Picked.Secondary } ),
               "Supporter", Set( gTkSupporter, { DisplayName: cmpTkPick.Picked.Primary, Mail: cmpTkPick.Picked.Secondary } ),
               "Client",    Set( gTkClient,    { Id: Value(cmpTkPick.Picked.Key), Value: cmpTkPick.Picked.Primary } ) );
-              // PRODUCT CANNOT SIT IN THE SWITCH ABOVE. It Collects rather than Sets,
-              // and Switch's arms have to agree on type — Collect returns a TABLE while
-              // Set returns a boolean, the same mismatch that made IfError reject the
-              // documented Remove/Notify idiom on scrProject.
-              //
-              // The LookUp is a duplicate guard: the picker will happily offer a product
-              // that is already staged, and two identical links would double-count it in
-              // the summary and in every count drawn from the junction.
+              // PRODUCT CANNOT SIT IN THE SWITCH ABOVE. It Collects rather than Sets, and Switch's
+              // arms must agree on type — Collect returns a TABLE, Set a boolean.
+              // The LookUp is a duplicate guard: the picker will happily offer a product already
+              // staged, and two identical links would double-count it everywhere.
               If( gTkPicker = "Product"
                && IsBlank( LookUp(colTkProducts, Id = Value(cmpTkPick.Picked.Key)) ),
                   Collect( colTkProducts,
@@ -1784,12 +1663,10 @@ Screens:
                    Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gTkPicker, "" )
       # =====================================================================
-      # DELETE CONFIRMATION. See scrProject's instance for the Studio check that
-      # must happen before this screen is pasted: cmpConfirmDialog had no consumer
-      # in src/ until issue #15, so its eight custom properties may never have been
-      # declared in Studio — and a component's properties do NOT come across in a
-      # paste. Visible is gated as well as IsOpen because a component intercepts
-      # every click inside its bounds.
+      # DELETE CONFIRMATION. See scrProject's instance for the Studio check that must
+      # happen before this screen is pasted — a component's custom properties do NOT come
+      # across in a paste. Visible is gated as well as IsOpen because a component
+      # intercepts every click inside its bounds.
       # =====================================================================
       - cmpTkConfirmDel:
           Control: CanvasComponent
@@ -1811,18 +1688,16 @@ Screens:
             ConfirmLabel: ="Delete"
             CancelLabel: ="Cancel"
             Destructive: =true
-            # IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED by
-            # Studio: Remove and ForAll/Patch return a TABLE while Notify and Set return a
-            # boolean, and IfError requires type-compatible arguments. Hence Set-into-a-scrap
-            # on both arms, with a DIFFERENT scrap name per call site.
+            # IfError( Remove(...), Notify(...) ) is REJECTED by Studio: Remove and ForAll/Patch
+            # return a TABLE while Notify and Set return a boolean, and IfError requires
+            # type-compatible arguments. Hence Set-into-a-scrap, with a DIFFERENT name per site.
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
                If( gDelRefs >= 500, Set( gDelBlock, true ) );
-               // DETACH FIRST, then remove. The reverse leaves issues pointing at a row
-               // that is already gone. COUNT AND REFUSE rather than half-do it: this is a
-               // local ForAll over a delegable Filter, so past the data row limit it would
-               // clear SOME references, raise NO error, and delete the parent anyway.
+               // DETACH FIRST, then remove — the reverse leaves issues pointing at a row that is
+               // already gone. COUNT AND REFUSE rather than half-do it: a local ForAll over a
+               // delegable Filter clears SOME references past the data row limit and raises NO error.
                If( !gDelBlock && gDelRefs > 0,
                    IfError( Set( gDelScrapDT,
                                  ForAll( Filter( taskmaster_issues, issue_task_name.Id = gDelId ) As iss,
@@ -1840,12 +1715,10 @@ Screens:
                              & " Some issue links may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( "Task deleted.", NotificationType.Success );
-                   // Clears the resume key for the same reason Cancel does: a task the
-                   // user has just deleted must not leave one armed.
+                   // Clears the resume key, same reason as Cancel.
                    Set( gTkResumeKey, "" );
-                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute —
-                   // so project_phase and the completion rollup repair themselves with no
-                   // second copy of that logic living here.
+                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute — so the phase
+                   // and the completion rollup repair themselves with no second copy of that logic here.
                    Back() );
                Set( gDelKind, "" )
             OnCancel: =Set( gDelKind, "" )

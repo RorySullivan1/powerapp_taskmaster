@@ -1,12 +1,30 @@
 # One project: info card + KPI ring over a work band — tasks and transactions stacked
 # left, issues full height right. Containers throughout below the header.
+#
+# THREE RULES EVERY GALLERY ROW ON THIS SCREEN OBEYS:
+#  1. The delete icon is the row container's LAST auto-layout child and carries NO X
+#     and NO Y. An absolute X did not survive a whole-screen paste in either form
+#     (user, 2026-08-18), and a child with no X has nothing to lose.
+#  2. The row's action lives on a transparent full-template button declared LAST, not
+#     on the gallery's OnSelect — a gallery's own OnSelect does not reliably fire when
+#     the click lands on a child control.
+#  3. That button is TemplateWidth - 46, stopping short of the delete icon's strip, or
+#     it sits over the icon and swallows every tap meant for it.
+#
+# COUNTS COME FROM THE QUERY, never a gallery's AllItems: a gallery bound to a data
+# source pages as the user scrolls, so AllItems is "what is on screen so far".
+#
+# IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED by Studio:
+# Remove and ForAll/Patch return a TABLE while Notify and Set return a boolean, and
+# IfError requires type-compatible arguments. Hence Set-into-a-scrap on both arms,
+# with a DIFFERENT scrap name per call site — a global's type unifies across every
+# Set, so one name holding differently-shaped tables is a type conflict.
 Screens:
   scrProject:
     Properties:
       Fill: =gTheme.Color.Bg
-      # THIN ON PURPOSE. Everything derived from the project's children now lives in
-      # btnPrjRecompute's OnSelect, because this screen deletes children too and each
-      # delete invalidates the same numbers. Four callers, ONE copy of the block.
+      # THIN ON PURPOSE. Everything derived from the project's children lives in
+      # btnPrjRecompute's OnSelect — four callers, one copy of the block.
       OnVisible: |
         =Set( gPrDelArm, false );
          Set( gDelKind, "" );
@@ -14,30 +32,15 @@ Screens:
          Select( btnPrjRecompute )
     Children:
       # =====================================================================
-      # THE RECOMPUTE BLOCK — hidden, and CALLED rather than duplicated.
+      # THE RECOMPUTE BLOCK — hidden, 1x1, declared FIRST so it can never cover a
+      # control (z-order is positional here). Seed colHlTasks, then Select this.
       #
-      # WHY IT IS A CONTROL: Power Fx cannot name a behaviour block, and this one
-      # has four callers — OnVisible plus the three delete handlers. Inlining it in
-      # each would create four writers of project_phase and project_perc_completion
-      # that can drift apart, which is the exact failure the 500-cap comment below
-      # already guards against. A control's OnSelect is the only reusable behaviour
-      # unit the language offers, and Select() invokes it.
-      #
-      # WHY Visible:=false IS SAFE, and not folklore: confirmed in Studio
-      # 2026-08-18. tests/scrProbeRerun scored Select() on a visible button, a 1x1
-      # transparent button and a hidden button IDENTICALLY, with a passing positive
-      # control. Select() does NOT no-op on an invisible control. Do not "fix" this
-      # into a 1x1 transparent button — hidden is deliberate and grounded.
-      #
-      # It RE-READS colProjectTasks rather than trusting each caller to patch the
-      # snapshot: one delegable Filter on an indexed FK is cheaper than three delete
-      # handlers each remembering to keep a collection in step, and it cannot drift.
-      # =====================================================================
-      # =====================================================================
-      # HEALTH RECOMPUTE. Hidden, 1x1, declared FIRST so it can never cover a
-      # control — z-order is positional in this dialect. Select() DOES fire on an
-      # invisible control (probe, tests/README.md). Seed colHlTasks with the task
-      # ids to recompute, then Select this.
+      # IT IS A CONTROL because Power Fx cannot name a behaviour block and this one has
+      # four callers; a control's OnSelect is the only reusable behaviour unit there is.
+      # Visible:=false IS GROUNDED, not folklore — tests/scrProbeRerun scored Select()
+      # on visible, 1x1-transparent and hidden buttons identically (Studio, 2026-08-18).
+      # Do not "fix" it into a 1x1 transparent button.
+      # It RE-READS colProjectTasks rather than trusting callers to patch the snapshot.
       # =====================================================================
       - btnPrjHealth:
           Control: Classic/Button@2.2.0
@@ -55,31 +58,25 @@ Screens:
                // The rules, and why OVERDUE IS DELIBERATELY NOT IN HERE, live in one place:
                // rollups.task_health in schema.yaml. Do not restate them at the call sites.
                //
-               // THIS BODY IS DUPLICATED ON scrIssueEdit AND scrProject and must stay
-               // identical — a control can only be Selected from its own screen, so there is
-               // no shared copy to call. Change one, change the other.
+               // THIS BODY IS DUPLICATED ON scrIssueEdit AND scrProject and must stay identical —
+               // a control can only be Selected from its own screen. Change one, change the other.
                //
-               // NARROW SERVER-SIDE, TEST LOCALLY. The outer Filter uses issue_task_name and
-               // issue_status, both INDEXED, so it delegates; issue_type and issue_impact are
-               // NOT indexed and are only ever tested against the few rows it returns. Written
-               // as one flat Filter the whole query would go non-delegable and silently read a
-               // page of the issues list instead of one task's issues.
-               //
-               // The RAW list, not OpenIssues: that named formula also excludes archived
-               // projects, which would drive every task under one to Green rather than leave
-               // it alone. This query is already scoped to a single task.
+               // NARROW SERVER-SIDE, TEST LOCALLY: the outer Filter uses issue_task_name and
+               // issue_status, both INDEXED, so it delegates; issue_type and issue_impact are not
+               // indexed and are only tested against the few rows it returns. Written as one flat
+               // Filter the whole query goes non-delegable and reads an arbitrary page.
+               // The RAW list, not OpenIssues — that named formula also excludes archived projects,
+               // which would drive every task under one to Green instead of leaving it alone.
                ClearCollect( colHlWork,
                    ForAll( colHlTasks As t,
                        { Id: t.Id,
                          Hl: With( { iss: Filter( taskmaster_issues,
                                                   issue_task_name.Id = t.Id
                                                && issue_status.Value = "Open" ) },
-                                 // AMBER IS THE RESIDUAL — "any other open issue" — NOT the
-                                 // four amber types enumerated. Enumerated, a type added in
-                                 // SharePoint and not added here falls through to GREEN: an
-                                 // allow-list failing CLOSED, silently, on the one signal that
-                                 // exists to warn people. As a residual it fails SAFE — an
-                                 // unknown or blank type reads Amber, which is visible.
+                                 // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four
+                                 // amber types enumerated. Enumerated, a type added in SharePoint and
+                                 // not added here falls through to GREEN: an allow-list failing closed,
+                                 // silently, on the one signal that exists to warn people.
                                  If( CountRows( Filter( iss,
                                          issue_impact.Value = "Critical"
                                       || issue_type.Value = "Blockage"
@@ -87,23 +84,15 @@ Screens:
                                       || issue_type.Value = "Limitation" ) ) > 0, "Red",
                                      CountRows(iss) > 0, "Amber",
                                      "Green" ) ) } ) );
-               // WRITE ONLY ON A CHANGE, exactly like project_phase: most issue edits leave
-               // the task's health where it was, and a no-op Patch is still a round trip.
-               //
-               // NO Set() INSIDE THIS ForAll. MS Learn sanctions Patch and Collect as the
-               // actions a ForAll body may take, and rules out the functions that HOLD A
-               // VARIABLE — UpdateContext, Clear, ClearCollect — because ForAll may run its
-               // records in any order and in parallel. Set is the global-scope twin of
-               // UpdateContext and Studio rejects it here for the same reason. Patch's
-               // return value is not captured either, and deliberately: the same page notes
-               // that an uncaptured ForAll result is never built, so there is no per-record
-               // data source copy to pay for.
-               //
-               // A failed health write is NOT worth interrupting a save or a delete for —
-               // the next recompute retries it and only a stale colour is wrong meanwhile.
-               // IfError is the documented way to catch a Patch failure; the error is
-               // DISCARDED on purpose. If it ever needs surfacing, Notify() or a Collect()
-               // into a log are the two things this body is allowed to do.
+               // WRITE ONLY ON A CHANGE: most issue edits leave the task's health where it was,
+               // and a no-op Patch is still a round trip.
+               // NO Set() INSIDE THIS ForAll. MS Learn sanctions Patch and Collect and rules out
+               // the functions that HOLD A VARIABLE, because ForAll may run its records in any
+               // order; Set is the global twin of UpdateContext and Studio rejects it the same way.
+               // Patch's return is not captured either — an uncaptured ForAll result is never
+               // built, so there is no per-record data source copy to pay for.
+               // A failed health write is not worth interrupting a save for, so IfError discards it;
+               // the next recompute retries and only a stale colour is wrong meanwhile.
                ForAll( colHlWork As w,
                    With( { tk: LookUp(taskmaster_tasks, ID = w.Id) },
                        If( !IsBlank(tk.ID) && Coalesce(tk.task_status.Value, "") <> w.Hl,
@@ -125,15 +114,11 @@ Screens:
               =ClearCollect( colProjectTasks,
                   Filter( taskmaster_tasks,
                       task_project_id.Id = gSelProject.ID ) );
-              // PHASE IS DERIVED HERE, not chosen by anyone. scrProjectEdit has no phase
-              // control; this screen recomputes on open and writes back only on a change.
+              // PHASE IS DERIVED HERE, not chosen by anyone — scrProjectEdit has no phase control.
               //   any OPEN issue                        -> Stalled
               //   any started task, or any transaction  -> Active
               //   any child at all, no started task     -> Planning
               //   nothing attached                      -> Not Started
-              // Counted from the QUERY, not from a gallery — a gallery pages as the user
-              // scrolls, so its AllItems would make the phase depend on how far someone had
-              // scrolled. colProjectTasks is a full ClearCollect, so it is safe to count.
               Set( gPrjOpenIss,
                    CountRows( Filter( taskmaster_issues,
                                       issue_project_id.Id = gSelProject.ID
@@ -151,9 +136,9 @@ Screens:
                            nStarted > 0 || nX > 0,   "Active",
                            nT + nX + nI > 0,         "Planning",
                                                      "Not Started" ) ) );
-              // COMPLETE AND ARCHIVED ARE TERMINAL. Complete is reachable only through the
-              // Mark complete button, and Archived only through the external cleanup flow —
-              // the derivation must never drag a project back out of either.
+              // COMPLETE AND ARCHIVED ARE TERMINAL. Complete is reachable only through the Mark
+              // complete button, Archived only through the external cleanup flow — the derivation
+              // must never drag a project back out of either.
               If( Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
                && Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
                && gPrjDerived <> Coalesce(gSelProject.project_phase.Value, ""),
@@ -161,20 +146,13 @@ Screens:
                                 Patch( taskmaster_projects,
                                        LookUp(taskmaster_projects, ID = gSelProject.ID),
                                        { project_phase: { Value: gPrjDerived } } ) ),
-                           // A failed re-phase is not worth interrupting a read-only screen
-                           // for: the next open retries it, and nothing downstream is wrong
-                           // in the meantime except a stale label.
+                           // A failed re-phase is not worth interrupting a read-only screen for.
                            Set( gPrjPhaseErr, FirstError.Message ) );
                   Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
-              // WEIGHTED COMPLETION IS DERIVED HERE TOO, for the same reason as the phase
-              // above: this screen already holds every task on the project, so the number
-              // costs nothing to compute and is always current — whereas the STORED value is
-              // only ever as fresh as the last task save whose STAGE MOVED. Saving a task
-              // without changing its stage deliberately skips the rollup, so the column can
-              // sit stale indefinitely, and it is blank outright on any project untouched
-              // since it was recreated. A screen that shows a ring should not depend on that.
-              // Written back only on a change, exactly like the phase, so opening a project
-              // repairs the stored copy the other screens read.
+              // DERIVED HERE for the same reason as the phase: the STORED value is only ever as
+              // fresh as the last task save whose STAGE MOVED, and is blank outright on an
+              // untouched project. Written back on a change, so opening a project repairs the
+              // stored copy the other screens read.
               Set( gPrjPc,
                    If( CountRows(colProjectTasks) = 0, 0,
                        RoundDown( Average( AddColumns( colProjectTasks, wgt,
@@ -183,16 +161,13 @@ Screens:
                                   wgt ), 0 ) ) );
               // HOW MANY TASKS CARRY A STAGE gStageWeights DOES NOT KNOW. Every weight lookup
               // Coalesces a miss to 0, so a stale weights table and a project of genuinely
-              // unstarted work produce the SAME 0% and the screen cannot tell them apart.
-              // gStageWeights lives in App.OnStart — a formula-bar property no paste carries —
-              // so it is the one input to this number that can silently be a version behind.
-              // Stated below rather than left to inference; see issue #16.
+              // unstarted work produce the SAME 0%. gStageWeights lives in App.OnStart, a
+              // formula-bar property no paste carries — the one input that can be a version behind.
               Set( gPrjNoWgt,
                    CountRows( Filter( colProjectTasks,
                                       IsBlank( LookUp(gStageWeights, Stage = task_stage.Value, Weight) ) ) ) );
               // The 500 cap matches scrTaskEdit's rollup so the two writers cannot disagree:
-              // past it the average is over a truncated fetch, and a wrong number written back
-              // is worse than a stale one left alone.
+              // a wrong number written back is worse than a stale one left alone.
               If( CountRows(colProjectTasks) < 500
                && gPrjPc <> Coalesce(gSelProject.project_perc_completion, -1),
                   IfError( Set( gPrjPcScrap,
@@ -201,10 +176,6 @@ Screens:
                                        { project_perc_completion: gPrjPc } ) ),
                            Set( gPrjPcErr, FirstError.Message ) );
                   Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
-              // NO gProjArchived. It counted this project's individually-archived TASKS, and
-              // task_stage has no "Archived" value as of 2026-08-12 — so the query could only
-              // ever return 0 and the "N archived (hidden)" caption it fed could never show.
-              // Nothing is hidden from the task list any more: it is every task on the project.
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -239,18 +210,10 @@ Screens:
             Y: =(gTheme.Space.HeaderH - 24) / 2
             Width: =24
             Height: =24
-            # AN EXPLICIT DESTINATION, NOT Back(). This screen has four inbound
-            # edges — the projects list, both scrHome galleries, and
-            # scrProjectEdit's save, which lands here with a Navigate. Back()
-            # honours whichever one was used, so saving a project and then
-            # pressing X put the user straight back INTO the editor.
-            #
-            # Back() also alternates between the two most recently displayed
-            # screens rather than unwinding a stack, so scrProject -> scrTaskEdit
-            # -> Back() -> scrProject leaves X pointing at the task editor.
-            #
-            # UnCover is the inverse of the Cover every inbound Navigate uses, and
-            # matches the delete path further down this screen.
+            # AN EXPLICIT DESTINATION, NOT Back(). This screen has four inbound edges,
+            # and Back() alternates between the two most recently displayed screens rather
+            # than unwinding a stack — so saving a project then pressing X went back INTO
+            # the editor. UnCover is the inverse of the Cover every inbound Navigate uses.
             OnSelect: =Navigate( scrProjects, ScreenTransition.UnCover )
       - bodyRoot:
           Control: GroupContainer@1.5.0
@@ -625,17 +588,10 @@ Screens:
                                           LayoutMinHeight: =22
                                           Width: =Parent.Width
                                           Height: =22
-                  # The ring sits between the facts and the actions, as asked.
-                  #
-                  # It is WRAPPED because the layout properties belong on the wrapper,
-                  # not on the instance: FillPortions and LayoutMinWidth are proven on
-                  # GroupContainer but NOT on a CanvasComponent instance, and the
-                  # contract check rejects them there. scrProjectEdit's pickers set
-                  # only Width/Height for the same reason. Without a pinned wrapper the
-                  # ring would default to FillPortions 1 and stretch across the card.
-                  # TWO ROWS. The ring and the action icons sit side by side; Mark complete
-                  # spans the pair beneath them, so the control that changes the project's
-                  # state reads as belonging to both rather than hanging off the icons.
+                  # The ring is WRAPPED because the layout properties belong on the wrapper:
+                  # FillPortions and LayoutMinWidth are proven on GroupContainer but NOT on a
+                  # CanvasComponent instance, and the contract check rejects them there. Without a
+                  # pinned wrapper the ring defaults to FillPortions 1 and stretches across the card.
                   - colRight:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -678,8 +634,7 @@ Screens:
                                         Properties:
                                           Width: =120
                                           Height: =120
-                                          # The DERIVED value, not the stored one — the ring
-                                          # is then correct even when the write-back fails.
+                                          # The DERIVED value, not the stored one — correct even when the write-back fails.
                                           Percent: =Coalesce(gPrjPc, 0)
                                           Label: =Coalesce(gPrjPc, 0) & "%"
                                           AccentHex: ="#005A9E"
@@ -718,8 +673,8 @@ Screens:
                                           Icon: =If( gPrDelArm, Icon.Warning, Icon.Trash )
                                           Color: =gTheme.Color.Danger
                                           HoverColor: =gTheme.Color.Danger
-                                          # A RED wash, not gTheme.Color.Hover — a blue tint behind a red destructive
-                                          # icon reads as a different control.
+                                          # A RED wash, not gTheme.Color.Hover — a blue tint behind a red destructive icon
+                                          # reads as a different control.
                                           HoverFill: =RGBA(197, 58, 58, 0.08)
                                           HoverBorderColor: =RGBA(0, 0, 0, 0)
                                           Tooltip: |
@@ -734,28 +689,13 @@ Screens:
                                             =If( !gPrDelArm,
                                                  Set( gPrDelArm, true ),
                                                  Set( gPrDelErr, "" );
-                                                 // Children FIRST. Every child carries a REQUIRED lookup
-                                                 // to the project, so removing the parent while they
-                                                 // exist would leave rows SharePoint will not let
-                                                 // anything edit afterwards.
+                                                 // Children FIRST. Every child carries a REQUIRED lookup to the
+                                                 // project, so removing the parent while they exist leaves rows
+                                                 // SharePoint will not let anything edit afterwards.
                                                  //
-                                                 // Each removal is wrapped in a Set. MS Learn's own idiom
-                                                 // is IfError( Remove(...), Notify(...) ), but Remove and
-                                                 // RemoveIf "return the modified data source as a TABLE"
-                                                 // while Notify and Set return a boolean, and IfError
-                                                 // requires ALL its arguments to be type-compatible — so
-                                                 // the documented form is rejected. Four DIFFERENT scrap names: a global's
-                                                 // type unifies across every Set, so one name holding four
-                                                 // differently-shaped tables is a type conflict. They exist
-                                                 // only to make both arms a Set.
-                                                 //
-                                                 // RemoveIf is NOT delegable: it pulls matching rows up to the
-                                                 // data row limit and deletes them one by one. A partial pass
-                                                 // raises NO error, so without the count first the parent
-                                                 // would be removed on top of surviving children — and a child
-                                                 // holding a required lookup to a deleted project cannot be
-                                                 // edited or deleted by anything afterwards. Count, then refuse
-                                                 // rather than half-do it. Same shape as the archive cascade.
+                                                 // RemoveIf is NOT delegable: it pulls matching rows up to the data
+                                                 // row limit and deletes them one by one, and a partial pass raises
+                                                 // NO error. COUNT, THEN REFUSE — never half-do it.
                                                  Set( gPrDelBlock, false );
                                                  With( { nI: CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gSelProject.ID) ),
                                                          nX: CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gSelProject.ID) ),
@@ -782,9 +722,8 @@ Screens:
                                                      Notify( "This project has too many attached items to delete in one pass. Nothing was deleted — ask for the cleanup workflow.",
                                                              NotificationType.Error ),
                                                      Len(gPrDelErr) > 0,
-                                                     // Say that the children may be gone. There is no
-                                                     // transaction here: by the time the parent fails, the
-                                                     // child removals have already committed.
+                                                     // No transaction here: by the time the parent fails, the child removals
+                                                     // have already committed. Say so.
                                                      Notify( "Couldn't finish deleting the project: " & gPrDelErr
                                                                & " Some attached items may already have been removed — reopen the project to check.",
                                                              NotificationType.Error ),
@@ -795,9 +734,8 @@ Screens:
                                                              NotificationType.Success );
                                                      Navigate( scrProjects, ScreenTransition.UnCover ) );
                                                  Set( gPrDelArm, false ) )
-                                    # THE ONLY WAY A PROJECT REACHES "Complete". Every other phase is
-                                    # derived on this screen's OnVisible; this button is the one place a
-                                    # human decides, and it writes the completion date with it.
+                                    # THE ONLY WAY A PROJECT REACHES "Complete". Every other phase is derived on
+                                    # this screen's OnVisible; this button is the one place a human decides.
                                     - lblDelArmed:
                                         Control: Label@2.5.1
                                         Properties:
@@ -816,9 +754,8 @@ Screens:
                             Properties:
                               Visible: |
                                 =Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
-                              # DISABLED until nothing is outstanding. A disabled button cannot
-                              # say why, so lblPrjCompleteWhy below spells out what is blocking
-                              # it — the two always appear together.
+                              # DISABLED until nothing is outstanding. A disabled button cannot say why, so
+                              # lblPrjCompleteWhy spells out what is blocking it — the two always appear together.
                               DisplayMode: |
                                 =If( gPrjOpenIss = 0 && gPrjOpenTasks = 0,
                                      DisplayMode.Edit, DisplayMode.Disabled )
@@ -842,8 +779,8 @@ Screens:
                                                  { project_phase:         { Value: "Complete" },
                                                    project_date_complete: Now() } ) ),
                                      Set( gPrjCompErr, FirstError.Message ) );
-                                 // Trust the RECORD, never the message — a write can fail and
-                                 // still leave FirstError.Message empty.
+                                 // Trust the RECORD, never the message — a write can fail and still leave
+                                 // FirstError.Message empty.
                                  If( IsBlank(gPrjCompSaved.ID) && Len(gPrjCompErr) = 0,
                                      Set( gPrjCompErr, "SharePoint returned no record and no error message." ) );
                                  If( Len(gPrjCompErr) > 0,
@@ -934,13 +871,10 @@ Screens:
                                           Text: |
                                             ="Tasks   " & CountRows( Filter(colProjectTasks, task_stage.Value = "Completed") )
                                             & " of " & CountRows(colProjectTasks) & " complete"
-                                            // AN EMPTY WEIGHTS TABLE IS A DIFFERENT FAULT
-                                            // FROM AN UNKNOWN STAGE, and needs a different
-                                            // action, so it is reported separately. Every
-                                            // task missing at once means gStageWeights is
-                                            // blank, not that a value drifted — App.OnStart
-                                            // sets it and Studio only runs that on app open
-                                            // or on Run OnStart, so editing it is not enough.
+                                            // AN EMPTY WEIGHTS TABLE IS A DIFFERENT FAULT FROM AN
+                                            // UNKNOWN STAGE and needs a different action. Every task
+                                            // missing at once means gStageWeights is blank, and Studio
+                                            // runs App.OnStart only on app open or Run OnStart.
                                             & If( IsEmpty(gStageWeights),
                                                   "   ·   stage weights not loaded — run App.OnStart",
                                                   gPrjNoWgt > 0,
@@ -990,12 +924,9 @@ Screens:
                                   Control: Gallery@2.15.0
                                   Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                                   Properties:
-                                    # ONE composite sort key, not two chained Sorts: Power Fx
-                                    # does not guarantee a stable sort, so a second Sort could
-                                    # undo the first. priority * 100000 dominates, the day count
-                                    # breaks ties within a priority, and +50000 keeps an overdue
-                                    # (negative) count positive. No target date sorts last inside
-                                    # its own priority band rather than first.
+                                    # ONE composite sort key, not two chained Sorts — Power Fx does not
+                                    # guarantee a stable sort. priority * 100000 dominates, the day count
+                                    # breaks ties, and +50000 keeps an overdue (negative) count positive.
                                     Items: |
                                       =Sort( colProjectTasks,
                                              Switch( task_priority.Value,
@@ -1014,9 +945,8 @@ Screens:
                                     Width: =Parent.Width - 32
                                     Height: =Parent.Height - 80
                                   Children:
-                                    # AUTO-LAYOUT ROW. The columns carry no X, so they cannot
-                                    # overlap at any TemplateWidth — which the previous
-                                    # percentage arithmetic did once the panel narrowed.
+                                    # AUTO-LAYOUT ROW. The columns carry no X, so they cannot overlap
+                                    # at any TemplateWidth.
                                     - rowTaskBody:
                                         Control: GroupContainer@1.5.0
                                         Variant: AutoLayout
@@ -1031,9 +961,8 @@ Screens:
                                           Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight - 1
                                         Children:
-                                          # LIFECYCLE glyph, bound to task_stage — the same
-                                          # progression the project rows use. task_status is a
-                                          # separate RAG health column and is NOT what this shows.
+                                          # LIFECYCLE glyph, bound to task_stage. task_status is a separate
+                                          # RAG health column and is NOT what this shows.
                                           - icoTaskStage:
                                               Control: Image@2.2.3
                                               Properties:
@@ -1130,14 +1059,6 @@ Screens:
                                                 FillPortions: =2
                                                 LayoutMinWidth: =96
                                                 Height: =44
-                                          # LAST CHILD OF THE AUTO-LAYOUT ROW, CARRYING NO X AND NO Y AT ALL.
-                                          # X DID NOT SURVIVE A SCREEN PASTE in either absolute form — off
-                                          # Parent.TemplateWidth or off this container's Width — while Y and every other
-                                          # property came through (user, 2026-08-18). Pasting the icon ALONE worked, so
-                                          # whatever drops it is a property of the whole-screen paste, not of the value.
-                                          # Auto-layout is what the design skill already prescribes for this: a child with
-                                          # no X has nothing to lose. FillPortions 0, against the flexible columns to its
-                                          # left, parks it hard right inside the strip the hit button stops short of.
                                           - icoDelTask:
                                               Control: Classic/Icon@2.5.0
                                               Properties:
@@ -1167,12 +1088,6 @@ Screens:
                                     - galTasksHit:
                                         Control: Classic/Button@2.2.0
                                         Properties:
-                                          # The row's action lives HERE, not on the gallery's
-                                          # OnSelect: a gallery's own OnSelect does not reliably
-                                          # fire when the click lands on a child control, so
-                                          # without a transparent full-template button declared
-                                          # LAST the rows look right and do nothing. Confirmed
-                                          # in Studio on the nav rail, 2026-08-03.
                                           Text: =""
                                           Fill: =RGBA(0, 0, 0, 0)
                                           HoverFill: =gTheme.Color.Hover
@@ -1180,41 +1095,15 @@ Screens:
                                           BorderThickness: =0
                                           X: =0
                                           Y: =0
-                                          # Stops short of the delete icon's strip, so a tap aimed at delete
-                                          # cannot fall through to "open the editor" instead.
-                                          # STOPS SHORT OF THE DELETE ICON. The icon is the row container's last
-                                          # auto-layout child, and this transparent button is declared AFTER that
-                                          # container — so at full width it would sit on top of the icon and swallow
-                                          # every tap meant for it.
                                           Width: =Parent.TemplateWidth - 46
                                           Height: =Parent.TemplateHeight
-                                          # Goes STRAIGHT to the editor, exactly like the
-                                          # transaction and issue rows below. The old
-                                          # scrTask detail screen was deleted 2026-08-10:
-                                          # it was a second, weaker writer for the same
-                                          # row that seeded every control from `Default`
-                                          # and never called `Reset()`, so on the second
-                                          # task opened it still displayed the FIRST
-                                          # task's name, stage, health and priority — and
-                                          # saving wrote those stale values back. It also
-                                          # wrote `task_stage` WITHOUT the derived
-                                          # `task_date_completion` that scrTaskEdit
-                                          # maintains, so completing a task from there
-                                          # left the completion date blank.
-                                          #
-                                          # LookUp, not ThisItem: colProjectTasks is a
-                                          # snapshot taken in OnVisible, and the editor
-                                          # Patches against whatever record it is handed.
-                                          # Re-reading the live row on the way in costs
-                                          # one delegable ID lookup and removes a whole
-                                          # class of write-stale-data bug.
-                                          #
-                                          # A LookUp can MISS — the row may have been
-                                          # deleted by someone else since OnVisible took
-                                          # the snapshot. Opening the editor on a blank
-                                          # record would show an empty "Edit task" form
-                                          # and then Patch against nothing, so refuse and
-                                          # say so instead.
+                                          # LookUp, not ThisItem: colProjectTasks is a snapshot
+                                          # taken in OnVisible, and the editor Patches against
+                                          # whatever record it is handed. Re-reading the live row
+                                          # costs one delegable ID lookup.
+                                          # A LookUp can MISS — the row may have been deleted since
+                                          # the snapshot — so refuse and say so rather than opening
+                                          # an empty form that Patches against nothing.
                                           OnSelect: |
                                             =Select(Parent);
                                             Set( gEditTask, LookUp(taskmaster_tasks, ID = ThisItem.ID) );
@@ -1259,11 +1148,6 @@ Screens:
                                         Properties:
                                           Text: |
                                             =
-                                             // Counted from the QUERY, not galTransactions.AllItems:
-                                             // a gallery bound to a data source loads pages as the
-                                             // user scrolls, so AllItems is "what is on screen so
-                                             // far", not the total. Scoped to one project, so the
-                                             // count is bounded.
                                              "Transactions   " & CountRows( Filter( taskmaster_transactions,
                                                                                     transaction_project_id.Id = gSelProject.ID ) )
                                           Font: =gTheme.Font
@@ -1324,8 +1208,7 @@ Screens:
                                     Width: =Parent.Width - 32
                                     Height: =Parent.Height - 80
                                   Children:
-                                    # AUTO-LAYOUT ROW — the columns carry no X, so they cannot
-                                    # overlap however narrow the panel gets.
+                                    # AUTO-LAYOUT ROW — the columns carry no X.
                                     - rowTxBody:
                                         Control: GroupContainer@1.5.0
                                         Variant: AutoLayout
@@ -1340,11 +1223,9 @@ Screens:
                                           Width: =Parent.TemplateWidth
                                           Height: =Parent.TemplateHeight - 1
                                         Children:
-                                          # DERIVED, NOT STORED. taskmaster_transactions has no
-                                          # status column — the only lifecycle signal on the row is
-                                          # transaction_date, so this reads booked / today /
-                                          # scheduled off it. If a real status column is ever added,
-                                          # bind the Switch to that instead of to the date.
+                                          # DERIVED, NOT STORED. taskmaster_transactions has no status
+                                          # column, so this reads booked / today / scheduled off
+                                          # transaction_date. Bind to a real status column if one is added.
                                           - icoTxState:
                                               Control: Image@2.2.3
                                               Properties:
@@ -1424,14 +1305,6 @@ Screens:
                                                 FillPortions: =2
                                                 LayoutMinWidth: =104
                                                 Height: =44
-                                          # LAST CHILD OF THE AUTO-LAYOUT ROW, CARRYING NO X AND NO Y AT ALL.
-                                          # X DID NOT SURVIVE A SCREEN PASTE in either absolute form — off
-                                          # Parent.TemplateWidth or off this container's Width — while Y and every other
-                                          # property came through (user, 2026-08-18). Pasting the icon ALONE worked, so
-                                          # whatever drops it is a property of the whole-screen paste, not of the value.
-                                          # Auto-layout is what the design skill already prescribes for this: a child with
-                                          # no X has nothing to lose. FillPortions 0, against the flexible columns to its
-                                          # left, parks it hard right inside the strip the hit button stops short of.
                                           - icoDelTx:
                                               Control: Classic/Icon@2.5.0
                                               Properties:
@@ -1461,12 +1334,6 @@ Screens:
                                     - galTransactionsHit:
                                         Control: Classic/Button@2.2.0
                                         Properties:
-                                          # The row's action lives HERE, not on the gallery's
-                                          # OnSelect: a gallery's own OnSelect does not reliably
-                                          # fire when the click lands on a child control, so
-                                          # without a transparent full-template button declared
-                                          # LAST the rows look right and do nothing. Confirmed
-                                          # in Studio on the nav rail, 2026-08-03.
                                           Text: =""
                                           Fill: =RGBA(0, 0, 0, 0)
                                           HoverFill: =gTheme.Color.Hover
@@ -1474,26 +1341,13 @@ Screens:
                                           BorderThickness: =0
                                           X: =0
                                           Y: =0
-                                          # Stops short of the delete icon's strip, so a tap aimed at delete
-                                          # cannot fall through to "open the editor" instead.
-                                          # STOPS SHORT OF THE DELETE ICON. The icon is the row container's last
-                                          # auto-layout child, and this transparent button is declared AFTER that
-                                          # container — so at full width it would sit on top of the icon and swallow
-                                          # every tap meant for it.
                                           Width: =Parent.TemplateWidth - 46
                                           Height: =Parent.TemplateHeight
-                                          # Re-read on the way in, like the task row. This
-                                          # gallery binds to a LIVE Filter rather than a
-                                          # ClearCollect snapshot, so the exposure is
-                                          # smaller than the task one was — ThisItem is a
-                                          # genuine data-source row and Patch hits the
-                                          # right ID either way. What it does NOT give is
-                                          # freshness: the query result is cached between
-                                          # refreshes, so the editor can seed its form
-                                          # from values someone else has since changed and
-                                          # patch them straight back. The LookUp costs one
-                                          # delegable read; the guard covers the row being
-                                          # gone entirely.
+                                          # Re-read on the way in, like the task row. This gallery
+                                          # binds to a LIVE Filter, so this is a FRESHNESS fix rather
+                                          # than an identity one: the query result is cached between
+                                          # refreshes, so the editor could seed from stale values and
+                                          # patch them straight back.
                                           OnSelect: |
                                             =Select(Parent);
                                             Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.ID) );
@@ -1502,21 +1356,15 @@ Screens:
                                                         NotificationType.Error ),
                                                 Set( gEditMode, "Edit" );
                                                 Navigate( scrTransactionEdit, ScreenTransition.Cover ) )
-                        # Preserved from the tabbed version, decision and all: there is no
-                        # cross-currency total to show, because since Q14 the app stores only
-                        # the native notional. Totalling ONE currency at a time is the honest
-                        # thing an app can do. CROSS-CURRENCY CONVERSION IS OUT OF SCOPE for this
-                        # project (2026-08-17) — other tools handle it, so no blended figure is owed
-                        # here and none should be invented. Sum and
-                        # CountRows never delegate, so this is the RETURNED PAGE only.
+                        # CROSS-CURRENCY CONVERSION IS OUT OF SCOPE for this project — the app stores
+                        # only the native notional, so no blended figure is owed here and none should be
+                        # invented. Sum and CountRows never delegate, so this is the RETURNED PAGE only.
                         - lblTxTotal:
                             Control: Label@2.5.1
                             Properties:
-                              # Sums what the gallery has LOADED, not the whole query — a gallery
-                              # bound to a data source pages as the user scrolls. Accepted: a
-                              # project holds well under a page of transactions. Do not "fix" it
-                              # by widening the query; Sum does not delegate to SharePoint either
-                              # way, so the only real fix is collecting the rows in OnVisible.
+                              # Sums what the gallery has LOADED, not the whole query. Accepted: a project
+                              # holds well under a page. Do not "fix" it by widening the query — Sum does not
+                              # delegate either way, so the only real fix is collecting the rows in OnVisible.
                               Text: |
                                 =With( { rows: galTransactions.AllItems },
                                     With( { u: Sum(Filter(rows, transaction_currency.Value = "USD"), Coalesce(transaction_notional, 0)),
@@ -1572,9 +1420,6 @@ Screens:
                                   Properties:
                                     Text: |
                                       =
-                                       // Counted from the QUERY, not galIssues.AllItems — a gallery
-                                       // bound to a data source loads pages as the user scrolls,
-                                       // so AllItems undercounts until it is scrolled to the end.
                                        With( { rows: Filter( taskmaster_issues,
                                                              issue_project_id.Id = gSelProject.ID ) },
                                              "Issues   " & CountRows( Filter(rows, issue_status.Value = "Open") )
@@ -1622,13 +1467,10 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              # Was sorted on `Created` — a SYSTEM COLUMN the canvas connector
-                              # does not surface on this list, so that sort key never resolved.
-                              # Now impact, then days until due, on one composite key: Power Fx
-                              # does not guarantee a stable sort, so chaining two Sorts could
-                              # undo the first. The sort runs LOCALLY (an expression, not a
-                              # column), which is acceptable only because this query is already
-                              # scoped to a single project.
+                              # Impact, then days until due, on ONE composite key: Power Fx does not
+                              # guarantee a stable sort, so chaining two Sorts could undo the first. The
+                              # sort runs LOCALLY (an expression, not a column), acceptable only because
+                              # this query is already scoped to a single project.
                               Items: |
                                 =Sort( Filter( taskmaster_issues,
                                                issue_project_id.Id = gSelProject.ID ),
@@ -1695,9 +1537,8 @@ Screens:
                                                 "data:image/svg+xml," & EncodeUrl(
                                                     "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
                                             )
-                                    # IMPACT: signal bars, so severity is read from HEIGHT and
-                                    # count rather than from colour alone. This is the sort key,
-                                    # which is why it sits beside the status mark.
+                                    # IMPACT: signal bars, so severity reads from HEIGHT and count rather
+                                    # than colour alone. This is the sort key, hence its place beside status.
                                     - icoIssImpact:
                                         Control: Image@2.2.3
                                         Properties:
@@ -1778,14 +1619,6 @@ Screens:
                                           FillPortions: =2
                                           LayoutMinWidth: =96
                                           Height: =38
-                                    # LAST CHILD OF THE AUTO-LAYOUT ROW, CARRYING NO X AND NO Y AT ALL.
-                                    # X DID NOT SURVIVE A SCREEN PASTE in either absolute form — off
-                                    # Parent.TemplateWidth or off this container's Width — while Y and every other
-                                    # property came through (user, 2026-08-18). Pasting the icon ALONE worked, so
-                                    # whatever drops it is a property of the whole-screen paste, not of the value.
-                                    # Auto-layout is what the design skill already prescribes for this: a child with
-                                    # no X has nothing to lose. FillPortions 0, against the flexible columns to its
-                                    # left, parks it hard right inside the strip the hit button stops short of.
                                     - icoDelIss:
                                         Control: Classic/Icon@2.5.0
                                         Properties:
@@ -1822,17 +1655,9 @@ Screens:
                                     BorderThickness: =0
                                     X: =0
                                     Y: =0
-                                    # Stops short of the delete icon's strip, so a tap aimed at delete
-                                    # cannot fall through to "open the editor" instead.
-                                    # STOPS SHORT OF THE DELETE ICON. The icon is the row container's last
-                                    # auto-layout child, and this transparent button is declared AFTER that
-                                    # container — so at full width it would sit on top of the icon and swallow
-                                    # every tap meant for it.
                                     Width: =Parent.TemplateWidth - 46
                                     Height: =Parent.TemplateHeight
-                                    # Re-read on the way in — see the transaction row for
-                                    # why the live-Filter binding makes this a freshness
-                                    # fix rather than an identity one.
+                                    # Re-read on the way in — see the transaction row.
                                     OnSelect: |
                                       =Select(Parent);
                                        Set( gEditIssue, LookUp(taskmaster_issues, ID = ThisItem.ID) );
@@ -1846,17 +1671,12 @@ Screens:
       # DELETE CONFIRMATION — one instance serving all three galleries, keyed by
       # gDelKind. Declared LAST so positional z-order floats it over the content.
       #
-      # STUDIO CHECK BEFORE THIS SCREEN IS PASTED: cmpConfirmDialog had NO consumer
-      # anywhere in src/ until now, so its custom properties may never have been
-      # declared in Studio at all. A component crosses the gap in TWO parts and only
-      # the CONTROLS paste — every custom property is declared and typed BY HAND.
-      # That is exactly how cmpSelection silently returned blank for weeks. Confirm
-      # IsOpen / Title / Message / ConfirmLabel / CancelLabel / Destructive are
-      # INPUTS and OnConfirm / OnCancel are EVENTS before trusting this.
-      #
-      # Visible is gated as well as IsOpen: a component intercepts every click
-      # inside its bounds, so a full-screen instance left visible while closed would
-      # swallow every tap on the screen underneath it.
+      # STUDIO CHECK BEFORE THIS SCREEN IS PASTED: a component crosses the gap in TWO
+      # parts and only the CONTROLS paste — every custom property is declared and typed
+      # BY HAND. Confirm IsOpen / Title / Message / ConfirmLabel / CancelLabel /
+      # Destructive are INPUTS and OnConfirm / OnCancel are EVENTS before trusting this.
+      # Visible is gated as well as IsOpen: a component intercepts every click inside its
+      # bounds, so a full-screen instance left visible while closed swallows every tap.
       # =====================================================================
       - cmpPrjConfirmDel:
           Control: CanvasComponent
@@ -1874,9 +1694,8 @@ Screens:
                        "Transaction", "Delete this transaction?",
                        "Issue",       "Delete this issue?",
                        "Delete?" )
-            # Says what ELSE changes, which is the whole reason this is a dialog and
-            # not the two-press arm the project delete uses. An arm cannot explain
-            # that issues are about to be detached.
+            # Says what ELSE changes — an arm cannot explain that issues are about to
+            # be detached, which is why this one is a dialog.
             Message: |
               =Switch( gDelKind,
                        "Task",
@@ -1897,25 +1716,16 @@ Screens:
             ConfirmLabel: ="Delete"
             CancelLabel: ="Cancel"
             Destructive: =true
-            # Order is deliberate: DETACH the referencing issues first, then remove the
-            # row. The reverse leaves issues pointing at a row that no longer exists.
-            #
-            # IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED
-            # by Studio: Remove and ForAll/Patch return a TABLE while Notify and Set
-            # return a boolean, and IfError requires all arguments to be type-compatible.
-            # Hence Set-into-a-scrap on both arms, and a DIFFERENT scrap name per call
-            # site: a global's type unifies across every Set, so one name holding
-            # differently-shaped tables is a type conflict.
+            # Order is deliberate: DETACH the referencing issues first, then remove the row.
+            # The reverse leaves issues pointing at a row that no longer exists.
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
-               // COUNT, THEN REFUSE — never half-do it. The detach is a local ForAll over
-               // a delegable Filter, so past the data row limit it would clear SOME
-               // references, raise NO error, and then delete the parent anyway. Same
-               // shape as the project cascade above.
-               // THE ROW THAT KNOWS THE TASK IS ABOUT TO BE DELETED, so the link is read
-               // now. Deleting the last open Blockage on a task must take that task back
-               // off Red, and after the Remove there is nothing left to ask.
+               // COUNT, THEN REFUSE — never half-do it. The detach is a local ForAll over a
+               // delegable Filter, so past the data row limit it clears SOME references, raises
+               // NO error, and deletes the parent anyway.
+               // THE LINK IS READ NOW, while the row still knows its task: deleting the last open
+               // Blockage must take that task off Red, and after the Remove there is nothing to ask.
                Set( gDelIssTask,
                     If( gDelKind = "Issue",
                         Coalesce( LookUp(taskmaster_issues, ID = gDelId).issue_task_name.Id, 0 ),
@@ -1931,9 +1741,8 @@ Screens:
                                  ForAll( Filter( taskmaster_issues, issue_transaction_name.Id = gDelId ) As iss,
                                          Patch( taskmaster_issues, iss, { issue_transaction_name: Blank() } ) ) ),
                             Set( gDelErr, FirstError.Message ) ) );
-               // LookUp, not the gallery record: colProjectTasks is a snapshot, and a
-               // task's product links are removed by SharePoint's own CASCADE on
-               // taskproduct_task_id — the app must not try to delete them itself.
+               // LookUp, not the gallery record. A task's product links are removed by
+               // SharePoint's own CASCADE on taskproduct_task_id — the app must not delete them.
                If( Len(gDelErr) = 0 && !gDelBlock,
                    Switch( gDelKind,
                            "Task",
@@ -1952,8 +1761,7 @@ Screens:
                    Notify( "Too many issues reference this to detach in one pass. Nothing was deleted — ask for the cleanup workflow.",
                            NotificationType.Error ),
                    Len(gDelErr) > 0,
-                   // No transaction exists here: by the time the Remove fails, the detach
-                   // has already committed. Say so rather than implying nothing changed.
+                   // No transaction exists here: the detach has already committed.
                    Notify( "Couldn't delete it: " & gDelErr
                              & " Some issue links may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
