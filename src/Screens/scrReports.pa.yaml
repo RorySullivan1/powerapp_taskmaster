@@ -609,24 +609,67 @@ Screens:
               Set( gRptTxMax,
                    Max( 1, Coalesce(Max(colRptBuckets, Tx), 0),
                            Coalesce(Max(colRptBuckets, TxP), 0) ) );
-              // Ageing of OPEN projects, by days since start.
-              Set( gRptAgeA, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
-                                 && !IsBlank(project_date_start)
-                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) < 30 ) ) );
-              Set( gRptAgeB, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
-                                 && !IsBlank(project_date_start)
-                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) >= 30
-                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) < 90 ) ) );
-              Set( gRptAgeC, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
-                                 && !IsBlank(project_date_start)
-                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) >= 90
-                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) < 180 ) ) );
-              Set( gRptAgeD, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
-                                 && !IsBlank(project_date_start)
-                                 && DateDiff(project_date_start, Today(), TimeUnit.Days) >= 180 ) ) );
-              Set( gRptStalled,  CountRows( Filter(colRptPrj, project_phase.Value = "Stalled") ) );
+              // ---- projects by phase (pie) -----------------------------------------
+              // A FIXED SEQUENCE, NOT Distinct. project_phase is a closed vocabulary, so
+              // enumerating it holds lifecycle order and pins one colour per phase across
+              // refreshes; a Distinct would reorder both the moment a phase emptied.
+              // ActiveProjects excludes Archived, so these five are the whole set here.
+              ClearCollect( colRptPhSeq,
+                  ForAll( Sequence(5) As s,
+                      With( { k: Switch( s.Value, 1, "Not Started", 2, "Planning",
+                                                  3, "Active",      4, "Stalled",
+                                                     "Complete" ) },
+                          { Idx: s.Value, K: k,
+                            N:  CountRows( Filter(colRptPrj, project_phase.Value = k) ),
+                            Hx: Switch( s.Value, 1, "#B9C0C8", 2, "#2E8B9A", 3, "#005A9E",
+                                                 4, "#C05F3C", "#31825D" ) } ) ) );
+              Set( gRptPhTot, Max( 1, Coalesce(Sum(colRptPhSeq, N), 0) ) );
+              // Same running-cumulative slice geometry as the region pie; see the note
+              // there for why the percentages are derived rather than rounded per slice.
+              ClearCollect( colRptPhPie,
+                  ForAll( Filter(colRptPhSeq, N > 0) As r,
+                      With( { cb: Coalesce( Sum( Filter(colRptPhSeq, Idx < r.Idx), N ), 0 ) },
+                          { Idx: r.Idx, K: r.K, N: r.N, Hx: r.Hx,
+                            Li:  CountRows( Filter(colRptPhSeq, N > 0 && Idx <= r.Idx) ),
+                            Off: RoundDown( cb / gRptPhTot * 100, 0 ),
+                            Pct: RoundDown( (cb + r.N) / gRptPhTot * 100, 0 )
+                                 - RoundDown( cb / gRptPhTot * 100, 0 ) } ) ) );
+              // Kept when the ageing strip went: the phase pie shows Stalled itself, but
+              // nothing else on the screen counts open work with no date to be late by.
               Set( gRptNoTarget, CountRows( Filter( colRptPrj, project_phase.Value <> "Complete"
                                      && IsBlank(project_date_target) ) ) );
+              // ---- open tasks due in the next fortnight (bar) -----------------------
+              // FORWARD-LOOKING, AND DELIBERATELY OUTSIDE THE PERIOD WINDOW. Every other
+              // series on this screen looks back over gRptFrom..now; this one answers
+              // "what lands next", so it is keyed on Today() and the period strip does not
+              // move it. It reloads with the rest only because the load is one block.
+              // colRptOpen is every live task not yet Completed, so a task whose target has
+              // already passed is still open — counted as overdue beside the chart, not in
+              // a bar, because a bar for it would have no date to sit on.
+              ClearCollect( colRptDueSrc,
+                  ForAll( Filter(colRptOpen, !IsBlank(task_date_target)) As t,
+                      { Dd: DateDiff( Today(), t.task_date_target, TimeUnit.Days ) } ) );
+              Set( gRptDueOver,   CountRows( Filter(colRptDueSrc, Dd < 0) ) );
+              Set( gRptDueBeyond, CountRows( Filter(colRptDueSrc, Dd > 14) ) );
+              Set( gRptDueNone,   CountRows( Filter(colRptOpen, IsBlank(task_date_target)) ) );
+              // 15 bars: today plus a fortnight. WEEKEND IS READ OFF THE FORMATTED DAY
+              // NAME, not Weekday() — that function appears nowhere else in this app and
+              // there is no way to confirm its numbering here, whereas "[$-en-US]ddd" is
+              // already the format the trend bucket labels use.
+              ClearCollect( colRptDueBars,
+                  ForAll( Sequence(15) As s,
+                      With( { dv: s.Value - 1 },
+                          With( { dt: DateAdd( Today(), s.Value - 1, TimeUnit.Days ) },
+                              { Idx: s.Value,
+                                Lbl: Text( dt, "[$-en-US]d" ),
+                                // Month only where it changes, so the day numbers stay
+                                // readable when the fortnight crosses a month end.
+                                Mon: If( s.Value = 1 || Text(dt, "[$-en-US]d") = "1",
+                                         Text(dt, "[$-en-US]mmm"), "" ),
+                                We:  With( { w: Text(dt, "[$-en-US]ddd") },
+                                         If( w = "Sat" || w = "Sun", 1, 0 ) ),
+                                N:   CountRows( Filter(colRptDueSrc, Dd = dv) ) } ) ) ) );
+              Set( gRptDueMax, Max( 1, Coalesce(Max(colRptDueBars, N), 0) ) );
               // ---- BAND 5 folds: transactions --------------------------------------
               // ACCEPTED COST, NOT AN OVERSIGHT: a linear LookUp per transaction, so this
               // is O(tx x products) + O(tx x projects) and it re-runs on every period change.
@@ -2125,133 +2168,313 @@ Screens:
             # =============================================================
             # BAND 4 — how projects are trending
             # =============================================================
-            # BUILT ENTIRELY FROM DATED EVENTS. project_perc_completion, task_stage and
-            # project_phase are CURRENT STATE with no snapshot anywhere, so "completion
-            # over time" is impossible natively — every series here comes from
-            # project_date_start / project_date_complete instead.
-            - pnlRptTrend:
+            # THE TREND SERIES ARE BUILT ENTIRELY FROM DATED EVENTS.
+            # project_perc_completion, task_stage and project_phase are CURRENT STATE with
+            # no snapshot anywhere, so "completion over time" is impossible natively —
+            # the left chart comes from project_date_start / project_date_complete instead.
+            #
+            # THREE COLUMNS, READ LEFT TO RIGHT AS PAST, PRESENT, FUTURE: what opened and
+            # closed across the window, where the open book stands right now, and what
+            # falls due next. ONLY THE LEFT PANEL IS BOUND BY THE PERIOD STRIP — the pie
+            # is a snapshot and the due chart is keyed on Today(); each says so on its face.
+            #
+            # FillPortions 2 : 1 : 2 — the two bar charts carry up to 13 and 15 categories
+            # and need the room; the pie is a 320x150 box and does not. The minimums add to
+            # ~950px, under both band 3 and band 5, so this band never sets the scroll width.
+            - rowRptTrend:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
-                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutDirection: =LayoutDirection.Horizontal
                   LayoutAlignItems: =LayoutAlignItems.Start
-                  LayoutGap: =6
-                  PaddingTop: =12
-                  PaddingBottom: =12
-                  PaddingLeft: =16
-                  PaddingRight: =16
-                  Fill: =gTheme.Color.Surface
-                  BorderColor: =gTheme.Color.Border
-                  BorderThickness: =1
+                  LayoutGap: =gTheme.Space.Gap
                   FillPortions: =0
-                  LayoutMinHeight: =320
+                  LayoutMinHeight: =360
                   Width: =Parent.Width - 48
-                  Height: =320
+                  Height: =360
                 Children:
-                  - lblRptTrendT:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Projects started, completed, and net open"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.H3
-                        FontWeight: =FontWeight.Semibold
-                        Color: =gTheme.Color.Primary
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinHeight: =24
-                        Width: =Parent.Width - 32
-                        Height: =24
-                  - lblRptTrendS:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          ="Blue bars started · green bars completed · line is cumulative net open. "
-                           & "Archived projects are outside the query, so their completions are not counted."
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        FillPortions: =0
-                        LayoutMinHeight: =16
-                        Width: =Parent.Width - 32
-                        Height: =16
-                  # ONE SCALE for all three series — they are all project counts, so a
-                  # second axis would only make the line look bigger than it is.
-                  - imgRptTrend:
-                      Control: Image@2.2.3
-                      Properties:
-                        ImagePosition: =ImagePosition.Fit
-                        FillPortions: =1
-                        LayoutMinHeight: =160
-                        Width: =Parent.Width - 32
-                        Height: =Parent.Height - 80
-                        Image: |
-                          =With( { n: Max(1, CountRows(colRptBuckets)) },
-                              With( { w: RoundDown(880 / n, 0) },
-                                  "data:image/svg+xml;charset=utf-8," & EncodeUrl(
-                                      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 300'>"
-                                    & "<line x1='0' y1='250' x2='900' y2='250' stroke='#E1E5EB' stroke-width='2'/>"
-                                    & Concat( colRptBuckets,
-                                          "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
-                                        & (250 - Round(St / Max(1, gRptTrendMax) * 210, 0)) & "' width='"
-                                        & Max(3, RoundDown(w / 2, 0) - 4) & "' height='"
-                                        & Round(St / Max(1, gRptTrendMax) * 210, 0) & "' fill='#005A9E'/>"
-                                        & "<rect x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='"
-                                        & (250 - Round(Cp / Max(1, gRptTrendMax) * 210, 0)) & "' width='"
-                                        & Max(3, RoundDown(w / 2, 0) - 4) & "' height='"
-                                        & Round(Cp / Max(1, gRptTrendMax) * 210, 0) & "' fill='#31825D'/>"
-                                        & "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='272'"
-                                        & " text-anchor='middle' font-size='15'"
-                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                        & EncodeHTML(Lbl) & "</text>" )
-                                    & "<polyline fill='none' stroke='#D69828' stroke-width='4'"
-                                    & " stroke-linejoin='round' points='"
-                                    & Concat( colRptBuckets,
-                                          (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & ","
-                                        & (250 - Round(Net / Max(1, gRptTrendMax) * 210, 0)) & " " )
-                                    & "'/>"
-                                    & "</svg>" ) ) )
-                  - rowRptAge:
+                  - pnlRptTrend:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
-                        LayoutDirection: =LayoutDirection.Horizontal
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =20
-                        FillPortions: =0
-                        LayoutMinHeight: =30
-                        Width: =Parent.Width - 32
-                        Height: =30
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =2
+                        LayoutMinWidth: =340
+                        Height: =360
                       Children:
-                        - lblRptAge:
+                        - lblRptTrendT:
                             Control: Label@2.5.1
                             Properties:
-                              Text: |
-                                ="Open projects by age:   <30d " & gRptAgeA
-                                 & "    30-90d " & gRptAgeB
-                                 & "    90-180d " & gRptAgeC
-                                 & "    180d+ " & gRptAgeD
+                              Text: ="Projects started, completed, net open"
                               Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextPrimary
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =2
-                              LayoutMinWidth: =320
-                              Height: =30
-                        - lblRptStall:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: |
-                                ="Stalled " & gRptStalled & "    ·    no target date " & gRptNoTarget
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
+                              Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
-                              Color: |
-                                =If( gRptStalled > 0, gTheme.Color.Danger, gTheme.Color.TextMuted )
-                              Align: =Align.Right
+                              Color: =gTheme.Color.Primary
                               VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - lblRptTrendS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Blue started · green completed · line is cumulative net open. "
+                                 & "Archived projects are outside the query, so their completions are not counted."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =32
+                              Width: =Parent.Width - 32
+                              Height: =32
+                        # ONE SCALE for all three series — they are all project counts, so a
+                        # second axis would only make the line look bigger than it is.
+                        - imgRptTrend:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
                               FillPortions: =1
-                              LayoutMinWidth: =200
-                              Height: =30
+                              LayoutMinHeight: =160
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 90
+                              # 480-WIDE viewBox, NOT the 900 this chart carried while it had
+                              # the whole band. ImagePosition.Fit scales the box to the control,
+                              # so a 900-unit box in a third-width column would shrink a 15pt
+                              # label to about 7px on screen. Halving the box halves the
+                              # downscale instead of shrinking the type.
+                              Image: |
+                                =With( { n: Max(1, CountRows(colRptBuckets)) },
+                                    With( { w: RoundDown(460 / n, 0),
+                                            sk: If( CountRows(colRptBuckets) > 8, 2, 1 ) },
+                                        "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 300'>"
+                                          & "<line x1='10' y1='40' x2='470' y2='40' stroke='#E1E5EB'"
+                                          & " stroke-width='1' stroke-dasharray='4 4'/>"
+                                          & "<text x='10' y='34' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & gRptTrendMax & "</text>"
+                                          & "<line x1='0' y1='250' x2='480' y2='250' stroke='#E1E5EB' stroke-width='2'/>"
+                                          & Concat( colRptBuckets,
+                                                "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
+                                              & (250 - Round(St / Max(1, gRptTrendMax) * 210, 0)) & "' width='"
+                                              & Max(3, RoundDown(w / 2, 0) - 3) & "' height='"
+                                              & Round(St / Max(1, gRptTrendMax) * 210, 0) & "' fill='#005A9E'/>"
+                                              & "<rect x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='"
+                                              & (250 - Round(Cp / Max(1, gRptTrendMax) * 210, 0)) & "' width='"
+                                              & Max(3, RoundDown(w / 2, 0) - 3) & "' height='"
+                                              & Round(Cp / Max(1, gRptTrendMax) * 210, 0) & "' fill='#31825D'/>"
+                                              // EVERY OTHER LABEL once the window gives more than 8
+                                              // buckets: a "d mmm" label runs about 42 units at this
+                                              // font and a quarter's buckets are only 35 apart.
+                                              & If( Mod(Idx - 1, sk) = 0,
+                                                    "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='272'"
+                                                  & " text-anchor='middle' font-size='14'"
+                                                  & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                                  & EncodeHTML(Lbl) & "</text>", "" ) )
+                                          & "<polyline fill='none' stroke='#D69828' stroke-width='3'"
+                                          & " stroke-linejoin='round' points='"
+                                          & Concat( colRptBuckets,
+                                                (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & ","
+                                              & (250 - Round(Net / Max(1, gRptTrendMax) * 210, 0)) & " " )
+                                          & "'/>"
+                                          & "</svg>" ) ) )
+                  # A SNAPSHOT, NOT A WINDOW. project_phase is current state with no history
+                  # behind it, so this counts the open book as it stands and the period strip
+                  # leaves it alone. That is the point of it sitting between the two.
+                  - pnlRptPhase:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =240
+                        Height: =360
+                      Children:
+                        - lblRptPhaseT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Projects by status"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - lblRptPhaseS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Where every live project stands now — not a window. "
+                                 & "Archived is outside the query. "
+                                 & gRptNoTarget & " open with no target date."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =32
+                              Width: =Parent.Width - 32
+                              Height: =32
+                        - imgRptPhase:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 90
+                              # Same construction as the band-3 and band-5 pies — circumference
+                              # 100 at r 15.9155, stroke-width 2r so the ring is a disc, and
+                              # every value Power Fx supplies is a whole number.
+                              Image: |
+                                =With( { n: CountRows(colRptPhPie) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
+                                      & "<g transform='translate(75 75) scale(2)'>"
+                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
+                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
+                                      & Concat( colRptPhPie,
+                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
+                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
+                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
+                                          & (125 - Off) & "'/>" )
+                                      & "</g>"
+                                      & Concat( colRptPhPie,
+                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
+                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
+                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
+                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
+                                          & " fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
+                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
+                                          & "' text-anchor='end' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "No live projects</text>", "" )
+                                      & "</svg>" ) )
+                  # KEYED ON Today(), NOT gRptFrom — see the fold. This is the one series on
+                  # the screen that looks forward, which is why it is the right-hand column.
+                  - pnlRptDue:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =2
+                        LayoutMinWidth: =340
+                        Height: =360
+                      Children:
+                        - lblRptDueT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks due, today and the next two weeks"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        # THE THREE TASKS THAT ARE NOT IN A BAR ARE STATED, for the same reason
+                        # gRptDoneNoDate and gRptNoSup are: a total that does not reconcile is
+                        # worse than one that explains itself.
+                        - lblRptDueS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Target dates only, weekends shaded, today first. "
+                                 & gRptDueOver & " overdue · " & gRptDueBeyond
+                                 & " due later · " & gRptDueNone & " with no target date."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =32
+                              Width: =Parent.Width - 32
+                              Height: =32
+                        - imgRptDue:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =160
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 90
+                              # FIFTEEN FIXED BARS 30 UNITS APART, so no bar-width arithmetic is
+                              # needed: unlike the trend chart the category count cannot change.
+                              Image: |
+                                =With( { t: Coalesce(Sum(colRptDueBars, N), 0) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 300'>"
+                                      & Concat( Filter(colRptDueBars, We = 1),
+                                            "<rect x='" & (20 + (Idx - 1) * 30) & "' y='40'"
+                                          & " width='30' height='210' fill='#F5F7FA'/>" )
+                                      & "<line x1='20' y1='40' x2='470' y2='40' stroke='#E1E5EB'"
+                                      & " stroke-width='1' stroke-dasharray='4 4'/>"
+                                      & "<text x='20' y='34' font-size='13'"
+                                      & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                      & gRptDueMax & "</text>"
+                                      & "<line x1='20' y1='250' x2='470' y2='250' stroke='#E1E5EB' stroke-width='2'/>"
+                                      & Concat( Filter(colRptDueBars, N > 0),
+                                            "<rect x='" & (20 + (Idx - 1) * 30 + 4) & "' y='"
+                                          & (250 - Round(N / Max(1, gRptDueMax) * 195, 0)) & "' width='22' height='"
+                                          & Round(N / Max(1, gRptDueMax) * 195, 0) & "' rx='2' fill='"
+                                          & If( Idx = 1, "#003C6E", If( We = 1, "#B9C0C8", "#005A9E" ) )
+                                          & "'/>"
+                                          & "<text x='" & (20 + (Idx - 1) * 30 + 15) & "' y='"
+                                          & (250 - Round(N / Max(1, gRptDueMax) * 195, 0) - 5)
+                                          & "' text-anchor='middle' font-size='12'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                          & N & "</text>" )
+                                      & Concat( colRptDueBars,
+                                            "<text x='" & (20 + (Idx - 1) * 30 + 15) & "' y='268'"
+                                          & " text-anchor='middle' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & EncodeHTML(Lbl) & "</text>"
+                                          & If( Len(Mon) > 0,
+                                                "<text x='" & (20 + (Idx - 1) * 30 + 15) & "' y='285'"
+                                              & " text-anchor='middle' font-size='12'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>"
+                                              & EncodeHTML(Mon) & "</text>", "" ) )
+                                      & If( t = 0,
+                                            "<text x='245' y='150' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "Nothing due in the next two weeks</text>", "" )
+                                      & "</svg>" ) )
             # =============================================================
             # BAND 5 — transactions (secondary)
             # =============================================================

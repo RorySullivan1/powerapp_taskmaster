@@ -234,13 +234,32 @@ row overflows:
 
 ### Band 4 — How projects are trending
 
-Built entirely from dated events, since no history exists:
+Three columns, read left to right as **past · present · future**. `FillPortions` 2 : 1 : 2 — the two
+bar charts carry up to 13 and 15 categories and need the room; the pie is a 320×150 box and does not.
+The minimums add to ~950px, under both band 3 and band 5, so this band never sets the scroll width.
 
-- **Combo chart** — bars: projects started per month (`project_date_start`); bars: completed per
-  month (`project_date_complete`); line: **cumulative net open** (started − completed, running).
-  That line is the direct answer to "how are projects trending" and needs no snapshot list.
-- **Ageing panel** — open projects bucketed by days since start (<30 · 30–90 · 90–180 · 180+), the
-  `Stalled` count, and the count with no target date set.
+**Only the left panel is bound by the period strip.** The other two are not, and each says so on its
+face — that is the whole reason they sit together.
+
+- **Combo chart** *(window)* — bars: projects started per bucket (`project_date_start`); bars:
+  completed per bucket (`project_date_complete`); line: **cumulative net open** (started − completed,
+  running). That line is the direct answer to "how are projects trending" and needs no snapshot list,
+  because it is built from dated **events** rather than stateful columns.
+- **Projects by status** *(snapshot)* — a **pie** on `project_phase`, over a **fixed five-value
+  sequence** rather than `Distinct`: the vocabulary is closed, so enumerating it holds lifecycle
+  order and pins one colour per phase across refreshes. Archived is outside `ActiveProjects` and so
+  is absent by construction. The count of open projects with **no target date** rides on the
+  subtitle — the one datum from the retired ageing strip that nothing else on the screen carries.
+- **Due next** *(forward)* — bars of open tasks by `task_date_target`, **today plus a fortnight**,
+  15 fixed bars. Keyed on `Today()`, so the period strip does not move it. Weekends are shaded and
+  today's bar is darkened. The three populations that are **not** in a bar — overdue, due beyond the
+  fortnight, no target date — are counted on the subtitle, for the same reason `gRptDoneNoDate` is:
+  a total that does not reconcile is worse than one that explains itself.
+
+The combo chart's viewBox is **480 wide, not 900**. `ImagePosition.Fit` scales the box to the
+control, so the box it carried while it owned the whole band would shrink a 15pt label to ~7px in a
+third-width column; halving the box halves the downscale instead of shrinking the type. Labels drop
+to every other bucket once the window yields more than 8.
 
 Archived projects are outside `ActiveProjects`, so their completions are not counted. Stated on the
 provenance line.
