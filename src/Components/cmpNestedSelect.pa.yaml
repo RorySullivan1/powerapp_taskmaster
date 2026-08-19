@@ -1,30 +1,23 @@
 # cmpNestedSelect — cascading 1-3 level picker over a mapping_* table.
+# Outputs SelectedPath (authoritative, composed from the picks) and SelectedId (the
+# exact row, or 0 when the pick names a branch with no row of its own).
 #
-#   caption
-#   [ level 1 ] [ level 2 ] [ level 3 ]  + ✕   + opens a level, ✕ closes one
-#
-# Outputs SelectedPath (authoritative, composed from the picks) and SelectedId
-# (the exact row, or 0 when the pick names a branch with no row of its own).
-#
-# THERE IS NO COMMIT TICK. Every pick raises OnChange immediately, so a
-# selection IS the acceptance — the consumer writes on each change and a user
-# can never leave a chosen value unrecorded by forgetting a second click.
-# + and ✕ raise it too: closing a level shortens the path, which is a change.
+# THERE IS NO COMMIT TICK. Every pick raises OnChange immediately, so a selection IS
+# the acceptance and a user cannot leave a chosen value unrecorded. + and ✕ raise it
+# too — closing a level shortens the path, which is a change.
 #
 # Four things that will re-break it if changed without knowing why:
-#   - Children of an auto-layout container default to flexible sizing, which makes
-#     an explicit Width advisory. FillPortions 0 pins them.
-#   - The internal geometry is integers only. That is for legibility, not safety —
-#     layout formulas do survive a paste (tests/README.md).
+#   - Children of an auto-layout container default to flexible sizing, which makes an
+#     explicit Width advisory. FillPortions 0 pins them.
+#   - The internal geometry is integers only — for legibility, not safety.
 #   - nsLevels is never initialised, so every read is Coalesce(nsLevels, <seed depth>),
-#     and the seed depth is CountRows(Split(DefaultPath, Separator)) — computed as a
-#     number. It used to be parked in a hidden Label's Text and read back with Value();
-#     that round trip through text is what raised "cannot be converted to a number".
+#     and the seed depth is CountRows(Split(DefaultPath, Separator)) computed as a
+#     NUMBER. Parking it in a hidden Label and reading it back with Value() is what
+#     raised "cannot be converted to a number".
 #   - Distinct() names its column Value, hence .Selected.Value.
 #
 # nsLevels is per INSTANCE: with AccessAppScope off, MS Learn states Set/Collect
-# results "are scoped to the component instance". Two pickers on one screen do not
-# share depth.
+# results "are scoped to the component instance". Two pickers do not share depth.
 ComponentDefinitions:
   cmpNestedSelect:
     DefinitionType: CanvasComponent

@@ -3,19 +3,17 @@
 # projects the rows and writes back { Id: Value(Picked.Key), Value: Picked.Primary }
 # for a lookup, or { DisplayName: Picked.Primary, Mail: Picked.Secondary } for a person.
 #
-# AccessAppScope is false, so it cannot read app globals, named formulas or data sources.
-# Colours are literals, and the SCREEN runs the query and passes rows in via Results.
+# AccessAppScope is false, so it cannot read app globals, named formulas or data
+# sources. Colours are literals, and the SCREEN runs the query and passes rows in.
 #
 # NINE properties to hand-type in Studio: Title / Results / AllowCreate (Input),
 # Query / Picked (Output), OnSearch / OnConfirm / OnCancel / OnCreateNew (Event).
 #
-# Call Reset(<instance>) when opening: one instance serves every field on a screen, so
+# CALL Reset(<instance>) WHEN OPENING: one instance serves every field on a screen, so
 # without it the dialog opens on the previous field's highlight and the check commits it.
 # Search is DEBOUNCED — canvas has no keypress or Enter event on a text input at all.
-#
-# THE DIALOG OPENS WITH ROWS ALREADY IN IT. `Results` is never gated on a query here;
-# each screen returns a default page when nothing is typed. So pkHint is shown by
-# CountRows(Results) = 0 alone — gating it on query length would cover those rows.
+# THE DIALOG OPENS WITH ROWS ALREADY IN IT: `Results` is never gated on a query, so
+# pkHint is shown by CountRows(Results) = 0 alone.
 ComponentDefinitions:
   cmpPicker:
     DefinitionType: CanvasComponent
@@ -70,31 +68,23 @@ ComponentDefinitions:
         =If( IsBlank(pkPicked), { Key: "", Primary: "", Secondary: "" }, pkPicked )
       Query: |
         =Coalesce( pkQuery, "" )
-      # NO SetFocus HERE — do not re-add it. `SetFocus` cannot target a control
-      # inside a Component, a Gallery, an Edit form OR a Container (MS Learn,
-      # function-setfocus#limitations; Studio rejected it 2026-08-12). Every one
-      # of those exclusions applies somewhere in this app, and the first applies
-      # to every control in this file. `Reset` carries no such restriction, which
-      # is why the line below is fine and the SetFocus line was not.
-      # CONSEQUENCE, ACCEPTED: the dialog opens with nothing focused, so the user
-      # must click into the search box before typing. There is no formula-level
-      # workaround — a PCF code component with an InputEvent property is the only
-      # documented route, and that is a far bigger change than this buys.
+      # NO SetFocus HERE — do not re-add it. `SetFocus` cannot target a control inside a
+      # Component, a Gallery, an Edit form OR a Container (MS Learn, function-setfocus
+      # #limitations), and the first exclusion applies to every control in this file.
+      # CONSEQUENCE, ACCEPTED: the dialog opens with nothing focused. There is no
+      # formula-level workaround — only a PCF code component with an InputEvent property.
       OnReset: |
         =Set( pkQuery, "" );
          Set( pkPicked, Blank() );
          Set( pkTried, false );
          Reset( txtPkSearch )
     Children:
-      # NO AccessibleLabel ON ANY Classic/* CONTROL — the property does not exist
-      # there (confirmed 2026-08-12), so it fails the paste. It survives below on
-      # `txtPkSearch` ONLY because that one is modern. Classic controls take
-      # `Tooltip` instead, which is what `pkClose` uses.
-      # The cost is real and is accepted, not overlooked: `pkRowHit` is an unnamed
-      # transparent button on every result row, so a screen reader announces the
-      # list as "button, button, button" and there is no property here that fixes
-      # it. Converting the row hit target to a modern button is the only route,
-      # and that is a separate, riskier change.
+      # NO AccessibleLabel ON ANY Classic/* CONTROL — the property does not exist there and
+      # fails the paste. It survives on `txtPkSearch` ONLY because that one is modern;
+      # classic controls take `Tooltip` instead.
+      # THE COST IS ACCEPTED, NOT OVERLOOKED: `pkRowHit` is an unnamed transparent button on
+      # every result row, so a screen reader announces the list as "button, button, button".
+      # Converting the row hit target to a modern button is the only route.
       # ---- Scrim -------------------------------------------------------------
       - pkScrim:
           Control: Classic/Button@2.2.0
@@ -157,9 +147,8 @@ ComponentDefinitions:
           Properties:
             Placeholder: ="Search, or pick from the list below…"
             AccessibleLabel: ="Search"
-            # Delayed: OnChange fires once the user STOPS TYPING, not per
-            # keystroke. Never FocusOut — that fires only on losing focus, which
-            # is what made Enter appear to do nothing.
+            # Delayed: OnChange fires once the user STOPS TYPING, not per keystroke. Never
+            # FocusOut — that fires only on losing focus, which made Enter appear to do nothing.
             TriggerOutput: =TriggerOutput.Delayed
             Font: =Font.'Segoe UI'
             Size: =14
@@ -252,9 +241,8 @@ ComponentDefinitions:
             - pkRowHit:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  # Transparent full-template button declared LAST — a gallery's
-                  # own OnSelect does not reliably fire when the click lands on a
-                  # child control. HIGHLIGHTS ONLY; the check commits.
+                  # Transparent full-template button declared LAST — a gallery's own OnSelect does
+                  # not reliably fire when the click lands on a child control. HIGHLIGHTS ONLY.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   HoverFill: =RGBA(0, 90, 158, 0.05)
@@ -347,8 +335,8 @@ ComponentDefinitions:
             Y: =(Parent.Height - 460) / 2 + 400
             Width: =120
             Height: =40
-            # ALWAYS ENABLED. With nothing picked it explains itself via pkNudge
-            # rather than sitting inert — a disabled button cannot say why.
+            # ALWAYS ENABLED. With nothing picked it explains itself via pkNudge rather than
+            # sitting inert — a disabled button cannot say why.
             OnSelect: |
               =If( Len(Coalesce(pkPicked.Key, "")) = 0,
                    Set( pkTried, true ),

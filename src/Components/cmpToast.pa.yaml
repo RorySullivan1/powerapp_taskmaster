@@ -1,58 +1,35 @@
 # =============================================================================
-# cmpToast  —  transient notification / snackbar (component; screen-level)
-# =============================================================================
-# ONE FLAG DRIVES EVERYTHING. The screen owns a boolean; that boolean shows the
-# toast, starts the timer, and resets it. There is no internal state and no
-# Show() action any more — see "Why the redesign" below.
+# cmpToast — transient notification / snackbar (component; screen-level)
+#
+# ONE FLAG DRIVES EVERYTHING. The screen owns a boolean; that boolean shows the toast,
+# starts the timer and resets it. There is no internal state and no Show() action.
 #
 #   To raise:   Set(gToastShow, false);                    // forces the reset edge
 #               Set(gToastMsg, "Saved"); Set(gToastTone, "Success");
 #               Set(gToastShow, true)
-#   To place:   one instance per screen, e.g. bottom-right, with
+#   To place:   one instance per screen, with
 #               Visible: =gToastShow   AND   IsOpen: =gToastShow
 #   It dismisses itself: OnTimerEnd raises OnDismiss, the screen clears the flag.
 #
-# ---------------------------------------------------------------------------
-# WHY THE REDESIGN (the "duration doesn't work" bug, 2026-08-04)
+# The timer is `Start: =cmpToast.IsOpen` with `Reset: =!cmpToast.IsOpen` — the
+# canonical restart idiom, and NOT an internal variable plus a Show() action, which is
+# two sources of truth plus a race between Reset() and the timer's Start.
 #
-# The first version kept its own `_show` variable, exposed a `Show()` action that
-# did `Set(_show, true); Reset(tmrToast)`, and had the timer's `Start: =_show`.
-# That is TWO sources of truth — the screen's `gToastShow` (which gates the
-# instance's Visible, added to stop the toast swallowing clicks) and the
-# component's `_show` — plus a race: `Reset()` fires in the same behaviour pass
-# that sets the variable the timer's `Start` reads, so whether the timer ends up
-# running depends on evaluation order this air gap cannot verify. The toast
-# appeared and never dismissed.
+# `IsOpen` DRIVES THE TIMER ONLY. The visual children carry no `Visible` of their own,
+# because the INSTANCE's `Visible` already hides the component. That is deliberate: an
+# unwired `IsOpen` defaults to false, so children depending on it would make the toast
+# vanish with no clue why. It degrades to "shows but never auto-dismisses" instead,
+# which points straight at the cause.
 #
-# Now: `IsOpen` is an INPUT, the timer is `Start: =cmpToast.IsOpen` with
-# `Reset: =!cmpToast.IsOpen`. Both are documented Timer properties and this is the
-# canonical restart idiom — while the flag is false the timer sits reset at zero;
-# the moment it goes true the timer starts from zero. No action, no internal
-# variable, nothing to race.
+# IF IT DOES NOT DISMISS, CHECK THESE FIRST:
+#   1. Timers only run in PREVIEW — "In Power Apps Studio, timers run only in Preview
+#      mode" (MS Learn, Timer control). Not a bug if you were on canvas.
+#   2. The timer is `Visible: =false`, which the same page endorses. If it still never
+#      fires, make it visible at 1x1 to prove whether hidden is the problem — that is
+#      the one remaining unverifiable.
 #
-# `IsOpen` DRIVES THE TIMER ONLY — the visual children carry no `Visible` of their
-# own, because the INSTANCE's `Visible` already hides the whole component. That is
-# deliberate: if `IsOpen` is ever left unwired on an instance it defaults to false,
-# and if the children depended on it the toast would vanish completely with no clue
-# why. Now a forgotten `IsOpen` degrades to "shows but never auto-dismisses" —
-# annoying, but it points straight at the cause. (This is exactly what happened on
-# 2026-08-04: the component was rebuilt but the instance's new input was not set.)
-#
-# FIRST TWO THINGS TO CHECK if it still doesn't dismiss:
-#   1. **Timers only run in Preview** — "In Power Apps Studio, timers run only in
-#      Preview mode" (MS Learn, Timer control). Not a bug if you were on canvas.
-#   2. The timer is `Visible: =false`, which the same page explicitly endorses
-#      ("Background timers should have their Visible property set to false"). If
-#      it still never fires, make it visible at 1x1 in a corner to prove whether
-#      hidden is the problem — that is the one remaining unverifiable.
-# Fallback if the Timer control is the problem at all: delete it and let the
-# screen own the timing, making this a visual-only toast driven by `IsOpen`.
-# ---------------------------------------------------------------------------
-#
-# Tokens: `Rectangle@2.3.0`, `Classic/Icon@2.5.0`, `Label@2.5.1`, and `Timer` —
-# plain `Timer`, NOT `Classic/Timer`, confirmed in Studio 2026-08-03. No version
-# suffix: optional per the schema, and Studio uses the current version.
-# Colours are literals mirroring the gTheme palette — a component cannot read gTheme.
+# Tokens: plain `Timer`, NOT `Classic/Timer` (confirmed in Studio). Colours are
+# literals mirroring the gTheme palette — a component cannot read gTheme.
 # =============================================================================
 ComponentDefinitions:
   cmpToast:
