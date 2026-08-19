@@ -113,8 +113,10 @@ session can't relitigate a settled call.
   "Never invent a column name" is now enforced rather than prose. It judges only snake_case
   tokens already in the columns' prefix namespace, strips comments first (screens legitimately
   discuss retired columns), and **fails open on anything it cannot parse**.
-- `tools/validate_pa_yaml.py` additionally catches a stray `#` inside a formula and any comment
-  left at column 0 — two ways a scripted edit can corrupt content while the file still parses.
+- `tools/validate_pa_yaml.py` additionally catches a stray `#` inside a formula, a ` #` in a
+  PLAIN scalar (which YAML eats along with the rest of the line, so no check on the parsed
+  document can see it), and any comment left at column 0 — three ways an edit can corrupt
+  content while the file still parses.
 
 - **Overlay reachability — BUILT (NOTE-level).** `overlay_reachability()` flags a control with an
   `OnSelect` declared *before* a full-template overlay in a gallery row — the failure that renders

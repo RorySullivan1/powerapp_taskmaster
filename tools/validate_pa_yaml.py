@@ -307,6 +307,56 @@ def stray_comment_indent(text: str) -> list[str]:
     return out
 
 
+def eaten_comment_errors(text: str) -> list[str]:
+    """A ` #` inside a PLAIN (unquoted) scalar — YAML eats it and the rest of the line.
+
+    The mirror image of stray_hash_errors, and the more dangerous half. That check
+    looks for a `#` that SURVIVED parsing, which only happens inside a block scalar.
+    Here the `#` does not survive: YAML treats ` #` in a plain scalar as the start of
+    a comment and discards everything after it, closing quote included. So
+
+        Text: ="Date-null delegation probe  ·  issue #35"
+
+    parses to `="Date-null delegation probe  ·  issue` — an unterminated string that
+    Studio rejects, and that no check working on the PARSED document can see, because
+    by then the `#` is gone. The validator said `ok` on exactly this file.
+
+    Scanned in the source text for that reason. Block scalars are skipped: inside a
+    `|` block a `#` is content, which is what stray_hash_errors already covers, and a
+    quoted YAML scalar is skipped too because `#` is literal there.
+
+    The fix at the call site is always the same — put the formula in a block scalar.
+    """
+    out, lines = [], text.split("\n")
+    block_indent = None
+    for n, line in enumerate(lines, 1):
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+        if block_indent is not None:
+            # block content is anything indented deeper than the key that opened it
+            if not stripped or indent > block_indent:
+                continue
+            block_indent = None
+        if not stripped or stripped.startswith("#"):
+            continue
+        m = re.match(r"^(\s*)(?:-\s+)?([A-Za-z_][\w.]*):\s*(.*)$", line)
+        if not m:
+            continue
+        value = m.group(3)
+        if re.match(r"^[|>][-+]?\d*\s*$", value):
+            block_indent = m.start(2)
+            continue
+        if not value.startswith("="):
+            continue
+        if " #" in value:
+            out.append(
+                f"line {n}: ' #' in a plain scalar — YAML reads it as a comment and "
+                f"DISCARDS the rest of the line, so the formula lands truncated. Put it "
+                f"in a block scalar (`{m.group(2)}: |`): {stripped[:70]}"
+            )
+    return out
+
+
 def _child_pairs(node) -> list:
     """(name, body) for a control's Children, in DECLARATION order — which is z-order."""
     if not isinstance(node, dict):
@@ -778,7 +828,8 @@ def main() -> int:
             print()
             continue
         tok = (token_errors(doc) + stray_hash_errors(doc)
-               + stray_comment_indent(text) + overlay_reachability(doc))
+               + stray_comment_indent(text) + eaten_comment_errors(text)
+               + overlay_reachability(doc))
         errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
         hard_tok = [t for t in tok if "NOTE " not in t]
         if not errors and not hard_tok:
