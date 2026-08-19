@@ -26,7 +26,7 @@ any future issue-cycle report reads. Fix the writer before reworking the readers
    renderer is proven in step 4's simpler section (single-level path, no join) before step 5 asks
    it to carry a two-level path AND a `transaction_product_id` join.
 
-**#9 IS BUILT AND UNPASTED** (`b46a17a`). Plan posted on the issue first and confirmed by the
+**#9 IS BUILT, LANDED AND EXERCISED** (`b46a17a`; landed 2026-08-19, all four checks clear). Plan posted on the issue first and confirmed by the
 user ("remove the opened by box outright"). Removed `lblIssCloseCap`/`dtpIssClose`, the
 `Reset(dtpIssClose)`, and `colIssOpened` with its provenance comment; `colIssAssignee` took the
 whole of `rowIss6`; `gridIss5` KEPT its two columns so Related transaction holds its width and
@@ -86,3 +86,14 @@ close-reopen-close inside one session, which off the snapshot restored the origi
   on-time do not make sense".
 - Chart type for "Open tasks by requestor" is unspecified in #11. Recommended a ranked BAR, not a pie:
   requestor cardinality is open-ended and a pie needs few slices.
+
+## Outcome
+#9 landed first try and all four checks cleared — new issue saves with no resolution field, the
+close stamps, **the re-save does NOT move the date**, and the reopen clears it. That third check
+is the one worth remembering: it is the direct evidence that reading the stored value through
+`LookUp(taskmaster_issues, ID = gEditIssue.ID, issue_date_close)` was necessary. Had the formula
+been left on `gEditIssue.issue_date_close` as first planned, ECS would have trimmed the column off
+a record no control reads any more, the Coalesce would have seen blank, and the date would have
+crept forward on every save — passing every OTHER check while failing silently on that one.
+
+`main` was fast-forwarded to `b7aa4ca` at the user's explicit request and the paste came from there.

@@ -11,20 +11,21 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **THE PASTE QUEUE HOLDS ONE FILE: `scrIssueEdit` (issue #9, built 2026-08-19, `b46a17a`).**
-  Nothing else is outstanding. Everything below was true as of 2026-08-18:
-- **(was) THE PASTE QUEUE IS EMPTY (user, 2026-08-18).** All 11 screens, all 10 components and the
-  App object are in Studio, and `scrProject` / `scrProjects` / `scrTaskEdit` /
-  `scrTransactionEdit` / `scrIssueEdit` all landed carrying issues #13, #15 and #17.
+- **THE PASTE QUEUE IS EMPTY AGAIN (user, 2026-08-19).** All 11 screens, all 10 components and
+  the App object are in Studio. `scrProject` / `scrProjects` / `scrTaskEdit` /
+  `scrTransactionEdit` / `scrIssueEdit` landed carrying issues #13, #15 and #17, and
+  **`scrIssueEdit` landed again on 2026-08-19 carrying #9 — LANDED AND FULLY EXERCISED**, all
+  four checks clear including the re-save that proves the date does not creep forward.
   **`task_output_audience` IS LIVE** on `taskmaster_tasks`, so #13's gate has a column behind it.
   **Landed is not the same as exercised** — see Threads for the three behaviours nobody has run
   yet: the confirm dialog actually opening, the completion gate actually blocking, and #14's
   junction write.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **THE BACKLOG IS DOWN TO TWO: #9 (scrIssueEdit trim) and #11 (scrReports rework).** Everything
-  else — #10, #12-#17 — is closed. Agreed order is **#9 first**, then #11 in five steps
-  (subtract, extend the data layer, people, task grouping, transactions). See Decisions.
+- **THE BACKLOG IS DOWN TO ONE: #11 (scrReports rework).** #9 is DONE (landed + exercised);
+  #10 and #12-#17 are closed. #11 runs in five steps — subtract, extend the data layer, people,
+  task grouping, transactions. Step 1 is unblocked; **step 2 needs the output
+  format-vs-audience question answered first.** See Decisions.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -269,3 +270,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-18 | issue #14 diagnosed read-only: the taskmaster_taskproduct reconcile is unguarded so a rejected write reports success, the summary is written before it and independently of it, the output toggle silently deletes links, and the RemoveIf does not delegate; probe-first plan posted, NOTHING written | sessions/2026-08-18-1118-issue14-multiproduct-diagnosis.md
 - 2026-08-19 | backlog reviewed and ordered: only #9 and #11 remain; #14 confirmed closed and the stale State block corrected; #9 planned in full (not a pure deletion — the resolution date becomes a derived stamp) | sessions/2026-08-19-0019-backlog-ordering.md
 - 2026-08-19 | issue #9 BUILT, unpasted: the resolution-date picker and the opened-by box removed from scrIssueEdit, issue_date_close now derived from the status transition; the stored date is read with a delegable LookUp because ECS would trim it off the gEditIssue snapshot once no control reads it | GitHub #9
+- 2026-08-19 | #9 LANDED AND EXERCISED — all four checks clear. The re-save check passing is the one that matters: it proves the derived `issue_date_close` reads the STORED value, so the ECS/snapshot hardening was necessary and correct | GitHub #9
