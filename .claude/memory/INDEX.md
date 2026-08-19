@@ -16,10 +16,16 @@
   **`task_output_audience` and `task_output_approval_flag` are LIVE** on `taskmaster_tasks`.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **THE BACKLOG IS THREE ISSUES, NONE STARTED (2026-08-19): #23 Issue Schema · #24 scrHome
-  project visibility + chart edits · #25 scrProjectEdit schema rework.** Everything #9-#22 is
-  closed and **the paste queue is empty**. #23 and #25 are SCHEMA work: `schema/schema.yaml` is
-  the golden source and internal names FREEZE at creation, so settle columns before provisioning.
+- **#23 IS BUILT AND UNLANDED — `scrIssueEdit` QUEUED FOR PASTE, AND SHAREPOINT MUST CHANGE
+  FIRST.** `issue_type` and `issue_impact` are now `required: true` with defaults Question and
+  Moderate; the "(none)" option is gone from both pickers and the save writes both unguarded.
+  **DO THE SHAREPOINT CHANGE BEFORE PASTING** — set both columns required with those defaults.
+  **Existing issues holding blank or a RETIRED type are edited into a default on open**, which
+  is a silent back-fill on save; scrHome and scrProject still Coalesce blanks and must keep
+  doing so for rows nobody has touched.
+- **BACKLOG: #24 scrHome project visibility + chart edits · #25 scrProjectEdit schema rework**,
+  neither started. Everything #9-#22 is closed. #25 is SCHEMA work: `schema/schema.yaml` is the
+  golden source and internal names FREEZE at creation, so settle columns before provisioning.
 - **STANDING RISKS AND UNEXERCISED BEHAVIOUR — landed is not the same as exercised.** Do not
   claim any of these work:
   - **scrProjects contains-search is bounded by the DATA ROW LIMIT and fails SILENTLY.** Confirm
@@ -331,3 +337,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #22: task health derived, not chosen. issue_type re-vocabularied to 7 values; stored issue-half + live overdue half; recompute wired to every issue change; scrReports folds overdue in | sessions/2026-08-19-1600-issue22-derived-health.md
 - 2026-08-19 | #22 paste defect: Set() removed from the health-recompute ForAll on scrIssueEdit and scrProject; gHlScrapI/gHlScrapP/gHlErr were all write-only and are gone. LANDED clean. Scan of all 91 ForAll sites finds no other occurrence | GitHub #22
 - 2026-08-19 | #22 (derived task health) LANDED and CLOSED after its ForAll paste defect was fixed; backlog is now #23, #24, #25, none started. State block consolidated — the closed-issue narrative moved out, the standing risks kept | GitHub #22
+- 2026-08-19 | #23 BUILT: issue_type and issue_impact required with defaults Question/Moderate, "(none)" dropped from both pickers, save unguarded. Two traps handled that the bare requirement misses — the seed is tested against the VOCABULARY (a retired value is not blank) and the DefaultId fallback resolves the default BY LABEL, not Id 1 | GitHub #23
