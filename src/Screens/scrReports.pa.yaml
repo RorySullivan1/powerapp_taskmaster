@@ -461,6 +461,9 @@ Screens:
                   ForAll( Filter(colRptFmtBar, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptFmtBar, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
+                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
+                            // a dropped zero-count row would leave a gap in the legend.
+                            Li:  CountRows( Filter(colRptFmtBar, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptFmtTot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptFmtTot * 100, 0 )
                                  - RoundDown( cb / gRptFmtTot * 100, 0 ),
@@ -513,6 +516,9 @@ Screens:
                   ForAll( Filter(colRptRgnSeq, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptRgnSeq, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
+                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
+                            // a dropped zero-count row would leave a gap in the legend.
+                            Li:  CountRows( Filter(colRptRgnSeq, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptRgnTot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptRgnTot * 100, 0 )
                                  - RoundDown( cb / gRptRgnTot * 100, 0 ),
@@ -646,6 +652,9 @@ Screens:
                   ForAll( Filter(colRptPrdSeq, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptPrdSeq, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
+                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
+                            // a dropped zero-count row would leave a gap in the legend.
+                            Li:  CountRows( Filter(colRptPrdSeq, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptPrdTot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptPrdTot * 100, 0 )
                                  - RoundDown( cb / gRptPrdTot * 100, 0 ),
@@ -671,6 +680,9 @@ Screens:
                   ForAll( Filter(colRptPr2Seq, N > 0) As r,
                       With( { cb: Coalesce( Sum( Filter(colRptPr2Seq, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
+                            // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
+                            // a dropped zero-count row would leave a gap in the legend.
+                            Li:  CountRows( Filter(colRptPr2Seq, N > 0 && Idx <= r.Idx) ),
                             Off: RoundDown( cb / gRptPr2Tot * 100, 0 ),
                             Pct: RoundDown( (cb + r.N) / gRptPr2Tot * 100, 0 )
                                  - RoundDown( cb / gRptPr2Tot * 100, 0 ),
@@ -1678,10 +1690,15 @@ Screens:
             # =============================================================
             # BAND 3 — where the work sits
             # =============================================================
-            # EVERY COORDINATE IS A WHOLE NUMBER. A fraction would have to go through
-            # Text(), which drags the locale decimal separator into an SVG attribute,
-            # and an attribute Power Fx cannot render comes out EMPTY — a width='' rect
-            # is not a thin rect, it is no rect. The viewBoxes are scaled up instead.
+            # EVERY COORDINATE POWER FX SUPPLIES IS A WHOLE NUMBER. A fraction would have
+            # to go through Text(), which drags the locale decimal separator into an SVG
+            # attribute, and an attribute Power Fx cannot render comes out EMPTY — a
+            # width='' rect is not a thin rect, it is no rect. The viewBoxes are scaled up
+            # instead. Fractions that appear as STRING LITERALS (the pie radius) never pass
+            # through Text() and are safe.
+            #
+            # FOUR COLUMNS AT LayoutMinWidth 260 need ~1100px before they overflow. Raising
+            # a panel's minimum without dropping one from the row is what breaks this band.
             - rowRptWork:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1709,7 +1726,7 @@ Screens:
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         FillPortions: =1
-                        LayoutMinWidth: =320
+                        LayoutMinWidth: =260
                         Height: =300
                       Children:
                         - lblRptFamT:
@@ -1781,7 +1798,7 @@ Screens:
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
                         FillPortions: =1
-                        LayoutMinWidth: =320
+                        LayoutMinWidth: =260
                         Height: =300
                       Children:
                         - lblRptFmtT:
@@ -1797,6 +1814,9 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
+                        # THE "Other" WARNING STAYS IN THE SUBTITLE. A red slice alone is too
+                        # easy to miss, and a non-zero Other means tasks hold a format the
+                        # column no longer offers — a data question, not a schema one.
                         - lblRptFmtS:
                             Control: Label@2.5.1
                             Properties:
@@ -1821,31 +1841,213 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 80
-                              # THE viewBox HEIGHT IS COMPUTED, because the row count is now
-                              # the column's vocabulary length plus two and is no longer
-                              # known at author time. A fixed 360 fitted exactly the eight
-                              # hard-coded rows; a ninth Choice value would have been drawn
-                              # outside the canvas and simply not appeared.
+                              # A PIE IS N STACKED CIRCLES, not arc paths: circumference 100 at
+                              # r 15.9155, so a slice IS its percentage and no Cos/Sin appears
+                              # anywhere. stroke-width 31.831 is 2r, which fills the stroke to
+                              # the centre and makes the ring a disc. The fractions here are
+                              # STRING LITERALS and never computed — a computed fraction goes
+                              # through Text(), drags the locale decimal separator into the
+                              # attribute, and the slice renders EMPTY. Everything Power Fx
+                              # supplies (Pct, Off, the legend coordinates) is a whole number.
+                              # dashoffset 125 - Off, not 25 - Off: the pattern repeats every
+                              # 100 units so the two are the same rotation, and this one can
+                              # never go negative.
                               Image: |
-                                =With( { n: Max(1, CountRows(colRptFmtBar)) },
+                                =With( { n: CountRows(colRptFmtPie) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
+                                      & "<g transform='translate(75 75) scale(2)'>"
+                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
+                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
+                                      & Concat( colRptFmtPie,
+                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
+                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
+                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
+                                          & (125 - Off) & "'/>" )
+                                      & "</g>"
+                                      & Concat( colRptFmtPie,
+                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
+                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
+                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
+                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
+                                          & " fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
+                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
+                                          & "' text-anchor='end' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "No open tasks</text>", "" )
+                                      & "</svg>" ) )
+                  - pnlRptReq:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =260
+                        Height: =300
+                      Children:
+                        - lblRptReqT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks by requestor"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - lblRptReqS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Top 6, from the parent project. "
+                                 & If( LookUp(colRptReqBar, K = "Unassigned", N) > 0,
+                                       LookUp(colRptReqBar, K = "Unassigned", N)
+                                       & " record no requestor.",
+                                       "The column is optional." )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - imgRptReq:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 80
+                              # SAME SHAPE AS THE FAMILY CHART, and the viewBox height is
+                              # COMPUTED for the same reason: the row count is top-6-plus-Other
+                              # and is not known at author time.
+                              Image: |
+                                =With( { n: Max(1, CountRows(colRptReqBar)) },
                                   "data:image/svg+xml;charset=utf-8," & EncodeUrl(
                                       "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 "
                                     & (n * 44 + 16) & "'>"
-                                    & Concat( colRptFmtBar,
+                                    & Concat( colRptReqBar,
                                           "<text x='0' y='" & ((Idx - 1) * 44 + 26)
                                         & "' font-size='17' font-family='Segoe UI, sans-serif' fill='#20262D'>"
-                                        & EncodeHTML(K) & "</text>"
+                                        & EncodeHTML( If(Len(K) > 22, Left(K, 21) & "..", K) ) & "</text>"
                                         & "<rect x='210' y='" & ((Idx - 1) * 44 + 12)
                                         & "' width='330' height='20' rx='10' fill='#EEF1F5'/>"
                                         & "<rect x='210' y='" & ((Idx - 1) * 44 + 12) & "' width='"
-                                        & Max(2, Round(N / Max(1, gRptFmtMax) * 330, 0))
+                                        & Max(2, Round(N / Max(1, gRptReqMax) * 330, 0))
                                         & "' height='20' rx='10' fill='"
-                                        & If( K = "Other", "#C53A3A",
-                                              If(K = "Unspecified", "#B9C0C8", "#005A9E") ) & "'/>"
+                                        & If( K = "Other" || K = "Unassigned", "#B9C0C8", "#005A9E" ) & "'/>"
                                         & "<text x='598' y='" & ((Idx - 1) * 44 + 27)
                                         & "' text-anchor='end' font-size='16'"
                                         & " font-family='Segoe UI, sans-serif' fill='#6E7882'>" & N & "</text>" )
                                     & "</svg>" ) )
+                  - pnlRptRgn:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =260
+                        Height: =300
+                      Children:
+                        - lblRptRgnT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks by region"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - lblRptRgnS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Level 1 of the project's region path."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =16
+                              Width: =Parent.Width - 32
+                              Height: =16
+                        - imgRptRgn:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 80
+                              # A PIE IS N STACKED CIRCLES, not arc paths: circumference 100 at
+                              # r 15.9155, so a slice IS its percentage and no Cos/Sin appears
+                              # anywhere. stroke-width 31.831 is 2r, which fills the stroke to
+                              # the centre and makes the ring a disc. The fractions here are
+                              # STRING LITERALS and never computed — a computed fraction goes
+                              # through Text(), drags the locale decimal separator into the
+                              # attribute, and the slice renders EMPTY. Everything Power Fx
+                              # supplies (Pct, Off, the legend coordinates) is a whole number.
+                              # dashoffset 125 - Off, not 25 - Off: the pattern repeats every
+                              # 100 units so the two are the same rotation, and this one can
+                              # never go negative.
+                              Image: |
+                                =With( { n: CountRows(colRptRgnPie) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
+                                      & "<g transform='translate(75 75) scale(2)'>"
+                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
+                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
+                                      & Concat( colRptRgnPie,
+                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
+                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
+                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
+                                          & (125 - Off) & "'/>" )
+                                      & "</g>"
+                                      & Concat( colRptRgnPie,
+                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
+                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
+                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
+                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
+                                          & " fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
+                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
+                                          & "' text-anchor='end' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "No open tasks</text>", "" )
+                                      & "</svg>" ) )
             # =============================================================
             # BAND 4 — how projects are trending
             # =============================================================
