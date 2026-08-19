@@ -6,21 +6,21 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. #27, #29, #31, #36 LANDED AND CLOSED; #32, #28, #30 BUILT AND
-  UNLANDED; the other 7 (#33, #34, #35, #37, #38, #39, #40) not started.** Ranked in
+- **PERF BACKLOG — GitHub #27–#40. #27, #28, #29, #30, #31, #32, #36 ARE LANDED AND CLOSED; the
+  other 7 (#33, #34, #35, #37, #38, #39, #40) are not started.** Ranked in
   sessions/2026-08-19-1853-perf-review-issues.md.
-- **PASTE QUEUE: `scrHome` (#32 + #28 + #30, three commits, one screen).** The one thing that
-  could fail outright rather than degrade is `Select( btnHomeRecompute )` named from the
-  cmpSectionHeader instance's `OnAction` — no prior case in the repo. Fallback if Studio rejects
-  it: inline the fold in `OnAction` again, keep `OnVisible` on the button.
+- **THE PASTE QUEUE IS EMPTY (user, 2026-08-19)** — `scrHome` landed clean.
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
   `scrTaskEdit` / `scrIssueEdit` save handlers hoist their pre-Patch reads into one `Concurrent`
   (`gTkParentProj` / `gIssParentProj` replace two LookUps each, keyed on the screen's OWN parent
   id, not `gSelProject.ID`); and `scrTaskEdit` skips the taskproduct reconcile when the staged set
-  matches `colTkProductsLoaded`. **EVERY ONE OF THESE LANDED ON THE PASTE ALONE — no round-trip
-  count was ever measured.** Unexercised: the `Concurrent` independent-failure path, the
+  matches `colTkProductsLoaded`; and `scrHome` holds its whole dashboard fold in ONE hidden
+  button (`btnHomeRecompute`, two callers), resolves work-list project names from `colPrjNames`
+  instead of per visible row, and counts `gIssLed` off one `colIssByPrj` fetch with a `>= 2000`
+  fallback to the old per-project queries. **EVERY ONE OF THESE LANDED ON THE PASTE ALONE — no
+  round-trip count was ever measured.** Unexercised: the `Concurrent` independent-failure path, the
   `CountRows(col) <= 1` guard against a genuinely empty fetch, a save that removes or clears
   products, and the archived mirror under a project archived mid-edit.
 - **BUILT — editing and refining, not creating.** 11 screens, 10 components, the App object.
@@ -353,6 +353,10 @@ not know them will author something broken:
 
 - 2026-08-19 | #30 BUILT: gIssLed issued one delegable query PER PROJECT MANAGED on every dashboard open and refresh; now counted locally off colIssByPrj (a fifth Concurrent arm, ForAll projection over OpenIssues). **THIS AMENDS THE 2026-08-13 DECISION, IT DOES NOT REVERSE IT** — there is still no delegable single query for "children of the projects I manage" and `issue_project_id.Id in colMyProjects.ID` still does not delegate. What makes the local count safe is the guard that decision lacked: at `CountRows(colIssByPrj) >= 2000` the map is a partial page, so the OLD per-project queries run instead rather than undercount silently. Both If arms are live and the comment says so | GitHub #30
 
+- 2026-08-19 | **`Select()` OF A SCREEN CONTROL FROM A CANVAS COMPONENT INSTANCE'S EVENT HANDLER WORKS — GROUNDED IN STUDIO** (user, 2026-08-19, `scrHome.hdrMyWork.OnAction` -> `Select( btnHomeRecompute )`). The instance's event binding is authored in SCREEN scope, so component isolation does not apply to it; isolation applies to formulas INSIDE the component definition, which still cannot see screen controls. This was the open paste-time risk on #32 and it resolved positively — the fallback (inline the fold in OnAction, keep OnVisible on the button) was never needed. First case of the pattern in this repo; reuse it rather than duplicating a block into a component handler | GitHub #32
+
+- 2026-08-19 | #32, #28 and #30 LANDED and CLOSED (user) — `scrHome` pasted clean. The dashboard perf work is live: one copy of the fold reached by Select from two callers, three Refreshes in parallel, project names resolved from a local map instead of per visible row, and gIssLed counted off one open-issues fetch. **AS WITH #27/#31 AND #29/#36, LANDING IS A PASTE CONFIRMATION, NOT A MEASUREMENT** — #30's "Done when" asked for a Live Monitor count and that step was NOT performed. **THE `>= 2000` FALLBACK ARM HAS NEVER RUN** (needs a 2000+ open-issue tenant), and the toast-before-numbers ordering introduced by Select's queueing has not been judged in use | GitHub #28, #30, #32
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
@@ -413,3 +417,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #29 and #36 built; scrTaskEdit and scrIssueEdit queued for paste | sessions/2026-08-19-2012-issues-29-36-built.md
 - 2026-08-19 | #29 and #36 landed and closed; paste queue empty | sessions/2026-08-19-2012-issues-29-36-built.md
 - 2026-08-19 | #32/#28/#30 built on scrHome in three commits: the fold deduped into btnHomeRecompute (Select is QUEUED, not inline), project names resolved from colPrjNames instead of per visible row, gIssLed counted off one open-issues fetch with a >=2000 fallback. Queued for paste; the Select-from-a-component-OnAction question is the only thing that could fail outright | sessions/2026-08-19-2031-home-32-28-30-built.md
+- 2026-08-19 | #32/#28/#30 LANDED and closed; scrHome clean on the paste. Select-from-a-component-OnAction is now grounded, not a risk | sessions/2026-08-19-2031-home-32-28-30-built.md
