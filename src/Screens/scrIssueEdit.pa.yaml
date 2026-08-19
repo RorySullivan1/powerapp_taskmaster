@@ -109,7 +109,7 @@ Screens:
         Reset( txtIssName ); Reset( txtIssDesc );
         Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
         // Re-read DefaultDate; see the note on the pickers themselves.
-        Reset( dtpIssTarget ); Reset( dtpIssClose );
+        Reset( dtpIssTarget );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset.
         Reset( cboIssTask ); Reset( cboIssTx );
         // cmpSelection re-reads its DefaultId ONLY on Reset — it gained OnReset for
@@ -486,31 +486,6 @@ Screens:
                                 =Set( gIssTx,
                                       { Id:    cboIssTx.Selected.Id,
                                         Value: If( cboIssTx.Selected.Id = 0, "", cboIssTx.Selected.Label ) } )
-                  - lblIssCloseCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Resolution date"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =3
-                        Height: =18
-                  - dtpIssClose:
-                      Control: ModernDatePicker@1.0.1
-                      Properties:
-                        DefaultDate: =If(gEditMode = "Edit", gEditIssue.issue_date_close, Blank())
-                        Placeholder: ="Close date"
-                        Format: =DatePickerFormat.LongAbbreviated
-                        StartOfWeek: =StartOfWeek.Monday
-                        IsEditable: =true
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =4
-                        LayoutGridRowEnd: =10
-                        Height: =36
             - rowIss6:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -528,7 +503,7 @@ Screens:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =8
-                        Width: =(Parent.Width - 24) / 2
+                        Width: =Parent.Width
                         Height: =62
                       Children:
                         - fldAssignee:
@@ -547,63 +522,6 @@ Screens:
                                  Set( gIssQuery, "" )
                               OnClear: |
                                 =Set( gIssAssignee, { DisplayName: "", Mail: "" } )
-                  # ---------------------------------------------------------------
-                  # PROVENANCE — READ ONLY, and read ONLY from SharePoint's own
-                  # system columns. This slot used to hold a "Business owner"
-                  # people-picker writing `issue_owner`, plus a hidden `issue_date_open`
-                  # the save stamped with Now(). Both were app-written, so both were
-                  # editable, wrong-able and duplicable — and neither was what anyone
-                  # actually wanted from them: who raised this, and when.
-                  #
-                  # `issue_owner` / `issue_date_open` are stamped ONCE, by a second Patch
-                  # that runs on insert only — the update path never names them, so an
-                  # edit cannot move them. There is no picker and no form field: the
-                  # field is un-manipulable because the app offers no way to touch it.
-                  #
-                  # NOT `Created By` / `Created`. The canvas connector does not surface
-                  # `Created By` on this list, so `gEditIssue.'Created By'` does not
-                  # resolve — see `system_columns` in schema.yaml.
-                  # ---------------------------------------------------------------
-                  - colIssOpened:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        Width: =(Parent.Width - 24) / 2
-                        Height: =62
-                      Children:
-                        - lblIssOpenedCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Opened by"
-                              Font: =gTheme.Font
-                              Size: =12
-                              Color: =gTheme.Color.TextMuted
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =0
-                              LayoutMinHeight: =18
-                              Width: =Parent.Width
-                              Height: =18
-                        - lblIssOpenedVal:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: |
-                                =If( gEditMode <> "Edit",
-                                     "Recorded automatically when you save",
-                                     Coalesce( gEditIssue.issue_owner.DisplayName, "not recorded" )
-                                     & If( IsBlank(gEditIssue.issue_date_open), "",
-                                           "   ·   " & Text(gEditIssue.issue_date_open, "d mmm yyyy") ) )
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Body
-                              Color: |
-                                =If( gEditMode <> "Edit", gTheme.Color.TextMuted, gTheme.Color.TextPrimary )
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =0
-                              LayoutMinHeight: =36
-                              Width: =Parent.Width
-                              Height: =36
             - colIssMissing:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -796,7 +714,24 @@ Screens:
                                            Department: "", JobTitle: "", Picture: "" },
                                      issue_status:      { Value: gIssStatus },
                                      issue_date_target: dtpIssTarget.SelectedDate,
-                                     issue_date_close:  dtpIssClose.SelectedDate,
+                                     // DERIVED — there is no close-date field on this screen.
+                                     // Read the STORED date, NOT gEditIssue: that global is a snapshot taken
+                                     // when the issue was opened, and no control reads this column any more,
+                                     // which is exactly what Explicit Column Selection trims out of a record
+                                     // carried through a global. Coalesce then PRESERVES it — re-saving a
+                                     // closed issue must not move the date forward. Delegable LookUp on ID,
+                                     // same shape as issue_project_archived above.
+                                     // StartsWith, not an enumerated list: a Closed-* value added to the
+                                     // column later must still stamp. This is a local test with no query
+                                     // behind it, so the rule that forces enumeration in App.Formulas — a
+                                     // DELEGATION rule — does not apply here.
+                                     issue_date_close:
+                                         If( StartsWith(gIssStatus, "Closed"),
+                                             If( gEditMode = "Edit",
+                                                 Coalesce( LookUp( taskmaster_issues, ID = gEditIssue.ID,
+                                                                   issue_date_close ), Now() ),
+                                                 Now() ),
+                                             Blank() ),
                                      issue_type:
                                          If( gIssType <> "(none)", { Value: gIssType }, Blank() ),
                                      issue_impact:
