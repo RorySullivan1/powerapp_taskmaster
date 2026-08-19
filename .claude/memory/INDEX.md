@@ -30,6 +30,16 @@
   `gRptNoTarget` survives on the pie's subtitle. The combo chart's viewBox was cut 900 -> 480
   because `ImagePosition.Fit` would otherwise render its 15pt labels at ~7px in a third-width
   column. **Backlog is now empty.**
+- **`src/` COMMENTS WERE PURGED 2026-08-19** — 2914 -> 1689 lines, density 18% -> 11%,
+  1054 lines gone. Repeated notes now live ONCE per file as numbered header rules.
+  **Do not re-inflate:** a comment earns its place only if it stops someone breaking the
+  code. **This needed NO PASTE** — `#` comments never reach Studio, and `//` changes ride
+  each file's next real paste.
+- **SUBTITLE TEXT TRIMMED 2026-08-19 — `scrReports` AND `scrHome` ARE QUEUED FOR PASTE**
+  (this half IS user-visible). Ten chart/panel subtitles cut 1471 -> 771 chars (48%).
+  **Rule applied: cut the PROSE, keep the NUMBERS** — every reconciliation count (no
+  supporter, no completion date, no target date, overdue, unassigned, unspecified)
+  survives. Panel and label heights unchanged, so the geometry cannot regress.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
 - **STANDING RISKS AND UNEXERCISED BEHAVIOUR — landed is not the same as exercised.** Do not
