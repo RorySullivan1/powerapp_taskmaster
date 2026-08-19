@@ -453,9 +453,8 @@ Screens:
                   { Idx: CountRows(colRptFmtVocab) + 2, K: "Other",
                     N: CountRows( Filter( colRptOpenTag,
                            Fmt <> "Unspecified" && !(Fmt in colRptFmtVocab.K) ) ) } );
-              Set( gRptFmtMax, Max( 1, Coalesce(Max(colRptFmtBar, N), 0) ) );
-              // THE FORMAT CHART IS A PIE, so it also needs slice geometry. Same fold shape
-              // as the three below it; see the pie note there.
+              // THE FORMAT CHART IS A PIE, so it needs slice geometry rather than a bar
+              // maximum. Same fold shape as the three below it; see the pie note there.
               Set( gRptFmtTot, Max( 1, Coalesce(Sum(colRptFmtBar, N), 0) ) );
               ClearCollect( colRptFmtPie,
                   ForAll( Filter(colRptFmtBar, N > 0) As r,
@@ -2181,125 +2180,288 @@ Screens:
             # =============================================================
             # BAND 5 — transactions (secondary)
             # =============================================================
-            - pnlRptTx:
+            # THE TWO PRODUCT PIES SIT BESIDE THE TREND, not under it: the trend answers
+            # "how many, when" and the pies answer "of what", and reading one against the
+            # other is the point of the band.
+            - rowRptTx:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
-                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutDirection: =LayoutDirection.Horizontal
                   LayoutAlignItems: =LayoutAlignItems.Start
-                  LayoutGap: =8
-                  PaddingTop: =12
-                  PaddingBottom: =12
-                  PaddingLeft: =16
-                  PaddingRight: =16
-                  Fill: =gTheme.Color.Surface
-                  BorderColor: =gTheme.Color.Border
-                  BorderThickness: =1
+                  LayoutGap: =gTheme.Space.Gap
                   FillPortions: =0
-                  LayoutMinHeight: =320
+                  LayoutMinHeight: =420
                   Width: =Parent.Width - 48
-                  Height: =320
+                  Height: =420
                 Children:
-                  - lblRptTxT:
-                      Control: Label@2.5.1
+                  - pnlRptTx:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Text: ="Transactions"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.H3
-                        FontWeight: =FontWeight.Semibold
-                        Color: =gTheme.Color.Primary
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinHeight: =24
-                        Width: =Parent.Width - 32
-                        Height: =24
-                  - imgRptTxTrend:
-                      Control: Image@2.2.3
-                      Properties:
-                        ImagePosition: =ImagePosition.Fit
-                        FillPortions: =0
-                        LayoutMinHeight: =130
-                        Width: =Parent.Width - 32
-                        Height: =130
-                        # Current window solid, prior window greyed BEHIND it.
-                        Image: |
-                          =With( { n: Max(1, CountRows(colRptBuckets)) },
-                              With( { w: RoundDown(880 / n, 0) },
-                                  "data:image/svg+xml;charset=utf-8," & EncodeUrl(
-                                      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 220'>"
-                                    & "<line x1='0' y1='180' x2='900' y2='180' stroke='#E1E5EB' stroke-width='2'/>"
-                                    & Concat( colRptBuckets,
-                                          "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
-                                        & (180 - Round(TxP / Max(1, gRptTxMax) * 150, 0)) & "' width='"
-                                        & Max(4, w - 12) & "' height='"
-                                        & Round(TxP / Max(1, gRptTxMax) * 150, 0) & "' fill='#E1E5EB'/>"
-                                        & "<rect x='" & (10 + (Idx - 1) * w + 6) & "' y='"
-                                        & (180 - Round(Tx / Max(1, gRptTxMax) * 150, 0)) & "' width='"
-                                        & Max(4, w - 24) & "' height='"
-                                        & Round(Tx / Max(1, gRptTxMax) * 150, 0) & "' fill='#005A9E'/>"
-                                        & "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='202'"
-                                        & " text-anchor='middle' font-size='14'"
-                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                        & EncodeHTML(Lbl) & "</text>" )
-                                    & "</svg>" ) ) )
-                  - galRptCcy:
-                      Control: Gallery@2.15.0
-                      Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
-                      Properties:
-                        # NEVER SUMMED ACROSS CURRENCIES — one tile each. Cross-currency
-                        # conversion is out of scope, so there is no blended total.
-                        Items: =Sort(colRptCcy, N, SortOrder.Descending)
-                        WrapCount: =5
-                        TemplateSize: =56
-                        TemplatePadding: =0
-                        TemplateFill: =RGBA(0, 0, 0, 0)
-                        BorderThickness: =0
-                        # SCROLLS, and two rows deep. The column has five values today, so
-                        # WrapCount 5 fits exactly — which is precisely why a sixth added in
-                        # SharePoint would have gone silently unreachable.
-                        ShowScrollbar: =true
-                        FillPortions: =0
-                        LayoutMinHeight: =120
-                        Width: =Parent.Width - 32
-                        Height: =120
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =420
+                        Height: =420
                       Children:
-                        - colRptCcyBody:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
+                        - lblRptTxT:
+                            Control: Label@2.5.1
                             Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =0
-                              PaddingLeft: =8
-                              PaddingRight: =8
-                              X: =0
-                              Y: =0
-                              Width: =Parent.TemplateWidth - 8
-                              Height: =Parent.TemplateHeight - 4
+                              Text: ="Transactions"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - imgRptTxTrend:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =130
+                              Width: =Parent.Width - 32
+                              Height: =130
+                              # Current window SPLIT BY CURRENCY, prior window greyed BEHIND it.
+                              # THE SEGMENTS ARE A SEPARATE Concat over colRptTxSeg, not one nested
+                              # inside the bucket Concat: colRptTxSeg carries its own bucket index
+                              # Bi, so the x position is computed from the row rather than from an
+                              # outer record scope. A nested Concat would have to reach the outer
+                              # Idx, and that is exactly the ambiguity that fails at paste time.
+                              # Each segment's height is the DIFFERENCE of two rounded tops, so the
+                              # stack cannot drift past the total the bar is scaled to.
+                              Image: |
+                                =With( { n: Max(1, CountRows(colRptBuckets)) },
+                                    With( { w: RoundDown(880 / n, 0) },
+                                        "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 220'>"
+                                          & "<line x1='0' y1='180' x2='900' y2='180' stroke='#E1E5EB' stroke-width='2'/>"
+                                          & Concat( colRptBuckets,
+                                                "<rect x='" & (10 + (Idx - 1) * w) & "' y='"
+                                              & (180 - Round(TxP / Max(1, gRptTxMax) * 150, 0)) & "' width='"
+                                              & Max(4, w - 12) & "' height='"
+                                              & Round(TxP / Max(1, gRptTxMax) * 150, 0) & "' fill='#E1E5EB'/>"
+                                              & "<text x='" & (10 + (Idx - 1) * w + RoundDown(w / 2, 0)) & "' y='202'"
+                                              & " text-anchor='middle' font-size='14'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                              & EncodeHTML(Lbl) & "</text>" )
+                                          & Concat( colRptTxSeg,
+                                                "<rect x='" & (10 + (Bi - 1) * w + 6) & "' y='"
+                                              & (180 - Round((Base + N) / Max(1, gRptTxMax) * 150, 0))
+                                              & "' width='" & Max(4, w - 24) & "' height='"
+                                              & Max( 1, Round((Base + N) / Max(1, gRptTxMax) * 150, 0)
+                                                        - Round(Base / Max(1, gRptTxMax) * 150, 0) )
+                                              & "' fill='" & Hx & "'/>" )
+                                          & "</svg>" ) ) )
+                        - galRptCcy:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              # NEVER SUMMED ACROSS CURRENCIES — one tile each. Cross-currency
+                              # conversion is out of scope, so there is no blended total.
+                              Items: =Sort(colRptCcy, N, SortOrder.Descending)
+                              WrapCount: =5
+                              TemplateSize: =56
+                              TemplatePadding: =0
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              # SCROLLS, and two rows deep. The column has five values today, so
+                              # WrapCount 5 fits exactly — which is precisely why a sixth added in
+                              # SharePoint would have gone silently unreachable.
+                              ShowScrollbar: =true
+                              FillPortions: =0
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =120
                             Children:
-                              - lblRptCcyK:
-                                  Control: Label@2.5.1
+                              - colRptCcyBody:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
                                   Properties:
-                                    Text: =ThisItem.K & "   (" & ThisItem.N & ")"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - lblRptCcyV:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: =Text(ThisItem.Tot, "[$-en-US]#,###")
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.H3
-                                    FontWeight: =FontWeight.Semibold
-                                    Color: =gTheme.Color.TextPrimary
-                                    FillPortions: =0
-                                    LayoutMinHeight: =26
-                                    Width: =Parent.Width
-                                    Height: =26
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =0
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth - 8
+                                    Height: =Parent.TemplateHeight - 4
+                                  Children:
+                                    # THE TILE IS THE CHART'S LEGEND. Same Switch as colRptTxSeg's
+                                    # Hx, keyed on the currency value so the two cannot drift apart
+                                    # — a swatch that disagrees with the bar is worse than none.
+                                    - lblRptCcyK:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.K & "   (" & ThisItem.N & ")"
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          FontWeight: =FontWeight.Semibold
+                                          Color: |
+                                            =Switch( ThisItem.K,
+                                                     "EUR", ColorValue("#005A9E"),
+                                                     "USD", ColorValue("#2E8B9A"),
+                                                     "GBP", ColorValue("#D69828"),
+                                                     "JPY", ColorValue("#7A6FB0"),
+                                                     "CHF", ColorValue("#C05F3C"),
+                                                            ColorValue("#4A9E63") )
+                                          FillPortions: =0
+                                          LayoutMinHeight: =18
+                                          Width: =Parent.Width
+                                          Height: =18
+                                    - lblRptCcyV:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =Text(ThisItem.Tot, "[$-en-US]#,###")
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.H3
+                                          FontWeight: =FontWeight.Semibold
+                                          Color: =gTheme.Color.TextPrimary
+                                          FillPortions: =0
+                                          LayoutMinHeight: =26
+                                          Width: =Parent.Width
+                                          Height: =26
+                  - pnlRptPrd:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =420
+                        Height: =420
+                      Children:
+                        - lblRptPrdT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Transactions by product type"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        # Unclassified is A REAL SLICE, not a dropped row: a product with no
+                        # type path still traded, and hiding it would make the pie disagree
+                        # with the transaction count beside it.
+                        - lblRptPrdS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Level 1 above, level 2 below — top 5 and Other on each. "
+                                 & "A product whose path has one segment counts under "
+                                 & Char(34) & "Top level only" & Char(34) & "."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =32
+                              Width: =Parent.Width - 32
+                              Height: =32
+                        - imgRptPrd:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =150
+                              # Same construction as the band-3 pies — circumference 100 at
+                              # r 15.9155, stroke-width 2r so the ring is a disc, and every
+                              # value Power Fx supplies is a whole number.
+                              Image: |
+                                =With( { n: CountRows(colRptPrdPie) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
+                                      & "<g transform='translate(75 75) scale(2)'>"
+                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
+                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
+                                      & Concat( colRptPrdPie,
+                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
+                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
+                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
+                                          & (125 - Off) & "'/>" )
+                                      & "</g>"
+                                      & Concat( colRptPrdPie,
+                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
+                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
+                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
+                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
+                                          & " fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
+                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
+                                          & "' text-anchor='end' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "No transactions in this window</text>", "" )
+                                      & "</svg>" ) )
+                        - imgRptPr2:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =150
+                              # Same construction as the band-3 pies — circumference 100 at
+                              # r 15.9155, stroke-width 2r so the ring is a disc, and every
+                              # value Power Fx supplies is a whole number.
+                              Image: |
+                                =With( { n: CountRows(colRptPr2Pie) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
+                                      & "<g transform='translate(75 75) scale(2)'>"
+                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
+                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
+                                      & Concat( colRptPr2Pie,
+                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
+                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
+                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
+                                          & (125 - Off) & "'/>" )
+                                      & "</g>"
+                                      & Concat( colRptPr2Pie,
+                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
+                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
+                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
+                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
+                                          & " fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
+                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
+                                          & "' text-anchor='end' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "No transactions in this window</text>", "" )
+                                      & "</svg>" ) )
             # ---- provenance --------------------------------------------------
             - lblRptProv:
                 Control: Label@2.5.1
