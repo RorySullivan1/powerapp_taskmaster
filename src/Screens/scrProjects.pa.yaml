@@ -144,26 +144,32 @@ Screens:
                   Width: =150
                   Height: =40
       # ---- Gallery ----------------------------------------------------------
-      # TWO STAGES, AND THE SPLIT IS THE POINT. The inner `If` is EIGHT BRANCHES — show
-      # completed × coverage × only mine — each INDEPENDENTLY delegable, with its `Sort`
-      # INSIDE it. `Sort(If(...))` would not fold, and a predicate assembled from a variable
-      # does not fold either, so every branch WRITES ITS PREDICATES OUT. That duplication is
-      # the price of delegation; do not factor it away.
+      # ONE DELEGABLE QUERY, NO LOCAL PASS — and SIXTEEN BRANCHES, which is the honest price
+      # of that. Four binary filters (search × show completed × coverage × only mine), each
+      # branch INDEPENDENTLY delegable with its `Sort` INSIDE it. `Sort(If(...))` would not
+      # fold, and a predicate assembled from a variable does not fold either, so every branch
+      # WRITES ITS PREDICATES OUT. The duplication is the mechanism; do not factor it away.
       #
-      # The OUTER Filter is the name search and runs LOCALLY on purpose: SharePoint delegates
-      # `=`, `StartsWith`, `Filter` and `Sort` on Text and NOTHING else — `Search` and the
-      # substring `in` have no row in the connector's table at all. Wrapping the delegated
-      # `If` keeps phase, coverage and lead on the server; written as one flat Filter the
-      # whole query goes non-delegable.
-      # THE CEILING IS THE DATA ROW LIMIT (set it to 2000): the outer pass cannot see a row
-      # the inner query did not return, and it fails SILENTLY.
-      # The blank test is EXPLICIT, not `"" in project_name` — see the toggle above.
+      # THE NAME SEARCH IS A PREFIX MATCH, AND THAT IS THE WHOLE REASON IT IS SERVER-SIDE.
+      # SharePoint delegates `=`, `StartsWith`, `Filter` and `Sort` on Text and NOTHING else —
+      # `Search` and the substring `in` have no row in the connector's table at all. A
+      # substring search therefore runs over whatever page the query returned and CANNOT SEE
+      # a row past the data row limit, failing silently. Typing a word from the MIDDLE of a
+      # name finds nothing now: that is the accepted trade, not a defect.
+      #
+      # THE EMPTY-SEARCH CASE IS ITS OWN BRANCH, NOT `StartsWith(col, "")`. That trick reads
+      # as obviously true and HALVES this formula, and it is banned here: the lead filter was
+      # built on it and returned NOTHING for every choice in the app. Which half fails — the
+      # empty argument, or the subfield — could not be settled from this side of the gap, and
+      # a filter that silently returns zero rows is indistinguishable from an empty list to
+      # the only observer there is. An "off" state is a BRANCH.
       #
       # EVERY BRANCH CARRIES ITS OWN PHASE PREDICATE, and the "show completed" ones look
       # redundant against ActiveProjects. DO NOT SIMPLIFY THEM AWAY: sorting a bare
       # `Filter(ActiveProjects, StartsWith(...))` returned "the query is not valid" from
-      # SharePoint while the identical shape WITH an explicit phase group did not. The
-      # phases are ENUMERATED because a Text `<>` does not delegate.
+      # SharePoint while the identical shape WITH an explicit phase group did not — which is
+      # why the search predicate goes INSIDE each branch and never replaces one. The phases
+      # are ENUMERATED because a Text `<>` does not delegate.
       #
       # `project_coverage` is NOT indexed in the golden source. Equality on it delegates, but
       # SharePoint refuses an unindexed filter past 5,000 items — index it before then.
@@ -174,7 +180,7 @@ Screens:
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: |
-              =Filter(
+              =If( Len( Trim(txtProjSearch.Text) ) = 0,
                    If( tglShowComplete.Value && tglOnlyMine.Value
                     && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                        Sort( Filter( ActiveProjects,
@@ -248,8 +254,87 @@ Screens:
                                 || project_phase.Value = "Stalled" )
                               && project_coverage.Value = cboPrjCoverage.Selected.Value ),
                              project_name ) ),
-                   Len( Trim(txtProjSearch.Text) ) = 0
-                || Trim(txtProjSearch.Text) in project_name )
+                   If( tglShowComplete.Value && tglOnlyMine.Value
+                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled"
+                                || project_phase.Value = "Complete" )
+                              && project_manager.Email = gUserEmail
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ),
+                       tglShowComplete.Value && tglOnlyMine.Value,
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled"
+                                || project_phase.Value = "Complete" )
+                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                              && project_manager.Email = gUserEmail
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ),
+                       tglShowComplete.Value
+                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
+                         = "All coverage",
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled"
+                                || project_phase.Value = "Complete" )
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ),
+                       tglShowComplete.Value,
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled"
+                                || project_phase.Value = "Complete" )
+                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ),
+                       tglOnlyMine.Value
+                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
+                         = "All coverage",
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled" )
+                              && project_manager.Email = gUserEmail
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ),
+                       tglOnlyMine.Value,
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled" )
+                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                              && project_manager.Email = gUserEmail
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ),
+                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
+                       = "All coverage",
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled" )
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ),
+                       Sort( Filter( ActiveProjects,
+                                 ( project_phase.Value = "Not Started"
+                                || project_phase.Value = "Planning"
+                                || project_phase.Value = "Active"
+                                || project_phase.Value = "Stalled" )
+                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                             project_name ) ) )
             # EXPLICIT single column. Left unset, a wrapping gallery divides TemplateWidth
             # between columns and every proportional child inside the row shrinks with it.
             WrapCount: =1
@@ -456,7 +541,7 @@ Screens:
                    "No projects here are led by you. "
                      & "Turn off Only show my projects to see the rest.",
                    Len(Trim(txtProjSearch.Text)) > 0,
-                   "No project name contains """ & Trim(txtProjSearch.Text) & """.",
+                   "No project name starts with """ & Trim(txtProjSearch.Text) & """.",
                    !tglShowComplete.Value,
                    "Nothing open here. Turn on Show completed to include finished projects.",
                    "No projects match this coverage." )
