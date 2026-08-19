@@ -6,20 +6,21 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40 (14 issues). #27 AND #31 ARE BUILT AND UNLANDED; the other
-  12 are not started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md.
-- **SIX SCREENS ARE QUEUED FOR PASTE (2026-08-19) — the paste queue is NO LONGER empty.**
-  #27: `scrProject` folds tasks/transactions/issues once in `Concurrent` (new `colProjectTx`,
-  `colProjectIss`) and every count, gallery, title and total reads the collections.
-  #31: `scrTaskEdit`, `scrIssueEdit`, `scrProjectEdit`, `scrClientEdit`, `scrTransactionEdit`
-  cache 20 reference fetches once per session inside `Concurrent`.
+- **PERF BACKLOG — GitHub #27–#40. #27 AND #31 ARE LANDED AND CLOSED; the other 12 are not
+  started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md.
+- **THE PASTE QUEUE IS EMPTY AGAIN (user, 2026-08-19)** — all six perf screens landed clean.
+  Live in Studio: `scrProject` folds tasks/transactions/issues once in `Concurrent`
+  (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads the
+  collections; the five edit screens cache 20 reference fetches once per session, also in
+  `Concurrent`. **Both landed on the paste alone — the round-trip counts were never measured,
+  and the Concurrent independent-failure path is unexercised.**
 - **BUILT — editing and refining, not creating.** 11 screens, 10 components, the App object.
   22/22 valid. **The published app renders properly** (user, 2026-08-12).
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **EVERYTHING IN `src/` HAS LANDED AND THE PASTE QUEUE IS EMPTY (user, 2026-08-19).** All 11
-  screens, all 10 components and the App object are in Studio and current with this repo.
+- **EVERYTHING IN `src/` HAS LANDED (user, 2026-08-19).** All 11 screens, all 10 components and
+  the App object are in Studio and current with this repo.
   **`task_output_audience` and `task_output_approval_flag` are LIVE** on `taskmaster_tasks`.
 - **#23 AND #24 ARE LANDED AND CLOSED (user, 2026-08-19).** `scrIssueEdit` carries required
   type/impact with defaults Question/Moderate; `scrHome` carries the Projects-I-lead gallery
@@ -329,6 +330,8 @@ not know them will author something broken:
 - 2026-08-19 | #27 BUILT: scrProject fetches its three child lists once in Concurrent; the phase counts, both galleries, both section titles, the currency totals and the empty states all read colProjectTasks/colProjectTx/colProjectIss. The health block, the per-click delete guards and the cascade counts deliberately still query live | GitHub #27
 - 2026-08-19 | #31 BUILT: 20 reference fetches across five edit screens guarded to once per session and issued in Concurrent. THE FIVE LISTS CARRYING AN APP-ADDED "(none)" ROW GUARD ON CountRows <= 1, NOT IsEmpty — the sentinel makes an empty fetch look populated and IsEmpty would latch a one-option dropdown for the session. A Concurrent arm is one formula, so the two-statement sentinel builds became one multi-item ClearCollect | GitHub #31
 
+- 2026-08-19 | #27 and #31 LANDED and CLOSED — all six screens pasted clean first time. The perf work is live: scrProject reads three collections instead of re-querying three lists ~8 times, and the five edit screens fetch their vocabularies once per session. NEITHER GAIN IS MEASURED — landing is a paste confirmation, not a Live Monitor count | GitHub #27, #31
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
@@ -385,3 +388,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #23 and #24 LANDED and CLOSED. #25 BUILT: project_coverage required, default Internal, three-branch seed because the coverage vocabulary is the one this repo has never been told — a wrong default degrades to a real member rather than losing the insert | GitHub #25
 - 2026-08-19 | perf review -> 14 issues #27–#40 | sessions/2026-08-19-1853-perf-review-issues.md
 - 2026-08-19 | #27 and #31 built, six screens queued for paste | sessions/2026-08-19-1939-issues-27-31-built.md
+- 2026-08-19 | #27 and #31 landed and closed; paste queue empty | sessions/2026-08-19-1939-issues-27-31-built.md
