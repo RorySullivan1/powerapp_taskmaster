@@ -11,36 +11,31 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **EVERYTHING HAS LANDED AT LEAST ONCE (user, 2026-08-19).** All 11 screens, all 10 components
-  and the App object are in Studio — but see the paste-queue bullet below: `scrProjects` has
-  been re-authored since. `scrProject` / `scrProjects` / `scrTaskEdit` /
-  `scrTransactionEdit` / `scrIssueEdit` landed carrying issues #13, #15 and #17, and
-  **`scrIssueEdit` landed again on 2026-08-19 carrying #9 — LANDED AND FULLY EXERCISED**, all
-  four checks clear including the re-save that proves the date does not creep forward.
-  **`task_output_audience` IS LIVE** on `taskmaster_tasks`, so #13's gate has a column behind it.
-  **Landed is not the same as exercised** — see Threads for the three behaviours nobody has run
-  yet: the confirm dialog actually opening, the completion gate actually blocking, and #14's
-  junction write.
+- **EVERYTHING IN `src/` HAS LANDED AND THE PASTE QUEUE IS EMPTY (user, 2026-08-19).** All 11
+  screens, all 10 components and the App object are in Studio and current with this repo.
+  **`task_output_audience` and `task_output_approval_flag` are LIVE** on `taskmaster_tasks`.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **#11 IS DONE AND CLOSED (user, 2026-08-19).** scrReports landed in
-  full: all five rework steps, both paste defects fixed, band 5 at three columns, the person
-  overlay at 1200 wide. **Landed is not the same as exercised** — on scrReports nobody has yet
-  seen the truncation banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the
-  audience pie, or a multi-currency stack in the trend bars.
-- **#19 IS DONE, LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** scrProjects
-  landed across two pastes and **the contains-search is EXERCISED and working** — the one
-  behaviour that mattered, since it is the only search this app has that no delegation covers.
-  Shipped: one filter row (coverage · search · "Only show my projects" · show completed), the
-  lead picker and its second row deleted, eight delegable branches, gallery back to 220.
-  **STANDING RISK, unverified: the contains-search is bounded by the DATA ROW LIMIT and fails
-  SILENTLY.** Confirm Settings > General > Data row limit is 2000. It works today because the
-  projects list is small; nothing in the app will say when that stops being true.
-- **#20 IS DONE, LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** The four
-  optional product columns are live in SharePoint and both screens landed — the emergent ticker
-  chips, the write-time uppercasing, the classic number input and the four-line product row.
-  **`Split(...).Value` IS NOW GROUNDED** by that landing and is recorded in
-  `tools/studio-enums.json`, not just in a session log.
+- **THE BACKLOG IS THREE ISSUES, NONE STARTED (2026-08-19): #23 Issue Schema · #24 scrHome
+  project visibility + chart edits · #25 scrProjectEdit schema rework.** Everything #9-#22 is
+  closed and **the paste queue is empty**. #23 and #25 are SCHEMA work: `schema/schema.yaml` is
+  the golden source and internal names FREEZE at creation, so settle columns before provisioning.
+- **STANDING RISKS AND UNEXERCISED BEHAVIOUR — landed is not the same as exercised.** Do not
+  claim any of these work:
+  - **scrProjects contains-search is bounded by the DATA ROW LIMIT and fails SILENTLY.** Confirm
+    Settings > General > Data row limit is 2000. Fine today because the list is small; nothing
+    in the app will say when that stops being true.
+  - **#22 leaves existing rows stale** — nothing back-fills `task_status` and there is no bulk
+    recompute, so a task keeps its last user-chosen health until an issue on it changes or it is
+    saved. The overdue half is live and correct immediately.
+  - **#22's seven `issue_type` values are taken on trust.** If SharePoint's Choice does not hold
+    exactly Blockage / Exception / Limitation, those issues read Amber instead of Red — silently.
+  - The completion gate has never once blocked a save (unexercised under #13 and #21 alike), the
+    confirm dialog has never been seen to open, and the Division-by-0 fix has not been proven on
+    a cold start.
+  - On scrReports: the truncation banner has never fired, `gRptDoneNoDate` has never been
+    non-zero, the audience pie's `Other` slice has never been non-zero, and no trend bar has yet
+    carried more than one currency.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -51,33 +46,6 @@
 - **claudeBrain PR #36 is OPEN and unmerged** (2026-08-19) — the canvas-app family ported out.
   It asks one question back: genericise the ported skills' `tools/` / `schema/` path references,
   or leave them as worked-example voice? Answer it before assuming the port is finished.
-- **BOTH QUEUED SCREENS LANDED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY AGAIN.**
-  `scrHome` (Division by 0) and `scrTaskEdit` (#21) are in Studio, and
-  **`task_output_approval_flag`'s internal name is CONFIRMED** — the write target is right.
-  - **Division by 0:** `imgTimeline.Image` divided by `gTlSpan`, which `OnVisible` set LAST,
-    after `colTimeline` already had rows; an unset global is blank and blank divides as zero.
-    Fixed by seeding `sp: Max(7, gTlSpan)` in the Image formula and dividing by `sp`, plus
-    moving the three `Set(gTlStart/gTlEnd/gTlSpan)` calls above `Clear/Collect(colTimeline)`
-    in BOTH `OnVisible` and the `Refresh Stats` `OnAction`. Nothing else in the app divides
-    unguarded — that audit is complete.
-  - **#21:** approval is gated by the per-task `task_output_approval_flag` and its
-    `tglTkApprovalReq` toggle, NOT by the audience value. Audience is still required whenever
-    Output is on (deliberately kept — #21 asked only to drop the Internal-Only test).
-  - **LANDED IS NOT EXERCISED, and neither of these has been.** Nobody has yet seen the
-    Division-by-0 banner FAIL to appear on a cold start (it only ever showed for a user
-    leading a non-complete project WITH a target date, so an empty dashboard proves nothing),
-    and the completion gate has never once blocked a save — it was unexercised under #13 too.
-  - **#21 IS CLOSED (completed, 2026-08-19)** with a debrief comment on the issue. Closed on
-    LANDING, not on exercising — the gate itself is still unproven, see the bullet above.
-- **#22 IS BUILT AND UNLANDED — FOUR SCREENS QUEUED FOR PASTE: `scrTaskEdit`, `scrIssueEdit`,
-  `scrProject`, `scrReports`.** Task health is now DERIVED; `scrTaskEdit` has no health control.
-  **`issue_type`'s vocabulary CHANGED** — the user had already replaced the five values with
-  seven (Approval, Change Request, Question, Other, Blockage, Exception, Limitation) in
-  SharePoint; schema.yaml mirrors it. Health is computed in TWO HALVES that are deliberately not
-  stored together — stored issue-derived half in `task_status`, live overdue folded in by
-  readers — full rules in `rollups.task_health` in schema.yaml. 22/22 valid.
-  **Existing rows stay stale until touched: nothing back-fills `task_status`, and no bulk
-  recompute exists.**
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-19] **NO `Set()` INSIDE A `ForAll` — Studio rejects it.** MS Learn's ForAll page sanctions **Patch** and **Collect** as the actions a ForAll body may take, and rules out the functions that HOLD A VARIABLE — `UpdateContext`, `Clear`, `ClearCollect` — because ForAll may process records **in any order and in parallel**. `Set` is the global-scope twin of `UpdateContext` and falls to the same rule; the docs do not list it only because they list the context-variable form. Hit on `btnIssHealth.OnSelect` / `btnPrjHealth.OnSelect` (user, 2026-08-19), where `Set(gHlScrap*, Patch(...))` wrapped the write purely to swallow Patch's return value. **That wrapper was backwards**: the same page states an UNCAPTURED ForAll result is never built, so capturing it was the only thing creating a per-record data-source copy. `IfError` is fine inside a ForAll and is the documented way to catch a Patch failure. If an error ever needs surfacing from inside one, the two legal options are `Notify()` or a `Collect()` into a log — Collect is explicitly allowed, order undefined — INDEX Decisions
@@ -362,3 +330,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #21 debriefed and CLOSED (completed). Closed on landing; the completion gate remains unexercised | GitHub #21
 - 2026-08-19 | #22: task health derived, not chosen. issue_type re-vocabularied to 7 values; stored issue-half + live overdue half; recompute wired to every issue change; scrReports folds overdue in | sessions/2026-08-19-1600-issue22-derived-health.md
 - 2026-08-19 | #22 paste defect: Set() removed from the health-recompute ForAll on scrIssueEdit and scrProject; gHlScrapI/gHlScrapP/gHlErr were all write-only and are gone. LANDED clean. Scan of all 91 ForAll sites finds no other occurrence | GitHub #22
+- 2026-08-19 | #22 (derived task health) LANDED and CLOSED after its ForAll paste defect was fixed; backlog is now #23, #24, #25, none started. State block consolidated — the closed-issue narrative moved out, the standing risks kept | GitHub #22
