@@ -25,34 +25,49 @@ Screens:
         // to this global and Resets the control — the only way to write into a text input,
         // which has no .Text setter.
         Set( gPdUnd, If( gPdMode = "Edit", Coalesce(gEditProduct.product_underlying, ""), "" ) );
-        ClearCollect( colMapProdType, mapping_producttype );
-        // THE TICKER VOCABULARY IS EMERGENT — every ticker any product already names, not a
-        // governed list. Concat joins every stored value into one comma-string and Split breaks
-        // it back, which is what makes a multi-ticker product contribute each separately.
-        // NOT DELEGABLE, and it does not need to be: Concat reads up to the data row limit and
-        // taskmaster_products is reference data. Past 2000 rows the suggestions go stale
-        // silently and nothing else breaks.
-        // A typo becomes a suggestion — the accepted cost, and why the chips are a convenience
-        // and never a constraint.
-        ClearCollect( colPdUndAll,
+        // ONCE PER SESSION, NOT ONCE PER VISIT. All three are reference data and independent
+        // of the product being edited, so an EMPTY collection is the only reason to fetch one
+        // again; someone else's addition is picked up on the next app start. IsEmpty, never
+        // IsBlank: these are tables.
+        //
+        // THE GUARD MATTERS MORE HERE THAN ANYWHERE. This screen is reachable mid-flow from the
+        // task and transaction pickers ("+ New product"), so an unguarded fetch is paid at the
+        // deepest point of someone else's save, every time, to type one product.
+        Concurrent(
+            If( IsEmpty(colMapProdType),
+                ClearCollect( colMapProdType, mapping_producttype ) ),
+            // THE TICKER VOCABULARY IS EMERGENT — every ticker any product already names, not a
+            // governed list. Concat joins every stored value into one comma-string and Split breaks
+            // it back, which is what makes a multi-ticker product contribute each separately.
+            // NOT DELEGABLE, and it does not need to be: Concat reads up to the data row limit and
+            // taskmaster_products is reference data. Past 2000 rows the suggestions go stale
+            // silently and nothing else breaks.
+            // A typo becomes a suggestion — the accepted cost, and why the chips are a convenience
+            // and never a constraint.
+            // This is the whole-list read the guard above exists for; btnPdSave keeps it current
+            // for this session's own saves without refetching it.
+            If( IsEmpty(colPdUndAll),
+                ClearCollect( colPdUndAll,
                       Sort( Distinct( Filter( ForAll( Split( Concat( taskmaster_products,
                                                                      Coalesce(product_underlying, "") & "," ),
                                                              "," ) As t,
                                                       { Tk: Trim(Upper(t.Value)) } ),
                                               Len(Tk) > 0 ),
                                       Tk ),
-                            Value ) );
-        // FROM Choices() ON THE COLUMN, never a literal list. product_assetclass ships with
-        // PLACEHOLDER values in the golden source, so whatever is provisioned appears here with
-        // no app change — and a label the Choice would refuse can never be written.
-        // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
-        // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — DefaultId looks
-        // the value up by Label. No "(none)" row: the column is REQUIRED.
-        ClearCollect( colPdAssetOpts,
+                            Value ) ) ),
+            // FROM Choices() ON THE COLUMN, never a literal list. product_assetclass ships with
+            // PLACEHOLDER values in the golden source, so whatever is provisioned appears here with
+            // no app change — and a label the Choice would refuse can never be written.
+            // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
+            // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — DefaultId looks
+            // the value up by Label. No "(none)" row: the column is REQUIRED.
+            // Cached, the synthesised Ids are MORE stable, not less: they stop moving mid-session.
+            If( IsEmpty(colPdAssetOpts),
+                ClearCollect( colPdAssetOpts,
                       With( { ch: Choices([@taskmaster_products].product_assetclass) },
                             ForAll( Sequence( CountRows(ch) ) As n,
                                     { Id:    n.Value,
-                                      Label: Index(ch, n.Value).Value } ) ) );
+                                      Label: Index(ch, n.Value).Value } ) ) ) ) );
         // A NEW PRODUCT OPENS ON THE FIRST CHOICE, so the ORDER of the column's values decides
         // its default — order them with the safest first. Seeding it rather than leaving it
         // blank is deliberate: cmpSelection's DefaultId falls back to row 1 either way, so a
@@ -572,6 +587,20 @@ Screens:
               If( Len(gPdErr) > 0,
               Notify( "Couldn't save the product: " & gPdErr, NotificationType.Error ) );
               If( Len(gPdErr) = 0 && !IsBlank(gPdSaved.ID),
+              // KEEP THE TICKER CACHE CURRENT WITHOUT REFETCHING IT. colPdUndAll is collected
+              // once per session, so a ticker saved here would otherwise not reach the chips
+              // until the next app start. gPdUndNorm is the normalised string just written.
+              //
+              // STAGED THROUGH A SCRATCH COLLECTION because the merge both reads colPdUndAll and
+              // replaces it, and a ClearCollect over the collection it is filling is not a shape
+              // to trust. Distinct restores the single Value column colPdUndAll is built on and
+              // drops the duplicates; the Sort is not cosmetic — the chip strip is FirstN(..., 12)
+              // over this order, so an appended tail would never be seen.
+              ClearCollect( colPdUndMerge, colPdUndAll );
+              Collect( colPdUndMerge,
+              ForAll( Split( gPdUndNorm, "," ) As t, { Value: Trim(Upper(t.Value)) } ) );
+              ClearCollect( colPdUndAll,
+              Sort( Distinct( Filter(colPdUndMerge, Len(Value) > 0), Value ), Value ) );
               // TWO ONE-ARMED Ifs, not one two-armed one: the task branch Collects and the
               // transaction branch Sets, and an If's arms must agree on type. A task takes MANY
               // products, so a newly created one is appended rather than replacing a global.
