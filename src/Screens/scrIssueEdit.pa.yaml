@@ -732,17 +732,27 @@ Screens:
                     Set( gIssSaved, Blank() );
                     Set( gIssErr, "" );
                     Set( gIssWarn, "" );
+                    // THE PRE-WRITE READS, ISSUED TOGETHER. Both used to sit INSIDE the Patch record,
+                    // where the write could not be issued until each had returned in turn.
+                    Concurrent(
+                        // Keyed on gIssProject.Id, the issue's OWN parent, and read LIVE from the list:
+                        // a snapshot carried in a global would stamp the archived mirror `false` for a
+                        // project archived since, and the row would stay in scope forever.
+                        Set( gIssParentProj, LookUp( taskmaster_projects, ID = gIssProject.Id ) ),
+                        // STILL CONDITIONAL, DELIBERATELY. This read only matters when an existing issue
+                        // is being closed, so the guard keeps the ordinary save at one read, not two.
+                        Set( gIssPriorClose,
+                             If( gEditMode = "Edit" && StartsWith(gIssStatus, "Closed"),
+                                 LookUp( taskmaster_issues, ID = gEditIssue.ID, issue_date_close ) ) ) );
                     IfError(
                         Set( gIssSaved,
                             Patch( taskmaster_issues,
                                    If( gEditMode = "Edit", gEditIssue, Defaults(taskmaster_issues) ),
                                    // Mirrors the PARENT's phase so cross-project queries can exclude archived work with
-                                   // a delegable `= false`. Written on EVERY save. Read LIVE from the list, not from
-                                   // gSelProject — that global is a gallery snapshot, so a project archived since would
-                                   // stamp `false` and the row would stay in scope forever.
+                                   // a delegable `= false`. Written on EVERY save, from the record the Concurrent
+                                   // above read at save time.
                                    { issue_project_archived:
-                                         Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
-                                                           project_phase.Value ), "" ) = "Archived",
+                                         Coalesce( gIssParentProj.project_phase.Value, "" ) = "Archived",
                                    issue_name:        Trim(txtIssName.Text),
                                      issue_description: txtIssDesc.Text,
                                      issue_project_id:  { Id: gIssProject.Id, Value: gIssProject.Value },
@@ -754,9 +764,10 @@ Screens:
                                            Department: "", JobTitle: "", Picture: "" },
                                      issue_status:      { Value: gIssStatus },
                                      issue_date_target: dtpIssTarget.SelectedDate,
-                                     // DERIVED — there is no close-date field on this screen. Read the STORED date, NOT
-                                     // gEditIssue: that global is a snapshot, and no control reads this column any more,
-                                     // which is exactly what Explicit Column Selection trims out of a carried record.
+                                     // DERIVED — there is no close-date field on this screen. gIssPriorClose is the
+                                     // STORED date, read from the list by the Concurrent above, NOT gEditIssue: that
+                                     // global is a snapshot, and no control reads this column any more, which is
+                                     // exactly what Explicit Column Selection trims out of a carried record.
                                      // Coalesce then PRESERVES it — re-saving a closed issue must not move the date.
                                      // StartsWith, not an enumerated list: a Closed-* value added later must still stamp.
                                      // This is a local test with no query behind it, so the DELEGATION rule that forces
@@ -764,8 +775,7 @@ Screens:
                                      issue_date_close:
                                          If( StartsWith(gIssStatus, "Closed"),
                                              If( gEditMode = "Edit",
-                                                 Coalesce( LookUp( taskmaster_issues, ID = gEditIssue.ID,
-                                                                   issue_date_close ), Now() ),
+                                                 Coalesce( gIssPriorClose, Now() ),
                                                  Now() ),
                                              Blank() ),
                                      // UNGUARDED, like issue_status: both are required and the picker

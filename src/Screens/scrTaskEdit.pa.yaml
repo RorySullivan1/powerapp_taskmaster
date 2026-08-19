@@ -1396,6 +1396,17 @@ Screens:
                     Set( gTkSaved, Blank() );
                     Set( gTkErr, "" );
                     Set( gTkWarn, "" );
+                    // BOTH PRE-WRITE READS, ISSUED TOGETHER. Neither depends on the other and both
+                    // must settle before the Patch — Concurrent completes before the next statement,
+                    // so gTkHealth below still sees a finished colTkHlIss.
+                    Concurrent(
+                    // THE PARENT PROJECT, READ ONCE AND USED TWICE — the archived mirror in the Patch
+                    // record below and the C3 rollup at the end of this handler both read gTkParentProj.
+                    // Do not put either LookUp back: that was two round trips for one row.
+                    // Keyed on gTkProject.Id, the task's OWN parent, and read LIVE from the list: a
+                    // snapshot carried in a global would stamp `false` for a project archived since the
+                    // task was opened, and the row would stay in scope forever.
+                    Set( gTkParentProj, LookUp( taskmaster_projects, ID = gTkProject.Id ) ),
                     // HEALTH IS DERIVED, NEVER CHOSEN. Only the ISSUE-DERIVED half is stored; overdue
                     // is folded in by readers because it changes with no write. See rollups.task_health.
                     // A NEW TASK IS GREEN WITHOUT A QUERY, and that guard is load-bearing: in New mode
@@ -1408,7 +1419,7 @@ Screens:
                     Filter( taskmaster_issues,
                     issue_task_name.Id = gEditTask.ID
                     && issue_status.Value = "Open" ) ),
-                    Clear( colTkHlIss ) );
+                    Clear( colTkHlIss ) ) );
                     // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four amber types
                     // enumerated. Enumerated, a type added in SharePoint and not added here falls
                     // through to GREEN: an allow-list failing closed, silently, on a warning signal.
@@ -1425,12 +1436,10 @@ Screens:
                     Patch( taskmaster_tasks,
                     If( gEditMode = "Edit", gEditTask, Defaults(taskmaster_tasks) ),
                     // Mirrors the PARENT's phase so cross-project queries can exclude archived work
-                    // with a delegable `= false`. Written on every save. Read LIVE from the list, not
-                    // from `gSelProject` — that global is a gallery snapshot, so a project archived
-                    // since then would stamp `false` and the row would stay in scope forever.
+                    // with a delegable `= false`. Written on every save, from the record the
+                    // Concurrent above read at save time.
                     { task_project_archived:
-                          Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
-                                            project_phase.Value ), "" ) = "Archived",
+                          Coalesce( gTkParentProj.project_phase.Value, "" ) = "Archived",
                     task_name:        Trim(txtTkName.Text),
                     task_project_id:  { Id: gTkProject.Id, Value: gTkProject.Value },
                     task_description: txtTkDesc.Text,
@@ -1546,20 +1555,19 @@ Screens:
                     Set( gTkWarn, gTkWarn & "the product summary didn't update: " & FirstError.Message & "   " ) );
                     // --- C3: rewrite the parent project's weighted completion ---------
                     // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average over
-                    // task STAGES, so any other edit cannot change it — and computing it costs a LookUp,
-                    // a fetch of up to 500 rows and a write.
+                    // task STAGES, so any other edit cannot change it — and computing it costs a fetch
+                    // of up to 500 rows and a write.
                     If( !(gEditMode = "Edit" && gTkStage = gEditTask.task_stage.Value),
-                    // Independent reads, issued together. They have to be Sets — Concurrent takes
-                    // behaviour formulas, so a With() scope cannot carry the results out.
-                    Concurrent(
-                    Set( gTkRollupProj, LookUp(taskmaster_projects, ID = gTkProject.Id) ),
+                    // ONE READ HERE, NOT TWO: the parent project is already in gTkParentProj, read at
+                    // the top of this handler. It has to be a Set — a With() scope cannot carry the
+                    // scored table out to the branches below.
                     Set( gTkRollupScored,
                     AddColumns(
                     // Delegable: `=` on an indexed Lookup FK, and nothing else needed.
                     Filter( taskmaster_tasks,
                     task_project_id.Id = gTkProject.Id ),
-                    wgt, Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ) ) );
-                    If( IsBlank(gTkRollupProj),
+                    wgt, Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ) );
+                    If( IsBlank(gTkParentProj),
                     Notify("Task saved. Parent project not found, so completion was left unchanged.",
                     NotificationType.Warning),
                     CountRows(gTkRollupScored) >= 500,
@@ -1570,7 +1578,7 @@ Screens:
                     // Coalesce to -1: a just-inserted row holds NULL and newPc is 0, so a bare compare
                     // would skip the write and leave NULL — and Average() drops blanks from the
                     // denominator, so portfolio completion then reads high.
-                    If( newPc <> Coalesce(gTkRollupProj.project_perc_completion, -1),
+                    If( newPc <> Coalesce(gTkParentProj.project_perc_completion, -1),
                     IfError(
                     // PATCH, THEN RE-READ. Do NOT keep the Patch return: scrProject renders entirely
                     // from gSelProject, and a record carried into a variable can come back with columns
@@ -1579,8 +1587,8 @@ Screens:
                     // gTkRollupSaved exists only to hold the discarded return — IfError's arms must be
                     // type-compatible, so the Patch cannot stand bare beside a Set.
                     Set( gTkRollupSaved,
-                    Patch( taskmaster_projects, gTkRollupProj, { project_perc_completion: newPc } ) );
-                    Set( gSelProject, LookUp( taskmaster_projects, ID = gTkRollupProj.ID ) ),
+                    Patch( taskmaster_projects, gTkParentProj, { project_perc_completion: newPc } ) );
+                    Set( gSelProject, LookUp( taskmaster_projects, ID = gTkParentProj.ID ) ),
                     Set( gTkWarn, gTkWarn & "Task saved, but the project rollup didn't update: " & FirstError.Message & "   " )) ) ) ) );
                     If( Len(gTkWarn) > 0,
                     Notify( "Task saved, but: " & gTkWarn, NotificationType.Warning ) );
