@@ -79,7 +79,18 @@ Screens:
                       // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email = gUserEmail`:
                       // issue_owner is not indexed, so an Or-arm on it drops delegation for the WHOLE
                       // filter and silently truncates at 500 rows.
-                      Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
+                      Filter( OpenIssues, issue_assignee.Email = gUserEmail ) ),
+                  // THE NAME MAP the two work-list galleries resolve their parent project against.
+                  // task_project_id and issue_project_id are Lookup columns and the canvas connector
+                  // displays the NUMERIC ID, so the name has to be resolved app-side either way; the
+                  // only question is once per screen or once per visible row.
+                  //
+                  // EVERY ACTIVE PROJECT, not colMyProjects — a task I lead can hang off a project
+                  // someone else manages. ForAll projection, NOT ShowColumns: ShowColumns over
+                  // anything rooted in a named formula reads text columns back as an ERROR type,
+                  // and project_name is exactly the column that burned it before.
+                  ClearCollect( colPrjNames,
+                      ForAll( ActiveProjects As p, { ID: p.ID, project_name: p.project_name } ) )
               );
               Set( gPrjLed,
                    CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
@@ -833,9 +844,16 @@ Screens:
                                         Properties:
                                           # RESOLVED APP-SIDE. task_project_id is a Lookup and the
                                           # canvas connector DISPLAYS ITS NUMERIC ID, not project_name.
-                                          # One delegable ID lookup per visible row.
+                                          # LOCAL LOOKUP — colPrjNames, never the data source: a
+                                          # LookUp against taskmaster_projects here is one server call
+                                          # per VISIBLE ROW, re-fired on every scroll.
+                                          # colPrjNames covers active projects only, so a row whose
+                                          # parent archived since its task_project_archived flag was
+                                          # last stamped shows the dash. Accepted: the flag is what
+                                          # keeps the row in this gallery at all, so the window is the
+                                          # lag between archiving and the next rollup.
                                           Text: |
-                                            =Coalesce( LookUp( taskmaster_projects,
+                                            =Coalesce( LookUp( colPrjNames,
                                                                ID = ThisItem.task_project_id.Id,
                                                                project_name ),
                                                        "—" )
@@ -1057,8 +1075,10 @@ Screens:
                                     - cellMyIssueProject:
                                         Control: Label@2.5.1
                                         Properties:
+                                          # Same local resolve as cellMyTaskProject, same reason and
+                                          # same archived-parent edge.
                                           Text: |
-                                            =Coalesce( LookUp( taskmaster_projects,
+                                            =Coalesce( LookUp( colPrjNames,
                                                                ID = ThisItem.issue_project_id.Id,
                                                                project_name ),
                                                        "—" )
