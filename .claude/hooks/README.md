@@ -49,6 +49,7 @@ skill's judgment layer:
 
 | Fragment | Event | Calls | Effect |
 |---|---|---|---|
+| `pre-tool-use-column-guard.json` | `PreToolUse` (Write/Edit) | `pre_write_column_guard.py` | **Blocks a write under `src/` that names a SharePoint column not in `schema/schema.yaml`**, naming the offender and the nearest real column. Judges only snake_case tokens already in the columns' prefix namespace, so camelCase globals and collections are never considered; strips comments first, because screens legitimately discuss retired columns. The only hook here that VETOES — everything else nudges — because an invented column is not a test failure but a failed paste on a work machine. Fails open on anything it cannot parse. |
 | `pre-tool-use-read-guard.json` | `PreToolUse` (Read) | `pre_read_guard.py` | Caps an un-paged Read of a very large file to its first 1500 lines and says so. Respects explicit `offset`/`limit`. **Exempts `src/` and `schema/`** — a partial view of the golden source is how a truncated read becomes a wrong paste. Fails open. |
 | `post-tool-use-bash-filter.json` | `PostToolUse` (Bash) | `post_bash_filter.py` | Strips ANSI codes and head/tail-elides long output before the model sees it. The command still ran in full. |
 | `post-tool-use-plan-nudge.json` | `PostToolUse` (ExitPlanMode) | `skill-distiller/scripts/plan_nudge.py` | On plan approval, asks whether the plan encoded reusable know-how worth distilling into a skill. |

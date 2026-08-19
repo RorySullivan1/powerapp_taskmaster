@@ -107,14 +107,18 @@ session can't relitigate a settled call.
 - Operational hooks are compiled from `.claude/hooks/*.json` into `settings.json` by
   `build-hooks.py`; edit fragments, not `settings.json`.
 
-## Hook candidates (proposed, not built)
-With no CI on this machine, a write-time hook is the only enforcement available:
-- **Column-token validator** *(strongest)* — on write to a file under `src/`, grep for column
-  tokens and validate against `schema/schema.yaml`. "Never invent a column name" is currently
-  prose the model can drift past; a hook would make it enforced.
+## Enforcement (there is no CI, so hooks and the validator are all of it)
+- **Column-token validator — BUILT.** `pre_write_column_guard.py` blocks a `Write`/`Edit` under
+  `src/` that names a column absent from `schema/schema.yaml`, and suggests the nearest real one.
+  "Never invent a column name" is now enforced rather than prose. It judges only snake_case
+  tokens already in the columns' prefix namespace, strips comments first (screens legitimately
+  discuss retired columns), and **fails open on anything it cannot parse**.
+- `tools/validate_pa_yaml.py` additionally catches a stray `#` inside a formula and any comment
+  left at column 0 — two ways a scripted edit can corrupt content while the file still parses.
 
-Build it with `/add-hook`, and copy the fail-open shape of `pre_read_guard.py`: a guard that
-misfires here costs a paste, and the human can only report that as "it didn't work".
+**A new candidate, from 2026-08-18:** nothing checks that a control which needs to be clickable
+is declared after the transparent full-template hit button in its gallery row. That failure
+renders perfectly and simply does nothing, which is the hardest kind to see.
 
 ## Compact Instructions
 On compaction, preserve: **the air gap** (clipboard-only, **ONE-WAY** repo→Studio; only binary
