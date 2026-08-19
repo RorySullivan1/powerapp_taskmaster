@@ -307,6 +307,85 @@ def stray_comment_indent(text: str) -> list[str]:
     return out
 
 
+def _child_pairs(node) -> list:
+    """(name, body) for a control's Children, in DECLARATION order — which is z-order."""
+    if not isinstance(node, dict):
+        return []
+    out = []
+    for item in (node.get("Children") or []):
+        if isinstance(item, dict):
+            out.extend(item.items())
+    return out
+
+
+def _clickable_names(name, body) -> list:
+    """This control, or any descendant, that carries a real OnSelect."""
+    if not isinstance(body, dict):
+        return []
+    props = body.get("Properties") or {}
+    if str(props.get("OnSelect", "")).strip():
+        return [name]
+    return [n for cn, cb in _child_pairs(body) for n in _clickable_names(cn, cb)]
+
+
+def _covers_template(props) -> bool:
+    """Does this control blanket the whole row template?
+
+    A reduced width (`Parent.TemplateWidth - 46`) counts as NOT covering — that is
+    precisely how a row makes room for an icon beside it, and treating it as full
+    cover flags the fix instead of the bug.
+    """
+    if not isinstance(props, dict):
+        return False
+    w, h = str(props.get("Width", "")), str(props.get("Height", ""))
+    if "TemplateWidth" not in w or "TemplateHeight" not in h:
+        return False
+    if str(props.get("X", "")).strip("= ") not in ("0", ""):
+        return False
+    return not re.search(r"TemplateWidth\s*-\s*\d+", w)
+
+
+def overlay_reachability(doc) -> list[str]:
+    """NOTE: a clickable control buried under a full-template overlay.
+
+    Galleries here end each row template with a transparent full-template button,
+    because a gallery's own OnSelect does not fire reliably when the click lands on a
+    child. Anything declared BEFORE that button is underneath it. The control still
+    renders and still hovers, so the failure looks like a dead handler rather than a
+    layering problem, and the geometry all reads as correct.
+
+    NOTE, never FAIL, and the limit is real: this cannot prove a reduced width is
+    reduced ENOUGH, and an auto-layout child carries no X in the source at all, so its
+    true position is unknowable here. It can say "confirm this is reachable"; it cannot
+    say "this is broken".
+    """
+    notes = []
+
+    def walk(node, path=""):
+        for name, body in _child_pairs(node):
+            here = f"{path}/{name}" if path else name
+            if isinstance(body, dict) and str(body.get("Control", "")).startswith("Gallery@"):
+                at_risk = []
+                for cn, cb in _child_pairs(body):
+                    props = (cb or {}).get("Properties") or {}
+                    clicks = _clickable_names(cn, cb)
+                    if _covers_template(props) and at_risk and clicks == [cn]:
+                        notes.append(
+                            f"{here}: NOTE {cn} covers the whole row template and is declared "
+                            f"AFTER {', '.join(at_risk)} — a control under a full-template "
+                            f"overlay renders and hovers but cannot be clicked. Confirm it is "
+                            f"reachable, or narrow {cn}'s Width to stop short of it."
+                        )
+                    # Children of a container stay at risk even when the container itself
+                    # is full-size — the container being big does not protect them.
+                    at_risk += [c for c in clicks if c != cn]
+            walk(body, here)
+
+    for screen in (doc.get("Screens") or {}).values() if isinstance(doc, dict) else []:
+        walk(screen)
+    return notes
+
+
 def token_errors(doc) -> list[str]:
     """Pass 2 — the values the schema leaves wide open."""
     out, warned = [], set()
@@ -698,7 +777,8 @@ def main() -> int:
                 print(f"    ... and {len(dups) - 12} more")
             print()
             continue
-        tok = token_errors(doc) + stray_hash_errors(doc) + stray_comment_indent(text)
+        tok = (token_errors(doc) + stray_hash_errors(doc)
+               + stray_comment_indent(text) + overlay_reachability(doc))
         errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
         hard_tok = [t for t in tok if "NOTE " not in t]
         if not errors and not hard_tok:

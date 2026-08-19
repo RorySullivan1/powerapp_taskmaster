@@ -73,6 +73,9 @@ First child = bottom, last = top. There is no `ZIndex`.
   delete, flag, anything — must be declared **after** it, or shrunk out from under it. The icon
   still RENDERS either way, so getting this wrong looks like a dead control rather than a
   layering bug, and you can stare at the geometry for a long time before suspecting z-order.
+  `tools/validate_pa_yaml.py` emits a NOTE for this shape, but only catches the blatant case —
+  it cannot tell whether a *reduced* overlay is reduced enough, and an auto-layout child has no
+  `X` in the source for it to reason about. Treat the NOTE as a prompt, not a proof.
 - A dynamic height is the other legitimate gate:
   `Height: =If(gNavOpen, Parent.Height, Theme.Space.HeaderH)` — full-screen only while open,
   when swallowing the click is the point.

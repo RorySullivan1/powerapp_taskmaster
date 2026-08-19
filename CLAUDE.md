@@ -116,9 +116,11 @@ session can't relitigate a settled call.
 - `tools/validate_pa_yaml.py` additionally catches a stray `#` inside a formula and any comment
   left at column 0 — two ways a scripted edit can corrupt content while the file still parses.
 
-**A new candidate, from 2026-08-18:** nothing checks that a control which needs to be clickable
-is declared after the transparent full-template hit button in its gallery row. That failure
-renders perfectly and simply does nothing, which is the hardest kind to see.
+- **Overlay reachability — BUILT (NOTE-level).** `overlay_reachability()` flags a control with an
+  `OnSelect` declared *before* a full-template overlay in a gallery row — the failure that renders
+  and hovers perfectly and simply does nothing. It is a NOTE, not a failure, and deliberately so:
+  it cannot prove a reduced width is reduced *enough*, and an auto-layout child carries no `X` in
+  the source at all, so it can say "confirm this is reachable" but never "this is broken".
 
 ## Compact Instructions
 On compaction, preserve: **the air gap** (clipboard-only, **ONE-WAY** repo→Studio; only binary
