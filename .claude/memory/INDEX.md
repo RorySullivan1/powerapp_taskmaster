@@ -6,9 +6,13 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG FILED 2026-08-19 — GitHub #27–#40 (14 issues), NONE BUILT.** Screen-transition
-  and save-path round trips, dashboard N+1s, two scale cliffs, two guards. Ranked in
-  sessions/2026-08-19-1853-perf-review-issues.md.
+- **PERF BACKLOG — GitHub #27–#40 (14 issues). #27 AND #31 ARE BUILT AND UNLANDED; the other
+  12 are not started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md.
+- **SIX SCREENS ARE QUEUED FOR PASTE (2026-08-19) — the paste queue is NO LONGER empty.**
+  #27: `scrProject` folds tasks/transactions/issues once in `Concurrent` (new `colProjectTx`,
+  `colProjectIss`) and every count, gallery, title and total reads the collections.
+  #31: `scrTaskEdit`, `scrIssueEdit`, `scrProjectEdit`, `scrClientEdit`, `scrTransactionEdit`
+  cache 20 reference fetches once per session inside `Concurrent`.
 - **BUILT — editing and refining, not creating.** 11 screens, 10 components, the App object.
   22/22 valid. **The published app renders properly** (user, 2026-08-12).
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
@@ -322,6 +326,9 @@ not know them will author something broken:
 - 2026-08-19 | Perf review filed #27–#40. Two finder claims verified FALSE and not filed: the health recompute is no project-wide N+1 (colHlTasks only ever holds 1-2 ids) and the task-edit picker queries nothing while closed (gTkPicker cleared on cancel). Donut-SVG inline recompute and a recompute staleness guard deliberately not filed | sessions/2026-08-19-1853-perf-review-issues.md
 - 2026-08-19 | #30 is written as an AMENDMENT to the 2026-08-13 gIssLed decision, not a reversal: single truncation-guarded OpenIssues fetch, with the per-project counts kept as the >=2000 fallback | GitHub #30
 
+- 2026-08-19 | #27 BUILT: scrProject fetches its three child lists once in Concurrent; the phase counts, both galleries, both section titles, the currency totals and the empty states all read colProjectTasks/colProjectTx/colProjectIss. The health block, the per-click delete guards and the cascade counts deliberately still query live | GitHub #27
+- 2026-08-19 | #31 BUILT: 20 reference fetches across five edit screens guarded to once per session and issued in Concurrent. THE FIVE LISTS CARRYING AN APP-ADDED "(none)" ROW GUARD ON CountRows <= 1, NOT IsEmpty — the sentinel makes an empty fetch look populated and IsEmpty would latch a one-option dropdown for the session. A Concurrent arm is one formula, so the two-statement sentinel builds became one multi-item ClearCollect | GitHub #31
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
@@ -377,3 +384,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #24 BUILT: scrHome gains a Projects-I-lead gallery and swaps the timeline for a clamped days-to-due bar chart plus an effective-health donut; rowLists is now the widest band (1252 vs rowCharts 1204) and the old comment claiming the charts govern is corrected | GitHub #24
 - 2026-08-19 | #23 and #24 LANDED and CLOSED. #25 BUILT: project_coverage required, default Internal, three-branch seed because the coverage vocabulary is the one this repo has never been told — a wrong default degrades to a real member rather than losing the insert | GitHub #25
 - 2026-08-19 | perf review -> 14 issues #27–#40 | sessions/2026-08-19-1853-perf-review-issues.md
+- 2026-08-19 | #27 and #31 built, six screens queued for paste | sessions/2026-08-19-1939-issues-27-31-built.md
