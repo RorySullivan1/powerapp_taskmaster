@@ -158,10 +158,8 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =32
                   OnChange: =Set( gClCov, cboClCov.Selected.Value )
-            # WRAPPED IN A COL — this was the one lookup field of the nineteen that sat
-            # directly in bodyRoot rather than in a col/row container. A component
-            # instance cannot carry FillPortions or LayoutMinHeight, so the wrapper has
-            # to exist for the auto-layout contract to live somewhere.
+            # WRAPPED IN A COL — a component instance cannot carry FillPortions or
+            # LayoutMinHeight, so the wrapper has to exist for the auto-layout contract.
             - colClSales:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -304,24 +302,17 @@ Screens:
             # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
             OnSelect: |
               =If( gSaving,
-              // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
-              // A SharePoint Patch takes seconds; the button stayed live throughout, so a
-              // double-tap ran the whole handler twice and Defaults() built a SECOND new
-              // record. `Set` applies immediately within a behaviour chain, so the flag is
-              // already true by the time the second tap is evaluated.
-              // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
-              // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
-              // instead, and the guard below is what actually blocks the duplicate.
+              // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing — a Patch takes
+              // seconds and the button stays live, so a double-tap ran the handler twice and built a
+              // SECOND record. `Set` applies immediately within a behaviour chain.
               false,
               Set( gSaving, true );
               If( Len(lblClMissing.Text) > 0,
               Notify( "Can't save yet — this client still needs: " & lblClMissing.Text,
               NotificationType.Error ),
-              // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last
-              // successful save, gClSaved makes the IsBlank(.ID) guard below pass on a
-              // PREVIOUS record — so a write that fails with an empty error message
-              // reported success and handed the caller's form the WRONG record.
-              // scrTaskEdit has always blanked its equivalent; these two did not.
+              // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last successful save,
+              // this makes the IsBlank(.ID) guard below pass on a PREVIOUS record — so a write that
+              // fails with an empty error message reports success and hands back the WRONG record.
               Set( gClSaved, Blank() );
               Set( gClErr, "" );
               IfError(
@@ -336,8 +327,7 @@ Screens:
               client_region_path: gClRegionPath,
               client_notes:       txtClNotes.Text } ) ),
               Set( gClErr, FirstError.Message ) );
-              // Trust the RECORD, never the message — a write can fail and still
-              // leave FirstError.Message empty.
+              // Trust the RECORD, never the message.
               If( IsBlank(gClSaved.ID) && Len(gClErr) = 0,
               Set( gClErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
               If( Len(gClErr) > 0,
@@ -347,9 +337,8 @@ Screens:
               Set( gTkClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ),
               gClReturn = "TxClient",
               Set( gTxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ),
-              // NxClient is the STAGED transaction inside scrProjectEdit, not the
-              // transaction editor. Same shape, different global — the staged row is
-              // written from gNx* when the project saves.
+              // NxClient is the STAGED transaction inside scrProjectEdit, not the transaction
+              // editor — the staged row is written from gNx* when the project saves.
               gClReturn = "NxClient",
               Set( gNxClient,  { Id: gClSaved.ID, Value: gClSaved.client_name } ) );
               Set( gClReturn, "" );
@@ -357,8 +346,7 @@ Screens:
               Back() ) );
               Set( gSaving, false ) )
       # ---- Picker — declared LAST so it paints above the action bar ---------
-      # One state only here (the sales owner), but the same cmpPicker every
-      # other screen uses. See scrTaskEdit's instance for the full commentary.
+      # One state only here (the sales owner). See scrTaskEdit's instance for the contract.
       - cmpClPick:
           Control: CanvasComponent
           ComponentName: cmpPicker
@@ -369,13 +357,10 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: ="Select sales owner"
-            # The directory call runs HERE — the component cannot reach a data
-            # source with AccessAppScope false. Bound to the global that OnSearch
-            # fills, not to the instance's own Query output, which would be a
-            # same-instance cycle. Key is the person's Mail; Primary/Secondary are
-            # the display name and the address the row shows.
-            # There is no "first 10 people" to open on, so the default row is the
-            # current user — one tap to make yourself the sales owner.
+            # The directory call runs HERE — the component cannot reach a data source with
+            # AccessAppScope false. Bound to the global OnSearch fills, not to the instance's own
+            # Query output, which would be a same-instance cycle. The default row is the current
+            # user — one tap to make yourself the sales owner.
             Results: |
               =If( Len(gClQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gClQuery, top: 25 }).value As u,

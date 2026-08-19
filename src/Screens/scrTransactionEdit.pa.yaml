@@ -1,25 +1,16 @@
 # =============================================================================
-# scrTransactionEdit  —  create / edit a transaction.
+# scrTransactionEdit — create / edit a transaction.
+# Entered with gEditMode + gEditTransaction; gSelProject pre-attaches a new one.
+# Follows the shared edit-screen pattern documented in scrIssueEdit's header.
 #
-# Entered with:  Set(gEditMode, "New" | "Edit");  Set(gEditTransaction, <record>)
-# If gSelProject is set, a NEW transaction is pre-attached to that project.
+# CURRENCY — READ THIS BEFORE ADDING ANY TOTAL TO THIS SCREEN. This form writes the
+# NATIVE notional and its currency and nothing else. It does NOT convert: a write-time
+# rate freezes whatever number the app held on the day of the trade and nothing
+# downstream can correct it, whereas report-time conversion can be restated and
+# audited. The consequence is deliberate — NO CROSS-CURRENCY FIGURE MAY BE SHOWN IN
+# THE APP. Per-currency is fine; a mixed total is not.
 #
-# Follows the shared edit-screen pattern documented in scrIssueEdit's header and
-# _EDIT-NOTES.md (seed globals in OnVisible and write from them; normalised picker
-# records; overlay galleries declared last; required fields in one Patch).
-#
-# CURRENCY — read this before adding any total to this screen (Q14, 2026-08-03).
-# This form writes the NATIVE notional and its currency, and nothing else. It does
-# NOT convert to USD: conversion happens in the report layer, against a proper FX
-# dimension for whatever converts it. A write-time rate freezes whatever number the app happened
-# to hold on the day of the trade and nothing downstream can ever correct it;
-# report-time conversion can be restated, back-dated and audited.
-#
-# The consequence is deliberate: **no cross-currency figure can be shown in the
-# app.** Per-currency is fine; a mixed total is not.
-#
-# CONNECTION PREREQUISITE: Office 365 Users (people picker). See HANDOFF.md.
-# Every column token resolves to schema/schema.yaml (golden source).
+# CONNECTION PREREQUISITE: Office 365 Users (people picker).
 # =============================================================================
 Screens:
   scrTransactionEdit:
@@ -27,15 +18,11 @@ Screens:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnTxSave
-        // CURRENCY OPTIONS COME FROM THE COLUMN, not a literal list — a hard-coded
-        // vocabulary drifts from SharePoint silently. Outside the resume guard on
-        // purpose: the options do not depend on the record, and the guard exists to
-        // protect record state on the way back from "+ New".
+        // CURRENCY OPTIONS COME FROM THE COLUMN, not a literal list. Outside the resume guard
+        // on purpose: the options do not depend on the record.
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
-        // synthesised POSITIONALLY: Sequence() numbers the rows, Index() reads the nth
-        // choice back out. No "(none)" row — the column is required — so Id 1 is the
-        // first real currency. The Ids mean nothing beyond "which row": DefaultId looks
-        // the current value up by Label rather than assuming a number.
+        // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — DefaultId looks
+        // the value up by Label. No "(none)" row: the column is REQUIRED.
         ClearCollect( colTxCurrencyOpts,
                       With( { ch: Choices([@taskmaster_transactions].transaction_currency) },
                             ForAll( Sequence( CountRows(ch) ) As n,
@@ -45,9 +32,8 @@ Screens:
          Set( gTxProject,
               If( gEditMode = "Edit",
                   { Id: gEditTransaction.transaction_project_id.Id,
-                    // NOT redundant. The lookup column's live display field is the target's ID,
-                    // so `.Value` is a NUMBER — see schema.yaml on this column. Resolving the
-                    // name app-side is the fix from 2026-08-09; do not "optimise" it away.
+                    // NOT redundant. The lookup column's live display field is the target's ID, so
+                    // `.Value` is a NUMBER — see schema.yaml. Do not "optimise" this away.
                     Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
@@ -64,27 +50,22 @@ Screens:
               If( gEditMode = "Edit",
                   { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
                     Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
-                  // NOT User(). The sales owner of a transaction is usually somebody
-                  // else — defaulting to whoever is entering it writes a wrong name
-                  // silently, and transaction_sales is required so the empty state is
-                  // caught by lblTxMissing rather than slipping through.
+                  // NOT User(). The sales owner is usually somebody else — defaulting to whoever is
+                  // entering it writes a wrong name silently, and transaction_sales is required, so the
+                  // empty state is caught by lblTxMissing instead.
                   { DisplayName: "", Mail: "" } ) );
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
         Reset( txtTxName );
         Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
-        // transaction_date is REQUIRED, so an unseeded picker did not merely lose the
-        // date — it blocked the save outright on every edit.
-        // A text input re-reads Default ONLY on Reset. Without this the previous
-        // transaction's notional stays on screen and is written onto the next one.
+        // transaction_date is REQUIRED, so an unseeded picker did not merely lose the date —
+        // it blocked the save outright on every edit. A text input re-reads Default ONLY on
+        // Reset, or the previous transaction's notional is written onto the next one.
         Reset( numTxNotional );
         Reset( dtpTxDate );
-        // cmpSelection re-reads its DefaultId ONLY on Reset, so without this the strip
-        // shows the PREVIOUS record's currency while the save writes this one.
-        //
-        // INSIDE the resume guard on purpose: returning from ＋ New must not re-seed
-        // it from the stored record, which would discard a currency the user picked
-        // before stepping out to create a client.
+        // cmpSelection re-reads its DefaultId ONLY on Reset.
+        // INSIDE the resume guard on purpose: returning from ＋ New must not re-seed from the
+        // stored record and discard a currency the user picked before stepping out.
         Reset( selTxCurrency ) )
     Children:
       - HeaderBar:
@@ -205,14 +186,11 @@ Screens:
                               Width: =Parent.Width
                               Height: =18
                         # A COMBO BOX, not a cmpSelection strip. The strip raises OnChange with
-                        # `Select(Parent); cmpSelection.OnChange()`, so the consumer reads
-                        # `Selected` in the same behaviour chain that just changed it and can
-                        # get the PREVIOUS pick. transaction_currency is REQUIRED, so that lands
-                        # as the wrong currency on a real trade rather than as a missing field.
-                        # scrIssueEdit's three pickers moved off the strip for the same reason.
-                        #
-                        # No "(none)" row: unlike issue_type this column is required, so the
-                        # empty state is not a legal value. gTxCurrency seeds to USD.
+                        # `Select(Parent); cmpSelection.OnChange()`, so the consumer reads `Selected` in the
+                        # same behaviour chain that just changed it and can get the PREVIOUS pick.
+                        # transaction_currency is REQUIRED, so that lands as the wrong currency on a real
+                        # trade rather than as a missing field.
+                        # No "(none)" row: the column is required, so the empty state is not a legal value.
                         - selTxCurrency:
                             Control: CanvasComponent
                             ComponentName: cmpSelection
@@ -220,10 +198,8 @@ Screens:
                               Width: =Parent.Width
                               Height: =40
                               Items: =colTxCurrencyOpts
-                              # BY LABEL, not a hard-coded Id. The old literal table mapped
-                              # "USD",1 "EUR",2 "GBP",3 "JPY",4 and fell through to 5 for
-                              # everything else, so CHF resolved only because 5 happened to be
-                              # its row. A LookUp cannot go wrong that way.
+                              # BY LABEL, not a hard-coded Id. A literal position table fell through to 5 for
+                              # everything unlisted, so CHF resolved only because 5 happened to be its row.
                               DefaultId: |
                                 =Coalesce( LookUp(colTxCurrencyOpts, Label = gTxCurrency, Id), 1 )
                               OnChange: |
@@ -263,9 +239,8 @@ Screens:
                             Control: Classic/TextInput@2.3.2
                             Properties:
                               Default: =If(gEditMode = "Edit", gEditTransaction.transaction_notional, Blank())
-                              # Restricts typing to digits. Without it `Value(.Text)` on a
-                              # non-numeric entry is blank, and the save writes blank into an
-                              # optional Currency column with nothing on screen to point at.
+                              # Restricts typing to digits. Without it `Value(.Text)` on a non-numeric entry is
+                              # blank, and the save writes blank with nothing on screen to point at.
                               Format: =TextFormat.Number
                               HintText: ="e.g. 25000000"
                               Align: =Align.Right
@@ -440,19 +415,17 @@ Screens:
                         Text: |
                           =Trim(
                              If( Len(Trim(txtTxName.Text)) = 0,  "label   ",   "" ) &
-                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on
-                             // this form, but a blank one would still be rejected by SharePoint —
-                             // and silently, since there is nothing on screen to point at. Same
-                             // guard scrTaskEdit keeps for the same reason.
+                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
+                             // but a blank one would still be rejected by SharePoint — silently, since there is
+                             // nothing on screen to point at.
                              If( gTxProject.Id <= 0,             "a parent project (not set — reopen from the project screen)   ", "" ) &
                              If( gTxClient.Id  <= 0,             "client   ",  "" ) &
                              If( gTxProduct.Id <= 0,             "product   ", "" ) &
                              If( Len(gTxSales.Mail) = 0,         "sales owner   ", "" ) &
                              If( IsBlank(dtpTxDate.SelectedDate),
                                  "a valid trade date   ", "" ) &
-                             // transaction_notional is optional, so an EMPTY box is fine; only
-                             // text that will not parse is an error, and that is silent
-                             // otherwise — Value() returns blank and blank saves as blank.
+                             // transaction_notional is optional, so an EMPTY box is fine; only text that will
+                             // not parse is an error, and that is silent otherwise.
                              If( Len(Trim(numTxNotional.Text)) > 0
                               && IsBlank(Value(numTxNotional.Text)),
                                  "a numeric notional (that entry is not a number)   ", "" ) )
@@ -488,9 +461,8 @@ Screens:
             Width: =Parent.Width
             Height: =88
           Children:
-            # DESTRUCTIVE, so it sits hard left, away from Save. Edit mode only —
-            # there is nothing to delete while creating. Arms the dialog and deletes
-            # nothing; gDelRefs is counted here so the dialog can say what else changes.
+            # DESTRUCTIVE, so it sits hard left, away from Save. Edit mode only. Arms the dialog
+            # and deletes nothing; gDelRefs is counted here so the dialog can say what else changes.
             - btnTxDelete:
                 Control: Classic/Button@2.2.0
                 Properties:
@@ -534,42 +506,32 @@ Screens:
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =48
-                  # Every column this form owns is required, so a single Patch covers it
-                  # — no guarded second pass is needed. transaction_notional_usd is NOT
-                  # written: it has no app-side writer by decision (Q14).
+                  # Every column this form owns is required, so a single Patch covers it.
+                  # transaction_notional_usd is NOT written: it has no app-side writer by decision.
                   OnSelect: |
                     =If( gSaving,
-                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
-                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
-                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
-                    // record. `Set` applies immediately within a behaviour chain, so the flag is
-                    // already true by the time the second tap is evaluated.
-                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
-                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
-                    // instead, and the guard below is what actually blocks the duplicate.
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing — a Patch takes
+                    // seconds and the button stays live, so a double-tap ran the handler twice and built a
+                    // SECOND record. `Set` applies immediately within a behaviour chain.
                     false,
                     Set( gSaving, true );
                     If( Len(lblTxMissing.Text) > 0,
-                    // The requirement that used to disable the button, moved here so a blocked
-                    // save names the field. All six are required in schema.yaml — SharePoint would
-                    // reject the write regardless; this only decides whether the user is told.
+                    // Enforced here so a blocked save names the field. All six are required in
+                    // schema.yaml, so SharePoint would reject the write regardless.
                     Notify( "Can't save yet — this still needs: " & lblTxMissing.Text,
                     NotificationType.Error ),
                     Set( gTxSaved, Blank() );
                     Set( gTxErr, "" );
                     IfError(
-                        // The Set wrapper is not decoration: IfError requires all its
-                        // arguments to be type-compatible today, and a bare Patch (record)
-                        // against a Set fallback is rejected. Both sides are a Set now.
+                        // The Set wrapper is not decoration: IfError requires all its arguments to be
+                        // type-compatible, and a bare Patch (record) against a Set fallback is rejected.
                         Set( gTxSaved,
                         Patch( taskmaster_transactions,
                                If( gEditMode = "Edit", gEditTransaction, Defaults(taskmaster_transactions) ),
-                               // Mirrors the PARENT's phase so cross-project queries can exclude archived
-                               // work with a delegable `= false`. Written on EVERY save, not just on insert.
-                               // Read LIVE from the list, not from gSelProject: that global is a gallery
-                               // snapshot taken when the project was opened, so a project archived since
-                               // then would stamp `false` here and the row would stay in scope forever.
-                               // One delegable LookUp on ID.
+                               // Mirrors the PARENT's phase so cross-project queries can exclude archived work with
+                               // a delegable `= false`. Written on EVERY save. Read LIVE from the list, not from
+                               // gSelProject — that global is a gallery snapshot, so a project archived since would
+                               // stamp `false` and the row would stay in scope forever.
                                { transaction_project_archived:
                                      Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
                                                        project_phase.Value ), "" ) = "Archived",
@@ -590,8 +552,7 @@ Screens:
                         Set( gTxErr, FirstError.Message )
                     );
                     // Trust the RECORD, never the message: a write can fail and still leave
-                    // FirstError.Message empty, and reading that as success reports a save
-                    // that never happened.
+                    // FirstError.Message empty.
                     If( IsBlank(gTxSaved.ID) && Len(gTxErr) = 0,
                         Set( gTxErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                     If( Len(gTxErr) > 0,
@@ -617,10 +578,8 @@ Screens:
                   Height: =48
                   OnSelect: =Back()
       # =====================================================================
-      # PICKER — ONE cmpPicker instance for the sales owner AND both lookups.
-      # Declared LAST so the dialog paints above the footer. gTxPicker names
-      # the field and selects the row kind.
-      # See scrTaskEdit's instance for the full contract commentary.
+      # PICKER — ONE cmpPicker instance for the sales owner AND both lookups. Declared LAST
+      # so the dialog paints above the footer. See scrTaskEdit's instance for the contract.
       # =====================================================================
       - cmpTxPick:
           Control: CanvasComponent
@@ -636,11 +595,8 @@ Screens:
                        "Sales",   "Select sales owner",
                        "Client",  "Select client",
                        "Product", "Select product" )
-            # Queries run HERE — AccessAppScope false. Bound to gTxQuery, which
-            # OnSearch sets, never to the instance's own Query output.
-            # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
-            # The record branches carry no query-length gate — see scrTaskEdit's
-            # instance for why one branch serves both the default page and the search.
+            # Queries run HERE — AccessAppScope false. Bound to gTxQuery, which OnSearch sets,
+            # never to the instance's own Query output. See scrTaskEdit's instance.
             Results: |
               =If( gTxPicker = "Sales" && Len(gTxQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gTxQuery, top: 25 }).value As u,
@@ -682,12 +638,10 @@ Screens:
                    Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gTxPicker, "" )
       # =====================================================================
-      # DELETE CONFIRMATION. See scrProject's instance for the Studio check that
-      # must happen before this screen is pasted: cmpConfirmDialog had no consumer
-      # in src/ until issue #15, so its eight custom properties may never have been
-      # declared in Studio — and a component's properties do NOT come across in a
-      # paste. Visible is gated as well as IsOpen because a component intercepts
-      # every click inside its bounds.
+      # DELETE CONFIRMATION. See scrProject's instance for the Studio check that must happen
+      # before this screen is pasted — a component's custom properties do NOT come across in
+      # a paste. Visible is gated as well as IsOpen because a component intercepts every
+      # click inside its bounds.
       # =====================================================================
       - cmpTxConfirmDel:
           Control: CanvasComponent
@@ -709,18 +663,16 @@ Screens:
             ConfirmLabel: ="Delete"
             CancelLabel: ="Cancel"
             Destructive: =true
-            # IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED by
-            # Studio: Remove and ForAll/Patch return a TABLE while Notify and Set return a
-            # boolean, and IfError requires type-compatible arguments. Hence Set-into-a-scrap
-            # on both arms, with a DIFFERENT scrap name per call site.
+            # IfError( Remove(...), Notify(...) ) is REJECTED by Studio: Remove and ForAll/Patch
+            # return a TABLE while Notify and Set return a boolean, and IfError requires
+            # type-compatible arguments. Hence Set-into-a-scrap, with a DIFFERENT name per site.
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
                If( gDelRefs >= 500, Set( gDelBlock, true ) );
-               // DETACH FIRST, then remove. The reverse leaves issues pointing at a row
-               // that is already gone. COUNT AND REFUSE rather than half-do it: this is a
-               // local ForAll over a delegable Filter, so past the data row limit it would
-               // clear SOME references, raise NO error, and delete the parent anyway.
+               // DETACH FIRST, then remove — the reverse leaves issues pointing at a row that is
+               // already gone. COUNT AND REFUSE rather than half-do it: a local ForAll over a
+               // delegable Filter clears SOME references past the data row limit and raises NO error.
                If( !gDelBlock && gDelRefs > 0,
                    IfError( Set( gDelScrapDX,
                                  ForAll( Filter( taskmaster_issues, issue_transaction_name.Id = gDelId ) As iss,
@@ -738,9 +690,7 @@ Screens:
                              & " Some issue links may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( "Transaction deleted.", NotificationType.Success );
-                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute —
-                   // so project_phase and the completion rollup repair themselves with no
-                   // second copy of that logic living here.
+                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute.
                    Back() );
                Set( gDelKind, "" )
             OnCancel: =Set( gDelKind, "" )

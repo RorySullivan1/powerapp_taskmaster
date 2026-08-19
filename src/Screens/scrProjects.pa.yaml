@@ -1,41 +1,32 @@
 # Projects browser: coverage filter + search + two toggles ("only mine", "show
-# completed") over a six-column gallery. ONE filter row — there is no second.
+# completed") over a six-column gallery. ONE filter row.
 #
 # VERTICAL BANDS (768 tall). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
 #     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
 #    88 .. 148   hdrProjects   = HeaderH + Gutter, height 60
 #   164 .. 204   rowFilters    = off hdrProjects,  height 40
 #   220 .. 744   galProjects   = absolute 220, fills to the bottom gutter
-#
-# The bands above galProjects are RELATIVE — each anchored to the one above it, so a
-# height change in the header moves them together. The gallery itself is an ABSOLUTE
-# 220 and its Height subtracts the same number, so the two have to be edited together.
-# Layout formulas survive a paste and keep recomputing (tests/README.md) — what breaks
-# the link is dragging a control in Studio, so change geometry here or in the formula
-# bar, never with the mouse.
+# The bands above galProjects are RELATIVE. The gallery is an ABSOLUTE 220 and its
+# Height subtracts the same number, so those two must be edited together.
+# Layout formulas survive a paste and keep recomputing (tests/README.md); what breaks
+# the link is DRAGGING a control in Studio. Change geometry here, never with the mouse.
 #
 # Horizontal placement is auto-layout, not arithmetic: the filter row and each gallery
-# row are containers whose children carry NO X. Columns therefore cannot overlap at any
-# width. They previously could — `rowDue` was anchored proportionally while
-# `rowPercent` was pinned to the right edge with a fixed width, and the two only
-# cleared each other above about 850px of TemplateWidth.
+# row are containers whose children carry NO X, so columns cannot overlap at any width.
 Screens:
   scrProjects:
     Properties:
       Fill: =gTheme.Color.Bg
       # project_coverage's values are NOT in the golden source — schema.yaml carries
-      # PLACEHOLDERs and says the app must bind Choices() rather than a literal, so
-      # whatever the list actually holds appears here with no app change. The "All
-      # coverage" row is Collected FIRST so it sorts to the top and is what makes an
-      # unfiltered view selectable without a separate clear button.
+      # PLACEHOLDERs — so the app binds Choices() and whatever the list holds appears with
+      # no app change. "All coverage" is Collected FIRST so it sorts to the top.
       OnVisible: |
         =ClearCollect( colPrjCoverage, { Value: "All coverage" } );
          Collect( colPrjCoverage,
                   ForAll( Choices([@taskmaster_projects].project_coverage) As c,
                           { Value: c.Value } ) );
-         // SELF-HEAL, same as scrHome. App.OnStart is NON-BLOCKING, so this screen can
-         // run before it finishes, and a blank gUserEmail makes the "only mine" branches
-         // below match nothing.
+         // SELF-HEAL, same as scrHome. App.OnStart is NON-BLOCKING, so this screen can run
+         // before it finishes and a blank gUserEmail makes the "only mine" branches match nothing.
          If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) )
     Children:
       - hdrProjects:
@@ -50,23 +41,17 @@ Screens:
             Subtitle: ="Browse and open a project"
             ShowAction: =true
             ActionLabel: ="New project"
-            # gSelProject is cleared too: the child edit screens pre-attach to it,
-            # and a stale selection would silently parent the next new item to the
-            # last project the user happened to open.
+            # gSelProject is cleared too: the child edit screens pre-attach to it, and a stale
+            # selection would parent the next new item to the last project opened.
             OnAction: |
               =Set( gEditMode, "New" );
                Set( gEditProject, Blank() );
                Set( gSelProject, Blank() );
                Navigate( scrProjectEdit, ScreenTransition.Cover )
       # ---- Filter row -------------------------------------------------------
-      # ONE auto-layout row, and everything the screen filters on is on it. The controls
-      # carry no X at all, so the chain of hand-added offsets that used to place them
-      # cannot drift, and the search box takes whatever width the other five leave.
-      #
-      # THE WIDTH BUDGET: 240 + 220 + 60 + 170 + 60 + 150 with five 16px gaps = 980
-      # against 1318 usable (1366 - two gutters), so the search box gets 338 of slack and
-      # nothing is forced onto a second line. An earlier note here read the 768 DESIGN
-      # HEIGHT as the width and concluded a second row was unavoidable — it is not.
+      # ONE auto-layout row; the controls carry no X and the search box takes the slack.
+      # WIDTH BUDGET: 240 + 220 + 60 + 170 + 60 + 150 with five 16px gaps = 980 against
+      # 1318 usable (1366 - two gutters), so the search box gets 338 and nothing wraps.
       - rowFilters:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -79,9 +64,9 @@ Screens:
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
             Height: =40
           Children:
-            # FillPortions 0 + LayoutMinWidth on everything except the search box:
-            # a child of an auto-layout container is FLEXIBLE by default and its
-            # declared Width is only advisory until that is turned off.
+            # FillPortions 0 + LayoutMinWidth on everything except the search box: a child of an
+            # auto-layout container is FLEXIBLE by default and its declared Width is only advisory
+            # until that is turned off.
             - cboPrjCoverage:
                 Control: ModernCombobox@1.1.1
                 Properties:
@@ -107,17 +92,12 @@ Screens:
                   FillPortions: =1
                   LayoutMinWidth: =220
                   Height: =40
-            # THE "MINE" FILTER, and it is a toggle + label pair rather than a check box
-            # for the same reason tglShowComplete is: the check-box token is not grounded
-            # for this dialect and an unverified control fails the WHOLE screen paste.
-            #
-            # It replaced a lead picker whose filter RETURNED NOTHING for every choice,
-            # "All leads" included. That design rested on `StartsWith(person.Email, "")`
-            # being a no-op that matched every row, which is what kept the gallery at four
-            # branches; against the real list it matched none. The person test here is
-            # `= gUserEmail` instead — the equality scrHome has run all along — and the
-            # empty-string no-op is gone with the picker. Rebuild the trick and the
-            # branches collapse again, but so does the filter.
+            # THE "MINE" FILTER, a toggle + label pair rather than a check box: the check-box
+            # token is not grounded for this dialect and an unverified control fails the WHOLE
+            # screen paste.
+            # The person test is `= gUserEmail`. An earlier design used `StartsWith(person.Email,
+            # "")` as a match-everything off state and it returned NOTHING for every choice
+            # (user, 2026-08-19). Rebuild that trick to save branches and the filter dies with it.
             - tglOnlyMine:
                 Control: Classic/Toggle@2.1.0
                 Properties:
@@ -164,66 +144,31 @@ Screens:
                   Width: =150
                   Height: =40
       # ---- Gallery ----------------------------------------------------------
-      # TWO STAGES, AND THE SPLIT IS THE POINT. The inner `If` is EIGHT BRANCHES — three
-      # independent binary filters (show completed × coverage × only mine) — each
-      # INDEPENDENTLY delegable, with its `Sort` INSIDE it; `Sort(If(...))` would not
-      # fold, because If is not a delegable operation, so the sort would run locally over
-      # one arbitrary page. The duplication is the price of delegation: every predicate
-      # has to be WRITTEN OUT in the branch that uses it, because a filter assembled from
-      # a variable or a `||` against a client-side constant does not fold.
+      # TWO STAGES, AND THE SPLIT IS THE POINT. The inner `If` is EIGHT BRANCHES — show
+      # completed × coverage × only mine — each INDEPENDENTLY delegable, with its `Sort`
+      # INSIDE it. `Sort(If(...))` would not fold, and a predicate assembled from a variable
+      # does not fold either, so every branch WRITES ITS PREDICATES OUT. That duplication is
+      # the price of delegation; do not factor it away.
       #
-      # The OUTER Filter is the name search, and it runs LOCALLY on purpose. SharePoint
-      # delegates `=`, `StartsWith`, `Filter` and `Sort` on a Text column and NOTHING
-      # ELSE — `Search` and the substring `in` are absent from the connector's table
-      # entirely (they are listed for SQL, so the omission is a statement). "Anywhere in
-      # the name" therefore CANNOT fold, and the only question is how much data the local
-      # pass runs over. Wrapping the delegated `If` answers it: the server still applies
-      # phase, coverage and lead, and the client filters only what that returns. Written
-      # as one flat Filter instead, the whole query would go non-delegable and the phase
-      # and lead tests would run on an arbitrary page.
+      # The OUTER Filter is the name search and runs LOCALLY on purpose: SharePoint delegates
+      # `=`, `StartsWith`, `Filter` and `Sort` on Text and NOTHING else — `Search` and the
+      # substring `in` have no row in the connector's table at all. Wrapping the delegated
+      # `If` keeps phase, coverage and lead on the server; written as one flat Filter the
+      # whole query goes non-delegable.
+      # THE CEILING IS THE DATA ROW LIMIT (set it to 2000): the outer pass cannot see a row
+      # the inner query did not return, and it fails SILENTLY.
+      # The blank test is EXPLICIT, not `"" in project_name` — see the toggle above.
       #
-      # THE CEILING IS THE DATA ROW LIMIT (set it to 2000), because the outer pass can
-      # only see rows the inner query returned. The schema is designed around exactly
-      # this — every list is kept "safely under 2000 rows in scope" — so the local pass
-      # sees everything. If the projects list ever approaches that, the search starts
-      # missing matches SILENTLY, and no warning fires.
+      # EVERY BRANCH CARRIES ITS OWN PHASE PREDICATE, and the "show completed" ones look
+      # redundant against ActiveProjects. DO NOT SIMPLIFY THEM AWAY: sorting a bare
+      # `Filter(ActiveProjects, StartsWith(...))` returned "the query is not valid" from
+      # SharePoint while the identical shape WITH an explicit phase group did not. The
+      # phases are ENUMERATED because a Text `<>` does not delegate.
       #
-      # The blank test is EXPLICIT, not `"" in project_name`. An empty operand that
-      # "matches everything" is what the deleted lead filter rested on, and this file has
-      # paid for that once already — even though the semantics are documented and this
-      # one is evaluated locally.
-      #
-      # EIGHT AND NOT FOUR because the person test is `= gUserEmail`, an equality that has
-      # no neutral value. The lead picker this replaced held the count at four by writing
-      # `StartsWith(project_manager.Email, "")` in the off state and trusting it to match
-      # every row — and in the app it matched NONE, for every choice including "All leads"
-      # (user, 2026-08-19). Equality is what scrHome has always run against these Person
-      # columns. Restoring the empty-string form to save four branches restores the defect.
-      #
-      # EVERY BRANCH CARRIES ITS OWN PHASE PREDICATE, and the "show completed"
-      # ones look redundant against ActiveProjects because they enumerate the same
-      # five phases it already filters on. Do not simplify them away. Sorting a
-      # bare `Filter(ActiveProjects, StartsWith(...))` returned "the query is not
-      # valid" from SharePoint, while the identical shape WITH an explicit phase
-      # group did not — so all eight branches are deliberately the same shape, and
-      # the one that was different is the one that failed.
-      #
-      # The phases are ENUMERATED rather than written as `<> "Complete"`: a Text
-      # `<>` does not delegate, and one non-delegable clause silently truncates the
-      # whole query at the row limit. ActiveProjects already excludes Archived, so
-      # "show completed" is the difference between four open phases and five. That is the
-      # column's WHOLE vocabulary minus Archived, so a value added in SharePoint and not
-      # added here vanishes from this screen rather than erroring.
-      #
-      # `project_coverage` is NOT indexed in the golden source. Equality on it
-      # delegates, but SharePoint refuses an unindexed filter once the list passes
-      # 5,000 items — index it before the projects list gets near that.
-      #
-      # THE COVERAGE TEST IS Coalesce'd. Before OnVisible has run, or if Choices()
-      # returns nothing, `cboPrjCoverage.Selected.Value` is BLANK — which is not equal
-      # to "All coverage", so the old form fell through to a branch that filtered
-      # `project_coverage.Value = <blank>`. Treating an absent selection as "All"
-      # keeps that degenerate predicate out of the query entirely.
+      # `project_coverage` is NOT indexed in the golden source. Equality on it delegates, but
+      # SharePoint refuses an unindexed filter past 5,000 items — index it before then.
+      # THE COVERAGE TEST IS Coalesce'd: before OnVisible runs, Selected.Value is BLANK,
+      # which is not "All coverage", so an un-Coalesced form filtered on a blank value.
       - galProjects:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
@@ -305,9 +250,8 @@ Screens:
                              project_name ) ),
                    Len( Trim(txtProjSearch.Text) ) = 0
                 || Trim(txtProjSearch.Text) in project_name )
-            # EXPLICIT single column. Left unset, a wrapping gallery divides
-            # TemplateWidth between columns, and every proportional child inside the
-            # row shrinks with it — which is how the columns came to overlap.
+            # EXPLICIT single column. Left unset, a wrapping gallery divides TemplateWidth
+            # between columns and every proportional child inside the row shrinks with it.
             WrapCount: =1
             TemplateSize: =72
             TemplatePadding: =0
@@ -317,15 +261,9 @@ Screens:
             Height: =Parent.Height - 220 - gTheme.Space.Gutter
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
-            # ONE auto-layout row per record. The columns carry NO X, so they cannot
-            # collide at any TemplateWidth — which the previous absolute version did:
-            # `rowDue` was anchored proportionally while `rowPercent` was pinned to the
-            # right edge with a fixed width, and the two only cleared each other above
-            # about 850px.
-            #
-            # Every column is FillPortions + LayoutMinWidth. A child of an auto-layout
-            # container is FLEXIBLE by default and its declared Width is advisory until
-            # that is turned off, so a fixed Width alone would silently do nothing.
+            # ONE auto-layout row per record. The columns carry NO X, so they cannot collide at
+            # any TemplateWidth. Every column is FillPortions + LayoutMinWidth: a child of an
+            # auto-layout container is FLEXIBLE by default and a fixed Width alone does nothing.
             - rowBody:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -340,28 +278,17 @@ Screens:
                   Width: =Parent.TemplateWidth
                   Height: =Parent.TemplateHeight - 1
                 Children:
-                  # INLINE SVG, NOT A COMPONENT. A canvas component cannot be placed
-                  # inside a gallery template — Studio refuses the paste. Same technique
-                  # as cmpKpiRing.
-                  #
-                  # SHAPE CARRIES THE MEANING, colour only reinforces it: an empty ring,
-                  # a ring of dots, a ring with a filled core, an exclamation disc and a
-                  # tick are all distinguishable in greyscale and to a red-green
-                  # colour-blind reader. The set reads as a progression — empty, thinking,
-                  # working, stuck, done.
-                  #
-                  # EVERY VALUE OF project_phase NEEDS A CASE HERE. A phase added to the
-                  # SharePoint column but not added here renders as "?", which is at least
-                  # VISIBLE — unlike the same omission in the Items filter above, where the
-                  # rows simply do not appear.
-                  #
-                  # HEX TEXT, not gTheme.Color.*: these drop straight into the SVG string
-                  # and Power Fx has no Color-to-hex conversion. They mirror the palette —
-                  # Primary #005A9E · Success #31825D · Danger #C53A3A · TextMuted #6E7882.
-                  #
-                  # NO "Archived" CASE. Archived projects never reach this gallery, so one
-                  # would land on the "?" glyph — the right answer if it ever appears,
-                  # since it means something is showing work that should be hidden.
+                  # INLINE SVG, NOT A COMPONENT — a canvas component cannot be placed inside a gallery
+                  # template; Studio refuses the paste.
+                  # SHAPE CARRIES THE MEANING, colour only reinforces it: empty ring, ring of dots, ring
+                  # with a filled core, exclamation disc, tick — all distinguishable in greyscale and to
+                  # a red-green colour-blind reader.
+                  # EVERY VALUE OF project_phase NEEDS A CASE HERE. A phase added in SharePoint and not
+                  # added here renders as "?", which is at least VISIBLE — unlike the same omission in
+                  # the Items filter above, where the rows simply do not appear.
+                  # HEX TEXT, not gTheme.Color.*: Power Fx has no Color-to-hex conversion.
+                  # NO "Archived" CASE — those never reach this gallery, so one landing on "?" is the
+                  # right answer: it means something is showing work that should be hidden.
                   - rowStatus:
                       Control: Image@2.2.3
                       Properties:
@@ -398,9 +325,8 @@ Screens:
                               "data:image/svg+xml," & EncodeUrl(
                                   "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
                           )
-                  # Name over lead, so the two identity fields read as one block.
-                  # BOTH children are pinned: unpinned children of a vertical container
-                  # split the height evenly and ignore the 26/20 declared here.
+                  # Name over lead, so the two identity fields read as one block. BOTH children are
+                  # pinned: unpinned children of a vertical container split the height evenly.
                   - colNameLead:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -445,8 +371,8 @@ Screens:
                         Font: =gTheme.Font
                         FontWeight: =FontWeight.Semibold
                         Size: =gTheme.Size.Small
-                        # Colour-coded, but the value is also SPELLED OUT — colour alone
-                        # would carry the whole meaning for a reader who cannot see it.
+                        # Colour-coded, but the value is also SPELLED OUT — colour alone would carry the
+                        # whole meaning for a reader who cannot see it.
                         Color: |
                           =Switch( ThisItem.project_priority.Value,
                                    "Critical", gTheme.Color.Danger,
@@ -460,8 +386,8 @@ Screens:
                   - rowDue:
                       Control: Label@2.5.1
                       Properties:
-                        # No target date is "-", not a blank cell: an empty column reads
-                        # as a rendering fault, a dash reads as "nobody set one".
+                        # No target date is "-", not a blank cell: an empty column reads as a rendering
+                        # fault, a dash as "nobody set one".
                         Text: |
                           =If( IsBlank(ThisItem.project_date_target), "-",
                                Text(ThisItem.project_date_target, "dd mmm yyyy") & "   ·   " &
@@ -472,8 +398,8 @@ Screens:
                                                  d & " days left" ) ) )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
-                        # Only overdue on work that is still open — a completed project
-                        # past its target is history, not a problem to flag.
+                        # Only overdue on work that is still open — a completed project past its target
+                        # is history, not a problem to flag.
                         Color: |
                           =If( !IsBlank(ThisItem.project_date_target)
                             && ThisItem.project_date_target < Today()
@@ -495,8 +421,8 @@ Screens:
                         FillPortions: =1
                         LayoutMinWidth: =104
                         Height: =20
-            # Absolute siblings of the row container, not children of it: both must
-            # span the whole template, and the hit button must be LAST so it is on top.
+            # Absolute siblings of the row container, not children: both must span the whole
+            # template, and the hit button must be LAST so it is on top.
             - rowLine:
                 Control: Rectangle@2.3.0
                 Properties:
@@ -508,10 +434,8 @@ Screens:
             - galProjectsHit:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  # The row's action lives HERE, not on the gallery's OnSelect: a gallery's
-                  # own OnSelect does not reliably fire when the click lands on a child
-                  # control, so without a transparent full-template button declared LAST
-                  # the rows look right and do nothing.
+                  # The row's action lives HERE, not on the gallery's OnSelect — a gallery's own
+                  # OnSelect does not reliably fire when the click lands on a child control.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   HoverFill: =gTheme.Color.Hover
@@ -547,14 +471,10 @@ Screens:
             Width: =galProjects.Width
             Height: =galProjects.Height
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
-      # DECLARED LAST so positional z-order floats the fly-out over the content.
-      #
-      # Height is dynamic and that is the whole trick: a component intercepts every
-      # click inside its bounds, so closed it must own nothing but the 64px header
-      # strip. Open, covering the screen is exactly right — the scrim wants the click.
-      #
-      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
-      # the chosen entry and this screen does the navigating.
+      # DECLARED LAST so positional z-order floats the fly-out over the content. Height is
+      # dynamic and that is the trick: a component intercepts every click inside its bounds,
+      # so closed it must own nothing but the 64px header strip. cmpAppBar cannot Navigate
+      # (a component can't see app screens), so this screen does the navigating.
       - appBar:
           Control: CanvasComponent
           ComponentName: cmpAppBar

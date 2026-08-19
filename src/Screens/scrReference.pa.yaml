@@ -61,13 +61,8 @@ Screens:
                Set( gPdReturn, "" );
                Navigate( scrProductEdit, ScreenTransition.Cover )
       # ---- Maintenance lists -----------------------------------------------
-      # THESE ARE WHAT DEFINE `gEditClient` / `gEditProduct`. Until they existed
-      # the two create screens READ those globals but nothing in the app ever
-      # Set them, so Studio reported both as unknown — an undefined global has no
-      # type, and `gEditClient.client_name` cannot resolve against nothing.
-      # The Edit path had no entry point, which was the actual gap: scrReference
-      # could only CREATE reference data, never open any.
-      #
+      # THESE ARE WHAT DEFINE `gEditClient` / `gEditProduct` — the two create screens read
+      # those globals, so without an entry point here they have no type and nothing resolves.
       # Bands, computed (1366x768):
       #   112..140  heading      152..196  new buttons
       #   210..230  caption      234..270  search      278..744  gallery
@@ -99,8 +94,8 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
-            # Delegable: StartsWith on an indexed Text column, and an empty search
-            # box matches everything rather than nothing.
+            # Delegable: StartsWith on an indexed Text column, and an empty search box
+            # matches everything rather than nothing.
             Items: |
               =Sort( Filter( taskmaster_clients,
                              StartsWith(client_name, txtAdminClientSearch.Text) ),
@@ -153,9 +148,8 @@ Screens:
             - hitAdminCl:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  # Transparent full-template button declared LAST — a gallery's
-                  # own OnSelect does not reliably fire when the click lands on a
-                  # child control.
+                  # Transparent full-template button declared LAST — a gallery's own OnSelect
+                  # does not reliably fire when the click lands on a child control.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   HoverFill: =gTheme.Color.Hover
@@ -206,10 +200,9 @@ Screens:
                              StartsWith(product_uid, txtAdminProductSearch.Text) ),
                      product_uid )
             WrapCount: =1
-            # 80, not 44: the #20 fields take a third line and features a fourth. Every Y
-            # below is measured against this number and the separator sits on the last
-            # pixel of it, so the five move together. THE COST IS ROWS ON SCREEN — the
-            # 466px viewport holds ~5.8 products where the 44px row held ~10.
+            # 80, not 44: the #20 fields take a third line and features a fourth. Every Y below
+            # is measured against this number and the separator sits on its last pixel, so the five
+            # move together. THE COST IS ROWS ON SCREEN — ~5.8 products against ~10 at 44px.
             TemplateSize: =80
             TemplatePadding: =0
             TemplateFill: =RGBA(0, 0, 0, 0)
@@ -244,12 +237,9 @@ Screens:
                   Y: =23
                   Width: =Parent.TemplateWidth - 24
                   Height: =18
-            # THE #20 LINE. Blank fields COLLAPSE rather than printing a dash each:
-            # three placeholders on a reference row read as damage, and a product with
-            # none of these is the normal case, not a defect. The separator is only
-            # emitted between two values that both exist, so the line never starts or
-            # ends with one. Features get their OWN line below rather than joining this
-            # one — prose beside three short tokens reads as one run-on string.
+            # THE #20 LINE. Blank fields COLLAPSE rather than printing a dash each: three
+            # placeholders on a reference row read as damage, and a product with none of these is
+            # the normal case. The separator is only emitted between two values that both exist.
             - cellAdminPdSpec:
                 Control: Label@2.5.1
                 Properties:
@@ -269,14 +259,10 @@ Screens:
                   Y: =41
                   Width: =Parent.TemplateWidth - 24
                   Height: =18
-            # FEATURES, ONE LINE, TRUNCATED. Two things have to happen to free text
-            # before it can sit in a fixed-height row:
-            #   * LINE BREAKS BECOME SPACES. product_features is a Note — a stored
-            #     newline would render as one here and push the rest of the sentence out
-            #     of the 18px box, so the row would look truncated at a random word.
-            #   * A LENGTH CAP with an ellipsis, so a long entry ENDS rather than being
-            #     clipped mid-glyph. 100 characters is what fits 627px at Size.Small;
-            #     the ellipsis is the signal that the edit form holds the rest.
+            # FEATURES, ONE LINE, TRUNCATED. product_features is a Note, so LINE BREAKS BECOME
+            # SPACES — a stored newline would push the rest of the sentence out of the 18px box.
+            # The 100-character cap ends the text rather than clipping it mid-glyph, and the
+            # ellipsis signals that the edit form holds the rest.
             - cellAdminPdFeat:
                 Control: Label@2.5.1
                 Properties:
@@ -326,14 +312,10 @@ Screens:
                          Navigate( scrProductEdit, ScreenTransition.Cover ) )
 
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
-      # DECLARED LAST so positional z-order floats the fly-out over the content.
-      #
-      # Height is dynamic and that is the whole trick: a component intercepts every
-      # click inside its bounds, so closed it must own nothing but the 64px header
-      # strip. Open, covering the screen is exactly right — the scrim wants the click.
-      #
-      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
-      # the chosen entry and this screen does the navigating.
+      # DECLARED LAST so positional z-order floats the fly-out over the content. Height is
+      # dynamic and that is the trick: a component intercepts every click inside its bounds,
+      # so closed it must own nothing but the 64px header strip. cmpAppBar cannot Navigate
+      # (a component can't see app screens), so this screen does the navigating.
       - appBar:
           Control: CanvasComponent
           ComponentName: cmpAppBar

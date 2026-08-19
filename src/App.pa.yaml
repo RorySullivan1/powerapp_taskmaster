@@ -3,12 +3,11 @@
 # skill, and tools/formula_bar_body.py for a comment-free body.
 App:
   Properties:
-    # Constants. `Set`, not named formulas: named formulas did not resolve in the
-    # published app, which blanked every colour and dimension.
-    #
-    # `gTheme`, NOT `Theme`. `Theme` collides with modern theming — Power Apps
-    # defines `App.Theme` and loads theme objects by instance name. Studio tolerates
-    # the collision silently; the player does not.
+    # `Set`, not named formulas: named formulas did not resolve in the published app,
+    # which blanked every colour and dimension.
+    # `gTheme`, NOT `Theme` — `Theme` collides with modern theming (Power Apps defines
+    # App.Theme and loads theme objects by instance name). Studio tolerates the collision
+    # silently; the player does not.
     OnStart: |-
       =
        Set( gTheme, {
@@ -25,11 +24,10 @@ App:
               Success:      RGBA(49,  130, 93,  1),
               Warning:      RGBA(214, 152, 40,  1),
               Danger:       RGBA(197, 58,  58,  1),
-              // Wash tints for the transparent hit buttons layered OVER gallery rows.
-              // They must stay low-alpha: the hit button is declared last, so whatever
-              // it paints covers the row's own text. A classic Button left without
-              // HoverFill derives one from Fill by dimming 20%, which on a transparent
-              // fill reads as a solid block and hides the row.
+              // Wash tints for the transparent hit buttons layered OVER gallery rows. They must
+              // stay low-alpha: the hit button is declared last, so whatever it paints covers the
+              // row's own text. A classic Button left without HoverFill derives one by dimming Fill
+              // 20%, which on a transparent fill reads as a solid block and hides the row.
               Hover:        RGBA(0,  90, 158, 0.05),
               Press:        RGBA(0,  90, 158, 0.1)
           },
@@ -55,29 +53,23 @@ App:
           { Stage: "Completed",     Weight: 100 }
        ) );
 
-       // Prefix + lowercased UPN forms a Person column's Claims:
-       //   { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-       //     Claims: gClaimPrefix & Lower(<mail>), DisplayName: …, Email: …,
-       //     Department: "", JobTitle: "", Picture: "" }
-       // Community-confirmed shape, not first-party: first suspect if a Person write fails.
+       // Prefix + lowercased UPN forms a Person column's Claims. Community-confirmed shape,
+       // not first-party: first suspect if a Person write fails.
        Set( gClaimPrefix, "i:0#.f|membership|" );
 
        // Inlines into the server-side predicates on scrHome / scrReports.
        Set( gUserEmail, Lower(User().Email) )
 
-    # Data-source filters. These must stay named formulas: `Set(x, Filter(...))`
-    # captures a table value, and filtering a variable does not delegate — every
-    # cross-project query would silently cap at the data row limit.
-    #
-    # Filtering OVER one of these folds into a single server query (verified in Live
-    # Monitor). Only CROSS-PROJECT queries use them; a query already scoped to one
-    # project reads the raw list, so opening an archived project still shows its work.
+    # Data-source filters. These must stay NAMED FORMULAS: `Set(x, Filter(...))` captures
+    # a table value, and filtering a variable does not delegate — every cross-project query
+    # would silently cap at the data row limit. Filtering OVER one of these folds into a
+    # single server query (verified in Live Monitor). Only CROSS-PROJECT queries use them.
     Formulas: |-
       =
-      // Every phase except Archived, enumerated — `<> "Archived"` is a Text <> and does
-      // not delegate. This list is the column's whole vocabulary minus one value, so a
-      // value added to the column and not added here would vanish from the app rather
-      // than error: an allow-list fails CLOSED.
+      // Every phase except Archived, ENUMERATED — `<> "Archived"` is a Text <> and does not
+      // delegate. This is the column's whole vocabulary minus one value, so a value added to
+      // the column and not added here vanishes from the app rather than erroring: an
+      // allow-list fails CLOSED.
       ActiveProjects = Filter( taskmaster_projects,
           project_phase.Value = "Not Started" || project_phase.Value = "Planning"
        || project_phase.Value = "Active"      || project_phase.Value = "Stalled"
@@ -88,6 +80,6 @@ App:
           issue_project_archived = false && issue_status.Value = "Open" );
 
       // `*_project_archived` mirrors the parent's phase, maintained by scrProjectEdit's
-      // save. It exists because a child row cannot otherwise answer "is my project
-      // archived" without a join, and joins do not delegate.
+      // save. A child row cannot otherwise answer "is my project archived" without a join,
+      // and joins do not delegate.
       LiveTasks = Filter( taskmaster_tasks, task_project_archived = false );

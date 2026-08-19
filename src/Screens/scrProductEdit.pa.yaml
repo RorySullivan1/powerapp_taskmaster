@@ -1,25 +1,15 @@
 # =============================================================================
-# scrProductEdit  —  create / edit ONE product. Compact by instruction.
+# scrProductEdit — create / edit ONE product. Compact by instruction.
+# Reachable from scrReference ▸ Products and from cmpPicker ▸ "＋ New" only; a product
+# is reference data, not a destination, so it is not in gNavMenu.
 #
-# REACHABLE FROM EXACTLY TWO PLACES, like scrClientEdit:
-#   1. scrReference ▸ Products        — maintenance
-#   2. cmpPicker ▸ "＋ New"          — quick creation mid-flow
-# Not in gNavMenu. A product is reference data, not a destination.
+# product_uid IS A BUSINESS KEY (ISIN / Ticker / internal ID) and schema.yaml calls it
+# unique. SHAREPOINT DOES NOT ENFORCE THAT, so the save checks for a duplicate BEFORE
+# writing — without it a second row for the same instrument makes every lookup
+# pointing at it ambiguous.
 #
-# THREE required columns and no Person, so this is genuinely small: a business
-# key, a type path, a description. See scrClientEdit for the return contract and
-# for why quick-create is a screen rather than a "+" inside the picker dialog.
-#
-# product_uid IS A BUSINESS KEY (ISIN / Ticker / internal ID) and schema.yaml
-# calls it unique. SharePoint does not enforce that, so the save checks for a
-# duplicate BEFORE writing — a delegable `=` on an indexed Text column. Without
-# it the app would happily create a second row for the same instrument and every
-# lookup pointing at it would then be ambiguous.
-#
-# BAND ARITHMETIC (1366x768):
-#      0 ..  64   header (absolute)
-#     64 .. 700   bodyRoot, vertical auto-layout, 24 padding
-#    700 .. 768   actionBar (opaque, absolute)
+# BAND ARITHMETIC (1366x768): 0..64 header (absolute) · 64..700 bodyRoot, vertical
+# auto-layout, 24 padding · 700..768 actionBar (opaque, absolute).
 # =============================================================================
 Screens:
   scrProductEdit:
@@ -31,24 +21,19 @@ Screens:
         Set( gPdTypeId,   If( gPdMode = "Edit", Coalesce(gEditProduct.product_type_id, 0), 0 ) );
         Set( gPdTypePath, If( gPdMode = "Edit", Coalesce(gEditProduct.product_type_path, ""), "" ) );
         Set( gPdDesc,     If( gPdMode = "Edit", Coalesce(gEditProduct.product_description, ""), "" ) );
-        // gPdUnd IS THE UNDERLYING BOX'S Default, not just a copy of it. A suggestion
-        // chip appends to this global and Resets the control, which is the only way to
-        // write into a text input — there is no .Text setter.
+        // gPdUnd IS THE UNDERLYING BOX'S Default, not a copy of it. A suggestion chip appends
+        // to this global and Resets the control — the only way to write into a text input,
+        // which has no .Text setter.
         Set( gPdUnd, If( gPdMode = "Edit", Coalesce(gEditProduct.product_underlying, ""), "" ) );
         ClearCollect( colMapProdType, mapping_producttype );
-        // THE TICKER VOCABULARY IS EMERGENT — every ticker any product already names,
-        // not a governed list, so typing a new one needs no schema change and no admin
-        // step. Concat joins every stored value into one comma-string and Split breaks
-        // it back into single tickers, which is what makes a multi-ticker product
-        // contribute each of its tickers separately.
-        //
-        // NOT DELEGABLE, and it does not need to be: Concat over a data source reads up
-        // to the data row limit. taskmaster_products is reference data — if it ever
-        // approaches 2000 rows the suggestions go stale silently, and nothing else on
-        // this screen breaks.
-        //
-        // A typo becomes a suggestion. That is the accepted cost of an emergent
-        // vocabulary and the reason the chips are a convenience, never a constraint.
+        // THE TICKER VOCABULARY IS EMERGENT — every ticker any product already names, not a
+        // governed list. Concat joins every stored value into one comma-string and Split breaks
+        // it back, which is what makes a multi-ticker product contribute each separately.
+        // NOT DELEGABLE, and it does not need to be: Concat reads up to the data row limit and
+        // taskmaster_products is reference data. Past 2000 rows the suggestions go stale
+        // silently and nothing else breaks.
+        // A typo becomes a suggestion — the accepted cost, and why the chips are a convenience
+        // and never a constraint.
         ClearCollect( colPdUndAll,
                       Sort( Distinct( Filter( ForAll( Split( Concat( taskmaster_products,
                                                                      Coalesce(product_underlying, "") & "," ),
@@ -57,36 +42,29 @@ Screens:
                                               Len(Tk) > 0 ),
                                       Tk ),
                             Value ) );
-        // FROM Choices() ON THE COLUMN, never a literal list. product_assetclass ships
-        // with PLACEHOLDER values in the golden source, so whatever is actually
-        // provisioned appears here with no app change — and a label the Choice would
-        // refuse can never be written, which is what broke issue_type on 2026-08-13.
-        //
+        // FROM Choices() ON THE COLUMN, never a literal list. product_assetclass ships with
+        // PLACEHOLDER values in the golden source, so whatever is provisioned appears here with
+        // no app change — and a label the Choice would refuse can never be written.
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
-        // synthesised POSITIONALLY. The Ids mean nothing beyond "which row", so DefaultId
-        // looks up by Label.
-        //
-        // NO "(none)" ROW — the column is REQUIRED, so there is nothing to represent.
+        // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — DefaultId looks
+        // the value up by Label. No "(none)" row: the column is REQUIRED.
         ClearCollect( colPdAssetOpts,
                       With( { ch: Choices([@taskmaster_products].product_assetclass) },
                             ForAll( Sequence( CountRows(ch) ) As n,
                                     { Id:    n.Value,
                                       Label: Index(ch, n.Value).Value } ) ) );
-        // A NEW PRODUCT OPENS ON THE FIRST CHOICE, so the ORDER of the column's values
-        // decides its default — order them with the safest first.
-        //
-        // Seeding it rather than leaving it blank is deliberate: cmpSelection's DefaultId
-        // falls back to row 1 whichever way, so a blank global would leave the strip
-        // HIGHLIGHTING a value the save does not hold. A display that disagrees with the
-        // write is the defect that got scrTask deleted.
+        // A NEW PRODUCT OPENS ON THE FIRST CHOICE, so the ORDER of the column's values decides
+        // its default — order them with the safest first. Seeding it rather than leaving it
+        // blank is deliberate: cmpSelection's DefaultId falls back to row 1 either way, so a
+        // blank global would leave the strip HIGHLIGHTING a value the save does not hold.
         Set( gPdAsset, If( gPdMode = "Edit",
                            Coalesce( gEditProduct.product_assetclass.Value,
                                      First(colPdAssetOpts).Label ),
                            First(colPdAssetOpts).Label ) );
         Set( gPdDup, false );
         // A toggle re-reads Default and cmpSelection re-reads DefaultId ONLY on Reset —
-        // without these the previous product's values survive into the next one, and the
-        // control then DISAGREES WITH THE SAVE rather than failing visibly.
+        // without these the previous product's values survive and the control DISAGREES WITH
+        // THE SAVE rather than failing visibly.
         Reset( txtPdUid ); Reset( txtPdDesc ); Reset( pickPdType );
         Reset( tglPdEsg ); Reset( selPdAsset );
         Reset( txtPdUnd ); Reset( txtPdWrapper ); Reset( numPdMaturity ); Reset( txtPdFeatures )
@@ -184,8 +162,8 @@ Screens:
                   LayoutMinHeight: =18
                   Width: =Parent.Width - 48
                   Height: =18
-            # WRAPPED IN A COL — a component instance cannot carry FillPortions
-            # or LayoutMinHeight; the wrapper holds the auto-layout contract.
+            # WRAPPED IN A COL — a component instance cannot carry FillPortions or
+            # LayoutMinHeight; the wrapper holds the auto-layout contract.
             - colPdType:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -223,8 +201,8 @@ Screens:
                   LayoutMinHeight: =18
                   Width: =Parent.Width - 48
                   Height: =18
-            # A cmpSelection INSTANCE takes no FillPortions/LayoutMinHeight — the
-            # contract check rejects them there — so it carries Width/Height only.
+            # A cmpSelection INSTANCE takes no FillPortions/LayoutMinHeight — the contract
+            # check rejects them there — so it carries Width/Height only.
             - selPdAsset:
                 Control: CanvasComponent
                 ComponentName: cmpSelection
@@ -234,13 +212,10 @@ Screens:
                   Items: =colPdAssetOpts
                   DefaultId: =Coalesce( LookUp(colPdAssetOpts, Label = gPdAsset, Id), 1 )
                   OnChange: =Set( gPdAsset, selPdAsset.Selected.Label )
-            # A Classic/Toggle, NOT a check box: the check-box token is not grounded for
-            # this dialect and an unverified control fails the WHOLE screen paste. Same
-            # control the two scrTaskEdit section switches use.
-            #
-            # No global behind it. Default seeds from the record and the save reads
-            # tglPdEsg.Value directly, exactly as txtPdUid/txtPdDesc do — a global would
-            # be a third copy of the same fact.
+            # A Classic/Toggle, NOT a check box: the check-box token is not grounded for this
+            # dialect and an unverified control fails the WHOLE screen paste.
+            # No global behind it — the save reads tglPdEsg.Value directly, exactly as
+            # txtPdUid/txtPdDesc do. A global would be a third copy of the same fact.
             - rowPdEsg:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -256,8 +231,8 @@ Screens:
                   - tglPdEsg:
                       Control: Classic/Toggle@2.1.0
                       Properties:
-                        # Coalesce, not a bare read: a Yes/No column added to a list that
-                        # already has rows comes back BLANK on those rows, not false.
+                        # Coalesce, not a bare read: a Yes/No column added to a list that already has
+                        # rows comes back BLANK on those rows, not false.
                         Default: |
                           =If( gPdMode = "Edit",
                                Coalesce(gEditProduct.product_esg, false), false )
@@ -278,8 +253,7 @@ Screens:
                         FillPortions: =1
                         LayoutMinWidth: =140
                         Height: =34
-            # ---- #20 fields. All four OPTIONAL, so none of them appears in
-            # lblPdMissing and none can block a save. -------------------------------
+            # ---- #20 fields. All four OPTIONAL, so none appears in lblPdMissing. ----
             - lblPdUndCap:
                 Control: Label@2.5.1
                 Properties:
@@ -292,9 +266,8 @@ Screens:
                   LayoutMinHeight: =18
                   Width: =Parent.Width - 48
                   Height: =18
-            # Default reads gPdUnd, NOT the record, because a suggestion chip has to be
-            # able to write into this box and a text input has no .Text setter — the chip
-            # sets the global and Resets the control. OnChange keeps the global in step
+            # Default reads gPdUnd, NOT the record, because a suggestion chip has to write into
+            # this box and a text input has no .Text setter. OnChange keeps the global in step
             # while typing, so whichever way the text arrived, both agree.
             - txtPdUnd:
                 Control: ModernTextInput@1.1.1
@@ -309,15 +282,10 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =36
                   OnChange: =Set( gPdUnd, txtPdUnd.Text )
-            # THE CHIPS ARE A CONVENIENCE, NOT A CONSTRAINT — the box takes anything.
-            # A ticker already in the box is filtered out, so the list shrinks as it is
-            # used and clicking twice cannot double an entry.
-            #
-            # BOTH SIDES ARE COMMA-WRAPPED AND DE-SPACED so the test is on a whole token.
-            # `in` is a SUBSTRING test, so the bare form would hide AA whenever AAPL was
-            # in the box — a chip silently missing for a ticker that is a prefix of
-            # another. Tickers carry no spaces, so stripping them is safe and saves
-            # splitting the text.
+            # THE CHIPS ARE A CONVENIENCE, NOT A CONSTRAINT — the box takes anything. A ticker
+            # already in the box is filtered out, so clicking twice cannot double an entry.
+            # BOTH SIDES ARE COMMA-WRAPPED AND DE-SPACED so the test is on a whole token. `in` is
+            # a SUBSTRING test, so the bare form would hide AA whenever AAPL was in the box.
             - galPdUndSug:
                 Control: Gallery@2.15.0
                 Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
@@ -329,8 +297,7 @@ Screens:
                                              & Substitute(Upper(Coalesce(gPdUnd, "")), " ", "")
                                              & "," ) ) ),
                              12 )
-                  # Horizontal strip: WrapCount high enough that the 12 rows lay out as
-                  # one line of chips rather than a column.
+                  # Horizontal strip: WrapCount high enough that the 12 rows lay out as one line.
                   WrapCount: =12
                   TemplateSize: =28
                   TemplatePadding: =0
@@ -359,9 +326,8 @@ Screens:
                         Y: =0
                         Width: =Parent.TemplateWidth - 6
                         Height: =26
-                        # Strips ONE trailing comma before joining, so a box left reading
-                        # "AAPL," does not become "AAPL,, MSFT". Reset is what makes the
-                        # box re-read gPdUnd — without it the append is invisible.
+                        # Strips ONE trailing comma before joining, so a box reading "AAPL," does not become
+                        # "AAPL,, MSFT". Reset is what makes the box re-read gPdUnd.
                         OnSelect: |
                           =Set( gPdUnd,
                                 With( { b: Trim(Coalesce(gPdUnd, "")) },
@@ -408,21 +374,18 @@ Screens:
                   LayoutMinHeight: =18
                   Width: =Parent.Width - 48
                   Height: =18
-            # CLASSIC, not modern, and that is deliberate: there is no grounded modern
-            # number-input token, and `TextInputType.Number` is a guess that would fail
-            # the whole paste. This is the same control and the same `Format` /
-            # `Value(.Text)` pair scrTransactionEdit uses for notional — HintText, not
-            # Placeholder, because the classic control names it differently.
+            # CLASSIC, not modern: there is no grounded modern number-input token and
+            # `TextInputType.Number` is a guess that would fail the whole paste. HintText, not
+            # Placeholder — the classic control names it differently.
             - numPdMaturity:
                 Control: Classic/TextInput@2.3.2
                 Properties:
-                  # The NUMBER itself, not Text() of it — the same shape scrTransactionEdit
-                  # gives notional. A blank column stays blank rather than becoming "0".
+                  # The NUMBER itself, not Text() of it. A blank column stays blank rather
+                  # than becoming "0".
                   Default: |
                     =If( gPdMode = "Edit", gEditProduct.product_maturity, Blank() )
-                  # Restricts typing to digits. Without it `Value(.Text)` on a non-numeric
-                  # entry is blank, and the save writes blank into an optional Number
-                  # column with nothing on screen to point at.
+                  # Restricts typing to digits. Without it `Value(.Text)` on a non-numeric entry is
+                  # blank, and the save writes blank with nothing on screen to point at.
                   Format: =TextFormat.Number
                   HintText: ="e.g. 5"
                   Font: =gTheme.Font
@@ -501,9 +464,8 @@ Screens:
               =Trim(
               If( Len(Trim(txtPdUid.Text)) = 0, "a product ID   ", "" ) &
               If( Len(gPdTypePath) = 0,         "a product type   ", "" ) &
-              // Can only fire if the column has no Choice values provisioned at all —
-              // otherwise the strip always holds one. Cheap, and it turns a rejected
-              // Patch into a sentence.
+              // Can only fire if the column has no Choice values provisioned at all — otherwise
+              // the strip always holds one. Cheap, and it turns a rejected Patch into a sentence.
               If( Len(gPdAsset) = 0,            "an asset class   ", "" ) &
               If( Len(Trim(txtPdDesc.Text)) = 0, "a description   ", "" ) )
             Font: =gTheme.Font
@@ -548,32 +510,24 @@ Screens:
             # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
             OnSelect: |
               =If( gSaving,
-              // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
-              // A SharePoint Patch takes seconds; the button stayed live throughout, so a
-              // double-tap ran the whole handler twice and Defaults() built a SECOND new
-              // record. `Set` applies immediately within a behaviour chain, so the flag is
-              // already true by the time the second tap is evaluated.
-              // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
-              // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
-              // instead, and the guard below is what actually blocks the duplicate.
+              // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing — a Patch takes
+              // seconds and the button stays live, so a double-tap ran the handler twice and built a
+              // SECOND record. `Set` applies immediately within a behaviour chain.
               false,
               Set( gSaving, true );
               If( Len(lblPdMissing.Text) > 0,
               Notify( "Can't save yet — this product still needs: " & lblPdMissing.Text,
               NotificationType.Error ),
-              // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last
-              // successful save, gPdSaved makes the IsBlank(.ID) guard below pass on a
-              // PREVIOUS record — so a write that fails with an empty error message
-              // reported success and handed the caller's form the WRONG record.
-              // scrTaskEdit has always blanked its equivalent; these two did not.
+              // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last successful save,
+              // this makes the IsBlank(.ID) guard below pass on a PREVIOUS record — so a write that
+              // fails with an empty error message reports success and hands back the WRONG record.
               Set( gPdSaved, Blank() );
               Set( gPdErr, "" );
-              // product_uid is a business key and SharePoint does not enforce uniqueness,
-              // so check first. The query is `=` on an indexed Text column ONLY — an
-              // `ID <>` clause used to sit here too, and `<>` DOES NOT DELEGATE on ID
-              // (delegation.md [id]), which quietly made the whole LookUp local: past the
-              // data row limit a duplicate slipped through with no warning. Excluding the
-              // row being edited is a comparison on the RESULT, not part of the query.
+              // product_uid is a business key and SharePoint does not enforce uniqueness, so check
+              // first. The query is `=` on an indexed Text column ONLY — an `ID <>` clause here made
+              // the whole LookUp local, because `<>` DOES NOT DELEGATE on ID, and past the data row
+              // limit a duplicate slipped through with no warning. Excluding the row being edited is
+              // a comparison on the RESULT, not part of the query.
               Set( gPdClash,
               LookUp( taskmaster_products, product_uid = Trim(txtPdUid.Text) ) );
               If( !IsBlank(gPdClash.ID)
@@ -582,12 +536,9 @@ Screens:
               Notify( "A product with ID " & Trim(txtPdUid.Text) & " already exists.",
               NotificationType.Error ),
               Set( gPdDup, false );
-              // NORMALISED HERE, NOT IN THE BOX. Uppercasing as the user types would need
-              // a Reset on every keystroke and would fight the cursor; doing it at write
-              // time means the stored form is predictable and what was typed is left
-              // alone until Save. Per-token, so spacing is regular whatever was typed:
-              // each token trimmed and uppercased, empties dropped, rejoined with ", ".
-              // The trailing separator is cut afterwards rather than avoided — Concat's
+              // NORMALISED HERE, NOT IN THE BOX. Uppercasing as the user types would need a Reset
+              // per keystroke and would fight the cursor. Per-token, so spacing is regular whatever
+              // was typed. The trailing separator is cut afterwards rather than avoided — Concat's
               // separator argument is not grounded in this dialect.
               Set( gPdUndNorm,
               Trim( Concat( ForAll( Split( Coalesce(txtPdUnd.Text, ""), "," ) As t,
@@ -609,9 +560,8 @@ Screens:
               product_esg:         tglPdEsg.Value,
               product_underlying:  gPdUndNorm,
               product_wrapper:     Trim(txtPdWrapper.Text),
-              // BLANK, NOT ZERO, WHEN THE BOX IS EMPTY. `Value("")` is blank already, but
-              // writing it explicitly says that an unset maturity is unknown rather than
-              // a zero-year tenor — the two would look identical in the list.
+              // BLANK, NOT ZERO, WHEN THE BOX IS EMPTY. Writing it explicitly says an unset
+              // maturity is unknown rather than a zero-year tenor — the two look identical in a list.
               product_maturity:    If( Len(Trim(numPdMaturity.Text)) = 0, Blank(),
               Value(numPdMaturity.Text) ),
               product_features:    txtPdFeatures.Text } ) ),
@@ -622,17 +572,15 @@ Screens:
               If( Len(gPdErr) > 0,
               Notify( "Couldn't save the product: " & gPdErr, NotificationType.Error ) );
               If( Len(gPdErr) = 0 && !IsBlank(gPdSaved.ID),
-              // TWO ONE-ARMED Ifs, not one two-armed one: the task branch Collects and
-              // the transaction branch Sets, and an If's arms have to agree on type —
-              // Collect returns a table, Set a boolean. A task takes MANY products now,
-              // so a newly created one is appended to the staging collection rather than
-              // replacing a single global.
+              // TWO ONE-ARMED Ifs, not one two-armed one: the task branch Collects and the
+              // transaction branch Sets, and an If's arms must agree on type. A task takes MANY
+              // products, so a newly created one is appended rather than replacing a global.
               If( gPdReturn = "TaskProduct",
               Collect( colTkProducts, { Id: gPdSaved.ID, Uid: gPdSaved.product_uid } ) );
               If( gPdReturn = "TxProduct",
               Set( gTxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
-              // NxProduct is the STAGED transaction inside scrProjectEdit. A staged
-              // transaction takes ONE product, so this Sets rather than Collects.
+              // NxProduct is the STAGED transaction inside scrProjectEdit, which takes ONE
+              // product — so this Sets rather than Collects.
               If( gPdReturn = "NxProduct",
               Set( gNxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
               Set( gPdReturn, "" );
