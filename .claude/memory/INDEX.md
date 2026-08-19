@@ -6,18 +6,19 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. #27 AND #31 ARE LANDED AND CLOSED. #29 AND #36 ARE BUILT AND
-  UNPASTED. The other 10 are not started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md.
-- **PASTE QUEUE: `scrTaskEdit` AND `scrIssueEdit`** (#29 + #36, sessions/2026-08-19-2012-*).
-  Save handlers now hoist their pre-Patch reads into one `Concurrent` — `gTkParentProj` /
-  `gIssParentProj` replace two LookUps each, keyed on the screen's OWN parent id, not
-  `gSelProject.ID` — and `scrTaskEdit` skips the whole taskproduct reconcile when the staged set
-  matches `colTkProductsLoaded`. `scrTransactionEdit` was deliberately left alone.
-- **LIVE IN STUDIO from #27/#31:** `scrProject` folds tasks/transactions/issues once in
-  `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
-  the collections; the five edit screens cache 20 reference fetches once per session, also in
-  `Concurrent`. **Both landed on the paste alone — the round-trip counts were never measured,
-  and the Concurrent independent-failure path is unexercised.**
+- **PERF BACKLOG — GitHub #27–#40. #27, #29, #31 AND #36 ARE LANDED AND CLOSED; the other 10 are
+  not started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md.
+- **THE PASTE QUEUE IS EMPTY (user, 2026-08-19)** — `scrTaskEdit` and `scrIssueEdit` landed clean.
+- **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
+  in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
+  the collections; the five edit screens cache 20 reference fetches once per session; the
+  `scrTaskEdit` / `scrIssueEdit` save handlers hoist their pre-Patch reads into one `Concurrent`
+  (`gTkParentProj` / `gIssParentProj` replace two LookUps each, keyed on the screen's OWN parent
+  id, not `gSelProject.ID`); and `scrTaskEdit` skips the taskproduct reconcile when the staged set
+  matches `colTkProductsLoaded`. **EVERY ONE OF THESE LANDED ON THE PASTE ALONE — no round-trip
+  count was ever measured.** Unexercised: the `Concurrent` independent-failure path, the
+  `CountRows(col) <= 1` guard against a genuinely empty fetch, a save that removes or clears
+  products, and the archived mirror under a project archived mid-edit.
 - **BUILT — editing and refining, not creating.** 11 screens, 10 components, the App object.
   22/22 valid. **The published app renders properly** (user, 2026-08-12).
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
@@ -340,6 +341,8 @@ not know them will author something broken:
 
 - 2026-08-19 | #36 BUILT: scrTaskEdit skips the whole taskproduct reconcile — three junction reads and a second task Patch — when the staged product set matches the set loaded in OnVisible (colTkProductsLoaded, copied from colTkProducts and seeded INSIDE the resume guard). **THE GATE IS ON THE STAGED SET, NEVER ON tglTkOutput**: gating on the toggle is what once made it a silent delete button, and clearing every product is still a set difference, so the deletes still run. Both tests are collection-against-collection, so the gate costs no round trip. Consequence accepted: task_product_summary is left UNWRITTEN on a products-untouched save, so a new task with no products keeps Blank() where it used to get "" — no control in src/ reads that column | GitHub #36
 
+- 2026-08-19 | #29 and #36 LANDED and CLOSED (user) — scrTaskEdit and scrIssueEdit pasted clean. The save-path perf work is live: one parent-project read per save instead of two, the pre-Patch reads issued in parallel, and the taskproduct reconcile skipped on a save that never touched the products. **AS WITH #27/#31, LANDING IS A PASTE CONFIRMATION, NOT A MEASUREMENT** — no Live Monitor count was taken, and the remove/clear branch of the #36 gate has not been walked | GitHub #29, #36
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
@@ -398,3 +401,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #27 and #31 built, six screens queued for paste | sessions/2026-08-19-1939-issues-27-31-built.md
 - 2026-08-19 | #27 and #31 landed and closed; paste queue empty | sessions/2026-08-19-1939-issues-27-31-built.md
 - 2026-08-19 | #29 and #36 built; scrTaskEdit and scrIssueEdit queued for paste | sessions/2026-08-19-2012-issues-29-36-built.md
+- 2026-08-19 | #29 and #36 landed and closed; paste queue empty | sessions/2026-08-19-2012-issues-29-36-built.md
