@@ -21,9 +21,8 @@ Screens:
         Set( gIssProject,
               If( gEditMode = "Edit",
                   { Id: gEditIssue.issue_project_id.Id,
-                    // NOT redundant. The lookup column's live display field is the target's ID,
-                    // so `.Value` is a NUMBER — see schema.yaml on this column. Resolving the
-                    // name app-side is the fix from 2026-08-09; do not "optimise" it away.
+                    // NOT redundant. The lookup column's live display field is the target's ID, so
+                    // `.Value` is a NUMBER — see schema.yaml. Do not "optimise" this away.
                     Value: LookUp(taskmaster_projects, ID = gEditIssue.issue_project_id.Id, project_name) },
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
@@ -41,24 +40,14 @@ Screens:
                   { DisplayName: Coalesce(gEditIssue.issue_assignee.DisplayName, ""),
                     Mail:        Coalesce(gEditIssue.issue_assignee.Email, "") },
                   { DisplayName: Coalesce(User().FullName, ""), Mail: Coalesce(User().Email, "") } ) );
-        // NO gIssOwner SEED. issue_owner is stamped once on insert and displayed
-        // straight off gEditIssue — it is never staged, because nothing edits it.
-        // OPTION SETS FOR THE TWO ASSOCIATION DROPDOWNS. Collected here, AFTER
-        // gIssProject is seeded above — they depend on it.
-        // Delegable: `=` on an indexed Lookup FK. The "(none)" row is Collected first
-        // so it sorts to the top, and it is what makes Id 0 a selectable "unlink"
-        // instead of needing a separate clear button.
-        // ForAll(... As alias, {record literal}) narrows each row to {Id, Label}; a
-        // literal cannot be Collected alongside a raw SharePoint row, whose schema is
-        // far wider, so both halves are projected to the same two columns.
-        //
-        // THE Filter DELEGATES; THE ForAll AROUND IT DOES NOT. So each option list is
-        // capped at the DATA ROW LIMIT (set it to 2000). A project with more tasks than
-        // that gets a silently short dropdown. The repo already treats 500-per-project
-        // as reachable — scrProjectEdit's C3 rollup refuses to compute above it — so
-        // this is a real ceiling, not a theoretical one. It is accepted here because the
-        // alternative is going back to a search picker over the whole tenant, which is
-        // what this replaced; revisit if a project ever nears the limit.
+        // NO gIssOwner SEED — issue_owner is stamped once on insert and never staged.
+        // The two association dropdowns depend on gIssProject, seeded above. Delegable: `=`
+        // on an indexed Lookup FK. "(none)" is Collected first so it sorts to the top, and
+        // is what makes Id 0 a selectable "unlink" rather than a separate clear button.
+        // THE Filter DELEGATES; THE ForAll AROUND IT DOES NOT, so each option list is capped
+        // at the DATA ROW LIMIT and a project with more tasks than that gets a silently short
+        // dropdown. Accepted because the alternative is a search picker over the whole
+        // tenant; revisit if a project ever nears the limit.
         ClearCollect( colIssTaskOpts, { Id: 0, Label: "(none)" } );
         Collect( colIssTaskOpts,
                  ForAll( Filter( taskmaster_tasks,
@@ -73,22 +62,18 @@ Screens:
             Collect( colIssTaskOpts, { Id: gIssTask.Id, Label: gIssTask.Value } ) );
         If( gIssTx.Id > 0 && IsBlank( LookUp(colIssTxOpts, Id = gIssTx.Id) ),
             Collect( colIssTxOpts, { Id: gIssTx.Id, Label: gIssTx.Value } ) );
-        // ALL THREE CHOICE VOCABULARIES COME FROM THE COLUMNS, not literal lists. A
-        // hard-coded list drifts from SharePoint silently — project_phase carried two
-        // values the app never enumerated, and those projects simply vanished.
-        //
-        // ALL THREE ARE REQUIRED, so none of them carries a blank row. There is nothing
-        // to clear to: the seed below always lands on a real member, and the save writes
-        // it unguarded.
+        // ALL THREE CHOICE VOCABULARIES COME FROM THE COLUMNS, not literal lists — a
+        // hard-coded list drifts from SharePoint silently, and project_phase once carried
+        // two values the app never enumerated, so those projects simply vanished.
+        // All three are REQUIRED, so none carries a blank row: the seed always lands on a
+        // real member and the save writes it unguarded.
         ClearCollect( colIssStatusOpts,
                       With( { ch: Choices([@taskmaster_issues].issue_status) },
                             ForAll( Sequence( CountRows(ch) ) As n,
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
-        //
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
-        // synthesised POSITIONALLY: Sequence() numbers the rows and Index() reads the
-        // nth choice back out. The Ids mean nothing beyond "which row" — never hard-code
-        // one, look it up by Label, which is what each DefaultId does.
+        // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — never hard-code
+        // one; each DefaultId looks its value up by Label. Required columns get no blank row.
         ClearCollect( colIssTypeOpts,
                       With( { ch: Choices([@taskmaster_issues].issue_type) },
                             ForAll( Sequence( CountRows(ch) ) As n,
@@ -99,11 +84,9 @@ Screens:
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
         // THE SEED IS TESTED AGAINST THE VOCABULARY, not just against blank. A legacy row
-        // can hold a RETIRED value — issue_type's list was replaced wholesale on 2026-08-19
-        // — and that value is not blank, so a Coalesce alone would carry it through: the
-        // picker would fall back to showing the default while the global still held the
-        // retired value, and the save would write the retired value the display denied.
-        // Falling back to the DEFAULT here keeps what is shown and what is stored equal.
+        // can hold a RETIRED value, which is not blank, so a Coalesce alone would carry it
+        // through: the picker would show the default while the global held the retired value,
+        // and the save would write what the display denied.
         Set( gIssType,
              With( { v: If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value, ""), "" ) },
                  If( Len(v) > 0 && v in colIssTypeOpts.Label, v, "Question" ) ) );
@@ -112,19 +95,17 @@ Screens:
                  If( Len(v) > 0 && v in colIssImpactOpts.Label, v, "Moderate" ) ) );
         Reset( txtIssName ); Reset( txtIssDesc );
         Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
-        // Re-read DefaultDate; see the note on the pickers themselves.
+        // Re-read DefaultDate.
         Reset( dtpIssTarget );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset.
         Reset( cboIssTask ); Reset( cboIssTx );
-        // cmpSelection re-reads its DefaultId ONLY on Reset — it gained OnReset for
-        // exactly this on 2026-08-11.
+        // cmpSelection re-reads its DefaultId ONLY on Reset.
         Reset( selIssStatus ); Reset( selIssType ); Reset( selIssImpact )
     Children:
       # =====================================================================
-      # HEALTH RECOMPUTE. Hidden, 1x1, declared FIRST so it can never cover a
-      # control — z-order is positional in this dialect. Select() DOES fire on an
-      # invisible control (probe, tests/README.md). Seed colHlTasks with the task
-      # ids to recompute, then Select this.
+      # HEALTH RECOMPUTE. Hidden, 1x1, declared FIRST so it can never cover a control
+      # (z-order is positional). Select() DOES fire on an invisible control (probe,
+      # tests/README.md). Seed colHlTasks with the task ids, then Select this.
       # =====================================================================
       - btnIssHealth:
           Control: Classic/Button@2.2.0
@@ -142,31 +123,25 @@ Screens:
                // The rules, and why OVERDUE IS DELIBERATELY NOT IN HERE, live in one place:
                // rollups.task_health in schema.yaml. Do not restate them at the call sites.
                //
-               // THIS BODY IS DUPLICATED ON scrIssueEdit AND scrProject and must stay
-               // identical — a control can only be Selected from its own screen, so there is
-               // no shared copy to call. Change one, change the other.
+               // THIS BODY IS DUPLICATED ON scrIssueEdit AND scrProject and must stay identical —
+               // a control can only be Selected from its own screen. Change one, change the other.
                //
-               // NARROW SERVER-SIDE, TEST LOCALLY. The outer Filter uses issue_task_name and
-               // issue_status, both INDEXED, so it delegates; issue_type and issue_impact are
-               // NOT indexed and are only ever tested against the few rows it returns. Written
-               // as one flat Filter the whole query would go non-delegable and silently read a
-               // page of the issues list instead of one task's issues.
-               //
-               // The RAW list, not OpenIssues: that named formula also excludes archived
-               // projects, which would drive every task under one to Green rather than leave
-               // it alone. This query is already scoped to a single task.
+               // NARROW SERVER-SIDE, TEST LOCALLY: the outer Filter uses issue_task_name and
+               // issue_status, both INDEXED, so it delegates; issue_type and issue_impact are not
+               // indexed and are only tested against the few rows it returns. Written as one flat
+               // Filter the whole query goes non-delegable and reads an arbitrary page.
+               // The RAW list, not OpenIssues — that named formula also excludes archived projects,
+               // which would drive every task under one to Green instead of leaving it alone.
                ClearCollect( colHlWork,
                    ForAll( colHlTasks As t,
                        { Id: t.Id,
                          Hl: With( { iss: Filter( taskmaster_issues,
                                                   issue_task_name.Id = t.Id
                                                && issue_status.Value = "Open" ) },
-                                 // AMBER IS THE RESIDUAL — "any other open issue" — NOT the
-                                 // four amber types enumerated. Enumerated, a type added in
-                                 // SharePoint and not added here falls through to GREEN: an
-                                 // allow-list failing CLOSED, silently, on the one signal that
-                                 // exists to warn people. As a residual it fails SAFE — an
-                                 // unknown or blank type reads Amber, which is visible.
+                                 // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four
+                                 // amber types enumerated. Enumerated, a type added in SharePoint and
+                                 // not added here falls through to GREEN: an allow-list failing closed,
+                                 // silently, on the one signal that exists to warn people.
                                  If( CountRows( Filter( iss,
                                          issue_impact.Value = "Critical"
                                       || issue_type.Value = "Blockage"
@@ -174,23 +149,15 @@ Screens:
                                       || issue_type.Value = "Limitation" ) ) > 0, "Red",
                                      CountRows(iss) > 0, "Amber",
                                      "Green" ) ) } ) );
-               // WRITE ONLY ON A CHANGE, exactly like project_phase: most issue edits leave
-               // the task's health where it was, and a no-op Patch is still a round trip.
-               //
-               // NO Set() INSIDE THIS ForAll. MS Learn sanctions Patch and Collect as the
-               // actions a ForAll body may take, and rules out the functions that HOLD A
-               // VARIABLE — UpdateContext, Clear, ClearCollect — because ForAll may run its
-               // records in any order and in parallel. Set is the global-scope twin of
-               // UpdateContext and Studio rejects it here for the same reason. Patch's
-               // return value is not captured either, and deliberately: the same page notes
-               // that an uncaptured ForAll result is never built, so there is no per-record
-               // data source copy to pay for.
-               //
-               // A failed health write is NOT worth interrupting a save or a delete for —
-               // the next recompute retries it and only a stale colour is wrong meanwhile.
-               // IfError is the documented way to catch a Patch failure; the error is
-               // DISCARDED on purpose. If it ever needs surfacing, Notify() or a Collect()
-               // into a log are the two things this body is allowed to do.
+               // WRITE ONLY ON A CHANGE: most issue edits leave the task's health where it was,
+               // and a no-op Patch is still a round trip.
+               // NO Set() INSIDE THIS ForAll. MS Learn sanctions Patch and Collect and rules out
+               // the functions that HOLD A VARIABLE, because ForAll may run its records in any
+               // order; Set is the global twin of UpdateContext and Studio rejects it the same way.
+               // Patch's return is not captured either — an uncaptured ForAll result is never
+               // built, so there is no per-record data source copy to pay for.
+               // A failed health write is not worth interrupting a save for, so IfError discards it;
+               // the next recompute retries and only a stale colour is wrong meanwhile.
                ForAll( colHlWork As w,
                    With( { tk: LookUp(taskmaster_tasks, ID = w.Id) },
                        If( !IsBlank(tk.ID) && Coalesce(tk.task_status.Value, "") <> w.Hl,
@@ -314,11 +281,9 @@ Screens:
                               LayoutMinHeight: =18
                               Width: =Parent.Width
                               Height: =18
-                        # FontSize 10, not the default 11: three of the four values are
-                        # "Closed - …" phrases sharing a half-width cell, so this strip is the
-                        # tightest one in the app. The labels cannot be shortened — OnChange
-                        # writes Selected.Label straight into the Choice, so each has to be the
-                        # column's value verbatim.
+                        # FontSize 10, not the default 11: three of the four values are "Closed - …"
+                        # phrases sharing a half-width cell. The labels cannot be shortened — OnChange
+                        # writes Selected.Label straight into the Choice.
                         - selIssStatus:
                             Control: CanvasComponent
                             ComponentName: cmpSelection
@@ -326,10 +291,9 @@ Screens:
                               FontSize: =10
                               Width: =Parent.Width
                               Height: =40
-                              # From Choices() on the column. NOTE the coupling: "Open" is a
-                              # literal in App.Formulas (OpenIssues), in scrProject's status
-                              # glyph and in its open-count. A status value added in SharePoint
-                              # appears HERE automatically but is invisible to those three.
+                              # NOTE THE COUPLING: "Open" is a literal in App.Formulas (OpenIssues), in
+                              # scrProject's status glyph and in its open-count. A status value added in
+                              # SharePoint appears HERE automatically but is invisible to those three.
                               Items: =colIssStatusOpts
                               DefaultId: =Coalesce( LookUp(colIssStatusOpts, Label = gIssStatus, Id), 1 )
                               OnChange: =Set(gIssStatus, selIssStatus.Selected.Label)
@@ -395,22 +359,19 @@ Screens:
                               FontSize: =11
                               Width: =Parent.Width
                               Height: =40
-                              # From Choices() on the column. NOTE the coupling: scrProject's
-                              # issues gallery sorts on impact via a Switch that ranks four known
-                              # names; a value added in SharePoint appears here and sorts last.
+                              # NOTE THE COUPLING: scrProject's issues gallery sorts on impact via a
+                              # Switch over four known names; a value added in SharePoint sorts last.
                               Items: =colIssImpactOpts
-                              # THE FALLBACK IS THE DEFAULT BY LABEL, not Id 1. Id 1 is
-                              # whichever value SharePoint returns first — Low, not Moderate.
+                              # THE FALLBACK IS THE DEFAULT BY LABEL, not Id 1 — Id 1 is whichever
+                              # value SharePoint returns first.
                               DefaultId: |
                                 =Coalesce( LookUp(colIssImpactOpts, Label = gIssImpact, Id),
                                            LookUp(colIssImpactOpts, Label = "Moderate", Id), 1 )
                               OnChange: =Set(gIssImpact, selIssImpact.Selected.Label)
-            # NO GRID HERE. Type is a full-width row, and a GridLayout child spanning
-            # LayoutGridColumnStart 1 to LayoutGridColumnEnd 2 did NOT render full width
-            # in Studio. The grid's own shape declaration has never been fully grounded
-            # from a code view (see powerapp-canvas-controls), so this sits directly in
-            # the vertical scroll container instead, sized like every other band —
-            # nothing to span, nothing to get wrong.
+            # NO GRID HERE. A GridLayout child spanning LayoutGridColumnStart 1 to
+            # LayoutGridColumnEnd 2 did NOT render full width in Studio, and the grid's shape
+            # declaration has never been fully grounded from a code view. This sits directly
+            # in the vertical scroll container instead.
             - colIssType:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -439,13 +400,11 @@ Screens:
                         FontSize: =11
                         Width: =Parent.Width
                         Height: =40
-                        # Built in OnVisible from Choices() on the column, so a value added
-                        # in SharePoint appears here with no app change.
+                        # Built in OnVisible from Choices(), so a value added in SharePoint
+                        # appears here with no app change.
                         Items: =colIssTypeOpts
-                        # BY LABEL, not a hard-coded Id: the Ids are positional and depend
-                        # on the order SharePoint returns, so nothing may assume one.
-                        # THE FALLBACK IS THE DEFAULT BY LABEL, not Id 1. Id 1 is whichever
-                        # value SharePoint returns first — Approval, not Question.
+                        # BY LABEL, not a hard-coded Id: the Ids are positional and depend on
+                        # the order SharePoint returns, so nothing may assume one.
                         DefaultId: |
                           =Coalesce( LookUp(colIssTypeOpts, Label = gIssType, Id),
                                      LookUp(colIssTypeOpts, Label = "Question", Id), 1 )
@@ -635,23 +594,17 @@ Screens:
                         Text: |
                           =Trim(
                              If( Len(Trim(txtIssName.Text)) = 0, "summary   ", "" ) &
-                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on
-                             // this form, but a blank one would still be rejected by SharePoint —
-                             // and silently, since there is nothing on screen to point at. Same
-                             // guard scrTaskEdit keeps for the same reason.
+                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on this
+                             // form, but a blank one would still be rejected by SharePoint — silently, since
+                             // there is nothing on screen to point at.
                              If( gIssProject.Id <= 0,            "a parent project (not set — reopen from the project screen)   ", "" ) &
                              If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) &
-                             // issue_status is required:true and the save writes it
-                             // UNGUARDED, so an empty gIssStatus sends {Value: ""} — not a
-                             // member, and the connector rejects the whole insert. That is
-                             // the exact failure project_coverage already paid for. The
-                             // combo box can empty it (deselecting a selected item), and a
-                             // legacy row holding a retired status seeds it to something
-                             // the new Items cannot display.
+                             // issue_status is required and the save writes it UNGUARDED, so an empty
+                             // gIssStatus sends {Value: ""} — not a member, and the connector rejects the
+                             // whole insert. The combo box can empty it, and a legacy row holding a retired
+                             // status seeds it to something the new Items cannot display.
                              If( Len(gIssStatus) = 0,            "status   ", "" ) &
-                             // SAME NET, same reason: type and impact are required too and
-                             // are now written unguarded, so an empty one sends {Value: ""}
-                             // and the connector rejects the whole insert.
+                             // SAME NET, same reason: type and impact are required and written unguarded.
                              If( Len(gIssType) = 0,              "type   ", "" ) &
                              If( Len(gIssImpact) = 0,            "impact   ", "" ) )
                         Font: =gTheme.Font
@@ -686,9 +639,9 @@ Screens:
             Width: =Parent.Width
             Height: =88
           Children:
-            # DESTRUCTIVE, so it sits hard left, away from Save. Edit mode only —
-            # there is nothing to delete while creating. Arms the dialog and deletes
-            # nothing; gDelRefs is counted here so the dialog can say what else changes.
+            # DESTRUCTIVE, so it sits hard left, away from Save. Edit mode only. Arms the
+            # dialog and deletes nothing; gDelRefs is counted here so the dialog can say
+            # what else changes.
             - btnIssDelete:
                 Control: Classic/Button@2.2.0
                 Properties:
@@ -728,60 +681,41 @@ Screens:
                   Text: |
                     =If( gSaving, "Saving…",
                          If(gEditMode = "Edit", "Save issue", "Create issue") )
-                  # ALWAYS ENABLED — see scrTaskEdit btnTkSave. A disabled button cannot fire
-                  # OnSelect, so a record missing a required field gave a click that did
-                  # nothing at all. The requirement moved into OnSelect, where it can speak.
+                  # ALWAYS ENABLED — do not put a DisplayMode gate back. A DISABLED BUTTON CANNOT FIRE
+                  # OnSelect, so a record missing a required field gave a click that did nothing and said
+                  # nothing. The requirement moved into OnSelect, where it can NAME the missing field.
                   FillPortions: =0
                   LayoutMinWidth: =200
                   Width: =200
                   Height: =48
-                  # ONE WRITE. Every column, required and optional, is in a single Patch;
-                  # the optionals are If(condition, value, Blank()) inside the record.
-                  # It used to be one Patch plus FIVE guarded follow-ups against the row
-                  # just written — six serial round trips to save one issue. Folding also
-                  # killed the unlink bug at the root: three of those follow-ups had no
-                  # clearing arm, so a cleared task/transaction/owner never saved.
-                  #
-                  # The gate is gIssErr, captured in IfError's fallback: FirstError is
-                  # only in scope THERE, so the message is stashed and acted on
-                  # afterwards. Two reasons it is not `IsBlank(gIssSaved)`: Errors()
-                  # returns a TABLE (so IsError(Errors(...)) never fires), and what a
-                  # failed Patch leaves in the Set target is not something a one-way gap
-                  # can verify. Each IfError argument is a SINGLE statement — no ";"
-                  # chains inside a function argument.
-                  #
-                  # EVERY IfError ARGUMENT IS A `Set(...)`, AND THAT IS LOAD-BEARING.
-                  # "IfError returns the value of one of its arguments. The types of all
-                  # values that might be returned by IfError must be compatible" — and
-                  # MS Learn adds that *currently* ALL arguments must be compatible, not
-                  # just the ones that could be returned. `Patch` returns a record and
-                  # `Notify` returns a boolean, so the obvious `IfError(Patch(…),
-                  # Notify(…))` — which the docs themselves show — is rejected today with
-                  # "expecting a record". Wrapping the Patch in a Set makes both sides a
-                  # Set and it types. Failures are therefore accumulated into gIssWarn
-                  # and reported in ONE banner after the guarded block, which also beats
-                  # up to five separate toasts.
+                  # ONE WRITE. Every column, required and optional, is in a single Patch; the
+                  # optionals are If(condition, value, Blank()) inside the record. Folding the old
+                  # follow-up Patches in also killed the unlink bug: three of them had no clearing arm,
+                  # so a cleared task/transaction/owner never saved.
+                  # The gate is gIssErr, captured in IfError's fallback — FirstError is only in scope
+                  # THERE. Not `IsBlank(gIssSaved)`: Errors() returns a TABLE, so IsError(Errors(...))
+                  # never fires. Each IfError argument is a SINGLE statement — no ";" chains inside a
+                  # function argument.
+                  # EVERY IfError ARGUMENT IS A `Set(...)`, AND THAT IS LOAD-BEARING. MS Learn requires
+                  # ALL arguments to be type-compatible, not just the ones that could be returned, so
+                  # the obvious IfError(Patch(...), Notify(...)) — which the docs themselves show — is
+                  # rejected with "expecting a record". Wrapping the Patch in a Set makes both sides a
+                  # Set. Failures accumulate into gIssWarn and are reported in ONE banner afterwards.
                   OnSelect: |
                     =If( gSaving,
-                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing.
-                    // A SharePoint Patch takes seconds; the button stayed live throughout, so a
-                    // double-tap ran the whole handler twice and Defaults() built a SECOND new
-                    // record. `Set` applies immediately within a behaviour chain, so the flag is
-                    // already true by the time the second tap is evaluated.
-                    // NO DisplayMode GATE — see this button's ALWAYS ENABLED note. A disabled
-                    // button cannot fire OnSelect and cannot say why; the Text says "Saving…"
-                    // instead, and the guard below is what actually blocks the duplicate.
+                    // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing — a Patch takes
+                    // seconds and the button stays live, so a double-tap ran the handler twice and built a
+                    // SECOND record. `Set` applies immediately within a behaviour chain.
                     false,
                     Set( gSaving, true );
                     If( Len(lblIssMissing.Text) > 0,
-                    // The requirement that used to disable the button, moved here so a blocked
-                    // save names the field. These are required in schema.yaml — SharePoint would
-                    // reject the write regardless; this only decides whether the user is told.
+                    // Enforced here so a blocked save names the field. These are required in
+                    // schema.yaml, so SharePoint would reject the write regardless; this only
+                    // decides whether the user is told.
                     Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
                     NotificationType.Error ),
-                    // THE TASK LINK CAN MOVE, so the task this issue is LEAVING needs its
-                    // health recomputed too — captured here because after the Patch the old
-                    // value is gone. New mode has no previous link.
+                    // THE TASK LINK CAN MOVE, so the task this issue is LEAVING needs its health
+                    // recomputed too — captured here because after the Patch the old value is gone.
                     Set( gIssOldTask,
                          If( gEditMode = "Edit", Coalesce(gEditIssue.issue_task_name.Id, 0), 0 ) );
                     Set( gIssSaved, Blank() );
@@ -791,12 +725,10 @@ Screens:
                         Set( gIssSaved,
                             Patch( taskmaster_issues,
                                    If( gEditMode = "Edit", gEditIssue, Defaults(taskmaster_issues) ),
-                                   // Mirrors the PARENT's phase so cross-project queries can exclude archived
-                                   // work with a delegable `= false`. Written on EVERY save, not just on insert.
-                                   // Read LIVE from the list, not from gSelProject: that global is a gallery
-                                   // snapshot taken when the project was opened, so a project archived since
-                                   // then would stamp `false` here and the row would stay in scope forever.
-                                   // One delegable LookUp on ID.
+                                   // Mirrors the PARENT's phase so cross-project queries can exclude archived work with
+                                   // a delegable `= false`. Written on EVERY save. Read LIVE from the list, not from
+                                   // gSelProject — that global is a gallery snapshot, so a project archived since would
+                                   // stamp `false` and the row would stay in scope forever.
                                    { issue_project_archived:
                                          Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
                                                            project_phase.Value ), "" ) = "Archived",
@@ -811,17 +743,13 @@ Screens:
                                            Department: "", JobTitle: "", Picture: "" },
                                      issue_status:      { Value: gIssStatus },
                                      issue_date_target: dtpIssTarget.SelectedDate,
-                                     // DERIVED — there is no close-date field on this screen.
-                                     // Read the STORED date, NOT gEditIssue: that global is a snapshot taken
-                                     // when the issue was opened, and no control reads this column any more,
-                                     // which is exactly what Explicit Column Selection trims out of a record
-                                     // carried through a global. Coalesce then PRESERVES it — re-saving a
-                                     // closed issue must not move the date forward. Delegable LookUp on ID,
-                                     // same shape as issue_project_archived above.
-                                     // StartsWith, not an enumerated list: a Closed-* value added to the
-                                     // column later must still stamp. This is a local test with no query
-                                     // behind it, so the rule that forces enumeration in App.Formulas — a
-                                     // DELEGATION rule — does not apply here.
+                                     // DERIVED — there is no close-date field on this screen. Read the STORED date, NOT
+                                     // gEditIssue: that global is a snapshot, and no control reads this column any more,
+                                     // which is exactly what Explicit Column Selection trims out of a carried record.
+                                     // Coalesce then PRESERVES it — re-saving a closed issue must not move the date.
+                                     // StartsWith, not an enumerated list: a Closed-* value added later must still stamp.
+                                     // This is a local test with no query behind it, so the DELEGATION rule that forces
+                                     // enumeration in App.Formulas does not apply.
                                      issue_date_close:
                                          If( StartsWith(gIssStatus, "Closed"),
                                              If( gEditMode = "Edit",
@@ -829,9 +757,8 @@ Screens:
                                                                    issue_date_close ), Now() ),
                                                  Now() ),
                                              Blank() ),
-                                     // UNGUARDED, like issue_status: both are required and the
-                                     // picker offers no blank, so there is no case left where
-                                     // Blank() is the right write.
+                                     // UNGUARDED, like issue_status: both are required and the picker
+                                     // offers no blank, so Blank() is never the right write.
                                      issue_type:   { Value: gIssType },
                                      issue_impact: { Value: gIssImpact },
                                      issue_task_name:
@@ -843,12 +770,10 @@ Screens:
                     // Trust the RECORD, never the message — see scrTaskEdit.
                     If( IsBlank(gIssSaved.ID) && Len(gIssErr) = 0,
                         Set( gIssErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
-                    // PROVENANCE, INSERT ONLY. A second Patch rather than two fields in the
-                    // one above, because the update path must not NAME these columns at all:
-                    // a field named in a Patch is written, and there is no value to write on
-                    // an edit that is not either a rewrite or a clear. Omitting them is the
-                    // only way to leave them alone. Failure is a warning, not an error — the
-                    // issue itself is already saved by this point.
+                    // PROVENANCE, INSERT ONLY. A second Patch rather than two fields in the one above,
+                    // because the update path must not NAME these columns at all: a field named in a
+                    // Patch is written, and omitting them is the only way to leave them alone. Failure
+                    // is a warning — the issue itself is already saved.
                     If( gEditMode <> "Edit" && Len(gIssErr) = 0,
                         IfError(
                             Set( gIssStamped,
@@ -861,10 +786,9 @@ Screens:
                                                Department: "", JobTitle: "", Picture: "" },
                                          issue_date_open: Now() } ) ),
                             Set( gIssWarn, gIssWarn & "who opened it and when: " & FirstError.Message & "   " ) ) );
-                    // HEALTH FOLLOWS THE ISSUE. type, impact, status and the task link all
-                    // feed a task's health, so every successful save recomputes it — for the
-                    // task gained AND the one lost. Only after the write: recomputing off a
-                    // save that failed would store health for a change that never happened.
+                    // HEALTH FOLLOWS THE ISSUE. type, impact, status and the task link all feed a
+                    // task's health, so every successful save recomputes it — for the task gained AND
+                    // the one lost. Only after the write.
                     If( Len(gIssErr) = 0,
                         Clear( colHlTasks );
                         If( gIssOldTask > 0, Collect( colHlTasks, { Id: gIssOldTask } ) );
@@ -897,11 +821,10 @@ Screens:
                   Height: =48
                   OnSelect: =Back()
       # =====================================================================
-      # PICKER — ONE cmpPicker instance for the two person fields AND the two
-      # record lookups. Declared LAST so the dialog paints above the footer.
-      # gIssPicker names the field being filled and selects the row kind.
-      # AllowCreate is false throughout: an issue links to things that already
-      # exist. See scrTaskEdit's instance for the full contract commentary.
+      # PICKER — ONE cmpPicker instance for the two person fields AND the two record
+      # lookups. Declared LAST so the dialog paints above the footer. AllowCreate is false
+      # throughout: an issue links to things that already exist.
+      # See scrTaskEdit's instance for the full contract commentary.
       # =====================================================================
       - cmpIssPick:
           Control: CanvasComponent
@@ -913,11 +836,8 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: ="Select assignee"
-            # Queries run HERE — AccessAppScope false. Bound to gIssQuery, which
-            # OnSearch sets, never to the instance's own Query output.
-            # Uniform {Key, Primary, Secondary}; Key is Text for both kinds.
-            # There is no "first 10 people" to open on, so the default row is the
-            # current user — one tap to assign an issue to yourself.
+            # Queries run HERE — AccessAppScope false. Bound to gIssQuery, which OnSearch
+            # sets. The default row is the current user — one tap to assign to yourself.
             Results: |
               =If( gIssPicker = "Assignee" && Len(gIssQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gIssQuery, top: 25 }).value As u,
@@ -936,12 +856,9 @@ Screens:
                Set( gIssPicker, "" )
             OnCancel: =Set( gIssPicker, "" )
       # =====================================================================
-      # DELETE CONFIRMATION. See scrProject's instance for the Studio check that
-      # must happen before this screen is pasted: cmpConfirmDialog had no consumer
-      # in src/ until issue #15, so its eight custom properties may never have been
-      # declared in Studio — and a component's properties do NOT come across in a
-      # paste. Visible is gated as well as IsOpen because a component intercepts
-      # every click inside its bounds.
+      # DELETE CONFIRMATION. See scrProject's instance for the Studio check that must
+      # happen before this screen is pasted — a component's custom properties do NOT
+      # come across in a paste. Visible is gated as well as IsOpen.
       # =====================================================================
       - cmpIssConfirmDel:
           Control: CanvasComponent
@@ -960,16 +877,14 @@ Screens:
             ConfirmLabel: ="Delete"
             CancelLabel: ="Cancel"
             Destructive: =true
-            # IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED by
-            # Studio: Remove and ForAll/Patch return a TABLE while Notify and Set return a
-            # boolean, and IfError requires type-compatible arguments. Hence Set-into-a-scrap
-            # on both arms, with a DIFFERENT scrap name per call site.
+            # IfError( Remove(...), Notify(...) ) is REJECTED by Studio: Remove and ForAll/Patch
+            # return a TABLE while Notify and Set return a boolean, and IfError requires
+            # type-compatible arguments. Hence Set-into-a-scrap, with a DIFFERENT name per site.
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
-               // THE ROW THAT KNOWS THE TASK IS ABOUT TO BE DELETED, so the link is read
-               // now. Deleting the last open Blockage on a task must take that task back
-               // off Red, and after the Remove there is nothing left to ask.
+               // THE LINK IS READ NOW, while the row still knows its task: deleting the last open
+               // Blockage must take that task off Red, and after the Remove there is nothing to ask.
                Set( gDelIssTask,
                     If( gDelKind = "Issue",
                         Coalesce( LookUp(taskmaster_issues, ID = gDelId).issue_task_name.Id, 0 ),
@@ -989,9 +904,7 @@ Screens:
                    If( gDelIssTask > 0,
                        ClearCollect( colHlTasks, { Id: gDelIssTask } );
                        Select( btnIssHealth ) );
-                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute —
-                   // so project_phase and the completion rollup repair themselves with no
-                   // second copy of that logic living here.
+                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute.
                    Back() );
                Set( gDelKind, "" )
             OnCancel: =Set( gDelKind, "" )
