@@ -6,12 +6,15 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. #27, #28, #29, #30, #31, #32, #36 ARE LANDED AND CLOSED.
-  #33, #37 and #39 are BUILT AND UNLANDED. #34, #35, #38 and #40 are not started.** Ranked in
-  sessions/2026-08-19-1853-perf-review-issues.md; the take-next assessment is in
-  sessions/2026-08-19-2047-issues-39-33-37-built.md.
-- **PASTE QUEUE: `scrProjectEdit` (#33) and `scrProductEdit` (#37).** #39 needs NO paste — it
-  needs `transaction_product_id` indexed in SharePoint List settings; the schema already says so.
+- **PERF BACKLOG — GitHub #27–#40. TEN ARE CLOSED (#27–#33, #36, #37, #39); #34, #35, #38 and
+  #40 are open and not started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md; the
+  take-next assessment is in sessions/2026-08-19-2047-issues-39-33-37-built.md.
+- **#33, #37 AND #39 CLOSED AS BUILT, NOT AS LANDED (user instruction, 2026-08-19)** — the first
+  time the two have been separated. **The GitHub state no longer tracks what is in Studio.**
+- **PASTE QUEUE IS NOT EMPTY: `scrProjectEdit` (#33) and `scrProductEdit` (#37) are authored and
+  unpasted.** #39 needs no paste but needs `transaction_product_id` indexed in SharePoint List
+  settings — the schema says so, the live list does not yet carry it. **A failed paste on either
+  screen needs a NEW issue; the closed ones cannot track it.**
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -366,6 +369,8 @@ not know them will author something broken:
 - 2026-08-19 | #33 BUILT: `scrProjectEdit.btnPrSave` created staged tasks and staged transactions in two back-to-back ForAll loops though both depend only on `gPrSaved`; they are now the two arms of one `Concurrent`. **THE SPLIT RESULT COLLECTIONS ARE FORCED, NOT COSMETIC** — Concurrent's arms must not touch shared state and both loops collected into `colChildResult`; each now writes `colChildResultT` / `colChildResultX`, merged straight after, so colChildErrors, colChildOk and the Save-to-retry RemoveIf pair are untouched. **Legal only because the bodies `Collect`**: the 2026-08-19 ForAll rule sanctions Patch and Collect and rules out Set, so a later "simplification" to Set would break it — the comment says so in place | GitHub #33
 
 - 2026-08-19 | #37 BUILT: `scrProductEdit.OnVisible` rebuilt three reference collections per visit, one of them (`colPdUndAll`) a non-delegable `Concat` over the WHOLE products list — paid at the deepest point of another workflow, since the pickers open this screen mid-save. All three now `If(IsEmpty(...))`-guarded in one Concurrent (the #31 pattern, sixth application). **`btnPdSave` merges the tickers it just wrote into the cache LOCALLY rather than refetching**, staged through `colPdUndMerge` because the obvious shape would ClearCollect over the collection it is reading — unverifiable across the gap, so not used. **THE SORT IN THAT MERGE IS LOAD-BEARING**: `galPdUndSug.Items` is `FirstN(..., 12)` over the order, so an appended tail would never be seen. Staleness moves from per-visit to per-session for OTHER people's additions only | GitHub #37
+
+- 2026-08-19 | **#33, #37 AND #39 CLOSED AS BUILT RATHER THAN AS LANDED** (user instruction). Every earlier perf issue was closed on the human's binary "it works" after a paste; these three were closed while `scrProjectEdit` and `scrProductEdit` were still authored-and-unpasted, and while `transaction_product_id` was indexed in the golden source but not on the live list. **CONSEQUENCE: closed-issue state is no longer a proxy for what is in Studio, and a paste failure on either screen must be filed as a NEW issue** — the closed one cannot track it. Each closing comment says plainly that it is not a landing, names what is outstanding, and lists what to check once pasted. #37's Live Monitor "Done when" was explicitly recorded as not taken and not planned | GitHub #33, #37, #39
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
