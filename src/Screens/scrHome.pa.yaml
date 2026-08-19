@@ -1,55 +1,43 @@
 # =============================================================================
-# scrHome  —  personal dashboard. Four read-only metric cards, two work lists,
-# and a chart band. Column tokens resolve to schema/schema.yaml.
+# scrHome — personal dashboard. Four read-only metric cards, three work lists and
+# a chart band. Column tokens resolve to schema/schema.yaml.
 #
-# EVERYTHING BELOW THE APP BAR IS ONE AUTO-LAYOUT TREE. No child carries an X or
-# a Y, so nothing can collide at any window width and nothing here can be moved
-# by a stray drag in Studio.
+# EVERYTHING BELOW THE APP BAR IS ONE AUTO-LAYOUT TREE. No child carries an X or a
+# Y, so nothing can collide at any width and a stray drag in Studio cannot move it.
+#   rowLists.Height = Parent.Height - 572, where 572 = 48 padding + 48 gaps + 60
+#   wrapHdr + 96 rowCards + 320 rowCharts. Change a band height, change that number.
 #
-# BAND HEIGHTS (bodyRoot is Parent.Height for every direct child):
-#     60   wrapHdr     section header + Refresh
-#     96   rowCards    four metric cards
-#     ...  rowLists    fills — my tasks | my issues
-#    320   rowCharts   timeline + two pies + the completion ring
-#   rowLists.Height = Parent.Height - 572, where 572 = 48 padding + 48 gaps
-#   + 60 + 96 + 320. Change a band height and change that number with it.
-#   rowCharts is the tall one because the timeline plots up to TEN rows at 20
-#   units each — the viewBox grows with the row count, so a short panel would
-#   render the WHOLE chart smaller rather than clip it.
-#
-# Component INSTANCES use the v3.0 dialect: `Control: CanvasComponent` +
-# `ComponentName:` + `Properties:` (base props AND custom props; no Children).
-# An instance cannot take FillPortions/LayoutMinWidth, so every instance inside
-# an auto-layout container sits in a pinned GroupContainer wrapper.
-# Screens read gTheme; components cannot, so components use literal colours.
-#
-# NOT RUNNABLE until the lists exist: a SharePoint data source can't be added to
-# the app before its list is provisioned.
+# FIVE RULES THIS SCREEN BREAKS IF THEY ARE IGNORED:
+#  1. Narrow SERVER-side, aggregate LOCALLY — Sum, CountRows and Average never
+#     delegate. A delegable Filter still returns at most the DATA ROW LIMIT into a
+#     collection, so Settings > General > Data row limit must be 2000.
+#  2. EVERY VALUE POWER FX FEEDS AN SVG ATTRIBUTE IS A WHOLE NUMBER. A fraction has
+#     to go through Text(), which drags the viewer's decimal separator into the
+#     attribute; an attribute Power Fx cannot render comes out EMPTY, and an empty
+#     stroke-dasharray draws a SOLID RING, not a thin arc. viewBoxes are scaled up
+#     until integer precision is enough.
+#  3. CATEGORY TABLES ARE WRITTEN OUT, never derived with GroupBy. A group only
+#     exists when a row has that value, so GroupBy drops empty categories, reorders
+#     slices run to run, and changes a category's colour between refreshes. Each
+#     table carries an "Other" bucket so a drifted vocabulary shows as a labelled
+#     slice instead of a ring that quietly renders the wrong proportions.
+#  4. A CanvasComponent instance cannot take FillPortions or LayoutMinWidth, so
+#     every instance inside an auto-layout container sits in a pinned wrapper.
+#     Screens read gTheme; components cannot, so components use literal colours.
+#  5. A gallery's own OnSelect does not reliably fire when the click lands on a
+#     child control — every row's action is on a transparent full-template button
+#     declared LAST, and re-reads the row from the list rather than taking ThisItem.
 # =============================================================================
 Screens:
   scrHome:
     Properties:
       Fill: =gTheme.Color.Bg
-      # ---- One delegable pull per list, then local derivation ----------------
-      # Narrow SERVER-side to a bounded set, then aggregate LOCALLY — Sum,
-      # CountRows and Average never delegate to SharePoint.
-      # Everything inside these Filters delegates: Person `.Email =`, Choice
-      # `.Value =`, Lookup `.Id =`, and And/Or over them. `project_manager`,
-      # `task_lead` and `issue_assignee` are all single Person and all indexed.
-      #
-      # TWO LIMITS TO KNOW:
-      #  * A delegable Filter still returns at most the DATA ROW LIMIT into a
-      #    collection — set Settings > General > Data row limit to 2000. (While
-      #    testing, set it to 1: any non-delegable clause then shows up instantly.)
-      #  * task_stage / issue_status are REQUIRED with defaults (C9), so no row is
-      #    lost to a blank Choice — these counts miss nothing.
       OnVisible: |
         =
-        // SELF-HEAL, and it is not belt-and-braces. App.OnStart is NON-BLOCKING, so this
-        // screen can run before it finishes. A blank gUserEmail makes the Person filters
-        // below match NOTHING, and these KPIs are imperative Sets — they run once and never
-        // re-fire when the global later arrives, so the dashboard latches at zero until a
-        // manual refresh. Declarative properties like gTheme self-heal; these cannot.
+        // SELF-HEAL, and not belt-and-braces. App.OnStart is NON-BLOCKING, so this screen can
+        // run before it finishes. A blank gUserEmail makes the Person filters below match
+        // NOTHING, and these KPIs are imperative Sets that never re-fire — the dashboard
+        // latches at zero until a manual refresh. Declarative properties self-heal; these cannot.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
         Concurrent(
             ClearCollect( colMyProjects,
@@ -57,10 +45,9 @@ Screens:
             ClearCollect( colMyTasks,
                 Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
             ClearCollect( colMyIssues,
-                // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email =
-                // gUserEmail`: issue_owner is not indexed, so an Or-arm on it drops
-                // delegation for the WHOLE filter and silently truncates at 500 rows.
-                // issue_assignee is the resolver; issue_owner only records who raised it.
+                // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email = gUserEmail`:
+                // issue_owner is not indexed, so an Or-arm on it drops delegation for the WHOLE
+                // filter and silently truncates at 500 rows.
                 Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
         );
         Set( gPrjLed,
@@ -76,11 +63,9 @@ Screens:
                  task_stage.Value <> "Completed"
               && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
         // ONE DELEGABLE QUERY PER PROJECT, not one query over a set. There is no
-        // "issue_project_manager" to filter on, and `issue_project_id.Id in
-        // colMyProjects.ID` does NOT delegate — it would cap at the data row limit and
-        // undercount without saying so. ForAll runs each arm server-side instead; the
-        // cost is one round trip per project managed, so this grows with how many
-        // projects one person owns, not with the size of the issues list.
+        // "issue_project_manager" to filter on, and `issue_project_id.Id in colMyProjects.ID`
+        // does NOT delegate — it would cap at the data row limit and undercount silently.
+        // The cost is one round trip per project managed, not one per issue.
         Set( gIssLed,
              Coalesce( Sum( ForAll( colMyProjects As p,
                                     CountRows( Filter( OpenIssues,
@@ -94,14 +79,11 @@ Screens:
                      Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
         // ---- Chart source: open tasks I lead ---------------------------------
         // ONE FOLD FOR BOTH CHARTS, so they cannot disagree about what "open" means.
-        // Health is EFFECTIVE health — the stored issue-derived half with overdue folded
-        // in, per rollups.task_health in schema.yaml — resolved once here rather than
-        // re-tested per slice.
-        //
-        // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale and
-        // flatten every bar that matters; the end buckets mean "10 or more". A task with
-        // no target date gets 9999, which lands in no bucket at all, and is counted
-        // separately — a distribution that silently drops rows misstates its own total.
+        // Health is EFFECTIVE health — the stored issue-derived half with overdue folded in,
+        // per rollups.task_health in schema.yaml — resolved once here, not per slice.
+        // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale; the end
+        // buckets mean "10 or more". No target date gets 9999, lands in no bucket, and is
+        // counted separately — a distribution that silently drops rows misstates its total.
         ClearCollect( colDueSrc,
             ForAll( Filter(colMyTasks, task_stage.Value <> "Completed") As t,
                 { hl: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(),
@@ -109,9 +91,9 @@ Screens:
                   dd: If( IsBlank(t.task_date_target), 9999,
                           Max( -10, Min( 10, DateDiff(Today(), t.task_date_target, TimeUnit.Days) ) ) ) } ) );
         Set( gDueNoDate, CountRows( Filter(colDueSrc, dd = 9999) ) );
-        // 21 BUCKETS, WRITTEN OUT — not derived from the data. A bucket only exists when a
-        // row has that value, so grouping would drop every empty day and CLOSE UP the gaps —
-        // and a gap at zero tasks is exactly what a distribution has to show.
+        // 21 BUCKETS, WRITTEN OUT. A bucket only exists when a row has that value, so
+        // grouping would CLOSE UP the gaps — and a gap at zero tasks is what a distribution
+        // exists to show.
         ClearCollect( colDueBuckets,
             ForAll( Sequence(21) As s,
                 With( { dv: s.Value - 11 },
@@ -135,11 +117,8 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height - gTheme.Space.HeaderH
           Children:
-            # ---- Header + Refresh ------------------------------------------
-            # cmpSectionHeader carries ONE action button, so a second action has to
-            # be a sibling. The header sits in a flexible wrapper — a CanvasComponent
-            # instance cannot take FillPortions itself — and New project is pinned to
-            # the right of it, which lands it immediately beside Refresh Stats.
+            # cmpSectionHeader carries ONE action button, so a second action has to be a
+            # sibling. The header sits in a flexible wrapper; New project is pinned right of it.
             - wrapHdr:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -173,10 +152,9 @@ Screens:
                               Subtitle: ="Everything you lead or own, across every open project"
                               ShowAction: =true
                               ActionLabel: ="Refresh Stats"
-                              # THIS BLOCK MUST STAY IDENTICAL TO OnVisible ABOVE. There is no
-                              # shared function to call: a divergence shows up as the dashboard
-                              # reading one set of numbers on open and a different set after a
-                              # Refresh, with nothing to say which is right.
+                              # THIS BLOCK MUST STAY IDENTICAL TO OnVisible ABOVE. There is no shared
+                              # function to call, and a divergence shows up as the dashboard reading one
+                              # set of numbers on open and a different set after a Refresh.
                               OnAction: |
                                 =Refresh(taskmaster_projects); Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
                                 Concurrent(
@@ -210,16 +188,12 @@ Screens:
                                      If( CountRows(colMyTasks) = 0, 0,
                                          RoundDown( Average( AddColumns( colMyTasks, wgt,
                                              Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-                                // ---- Chart source: open tasks I lead ---------------------------------
                                 // ONE FOLD FOR BOTH CHARTS, so they cannot disagree about what "open" means.
-                                // Health is EFFECTIVE health — the stored issue-derived half with overdue folded
-                                // in, per rollups.task_health in schema.yaml — resolved once here rather than
-                                // re-tested per slice.
-                                //
-                                // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale and
-                                // flatten every bar that matters; the end buckets mean "10 or more". A task with
-                                // no target date gets 9999, which lands in no bucket at all, and is counted
-                                // separately — a distribution that silently drops rows misstates its own total.
+                                // Health is EFFECTIVE health — the stored issue-derived half with overdue folded in,
+                                // per rollups.task_health in schema.yaml — resolved once here, not per slice.
+                                // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale; the end
+                                // buckets mean "10 or more". No target date gets 9999, lands in no bucket, and is
+                                // counted separately — a distribution that silently drops rows misstates its total.
                                 ClearCollect( colDueSrc,
                                     ForAll( Filter(colMyTasks, task_stage.Value <> "Completed") As t,
                                         { hl: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(),
@@ -227,9 +201,9 @@ Screens:
                                           dd: If( IsBlank(t.task_date_target), 9999,
                                                   Max( -10, Min( 10, DateDiff(Today(), t.task_date_target, TimeUnit.Days) ) ) ) } ) );
                                 Set( gDueNoDate, CountRows( Filter(colDueSrc, dd = 9999) ) );
-                                // 21 BUCKETS, WRITTEN OUT — not derived from the data. A bucket only exists when a
-                                // row has that value, so grouping would drop every empty day and CLOSE UP the gaps —
-                                // and a gap at zero tasks is exactly what a distribution has to show.
+                                // 21 BUCKETS, WRITTEN OUT. A bucket only exists when a row has that value, so
+                                // grouping would CLOSE UP the gaps — and a gap at zero tasks is what a distribution
+                                // exists to show.
                                 ClearCollect( colDueBuckets,
                                     ForAll( Sequence(21) As s,
                                         With( { dv: s.Value - 11 },
@@ -253,18 +227,16 @@ Screens:
                         LayoutMinWidth: =150
                         Width: =150
                         Height: =36
-                        # gSelProject is cleared too: the child edit screens pre-attach
-                        # to it, and a stale selection would silently parent the new
-                        # project's children to the last project opened.
+                        # gSelProject is cleared too: the child edit screens pre-attach to it,
+                        # and a stale selection would parent the new project's children to the
+                        # last project opened.
                         OnSelect: |
                           =Set( gEditMode, "New" );
                            Set( gEditProject, Blank() );
                            Set( gSelProject, Blank() );
                            Navigate( scrProjectEdit, ScreenTransition.Cover )
-            # ---- Metric cards ----------------------------------------------
-            # PLAIN CONTAINERS, NOT cmpStatusCard. The component carries a
-            # full-bleed transparent button with a hover wash, so it reads as
-            # tappable; these four are deliberately inert.
+            # PLAIN CONTAINERS, NOT cmpStatusCard. The component carries a full-bleed
+            # transparent button with a hover wash, so it reads as tappable; these are inert.
             - rowCards:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -324,8 +296,7 @@ Screens:
                         - lblPrjLedSub:
                             Control: Label@2.5.1
                             Properties:
-                              # A percentage of nothing is not 0%, it is undefined —
-                              # say so rather than print a reassuring zero.
+                              # A percentage of nothing is not 0%, it is undefined — say so.
                               Text: |
                                 =If( gPrjLed = 0, "none open",
                                      RoundDown(gPrjLedOverdue / gPrjLed * 100, 0) & "% overdue" )
@@ -498,9 +469,8 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =Parent.Height - 572
                 Children:
-                  # PROJECTS FIRST, then the work under them. Fewer columns than the two
-                  # beside it — there is no parent to name, because the row IS the parent —
-                  # so it takes the smaller share rather than an equal third.
+                  # PROJECTS FIRST, then the work under them. Fewer columns than the two beside
+                  # it — the row IS the parent — so it takes the smaller share.
                   - secMyProjects:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -549,12 +519,9 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              # SAME COMPOSITE SORT KEY AS THE TASK LIST, for the same reasons:
-                              # one Sort because Power Fx does not guarantee a stable sort,
-                              # priority dominating, the day count breaking ties inside a band,
-                              # and +50000 keeping an overdue negative count positive so a
-                              # missing target date still sorts last within its priority.
-                              # Complete is excluded here exactly as Completed is there.
+                              # ONE composite sort key, not two chained Sorts — Power Fx does not guarantee a
+                              # stable sort. priority * 100000 dominates, the day count breaks ties, and +50000
+                              # keeps an overdue (negative) count positive so no target date sorts last.
                               Items: |
                                 =Sort( Filter(colMyProjects, project_phase.Value <> "Complete"),
                                        Switch( project_priority.Value,
@@ -587,12 +554,11 @@ Screens:
                                     Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight - 1
                                   Children:
-                                    # PHASE glyph, the project-level counterpart of the task
-                                    # stage glyph beside it. Six values, and the fallback is the
-                                    # dashed question mark for the same reason: a phase the app
-                                    # does not know must be visible, not invisible.
-                                    # HEX TEXT, not gTheme.Color.* — these drop straight into the
-                                    # SVG string and Power Fx has no Color-to-hex conversion.
+                                    # PHASE glyph, the project-level counterpart of the task stage glyph.
+                                    # The fallback is a dashed question mark: a phase the app does not know
+                                    # must be VISIBLE, not invisible.
+                                    # HEX TEXT, not gTheme.Color.* — these drop straight into the SVG string
+                                    # and Power Fx has no Color-to-hex conversion.
                                     - icoMyProjectPhase:
                                         Control: Image@2.2.3
                                         Properties:
@@ -654,11 +620,9 @@ Screens:
                                           FillPortions: =3
                                           LayoutMinWidth: =120
                                           Height: =32
-                                    # THE STORED ROLLUP, and it can be STALE — it only moves when
-                                    # a task save changes a stage, and scrProject repairs it on
-                                    # open. Shown because it is the project-level progress signal
-                                    # the cards and the ring already trade in; do not compute a
-                                    # live one here, that is a per-row scan of the task list.
+                                    # THE STORED ROLLUP, and it can be STALE — it only moves when a task save
+                                    # changes a stage, and scrProject repairs it on open. Do not compute a live
+                                    # one here; that is a per-row scan of the task list.
                                     - cellMyProjectPc:
                                         Control: Label@2.5.1
                                         Properties:
@@ -696,8 +660,6 @@ Screens:
                                     Y: =Parent.TemplateHeight - 1
                                     Width: =Parent.TemplateWidth
                                     Height: =1
-                              # DECLARED LAST, full template. A gallery's own OnSelect does not
-                              # reliably fire when the click lands on a child control.
                               - galMyProjectsHit:
                                   Control: Classic/Button@2.2.0
                                   Properties:
@@ -710,9 +672,8 @@ Screens:
                                     Y: =0
                                     Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight
-                                    # RE-READ FROM THE LIST, not handed ThisItem. colMyProjects is
-                                    # a snapshot; scrProject derives a phase and can Patch it, so
-                                    # it must open on a live record. The LookUp can miss.
+                                    # RE-READ FROM THE LIST, not handed ThisItem: scrProject derives a phase
+                                    # and can Patch it, so it must open on a live record. The LookUp can miss.
                                     OnSelect: |
                                       =Select(Parent);
                                       Set( gSelProject,
@@ -735,11 +696,9 @@ Screens:
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
-                        # 440 IS NOT ROUND: it is the task row's floor (22 + 70 + 130 + 100 +
-                        # 70 columns, 40 of gaps, 16 of row padding, 32 of panel padding = 480)
-                        # less the 40 the cells can absorb now that a THIRD panel shares this
-                        # row. rowLists is the widest band on the screen at 1252 against
-                        # rowCharts' 1204 — the two are no longer matched, and rowLists governs.
+                        # 440 IS NOT ROUND: the task row's floor (22 + 70 + 130 + 100 + 70 columns, 40 of
+                        # gaps, 16 row padding, 32 panel padding = 480) less the 40 the cells can absorb now
+                        # a THIRD panel shares this row. rowLists is the widest band at 1252 and governs.
                         FillPortions: =3
                         LayoutMinWidth: =440
                         Height: =Parent.Height
@@ -774,15 +733,11 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              # colMyTasks is a LOCAL collection, so `<>` and the
-                              # composite sort cost nothing — neither has to delegate.
-                              #
-                              # ONE composite sort key, not two chained Sorts: Power Fx
-                              # does not guarantee a stable sort, so a second Sort could
-                              # undo the first. priority * 100000 dominates, the day count
-                              # breaks ties within a priority, and +50000 keeps an overdue
-                              # (negative) count positive. No target date sorts last inside
-                              # its own priority band rather than first.
+                              # colMyTasks is a LOCAL collection, so `<>` and the composite sort
+                              # cost nothing — neither has to delegate.
+                              # ONE composite sort key, not two chained Sorts — Power Fx does not guarantee a
+                              # stable sort. priority * 100000 dominates, the day count breaks ties, and +50000
+                              # keeps an overdue (negative) count positive so no target date sorts last.
                               Items: |
                                 =Sort( Filter(colMyTasks, task_stage.Value <> "Completed"),
                                        Switch( task_priority.Value,
@@ -815,19 +770,11 @@ Screens:
                                     Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight - 1
                                   Children:
-                                    # INLINE SVG, NOT A COMPONENT. A canvas component
-                                    # cannot be placed inside a gallery template — Studio
-                                    # refuses the paste.
-                                    #
-                                    # LIFECYCLE glyph, bound to task_stage — the same
-                                    # progression scrProject and scrProjects use.
-                                    # task_status is a separate RAG health column and is
-                                    # NOT what this shows.
-                                    #
-                                    # HEX TEXT, not gTheme.Color.*: these drop straight
-                                    # into the SVG string and Power Fx has no Color-to-hex
-                                    # conversion. Primary #005A9E · Success #31825D ·
-                                    # Warning #D69828 · TextMuted #6E7882.
+                                    # INLINE SVG, NOT A COMPONENT — a canvas component cannot be
+                                    # placed inside a gallery template; Studio refuses the paste.
+                                    # LIFECYCLE glyph, bound to task_stage. task_status is a separate
+                                    # RAG health column and is NOT what this shows.
+                                    # HEX TEXT, not gTheme.Color.*: Power Fx has no Color-to-hex.
                                     - icoMyTaskStage:
                                         Control: Image@2.2.3
                                         Properties:
@@ -866,9 +813,9 @@ Screens:
                                     - cellMyTaskPriority:
                                         Control: Label@2.5.1
                                         Properties:
-                                          # Colour-coded, but the value is also SPELLED
-                                          # OUT — colour alone would carry the whole
-                                          # meaning for a reader who cannot see it.
+                                          # Colour-coded, but the value is also SPELLED OUT — colour
+                                          # alone would carry the whole meaning for a reader who cannot
+                                          # see it.
                                           Text: =Coalesce(ThisItem.task_priority.Value, "—")
                                           Font: =gTheme.Font
                                           FontWeight: =FontWeight.Semibold
@@ -897,11 +844,9 @@ Screens:
                                     - cellMyTaskProject:
                                         Control: Label@2.5.1
                                         Properties:
-                                          # RESOLVED APP-SIDE. task_project_id is a Lookup
-                                          # and the canvas connector DISPLAYS ITS NUMERIC
-                                          # ID, not project_name — the lookup's `show:`
-                                          # column is not what comes back. One delegable
-                                          # ID lookup per visible row.
+                                          # RESOLVED APP-SIDE. task_project_id is a Lookup and the
+                                          # canvas connector DISPLAYS ITS NUMERIC ID, not project_name.
+                                          # One delegable ID lookup per visible row.
                                           Text: |
                                             =Coalesce( LookUp( taskmaster_projects,
                                                                ID = ThisItem.task_project_id.Id,
@@ -917,13 +862,10 @@ Screens:
                                     - cellMyTaskDue:
                                         Control: Label@2.5.1
                                         Properties:
-                                          # A missing target date is "-", not an empty cell:
-                                          # a blank reads as a rendering fault, a dash reads
-                                          # as "nobody set one".
-                                          #
-                                          # No stage test on the overdue branch — this gallery
-                                          # is already filtered to open tasks, so a completed
-                                          # one cannot reach it.
+                                          # A missing target date is "-", not an empty cell: a blank
+                                          # reads as a rendering fault, a dash as "nobody set one".
+                                          # No stage test on the overdue branch — this gallery is
+                                          # already filtered to open tasks.
                                           Text: |
                                             =If( IsBlank(ThisItem.task_date_target), "-",
                                                  With( { d: DateDiff(Today(), ThisItem.task_date_target, TimeUnit.Days) },
@@ -945,9 +887,8 @@ Screens:
                                           FillPortions: =1
                                           LayoutMinWidth: =70
                                           Height: =40
-                              # Absolute siblings of the row container, not children of
-                              # it: both must span the whole template, and the hit button
-                              # must be LAST so it is on top.
+                              # Absolute siblings of the row container, not children: both must span
+                              # the whole template, and the hit button must be LAST so it is on top.
                               - rowMyTaskLine:
                                   Control: Rectangle@2.3.0
                                   Properties:
@@ -959,11 +900,6 @@ Screens:
                               - galMyTasksHit:
                                   Control: Classic/Button@2.2.0
                                   Properties:
-                                    # The row's action lives HERE, not on the gallery's
-                                    # OnSelect: a gallery's own OnSelect does not reliably
-                                    # fire when the click lands on a child control, so
-                                    # without a transparent full-template button declared
-                                    # LAST the rows look right and do nothing.
                                     Text: =""
                                     Fill: =RGBA(0, 0, 0, 0)
                                     HoverFill: =gTheme.Color.Hover
@@ -973,11 +909,9 @@ Screens:
                                     Y: =0
                                     Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight
-                                    # GOES TO THE PROJECT, not the task. A LookUp can MISS
-                                    # — the project may have been archived or deleted
-                                    # since the collection was taken — and scrProject
-                                    # derives a phase and can Patch it, so opening it on a
-                                    # blank record would write against nothing.
+                                    # GOES TO THE PROJECT, not the task. The LookUp can MISS — the
+                                    # project may have been archived or deleted since the collection
+                                    # was taken — and scrProject can Patch, so it must not open blank.
                                     OnSelect: |
                                       =Select(Parent);
                                       Set( gSelProject,
@@ -1034,9 +968,8 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              # Same composite key as the task list, on impact rather than
-                              # priority. colMyIssues is already Open-only — OpenIssues
-                              # filters issue_status server-side.
+                              # Same composite key as the task list, on impact rather than priority.
+                              # colMyIssues is already Open-only — OpenIssues filters server-side.
                               Items: |
                                 =Sort( colMyIssues,
                                        Switch( issue_impact.Value,
@@ -1069,10 +1002,9 @@ Screens:
                                     Width: =Parent.TemplateWidth
                                     Height: =Parent.TemplateHeight - 1
                                   Children:
-                                    # EVERY VALUE OF issue_status NEEDS A CASE HERE. This
-                                    # list is Open-only today, so the closed glyphs are
-                                    # unreachable — they exist so that widening the filter
-                                    # does not silently render every row identically.
+                                    # EVERY VALUE OF issue_status NEEDS A CASE HERE. This list is
+                                    # Open-only today, so the closed glyphs are unreachable — they
+                                    # exist so widening the filter does not render every row alike.
                                     - icoMyIssueStatus:
                                         Control: Image@2.2.3
                                         Properties:
@@ -1108,9 +1040,8 @@ Screens:
                                     - cellMyIssueImpact:
                                         Control: Label@2.5.1
                                         Properties:
-                                          # issue_impact is OPTIONAL in the golden source,
-                                          # so a blank is normal, not a fault — a dash, not
-                                          # an empty cell.
+                                          # issue_impact is OPTIONAL in the golden source, so a blank is
+                                          # normal, not a fault — a dash, not an empty cell.
                                           Text: =Coalesce(ThisItem.issue_impact.Value, "—")
                                           Font: =gTheme.Font
                                           FontWeight: =FontWeight.Semibold
@@ -1182,21 +1113,11 @@ Screens:
                                                   NotificationType.Error ),
                                           Navigate( scrProject, ScreenTransition.Cover ) )
             # ---- Charts band -----------------------------------------------
-            # FOUR SVG VISUALS, all drawn in Power Fx and handed to an Image control
-            # as a data URI. Read `.claude/skills/power-apps-svg` before editing one.
-            #
-            # THE CHART FORMULAS ARE DECLARATIVE ON PURPOSE. They read colMyTasks /
-            # colMyIssues / colMyProjects directly rather than a pre-computed global,
-            # so Refresh redraws them with no second copy of the maths to keep in step.
-            #
-            # NO FRACTION IS EVER INTERPOLATED. A bare fraction lands in the SVG using
-            # the VIEWER'S decimal separator, and `stroke-dasharray='33,3 66,7'` is not
-            # a number pair; Text(x, "[$-en-US]0.#", "en-US") is the documented cure but
-            # it puts a construct Power Fx may not render into an attribute, and an
-            # attribute it cannot render comes out EMPTY — a rect with width='' is not a
-            # thin rect, it is no rect, and a circle with stroke-dasharray='' is a SOLID
-            # ring. Every coordinate here is a whole number: viewBoxes are scaled up
-            # until integer precision is enough, and Round() does the rest.
+            # FOUR SVG VISUALS, all drawn in Power Fx and handed to an Image control as a data
+            # URI. Read `.claude/skills/power-apps-svg` before editing one. See rules 2 and 3.
+            # THE CHART FORMULAS ARE DECLARATIVE ON PURPOSE: they read colMyTasks / colMyIssues /
+            # colMyProjects directly rather than a pre-computed global, so Refresh redraws them
+            # with no second copy of the maths to keep in step.
             - rowCharts:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1209,13 +1130,9 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =320
                 Children:
-                  # DAYS TO DUE, CLAMPED TO -10..+10. Negative is overdue. The clamp is what
-                  # makes the chart readable: without it one task six months out sets the
-                  # scale and every bar that matters collapses to nothing. The end bars are
-                  # therefore "10 or more", not "exactly 10", and the caption says so.
-                  #
-                  # Tasks with NO target date are not plotted and are counted separately — a
-                  # distribution that silently drops rows misstates its own total.
+                  # DAYS TO DUE, CLAMPED TO -10..+10; negative is overdue. Without the clamp one task
+                  # six months out sets the scale and every bar that matters collapses. The end bars
+                  # are "10 or more", not "exactly 10", and the caption says so.
                   - pnlDueBars:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1271,14 +1188,11 @@ Screens:
                               LayoutMinHeight: =90
                               Width: =Parent.Width - 24
                               Height: =Parent.Height - 78
-                              # BUILT FROM colDueBuckets, not inline. Across a one-way gap a chart
-                              # that draws nothing is indistinguishable from a chart whose data
-                              # never arrived, and a collection can be opened in Studio's
-                              # Collections pane. Same reason the timeline this replaces did it.
-                              #
-                              # EVERY COORDINATE IS A WHOLE NUMBER. 21 buckets across a 1050-wide
-                              # viewBox gives each a 50-unit slot, so nothing here divides into a
-                              # fraction that would have to go through Text().
+                              # BUILT FROM colDueBuckets, not inline. Across a one-way gap a chart that draws
+                              # nothing is indistinguishable from a chart whose data never arrived, and a
+                              # collection can be opened in Studio's Collections pane.
+                              # 21 buckets across a 1050-wide viewBox gives each a 50-unit slot, so nothing
+                              # here divides into a fraction.
                               Image: |
                                 =With( { mx: Max( 1, Max(colDueBuckets, n) ) },
                                     "data:image/svg+xml," & EncodeUrl(
@@ -1304,11 +1218,9 @@ Screens:
                                       & "<text x='525' y='330' text-anchor='middle' font-size='24'"
                                       & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>days</text>"
                                       & "</svg>" ) )
-                  # HEALTH, NOT STAGE. task_status holds only the ISSUE-DERIVED half of health;
-                  # overdue changes with no write at all, so it is folded in HERE by the reader
-                  # — see rollups.task_health in schema.yaml. Reading task_status raw
-                  # UNDER-REPORTS Red, which is the one value that must not be missed. No join:
-                  # task_date_target is already on the row.
+                  # HEALTH, NOT STAGE. task_status holds only the ISSUE-DERIVED half; overdue changes
+                  # with no write, so it is folded in by the reader — see rollups.task_health. Reading
+                  # task_status raw UNDER-REPORTS Red. No join: task_date_target is already on the row.
                   - pnlPieHealth:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1349,18 +1261,10 @@ Screens:
                               LayoutMinHeight: =90
                               Width: =Parent.Width - 24
                               Height: =Parent.Height - 48
-                              # SAME DONUT CONSTRUCTION AS THE STAGE PIE BESIDE IT — written-out
-                              # category table so an unused value still holds its slot and its
-                              # colour, "Other" as the failsafe so a drifted vocabulary shows up
-                              # instead of silently rescaling, running total `uc` for the offset,
-                              # r 159.155 for a circumference of exactly 1000, and every value
-                              # Power Fx supplies a whole number. The full reasoning is on that
+                              # SAME DONUT CONSTRUCTION AS THE STAGE PIE BESIDE IT; the reasoning is on that
                               # chart and is not restated here.
-                              #
-                              # colDueSrc is the SAME open-task set the bar chart plots, folded
-                              # once in OnVisible with health already resolved — so the two
-                              # charts cannot disagree about what "open" means, and neither
-                              # recomputes the overdue test per slice.
+                              # colDueSrc is the SAME open-task set the bar chart plots, folded once in OnVisible
+                              # with health already resolved — so the two charts cannot disagree about "open".
                               Image: |
                                 =With(
                                     { cats: AddColumns(
@@ -1443,38 +1347,17 @@ Screens:
                               LayoutMinHeight: =90
                               Width: =Parent.Width - 24
                               Height: =Parent.Height - 48
-                              # DONUT + LEGEND IN ONE SVG, legend UNDER the ring. The legend
-                              # has to live inside the picture: an Image is a single control,
-                              # so there is nothing to hover and no per-slice click, and a
-                              # legend built from real controls would cost more than the chart.
-                              # Stacked rather than side by side because the panel is now a
-                              # third of the row — a wide chart would render as a thin strip
-                              # across the middle of it.
-                              #
-                              # THE CATEGORY TABLE IS WRITTEN OUT, not derived with GroupBy.
-                              # A group only exists when a row has that value, so GroupBy would
-                              # drop empty stages, reorder the slices run to run, and change the
-                              # colour of a stage between two refreshes. Written out, the
-                              # vocabulary and the ordering are fixed.
-                              #
-                              # "OTHER" IS WHAT STOPS THE ALLOW-LIST FAILING SILENTLY. It counts
-                              # every task whose stage matches NONE of the five, so `tot` is
-                              # always the real row count and a live vocabulary that has drifted
-                              # from schema.yaml shows up as a labelled purple slice instead of
-                              # a ring that quietly renders the wrong proportions. If Other is
-                              # ever non-zero, the SharePoint column and this list disagree.
-                              #
-                              # `uc` is the running total, which Power Fx has no primitive for:
-                              # each row sums the rows with a LOWER index, named through `As r`
-                              # so the inner Filter's scope cannot shadow the outer one.
-                              #
-                              # EVERY COORDINATE IS A WHOLE NUMBER, and the viewBox is 10x the
-                              # natural size so that the circumference is 1000 units and a slice
-                              # still has a tenth of a percent of precision. Fractions have to be
-                              # rendered with Text(), which brings the locale decimal separator
-                              # into an SVG attribute; an attribute Power Fx cannot render is an
-                              # EMPTY attribute, and an empty stroke-dasharray does not draw a
-                              # thin arc — it draws a SOLID RING in the last slice's colour.
+                              # DONUT + LEGEND IN ONE SVG, legend UNDER the ring. The legend has to live inside
+                              # the picture: an Image is a single control, so there is nothing to hover and no
+                              # per-slice click. Stacked rather than side by side because the panel is a third
+                              # of the row.
+                              # IF "Other" IS EVER NON-ZERO the SharePoint column and this list's category table
+                              # disagree — see rule 3.
+                              # `uc` is the running total, which Power Fx has no primitive for: each row sums the
+                              # rows with a LOWER index, named through `As r` so the inner Filter's scope cannot
+                              # shadow the outer one.
+                              # The viewBox is 10x natural size so the circumference is 1000 units and a slice
+                              # keeps a tenth of a percent of precision — see rule 2.
                               Image: |
                                 =With(
                                     { cats: AddColumns(
@@ -1498,16 +1381,14 @@ Screens:
                                                         u, Round( r.n / tot * 1000, 0 ),
                                                         uc, Round( Coalesce( Sum( Filter(cats, i < r.i), n ), 0 )
                                                                    / tot * 1000, 0 ) ),
-                                              // The legend lists only categories that HAVE rows, so it needs
-                                              // its own 1..n ordinal — `i` is the fixed slot in the vocabulary
-                                              // and would leave a blank line wherever a value is unused.
+                                              // The legend lists only categories that HAVE rows, so it needs its own
+                                              // 1..n ordinal — `i` is the fixed slot and would leave a blank line.
                                               leg: ForAll( Sequence( CountRows(Filter(cats, n > 0)) ) As s,
                                                        With( { g: Index(Filter(cats, n > 0), s.Value) },
                                                            { j: s.Value, lk: g.k, ln: g.n, lc: g.c } ) ) },
                                             "data:image/svg+xml," & EncodeUrl(
-                                                // HEIGHT GROWS WITH THE LEGEND so the chart stays close to
-                                                // square and fills a third-width panel. The ring's radius is
-                                                // FIXED at 159.155 — that is what makes the circumference
+                                                // HEIGHT GROWS WITH THE LEGEND so the chart stays near square. The
+                                                // radius is FIXED at 159.155 — that is what makes the circumference
                                                 // exactly 1000, which the integer dasharray depends on.
                                                 "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 440 "
                                               & (410 + CountRows(leg) * 34 + 12) & "'>"
@@ -1571,10 +1452,9 @@ Screens:
                               Width: =Parent.Width - 24
                               Height: =Parent.Height - 48
                               # Same construction as imgPieTasks — read the notes there.
-                              # `issue_impact` is OPTIONAL in the golden source, so "Not set"
-                              # is a REAL category here, not a fallback: without it the slices
-                              # would not account for every issue and the ring would understate
-                              # the total it prints in the middle.
+                              # `issue_impact` is OPTIONAL in the golden source, so "Not set" is a REAL
+                              # category, not a fallback: without it the slices would not account for
+                              # every issue and the ring would understate the total it prints.
                               Image: |
                                 =With(
                                     { cats: AddColumns(
@@ -1598,16 +1478,14 @@ Screens:
                                                         u, Round( r.n / tot * 1000, 0 ),
                                                         uc, Round( Coalesce( Sum( Filter(cats, i < r.i), n ), 0 )
                                                                    / tot * 1000, 0 ) ),
-                                              // The legend lists only categories that HAVE rows, so it needs
-                                              // its own 1..n ordinal — `i` is the fixed slot in the vocabulary
-                                              // and would leave a blank line wherever a value is unused.
+                                              // The legend lists only categories that HAVE rows, so it needs its own
+                                              // 1..n ordinal — `i` is the fixed slot and would leave a blank line.
                                               leg: ForAll( Sequence( CountRows(Filter(cats, n > 0)) ) As s,
                                                        With( { g: Index(Filter(cats, n > 0), s.Value) },
                                                            { j: s.Value, lk: g.k, ln: g.n, lc: g.c } ) ) },
                                             "data:image/svg+xml," & EncodeUrl(
-                                                // HEIGHT GROWS WITH THE LEGEND so the chart stays close to
-                                                // square and fills a third-width panel. The ring's radius is
-                                                // FIXED at 159.155 — that is what makes the circumference
+                                                // HEIGHT GROWS WITH THE LEGEND so the chart stays near square. The
+                                                // radius is FIXED at 159.155 — that is what makes the circumference
                                                 // exactly 1000, which the integer dasharray depends on.
                                                 "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 440 "
                                               & (410 + CountRows(leg) * 34 + 12) & "'>"
@@ -1630,11 +1508,8 @@ Screens:
                                                   & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                                   & EncodeHTML(lk) & "  " & ln & "</text>" )
                                               & "</svg>" ) ) ) )
-                  # THE ONE REAL VISUAL in this band — the licence-free completion
-                  # ring. It is WRAPPED because FillPortions and LayoutMinWidth are
-                  # proven on GroupContainer but NOT on a CanvasComponent instance,
-                  # and the contract check rejects them there. Without a pinned
-                  # wrapper the ring defaults to FillPortions 1 and stretches.
+                  # THE ONE REAL VISUAL in this band — the licence-free completion ring,
+                  # wrapped per rule 4.
                   - pnlRing:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1644,17 +1519,15 @@ Screens:
                         LayoutGap: =8
                         PaddingTop: =12
                         PaddingBottom: =12
-                        # NO SIDE PADDING: padding eats the inner width first, and at
-                        # the floor below that would clip the ring rather than inset it.
+                        # NO SIDE PADDING: padding eats the inner width first, and at the floor
+                        # below that would clip the ring rather than inset it.
                         PaddingLeft: =0
                         PaddingRight: =0
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
-                        # ONE OF THREE EQUAL THIRDS. Same FillPortions and the same floor
-                        # as the two donut panels, so whatever the timeline does not take
-                        # is divided evenly between them. Row minimum is
-                        # 300 + 210 + 210 + 210 + 48 = 978.
+                        # ONE OF THREE EQUAL THIRDS, same floor as the two donut panels.
+                        # Row minimum is 300 + 210 + 210 + 210 + 48 = 978.
                         FillPortions: =1
                         LayoutMinWidth: =210
                         Height: =Parent.Height
@@ -1665,15 +1538,11 @@ Screens:
                             Properties:
                               LayoutDirection: =LayoutDirection.Vertical
                               LayoutAlignItems: =LayoutAlignItems.Center
-                              # LayoutMinWidth, NOT LayoutMinHeight. This wrapper sits in a
-                              # VERTICAL parent, so height is the main axis and width is the
-                              # cross axis — the floor that keeps the ring from being squeezed
-                              # is the width one.
-                              #
-                              # SQUARE, AND AS BIG AS THE PANEL ALLOWS. Whichever of the two
-                              # is scarcer decides: 84 is the caption plus the gap plus the
-                              # top and bottom padding, so this is the largest circle that
-                              # still leaves the caption its two lines.
+                              # LayoutMinWidth, NOT LayoutMinHeight. This wrapper sits in a VERTICAL
+                              # parent, so height is the main axis and width is the cross axis — the
+                              # floor that keeps the ring from being squeezed is the width one.
+                              # SQUARE, AND AS BIG AS THE PANEL ALLOWS: 84 is the caption plus the gap
+                              # plus the top and bottom padding.
                               FillPortions: =0
                               LayoutMinWidth: =100
                               Width: =Max( 100, Min(Parent.Width, Parent.Height - 84) )
@@ -1695,9 +1564,8 @@ Screens:
                               Text: |
                                 ="Weighted completion across " & CountRows(colMyTasks) & " task(s) you lead"
                               Font: =gTheme.Font
-                              # A LITERAL 10, not gTheme.Size.Small — the theme's smallest
-                              # step is 12 and this caption has to wrap to three lines
-                              # inside a 126px column without clipping.
+                              # A LITERAL 10, not gTheme.Size.Small — the theme's smallest step is 12
+                              # and this caption has to wrap to three lines inside a 126px column.
                               Size: =10
                               Color: =gTheme.Color.TextMuted
                               Align: =Align.Center
@@ -1722,13 +1590,10 @@ Screens:
             OnDismiss: =Set(gToastShow, false)
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
-      #
-      # Height is dynamic and that is the whole trick: a component intercepts every
-      # click inside its bounds, so closed it must own nothing but the 64px header
-      # strip. Open, covering the screen is exactly right — the scrim wants the click.
-      #
-      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports
-      # the chosen entry and this screen does the navigating.
+      # Height is dynamic and that is the whole trick: a component intercepts every click
+      # inside its bounds, so closed it must own nothing but the 64px header strip.
+      # cmpAppBar cannot Navigate (a component can't see app screens), so it reports the
+      # chosen entry and this screen does the navigating.
       - appBar:
           Control: CanvasComponent
           ComponentName: cmpAppBar
