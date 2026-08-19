@@ -24,8 +24,8 @@
   no longer an open defect; do not reopen the diagnosis.
 - **#11 HAS LANDED (user, 2026-08-19): pastes clean, ALL CHARTS RENDER.** Two paste defects
   found and fixed since: the `task_name` error type (see Decisions) and the person-overlay task
-  row overlapping. **The overlay fix and a 20% wider overlay card are authored but NOT yet
-  pasted.** The rest of the backlog
+  row overlapping — both LANDED. **Authored and unpasted: the overlay card at 1000 wide with
+  only its free-text columns elastic.** The rest of the backlog
   is empty — #9, #10 and #12-#17 are all closed.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
@@ -294,3 +294,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #11 follow-up: the output pie switched from task_output_format to task_output_audience because scrTaskEdit ENFORCES the audience whenever the Output section is on and never enforces the format — so audience stays complete and format accumulates blanks; the young column's Unspecified count is stated in the subtitle because on a pie that case and a broken report look identical. Fam/Fmt dropped from colRptPersonSrc, taking a per-task project LookUp with them | GitHub #11
 - 2026-08-19 | outbound port #2 to claudeBrain: the canvas-app family (7 skills, 2 agents, the air-gap brief) plus 4 generic corrections, opened as claudeBrain#36. Nothing imported — the factory's Power Platform copies remain downstream of this repo. Open question asked in the PR: whether the ported skills' `tools/` and `schema/` path references should be genericised | sessions/2026-08-19-0258-claudebrain-canvas-port.md
 - 2026-08-19 | #11 LANDED — pastes clean, all charts render. Two paste defects: the task_name error type (ShowColumns over a named formula) and the overlay task row overlapping (absolute cells vs the auto-layout idiom); both fixed, the second unpasted | GitHub #11
+- 2026-08-19 | overlay geometry: absolute cells replaced by the auto-layout idiom (LANDED), then the card widened to 1000 with status/health/opened set to zero FillPortions — a bounded vocabulary should never take a share of the slack from a free-text column | GitHub #11
