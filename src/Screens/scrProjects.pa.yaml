@@ -1,16 +1,15 @@
-# Projects browser: coverage filter + search + a "show completed" toggle over a
-# six-column gallery.
+# Projects browser: coverage filter + search + two toggles ("only mine", "show
+# completed") over a six-column gallery. ONE filter row — there is no second.
 #
-# VERTICAL BANDS (tablet 768). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
+# VERTICAL BANDS (768 tall). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
 #     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
 #    88 .. 148   hdrProjects   = HeaderH + Gutter, height 60
 #   164 .. 204   rowFilters    = off hdrProjects,  height 40
-#   220 .. 260   rowFilters2   = off rowFilters,   height 40
-#   266 .. 744   galProjects   = absolute 266, fills to the bottom gutter
+#   220 .. 744   galProjects   = absolute 220, fills to the bottom gutter
 #
 # The bands above galProjects are RELATIVE — each anchored to the one above it, so a
 # height change in the header moves them together. The gallery itself is an ABSOLUTE
-# 266 and its Height subtracts the same number, so the two have to be edited together.
+# 220 and its Height subtracts the same number, so the two have to be edited together.
 # Layout formulas survive a paste and keep recomputing (tests/README.md) — what breaks
 # the link is dragging a control in Studio, so change geometry here or in the formula
 # bar, never with the mouse.
@@ -34,15 +33,10 @@ Screens:
          Collect( colPrjCoverage,
                   ForAll( Choices([@taskmaster_projects].project_coverage) As c,
                           { Value: c.Value } ) );
-         Set( gPrjPicker, "" );
-         Set( gPrjQuery, "" );
-         // SEEDED ONCE, NOT ON EVERY VISIT. The coverage combo and the search box both
-         // survive a round trip into a project and back, because nothing Resets them.
-         // An unguarded Set here would make the lead the ONE filter that silently
-         // reverts to "mine" every time the user comes back from a project.
-         If( !gPrjLeadInit,
-             Set( gPrjLead, { DisplayName: User().FullName, Mail: gUserEmail } );
-             Set( gPrjLeadInit, true ) )
+         // SELF-HEAL, same as scrHome. App.OnStart is NON-BLOCKING, so this screen can
+         // run before it finishes, and a blank gUserEmail makes the "only mine" branches
+         // below match nothing.
+         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) )
     Children:
       - hdrProjects:
           Control: CanvasComponent
@@ -65,9 +59,14 @@ Screens:
                Set( gSelProject, Blank() );
                Navigate( scrProjectEdit, ScreenTransition.Cover )
       # ---- Filter row -------------------------------------------------------
-      # ONE auto-layout row. The controls carry no X at all, so the chain of
-      # hand-added offsets that used to place them cannot drift, and the search box
-      # takes whatever width the other three leave.
+      # ONE auto-layout row, and everything the screen filters on is on it. The controls
+      # carry no X at all, so the chain of hand-added offsets that used to place them
+      # cannot drift, and the search box takes whatever width the other five leave.
+      #
+      # THE WIDTH BUDGET: 240 + 220 + 60 + 170 + 60 + 150 with five 16px gaps = 980
+      # against 1318 usable (1366 - two gutters), so the search box gets 338 of slack and
+      # nothing is forced onto a second line. An earlier note here read the 768 DESIGN
+      # HEIGHT as the width and concluded a second row was unavoidable — it is not.
       - rowFilters:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -108,8 +107,39 @@ Screens:
                   FillPortions: =1
                   LayoutMinWidth: =220
                   Height: =40
-            # A Classic/Toggle, not a check box: the check-box token is not grounded
+            # THE "MINE" FILTER, and it is a toggle + label pair rather than a check box
+            # for the same reason tglShowComplete is: the check-box token is not grounded
             # for this dialect and an unverified control fails the WHOLE screen paste.
+            #
+            # It replaced a lead picker whose filter RETURNED NOTHING for every choice,
+            # "All leads" included. That design rested on `StartsWith(person.Email, "")`
+            # being a no-op that matched every row, which is what kept the gallery at four
+            # branches; against the real list it matched none. The person test here is
+            # `= gUserEmail` instead — the equality scrHome has run all along — and the
+            # empty-string no-op is gone with the picker. Rebuild the trick and the
+            # branches collapse again, but so does the filter.
+            - tglOnlyMine:
+                Control: Classic/Toggle@2.1.0
+                Properties:
+                  Default: =false
+                  FalseText: =""
+                  TrueText: =""
+                  FillPortions: =0
+                  LayoutMinWidth: =60
+                  Width: =60
+                  Height: =30
+            - lblOnlyMine:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Only Show my Tasks"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  Color: =gTheme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinWidth: =170
+                  Width: =170
+                  Height: =40
             # Same control the two scrTaskEdit section switches already use.
             - tglShowComplete:
                 Control: Classic/Toggle@2.1.0
@@ -133,93 +163,28 @@ Screens:
                   LayoutMinWidth: =150
                   Width: =150
                   Height: =40
-      # ---- Lead filter row --------------------------------------------------
-      # A SECOND ROW IS FORCED, not a style choice. rowFilters' children sit at
-      # 240 + 220 + 60 + 150 with three 16px gaps = 718 against 720 usable at the
-      # 768 target — two pixels of slack, so nothing more fits on that line at any
-      # width the app supports. Anchored off rowFilters the same relative way, so a
-      # height change above still moves everything together.
-      - rowFilters2:
-          Control: GroupContainer@1.5.0
-          Variant: AutoLayout
-          Properties:
-            LayoutDirection: =LayoutDirection.Horizontal
-            LayoutAlignItems: =LayoutAlignItems.Center
-            LayoutGap: =gTheme.Space.Gap
-            X: =gTheme.Space.Gutter
-            Y: =rowFilters.Y + rowFilters.Height + gTheme.Space.Gap
-            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: =40
-          Children:
-            - lblPrjLeadCap:
-                Control: Label@2.5.1
-                Properties:
-                  Text: ="Lead"
-                  Font: =gTheme.Font
-                  Size: =gTheme.Size.Body
-                  Color: =gTheme.Color.TextMuted
-                  VerticalAlign: =VerticalAlign.Middle
-                  FillPortions: =0
-                  LayoutMinWidth: =50
-                  Width: =50
-                  Height: =40
-            # Reset FIRST: cmpPicker clears its own highlight and search box on Reset,
-            # and without it the dialog reopens showing the previous pick as if it were
-            # still current. gPrjQuery is the screen's half of that — the component
-            # never runs the query itself.
-            - btnPrjLead:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  Text: |
-                    =If( Len(Coalesce(gPrjLead.Mail, "")) = 0,
-                         "All leads",
-                         gPrjLead.DisplayName )
-                  Fill: =gTheme.Color.Surface
-                  Color: =gTheme.Color.Primary
-                  BorderColor: =gTheme.Color.Border
-                  BorderThickness: =1
-                  Font: =gTheme.Font
-                  Size: =gTheme.Size.Body
-                  FillPortions: =0
-                  LayoutMinWidth: =260
-                  Width: =260
-                  Height: =40
-                  OnSelect: |
-                    =Set( gPrjQuery, "" );
-                     Reset( cmpPrjPick );
-                     Set( gPrjPicker, "Lead" )
-            # Clearing to Blank is what makes the filter a no-op: the predicate becomes
-            # StartsWith(email, ""), which is true for every row. Do not "fix" this to
-            # an equality test — that would need a second branch per combination.
-            - btnPrjLeadAll:
-                Control: Classic/Button@2.2.0
-                Properties:
-                  Text: ="All leads"
-                  Fill: =gTheme.Color.Surface
-                  Color: =gTheme.Color.Primary
-                  BorderColor: =gTheme.Color.Primary
-                  BorderThickness: =1
-                  Font: =gTheme.Font
-                  Size: =gTheme.Size.Body
-                  DisplayMode: |
-                    =If( Len(Coalesce(gPrjLead.Mail, "")) = 0,
-                         DisplayMode.Disabled, DisplayMode.Edit )
-                  FillPortions: =0
-                  LayoutMinWidth: =120
-                  Width: =120
-                  Height: =40
-                  OnSelect: =Set( gPrjLead, Blank() )
       # ---- Gallery ----------------------------------------------------------
-      # FOUR BRANCHES, each INDEPENDENTLY delegable, and the Sort sits INSIDE each
-      # one — `Sort(If(...))` would not fold, because If is not a delegable
-      # operation, so the sort would run locally over one arbitrary page.
+      # EIGHT BRANCHES — three independent binary filters (show completed × coverage ×
+      # only mine) — each INDEPENDENTLY delegable, and the Sort sits INSIDE each one;
+      # `Sort(If(...))` would not fold, because If is not a delegable operation, so the
+      # sort would run locally over one arbitrary page. The duplication is the price of
+      # delegation: every predicate has to be WRITTEN OUT in the branch that uses it,
+      # because a filter assembled from a variable or a `||` against a client-side
+      # constant does not fold. Do not "simplify" this into one Filter.
       #
-      # EVERY BRANCH CARRIES ITS OWN PHASE PREDICATE, and the two "show completed"
+      # EIGHT AND NOT FOUR because the person test is `= gUserEmail`, an equality that has
+      # no neutral value. The lead picker this replaced held the count at four by writing
+      # `StartsWith(project_manager.Email, "")` in the off state and trusting it to match
+      # every row — and in the app it matched NONE, for every choice including "All leads"
+      # (user, 2026-08-19). Equality is what scrHome has always run against these Person
+      # columns. Restoring the empty-string form to save four branches restores the defect.
+      #
+      # EVERY BRANCH CARRIES ITS OWN PHASE PREDICATE, and the "show completed"
       # ones look redundant against ActiveProjects because they enumerate the same
       # five phases it already filters on. Do not simplify them away. Sorting a
       # bare `Filter(ActiveProjects, StartsWith(...))` returned "the query is not
       # valid" from SharePoint, while the identical shape WITH an explicit phase
-      # group did not — so all four branches are deliberately the same shape, and
+      # group did not — so all eight branches are deliberately the same shape, and
       # the one that was different is the one that failed.
       #
       # The phases are ENUMERATED rather than written as `<> "Complete"`: a Text
@@ -243,7 +208,7 @@ Screens:
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: |
-              =If( tglShowComplete.Value
+              =If( tglShowComplete.Value && tglOnlyMine.Value
                 && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                    Sort( Filter( ActiveProjects,
                              ( project_phase.Value = "Not Started"
@@ -252,7 +217,29 @@ Screens:
                             || project_phase.Value = "Stalled"
                             || project_phase.Value = "Complete" )
                           && StartsWith(project_name, txtProjSearch.Text)
-                          && StartsWith(project_manager.Email, Coalesce(gPrjLead.Mail, "")) ),
+                          && project_manager.Email = gUserEmail ),
+                         project_name ),
+                   tglShowComplete.Value && tglOnlyMine.Value,
+                   Sort( Filter( ActiveProjects,
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Stalled"
+                            || project_phase.Value = "Complete" )
+                          && project_coverage.Value = cboPrjCoverage.Selected.Value
+                          && StartsWith(project_name, txtProjSearch.Text)
+                          && project_manager.Email = gUserEmail ),
+                         project_name ),
+                   tglShowComplete.Value
+                && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
+                     = "All coverage",
+                   Sort( Filter( ActiveProjects,
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Stalled"
+                            || project_phase.Value = "Complete" )
+                          && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
                    tglShowComplete.Value,
                    Sort( Filter( ActiveProjects,
@@ -262,18 +249,20 @@ Screens:
                             || project_phase.Value = "Stalled"
                             || project_phase.Value = "Complete" )
                           && project_coverage.Value = cboPrjCoverage.Selected.Value
-                          && StartsWith(project_name, txtProjSearch.Text)
-                          && StartsWith(project_manager.Email, Coalesce(gPrjLead.Mail, "")) ),
+                          && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ),
-                   Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                   tglOnlyMine.Value
+                && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
+                     = "All coverage",
                    Sort( Filter( ActiveProjects,
                              ( project_phase.Value = "Not Started"
                             || project_phase.Value = "Planning"
                             || project_phase.Value = "Active"
                             || project_phase.Value = "Stalled" )
                           && StartsWith(project_name, txtProjSearch.Text)
-                          && StartsWith(project_manager.Email, Coalesce(gPrjLead.Mail, "")) ),
+                          && project_manager.Email = gUserEmail ),
                          project_name ),
+                   tglOnlyMine.Value,
                    Sort( Filter( ActiveProjects,
                              ( project_phase.Value = "Not Started"
                             || project_phase.Value = "Planning"
@@ -281,7 +270,24 @@ Screens:
                             || project_phase.Value = "Stalled" )
                           && project_coverage.Value = cboPrjCoverage.Selected.Value
                           && StartsWith(project_name, txtProjSearch.Text)
-                          && StartsWith(project_manager.Email, Coalesce(gPrjLead.Mail, "")) ),
+                          && project_manager.Email = gUserEmail ),
+                         project_name ),
+                   Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
+                     = "All coverage",
+                   Sort( Filter( ActiveProjects,
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Stalled" )
+                          && StartsWith(project_name, txtProjSearch.Text) ),
+                         project_name ),
+                   Sort( Filter( ActiveProjects,
+                             ( project_phase.Value = "Not Started"
+                            || project_phase.Value = "Planning"
+                            || project_phase.Value = "Active"
+                            || project_phase.Value = "Stalled" )
+                          && project_coverage.Value = cboPrjCoverage.Selected.Value
+                          && StartsWith(project_name, txtProjSearch.Text) ),
                          project_name ) )
             # EXPLICIT single column. Left unset, a wrapping gallery divides
             # TemplateWidth between columns, and every proportional child inside the
@@ -290,9 +296,9 @@ Screens:
             TemplateSize: =72
             TemplatePadding: =0
             X: =gTheme.Space.Gutter
-            Y: =266
+            Y: =220
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: =Parent.Height - 266 - gTheme.Space.Gutter
+            Height: =Parent.Height - 220 - gTheme.Space.Gutter
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
             # ONE auto-layout row per record. The columns carry NO X, so they cannot
@@ -506,9 +512,9 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Text: |
-              =If( Len(Coalesce(gPrjLead.Mail, "")) > 0,
-                   "No projects led by " & gPrjLead.DisplayName &
-                   ". Choose All leads to widen the filter.",
+              =If( tglOnlyMine.Value,
+                   "No projects here are led by you. "
+                     & "Turn off Only Show my Tasks to see the rest.",
                    Len(txtProjSearch.Text) > 0,
                    "No projects start with """ & txtProjSearch.Text & """.",
                    !tglShowComplete.Value,
@@ -524,40 +530,6 @@ Screens:
             Y: =galProjects.Y
             Width: =galProjects.Width
             Height: =galProjects.Height
-      # ---- Lead picker modal -------------------------------------------------
-      # Declared BEFORE appBar so the nav fly-out still floats above it. Same contract
-      # as cmpPrPick on scrProjectEdit: AccessAppScope is false, so the SCREEN runs the
-      # query and the component only renders the rows it is handed.
-      - cmpPrjPick:
-          Control: CanvasComponent
-          ComponentName: cmpPicker
-          Properties:
-            Visible: =Len( Coalesce(gPrjPicker, "") ) > 0
-            X: =0
-            Y: =0
-            Width: =Parent.Width
-            Height: =Parent.Height
-            Title: ="Filter by project lead"
-            # Bound to gPrjQuery, which OnSearch sets — never to this instance's own
-            # Query output, which would be a self-reference. With nothing typed the
-            # default page is the current user, which is also the default filter.
-            Results: |
-              =If( Len(gPrjQuery) >= 2,
-                   ForAll( Office365Users.SearchUserV2({ searchTerm: gPrjQuery, top: 25 }).value As u,
-                           { Key:       u.Mail,
-                             Primary:   u.DisplayName,
-                             Secondary: u.Mail } ),
-                   Table( { Key:       User().Email,
-                            Primary:   User().FullName,
-                            Secondary: User().Email } ) )
-            OnSearch: =Set( gPrjQuery, cmpPrjPick.Query )
-            # Pick-only: there is no person to create.
-            AllowCreate: =false
-            OnConfirm: |
-              =Set( gPrjLead, { DisplayName: cmpPrjPick.Picked.Primary,
-                                Mail:        cmpPrjPick.Picked.Secondary } );
-               Set( gPrjPicker, "" )
-            OnCancel: =Set( gPrjPicker, "" )
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content.
       #

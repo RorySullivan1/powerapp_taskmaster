@@ -27,11 +27,16 @@
   overlay at 1200 wide. **Landed is not the same as exercised** — on scrReports nobody has yet
   seen the truncation banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the
   audience pie, or a multi-currency stack in the trend bars.
-- **THE BACKLOG IS TWO NEW ISSUES, both filed 2026-08-19 and neither started:** **#19 REWORK -
-  scrProjects** (the lead filter returns nothing; replace it with an "Only Show my Tasks"
-  checkbox on the coverage/search line) and **#20 [Enhancement] - scrProductEdit** (four new
-  optional product columns: underlying, wrapper, maturity, features). **#20 NEEDS SCHEMA WORK
-  FIRST** — `schema/schema.yaml` is the golden source and internal names freeze at creation.
+- **THE PASTE QUEUE IS `scrProjects`, ALONE (authored 2026-08-19, NOT landed).** #19 is built:
+  the #17 lead filter and its `cmpPicker` instance are deleted, an "Only Show my Tasks" toggle
+  sits on the one filter row, `Items` is eight branches, and the gallery moved back up to 220.
+  Check FIRST after the paste: the screen now opens showing EVERY project (the old lead filter
+  seeded itself to you), and the toggle must return your projects with coverage and search
+  both in play.
+- **THE REST OF THE BACKLOG IS #20 [Enhancement] - scrProductEdit** (four new optional product
+  columns: underlying, wrapper, maturity, features), filed 2026-08-19 and not started. **IT
+  NEEDS SCHEMA WORK FIRST** — `schema/schema.yaml` is the golden source and internal names
+  freeze at creation.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -265,6 +270,9 @@ not know them will author something broken:
   `delegation.md` — **claudeBrain's copy is better than ours**, generalised during the last port.
   Test each hunk: *true for a generic consumer, or only because we ruled Power BI out?*
 
+- [2026-08-19] **A FILTER'S "OFF" STATE MUST BE A BRANCH, NOT A PREDICATE THAT CLAIMS TO MATCH EVERYTHING.** #17 held `galProjects.Items` at four branches by writing `StartsWith(person.Email, "")` when the lead filter was unset, on the reasoning that a prefix test against the empty string is true for every row. In the app it returned NOTHING — for every choice, "All leads" included (user, #19). The construct is deleted, not repaired: which half fails (the empty argument, or `StartsWith` over a Person subfield, which MS Learn's table says defers to a delegable `Email`) cannot be settled from this side of the gap, and a filter that silently returns zero rows is indistinguishable from an empty list to the only observer there is. **The replacement is `person.Email = gUserEmail`**, the equality scrHome's three KPI Filters have run against Person columns since the app was built. It has no neutral value, so `Items` went from four branches to EIGHT (show completed × coverage × only mine) — that is the honest price of the query folding, and the cheap version was cheap because its off state did not work — INDEX Decisions
+- [2026-08-19] **THIS APP IS 1366 WIDE AND 768 TALL; 768 IS THE HEIGHT AND HAS BEEN READ AS THE WIDTH AT LEAST ONCE.** #17 measured `rowFilters` at "718px against 720 usable at the tablet-768 target", concluded the line was two pixels from full, and FORCED a second filter row that cost the gallery 56px — the arithmetic was on the wrong axis. Usable width is **1318** (1366 − two 24px gutters), which INDEX's own 2026-08-13 collision entry states outright and scrReports' 1200-wide overlay could not otherwise fit; 768 is the height, which `docs/build-history.md` fixes ("numbers that only coincide on a screen exactly 768 tall") and every band table on every screen ends at 744 + gutter. The one-line row #19 asks for was available all along. **Horizontal budgets are against 1318, vertical against 768** — write which axis a number is on when recording one — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-18 | issue #15: delete for tasks/transactions/issues from scrProject and the three edit screens; issues DETACHED not cascaded; the OnVisible derivation moved into a hidden btnPrjRecompute called by four sites after the probe confirmed Select() fires on an invisible control | sessions/2026-08-18-issue15-delete-children.md
@@ -301,3 +309,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #11 LANDED — pastes clean, all charts render. Two paste defects: the task_name error type (ShowColumns over a named formula) and the overlay task row overlapping (absolute cells vs the auto-layout idiom); both fixed, the second unpasted | GitHub #11
 - 2026-08-19 | overlay geometry: absolute cells replaced by the auto-layout idiom (LANDED), then the card widened to 1000 with status/health/opened set to zero FillPortions — a bounded vocabulary should never take a share of the slack from a free-text column | GitHub #11
 - 2026-08-19 | #11 COMPLETE — scrReports rework landed end to end across five pastes: the subtraction, the data layer, the people section, four-column band 3, three-column band 5, then the overlay geometry, width and font refinements | GitHub #11
+- 2026-08-19 | #19 BUILT (authored, not landed): the #17 lead filter, its second filter row and its `cmpPicker` instance deleted; an "Only Show my Tasks" toggle joins coverage/search/show-completed on ONE row; `Items` is eight delegable branches because `person.Email = gUserEmail` has no neutral value where `StartsWith(…, "")` pretended to; gallery back to Y 220. The "720 usable" that forced the second row was the design HEIGHT — the width is 1318 | sessions/2026-08-19-issue19-scrprojects-mine-toggle.md
