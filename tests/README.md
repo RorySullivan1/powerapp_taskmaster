@@ -267,9 +267,60 @@ back as an ERROR type — so "delegates over the source" would not license the s
 - **F shows the two counts close together** → #35 buys little either way, which is worth
   knowing before authoring anything.
 
-### Result
+### Result — 2026-08-19, run by the user in Studio
 
-*(not yet run)*
+```
+A  Delegation warning. CountRows Operation not supported
+B  Delegation warning. Len & task_name large data set warning
+C  Delegation warning. CountRows not supported
+D  Delegation warning. CountRows not supported
+E  Delegation warning. CountRows not supported
+F  Delegation warning. CountRows not supported & task_date_completion - large dataset
+```
+
+**`task_date_completion = Blank()` DELEGATES. `IsBlank(task_date_completion)` DOES NOT.**
+That is the asymmetry #35 was written on, confirmed on a DateTime column.
+
+#### The probe has a design flaw, and it nearly cost the run
+
+**Every sub-case is wrapped in `CountRows`, which is itself non-delegable**, so all six labels
+carry an identical `CountRows Operation not supported` warning that says nothing about the
+`Filter` inside it. That is rule 4 again — *an instrument must not produce the same signal as
+the thing being measured* — and it is the second time this directory has been bitten by it
+after `scrProbeRerun`'s sub-case D. **A gallery `Items`, or `First(Filter(...)).task_name`,
+would have carried no aggregate and read cleanly.** Fix it that way before reusing this file.
+
+#### Why the run is still readable
+
+Subtract the constant `CountRows` warning and read what is left per label:
+
+| Label | Predicate warning after subtracting CountRows | Reads as |
+|---|---|---|
+| **A** | none | `=` on an indexed Choice is clean — positive control passed |
+| **B** | `Len & task_name` | non-delegable predicate flagged — negative control passed |
+| **C** | none | `task_date_completion = Blank()` alone delegates |
+| **D** | none | the full predicate delegates over the data source |
+| **E** | none | and over `LiveTasks` — the shape #35 would ship |
+| **F** | `task_date_completion - large dataset` | flagged, because **F is the only sub-case using `IsBlank()`** |
+
+**F is what makes C, D and E evidence of absence rather than absence of evidence.** It shows
+Studio will report a `task_date_completion` predicate warning *alongside* the CountRows warning
+on the same label — so the checker is not stopping at the first problem, and it is actively
+examining this column. C/D/E staying silent is therefore a reading, not a gap.
+
+F earned that by accident: it was written to measure scale, and it happens to use `IsBlank()`
+where C/D/E use `= Blank()`. **The probe was saved by a control it did not know it had.** Do
+not take that as vindication of the design — take it as the reason to fix the `CountRows`
+wrapper before the next probe leans on this file.
+
+#### Residual risk, and why it is not zero
+
+Studio's delegation checker is the documented instrument, not a guarantee. If the predicate
+turns out NOT to fold, the failure is not merely a lost optimisation: the whole `Filter` goes
+local, so the fetch degrades from *completed tasks* to *the first 2,000 live tasks, then
+filtered* — and **`gRptTrunc` would not catch it**, because it tests `CountRows(colRptDoneAll)`
+*after* that local filter, which can sit well under the limit. Corroborate with the
+data-row-limit-1 count before shipping the bound.
 
 ---
 
