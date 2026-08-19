@@ -114,7 +114,7 @@ Screens:
                                || task_stage.Value = "Drafting"    || task_stage.Value = "Finalizing" ),
                           ID, task_name, task_stage, task_status, task_date_start,
                           task_date_target, task_lead, task_supporter, task_project_id,
-                          task_output_format ) ),
+                          task_output_audience ) ),
                   // BOUNDED ON STAGE ALONE; the period is applied locally below.
                   // task_date_completion is optional and `>= gRptFrom` is FALSE for a blank
                   // date, so a task that reached Completed without one never entered this
@@ -125,8 +125,7 @@ Screens:
                       ShowColumns(
                           Filter( LiveTasks, task_stage.Value = "Completed" ),
                           ID, task_name, task_status, task_date_start, task_date_completion,
-                          task_date_target, task_lead, task_supporter, task_project_id,
-                          task_output_format ) ),
+                          task_date_target, task_lead, task_supporter, task_project_id ) ),
                   // F3 is the LOAD-BEARING bound — transactions grow fastest.
                   ClearCollect( colRptTx,
                       ShowColumns(
@@ -251,19 +250,17 @@ Screens:
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptOpen As t,
-                          // Tagged HERE, in a With, so the project LookUp runs once per
-                          // task rather than once per emitted row. The overlay reads these
-                          // straight back out — that is what makes it refetch nothing.
-                          With( { fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
-                                                 "Unclassified" ),
-                                  fmt: Coalesce( t.task_output_format.Value, "Unspecified" ),
-                                  stg: Coalesce( t.task_stage.Value, "Unspecified" ),
+                          // NO PROJECT LOOKUP HERE. These rows used to carry the activity
+                          // family and the output format for the overlay's mini-charts; the
+                          // overlay lists TASKS now and reads neither, so the join that fed
+                          // them is gone rather than merely unread. colRptOpenTag still does
+                          // that join, once, for the band-3 charts that need it.
+                          With( { stg: Coalesce( t.task_stage.Value, "Unspecified" ),
                                   // Carried on the row so the person overlay can list the
                                   // TASKS themselves off this collection and refetch nothing.
                                   hth: Coalesce( t.task_status.Value, "—" ),
-                                  // Hoisted for the same reason fam is: this is compared on
-                                  // every measure of the supports row, and left inline it
-                                  // was six Lower/Coalesce pairs per task.
+                                  // Hoisted: this is compared on every measure of the supports
+                                  // row, and left inline it was six Lower/Coalesce pairs per task.
                                   dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")) },
                           { r: Table(
                               { Em: Lower(Coalesce(t.task_lead.Email, "")),
@@ -273,7 +270,7 @@ Screens:
                                 Gc: If(t.task_status.Value = "Green", 1, 0),
                                 Ac: If(t.task_status.Value = "Amber", 1, 0),
                                 Rc: If(t.task_status.Value = "Red",   1, 0),
-                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg,
+                                Dn: 0, Days: -1, OnT: -1, Stg: stg,
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: false },
                               // SAME PERSON ON BOTH COLUMNS IS COUNTED IN BOTH ROLES, ONCE
@@ -298,17 +295,14 @@ Screens:
                                         If(t.task_status.Value = "Amber", 1, 0) ),
                                 Rc: If( dup, 0,
                                         If(t.task_status.Value = "Red",   1, 0) ),
-                                Dn: 0, Days: -1, OnT: -1, Fam: fam, Fmt: fmt, Stg: stg,
+                                Dn: 0, Days: -1, OnT: -1, Stg: stg,
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: dup } ) } ) ),
                       r ), Len(Em) > 0 ) );
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptDone As t,
-                          With( { fam: Coalesce( LookUp(colRptPrjMap, PId = t.task_project_id.Id, Fam),
-                                                 "Unclassified" ),
-                                  fmt: Coalesce( t.task_output_format.Value, "Unspecified" ),
-                                  hth: Coalesce( t.task_status.Value, "—" ),
+                          With( { hth: Coalesce( t.task_status.Value, "—" ),
                                   // A COMPLETED TASK MAY CARRY NO COMPLETION DATE — that is
                                   // exactly why colRptDoneAll is fetched on stage alone. Both
                                   // durations need one, so both fall back to "not applicable"
@@ -324,7 +318,7 @@ Screens:
                                           DateDiff(t.task_date_start, t.task_date_completion, TimeUnit.Days) ),
                                 OnT:  If( nod || IsBlank(t.task_date_target), -1,
                                           If(t.task_date_completion <= t.task_date_target, 1, 0) ),
-                                Fam: fam, Fmt: fmt, Stg: "Completed",
+                                Stg: "Completed",
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: false },
                               { Em: Lower(Coalesce(t.task_supporter.Email, "")),
@@ -344,7 +338,7 @@ Screens:
                                 OnT:  If( dup || nod, -1,
                                           If( IsBlank(t.task_date_target), -1,
                                           If(t.task_date_completion <= t.task_date_target, 1, 0) ) ),
-                                Fam: fam, Fmt: fmt, Stg: "Completed",
+                                Stg: "Completed",
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: dup } ) } ) ),
                       r ), Len(Em) > 0 ) );
@@ -410,7 +404,7 @@ Screens:
                           { Fam: Coalesce( pm.Fam, "Unclassified" ),
                             Rgn: Coalesce( pm.Rgn, "Unassigned" ),
                             Req: Coalesce( pm.Req, "Unassigned" ),
-                            Fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) } ) ) );
+                            Aud: Coalesce( t.task_output_audience.Value, "Unspecified" ) } ) ) );
               ClearCollect( colRptFamAll,
                   ForAll( Distinct(colRptOpenTag, Fam) As f,
                       { K: f.Value, N: CountRows( Filter(colRptOpenTag, Fam = f.Value) ) } ) );
@@ -434,38 +428,41 @@ Screens:
               // unused format still draws a zero bar. That is the same reason the gap grid
               // reads its axes from the dimension lists: a GroupBy over the facts would
               // delete exactly the categories worth seeing.
-              ClearCollect( colRptFmtVocab,
-                  ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+              ClearCollect( colRptAudVocab,
+                  ForAll( Choices([@taskmaster_tasks].task_output_audience) As c,
                           { K: c.Value } ) );
-              Clear( colRptFmtBar );
-              Collect( colRptFmtBar,
-                  ForAll( Sequence( CountRows(colRptFmtVocab) ) As s,
-                      With( { k: Index(colRptFmtVocab, s.Value).K },
+              Clear( colRptAudBar );
+              Collect( colRptAudBar,
+                  ForAll( Sequence( CountRows(colRptAudVocab) ) As s,
+                      With( { k: Index(colRptAudVocab, s.Value).K },
                           { Idx: s.Value, K: k,
-                            N: CountRows( Filter(colRptOpenTag, Fmt = k) ) } ) ) );
-              // Blank is not a Choice value, so it needs its own bucket. "Other" now means
-              // a value tasks still HOLD that the column no longer offers — retired in
-              // SharePoint while rows kept it — which is a data question, not the
-              // schema.yaml disagreement it used to mean.
-              Collect( colRptFmtBar,
-                  { Idx: CountRows(colRptFmtVocab) + 1, K: "Unspecified",
-                    N: CountRows( Filter(colRptOpenTag, Fmt = "Unspecified") ) },
-                  { Idx: CountRows(colRptFmtVocab) + 2, K: "Other",
+                            N: CountRows( Filter(colRptOpenTag, Aud = k) ) } ) ) );
+              // Blank is not a Choice value, so it needs its own bucket, and here it is the
+              // bucket that MATTERS: task_output_audience is younger than most of the open
+              // backlog, so Unspecified is mostly "predates the column", not "nobody bothered".
+              // scrTaskEdit blocks the save until an audience is picked whenever the Output
+              // section is on, so this bucket drains as tasks are touched — which is why the
+              // subtitle states its size rather than letting the pie imply the column is broken.
+              // "Other" means a value tasks still HOLD that the column no longer offers.
+              Collect( colRptAudBar,
+                  { Idx: CountRows(colRptAudVocab) + 1, K: "Unspecified",
+                    N: CountRows( Filter(colRptOpenTag, Aud = "Unspecified") ) },
+                  { Idx: CountRows(colRptAudVocab) + 2, K: "Other",
                     N: CountRows( Filter( colRptOpenTag,
-                           Fmt <> "Unspecified" && !(Fmt in colRptFmtVocab.K) ) ) } );
-              // THE FORMAT CHART IS A PIE, so it needs slice geometry rather than a bar
+                           Aud <> "Unspecified" && !(Aud in colRptAudVocab.K) ) ) } );
+              // THE AUDIENCE CHART IS A PIE, so it needs slice geometry rather than a bar
               // maximum. Same fold shape as the three below it; see the pie note there.
-              Set( gRptFmtTot, Max( 1, Coalesce(Sum(colRptFmtBar, N), 0) ) );
-              ClearCollect( colRptFmtPie,
-                  ForAll( Filter(colRptFmtBar, N > 0) As r,
-                      With( { cb: Coalesce( Sum( Filter(colRptFmtBar, Idx < r.Idx), N ), 0 ) },
+              Set( gRptAudTot, Max( 1, Coalesce(Sum(colRptAudBar, N), 0) ) );
+              ClearCollect( colRptAudPie,
+                  ForAll( Filter(colRptAudBar, N > 0) As r,
+                      With( { cb: Coalesce( Sum( Filter(colRptAudBar, Idx < r.Idx), N ), 0 ) },
                           { Idx: r.Idx, K: r.K, N: r.N,
                             // LEGEND ROW, not Idx: Idx comes from the pre-filter sequence, so
                             // a dropped zero-count row would leave a gap in the legend.
-                            Li:  CountRows( Filter(colRptFmtBar, N > 0 && Idx <= r.Idx) ),
-                            Off: RoundDown( cb / gRptFmtTot * 100, 0 ),
-                            Pct: RoundDown( (cb + r.N) / gRptFmtTot * 100, 0 )
-                                 - RoundDown( cb / gRptFmtTot * 100, 0 ),
+                            Li:  CountRows( Filter(colRptAudBar, N > 0 && Idx <= r.Idx) ),
+                            Off: RoundDown( cb / gRptAudTot * 100, 0 ),
+                            Pct: RoundDown( (cb + r.N) / gRptAudTot * 100, 0 )
+                                 - RoundDown( cb / gRptAudTot * 100, 0 ),
                             Hx:  If( r.K = "Other", "#C53A3A",
                                      If( r.K = "Unspecified", "#B9C0C8",
                                          Switch( Mod(r.Idx - 1, 6),
@@ -1752,9 +1749,9 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =0
-                              LayoutMinHeight: =16
+                              LayoutMinHeight: =32
                               Width: =Parent.Width - 32
-                              Height: =16
+                              Height: =32
                         - imgRptFam:
                             Control: Image@2.2.3
                             Properties:
@@ -1785,7 +1782,7 @@ Screens:
                                             "<text x='300' y='34' text-anchor='middle' font-size='17'"
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>No open tasks</text>", "" )
                                       & "</svg>" ) )
-                  - pnlRptFmt:
+                  - pnlRptAud:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
@@ -1803,10 +1800,10 @@ Screens:
                         LayoutMinWidth: =260
                         Height: =300
                       Children:
-                        - lblRptFmtT:
+                        - lblRptAudT:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open tasks by output format"
+                              Text: ="Open tasks by output audience"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1816,26 +1813,36 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        # THE "Other" WARNING STAYS IN THE SUBTITLE. A red slice alone is too
-                        # easy to miss, and a non-zero Other means tasks hold a format the
-                        # column no longer offers — a data question, not a schema one.
-                        - lblRptFmtS:
+                        # THE SUBTITLE CARRIES BOTH GAPS, because a slice cannot. A large
+                        # Unspecified wedge here means the column is YOUNGER than the backlog,
+                        # not that the report is broken — and those two look identical on a
+                        # pie. Other outranks it: a value tasks still hold that the column no
+                        # longer offers is a data question and rarer, so it must not be hidden
+                        # behind the commoner message.
+                        - lblRptAudS:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                =If( LookUp(colRptFmtBar, K = "Other", N) > 0,
-                                     "Other is NON-ZERO — tasks hold a format the column no longer offers.",
-                                     "Direct on the task, no join." )
+                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
+                                     "Other is NON-ZERO — tasks hold an audience the column no longer offers.",
+                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
+                                     LookUp(colRptAudBar, K = "Unspecified", N) & " of "
+                                       & CountRows(colRptOpenTag)
+                                       & " predate the column or produce no output.",
+                                     "Required on any task that produces output." )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: |
-                                =If( LookUp(colRptFmtBar, K = "Other", N) > 0,
-                                     gTheme.Color.Danger, gTheme.Color.TextMuted )
+                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
+                                     gTheme.Color.Danger,
+                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
+                                     gTheme.Color.Warning,
+                                     gTheme.Color.TextMuted )
                               FillPortions: =0
-                              LayoutMinHeight: =16
+                              LayoutMinHeight: =32
                               Width: =Parent.Width - 32
-                              Height: =16
-                        - imgRptFmt:
+                              Height: =32
+                        - imgRptAud:
                             Control: Image@2.2.3
                             Properties:
                               ImagePosition: =ImagePosition.Fit
@@ -1855,19 +1862,19 @@ Screens:
                               # 100 units so the two are the same rotation, and this one can
                               # never go negative.
                               Image: |
-                                =With( { n: CountRows(colRptFmtPie) },
+                                =With( { n: CountRows(colRptAudPie) },
                                     "data:image/svg+xml;charset=utf-8," & EncodeUrl(
                                         "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
                                       & "<g transform='translate(75 75) scale(2)'>"
                                       & "<circle cx='0' cy='0' r='15.9155' fill='none'"
                                       & " stroke='#EEF1F5' stroke-width='31.831'/>"
-                                      & Concat( colRptFmtPie,
+                                      & Concat( colRptAudPie,
                                             "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
                                           & Hx & "' stroke-width='31.831' stroke-dasharray='"
                                           & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
                                           & (125 - Off) & "'/>" )
                                       & "</g>"
-                                      & Concat( colRptFmtPie,
+                                      & Concat( colRptAudPie,
                                             "<rect x='160' y='" & ((Li - 1) * 22 + 10)
                                           & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
                                           & "<text x='176' y='" & ((Li - 1) * 22 + 19)
@@ -1931,9 +1938,9 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =0
-                              LayoutMinHeight: =16
+                              LayoutMinHeight: =32
                               Width: =Parent.Width - 32
-                              Height: =16
+                              Height: =32
                         - imgRptReq:
                             Control: Image@2.2.3
                             Properties:
@@ -2003,9 +2010,9 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =0
-                              LayoutMinHeight: =16
+                              LayoutMinHeight: =32
                               Width: =Parent.Width - 32
-                              Height: =16
+                              Height: =32
                         - imgRptRgn:
                             Control: Image@2.2.3
                             Properties:

@@ -23,9 +23,10 @@ Three were settled with the user on 2026-08-17 and belong in the Decisions ledge
    licence gap": native charts are the design now, not a dodge. `gHasPowerBiLicence`,
    `NeedsLicence` and `cmpAppBar.HasLicence` are all deleted from the source.
 3. **Effort is proxied, and labelled as such.** The model has no hours or effort column. "Where time
-   goes" is measured as **task volume** — by activity family, output format, requestor and region —
-   with elapsed duration surviving only as the per-person **median days** and **on-time %**. The
-   standalone median-cycle-time-by-family chart is gone. The screen says "volume and elapsed time"
+   goes" is measured as **task volume** — by activity family, output audience, requestor and region
+   — with elapsed duration surviving only as the per-person **median days** and **on-time %**. The
+   standalone median-cycle-time-by-family chart is gone, and **`task_output_format` is no longer
+   reported anywhere**: the output breakdown groups by audience, which is the enforced column. The screen says "volume and elapsed time"
    on its face and never calls either "effort".
 
 ---
@@ -93,8 +94,8 @@ over a fact collection may appear in any gallery `Items` or row property** — t
 | Fold | Rows | Built from |
 |---|---|---|
 | `colRptPrjMap` | ~hundreds | project ID → activity family L1, region L1, requestor, manager, supporter |
-| `colRptOpenTag` | = F1 | each open task tagged with family, region, requestor and format off **one** hoisted project lookup |
-| `colRptPersonSrc` | ~2× tasks | tasks unpivoted on `task_lead` / `task_supporter`, each row carrying its measures **and the task itself** — name, health, start, due — plus a `Dup` flag |
+| `colRptOpenTag` | = F1 | each open task tagged with family, region, requestor and audience off **one** hoisted project lookup — and the ONLY place that join happens |
+| `colRptPersonSrc` | ~2× tasks | tasks unpivoted on `task_lead` / `task_supporter`, each row carrying its measures **and the task itself** — name, health, start, due — plus a `Dup` flag. **No project lookup**: the family and format it used to carry fed overlay mini-charts that no longer exist |
 | `colRptPerson` | ~20–50 | one row per person, every measure precomputed |
 | `colRptPTask` | one person's tasks | built on row tap, feeds the overlay, refetches nothing |
 | `colRptTxEnriched` | ≤ F3 | each transaction tagged with product type L1 **and L2**, currency, date, notional |
@@ -219,9 +220,13 @@ row overflows:
 
 - **By activity family** — horizontal bars, top 6 + Other, share of open tasks. Joined through the
   parent project.
-- **By output format** — a **pie**, fixed vocabulary + Unspecified + Other. Direct on the task, no
-  join. A non-zero Other stays in the subtitle as well as the slice: it means tasks hold a format the
-  column no longer offers, and a red wedge alone is too easy to miss.
+- **By output audience** — a **pie**, fixed vocabulary + Unspecified + Other. Direct on the task, no
+  join. `task_output_audience` rather than `task_output_format` because **`scrTaskEdit` blocks the
+  save until an audience is picked whenever the Output section is on**, while format is never
+  enforced and will accumulate blanks indefinitely. The column is younger than the open backlog, so
+  Unspecified mostly means "predates the column" — the subtitle states its size, because on a pie
+  that case and a broken report look identical. A non-zero Other outranks it in the subtitle: rarer,
+  and a genuine data question.
 - **By requestor** — bars, top 6 + Other, `project_requestor` through the parent project. The
   column is optional, so `Unassigned` is a real bucket and its size is stated even when it falls
   outside the top six.
