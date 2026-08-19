@@ -32,74 +32,104 @@ Screens:
   scrHome:
     Properties:
       Fill: =gTheme.Color.Bg
+      # THIN ON PURPOSE. The whole dashboard fold lives in btnHomeRecompute's OnSelect —
+      # two callers, one copy of the block.
       OnVisible: |
         =
         // SELF-HEAL, and not belt-and-braces. App.OnStart is NON-BLOCKING, so this screen can
-        // run before it finishes. A blank gUserEmail makes the Person filters below match
-        // NOTHING, and these KPIs are imperative Sets that never re-fire — the dashboard
+        // run before it finishes. A blank gUserEmail makes the fold's Person filters match
+        // NOTHING, and those KPIs are imperative Sets that never re-fire — the dashboard
         // latches at zero until a manual refresh. Declarative properties self-heal; these cannot.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
-        Concurrent(
-            ClearCollect( colMyProjects,
-                Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
-            ClearCollect( colMyTasks,
-                Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
-            ClearCollect( colMyIssues,
-                // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email = gUserEmail`:
-                // issue_owner is not indexed, so an Or-arm on it drops delegation for the WHOLE
-                // filter and silently truncates at 500 rows.
-                Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
-        );
-        Set( gPrjLed,
-             CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
-        Set( gPrjLedOverdue,
-             CountRows( Filter( colMyProjects,
-                 project_phase.Value <> "Complete"
-              && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
-        Set( gTaskLed,
-             CountRows( Filter(colMyTasks, task_stage.Value <> "Completed") ) );
-        Set( gTaskLedOverdue,
-             CountRows( Filter( colMyTasks,
-                 task_stage.Value <> "Completed"
-              && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
-        // ONE DELEGABLE QUERY PER PROJECT, not one query over a set. There is no
-        // "issue_project_manager" to filter on, and `issue_project_id.Id in colMyProjects.ID`
-        // does NOT delegate — it would cap at the data row limit and undercount silently.
-        // The cost is one round trip per project managed, not one per issue.
-        Set( gIssLed,
-             Coalesce( Sum( ForAll( colMyProjects As p,
-                                    CountRows( Filter( OpenIssues,
-                                                       issue_project_id.Id = p.ID ) ) ),
-                            Value ),
-                       0 ) );
-        Set( gIssMine, CountRows(colMyIssues) );
-        Set( gMyPercent,
-             If( CountRows(colMyTasks) = 0, 0,
-                 RoundDown( Average( AddColumns( colMyTasks, wgt,
-                     Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-        // ---- Chart source: open tasks I lead ---------------------------------
-        // ONE FOLD FOR BOTH CHARTS, so they cannot disagree about what "open" means.
-        // Health is EFFECTIVE health — the stored issue-derived half with overdue folded in,
-        // per rollups.task_health in schema.yaml — resolved once here, not per slice.
-        // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale; the end
-        // buckets mean "10 or more". No target date gets 9999, lands in no bucket, and is
-        // counted separately — a distribution that silently drops rows misstates its total.
-        ClearCollect( colDueSrc,
-            ForAll( Filter(colMyTasks, task_stage.Value <> "Completed") As t,
-                { hl: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(),
-                          "Red", Coalesce(t.task_status.Value, "") ),
-                  dd: If( IsBlank(t.task_date_target), 9999,
-                          Max( -10, Min( 10, DateDiff(Today(), t.task_date_target, TimeUnit.Days) ) ) ) } ) );
-        Set( gDueNoDate, CountRows( Filter(colDueSrc, dd = 9999) ) );
-        // 21 BUCKETS, WRITTEN OUT. A bucket only exists when a row has that value, so
-        // grouping would CLOSE UP the gaps — and a gap at zero tasks is what a distribution
-        // exists to show.
-        ClearCollect( colDueBuckets,
-            ForAll( Sequence(21) As s,
-                With( { dv: s.Value - 11 },
-                    { i: s.Value, d: dv,
-                      n: CountRows( Filter(colDueSrc, dd = dv) ) } ) ) )
+        // KEEP Select LAST. It QUEUES the target OnSelect for after this formula finishes
+        // rather than running it inline, so the seed above is guaranteed to have landed
+        // before the fold reads gUserEmail — but nothing written after it can be relied on
+        // to run before the fold.
+        Select( btnHomeRecompute )
     Children:
+      # =====================================================================
+      # THE DASHBOARD FOLD — hidden, 1x1, declared FIRST so it can never cover a
+      # control (z-order is positional here). Two callers: OnVisible and the section
+      # header's Refresh Stats action.
+      #
+      # IT IS A CONTROL because Power Fx cannot name a behaviour block and this one has
+      # more than one caller; a control's OnSelect is the only reusable behaviour unit
+      # there is. Visible:=false IS GROUNDED, not folklore — tests/scrProbeRerun scored
+      # Select() on visible, 1x1-transparent and hidden buttons identically (Studio,
+      # 2026-08-18). Do not "fix" it into a 1x1 transparent button.
+      # =====================================================================
+      - btnHomeRecompute:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =Concurrent(
+                  ClearCollect( colMyProjects,
+                      Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
+                  ClearCollect( colMyTasks,
+                      Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
+                  ClearCollect( colMyIssues,
+                      // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email = gUserEmail`:
+                      // issue_owner is not indexed, so an Or-arm on it drops delegation for the WHOLE
+                      // filter and silently truncates at 500 rows.
+                      Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
+              );
+              Set( gPrjLed,
+                   CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
+              Set( gPrjLedOverdue,
+                   CountRows( Filter( colMyProjects,
+                       project_phase.Value <> "Complete"
+                    && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
+              Set( gTaskLed,
+                   CountRows( Filter(colMyTasks, task_stage.Value <> "Completed") ) );
+              Set( gTaskLedOverdue,
+                   CountRows( Filter( colMyTasks,
+                       task_stage.Value <> "Completed"
+                    && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
+              // ONE DELEGABLE QUERY PER PROJECT, not one query over a set. There is no
+              // "issue_project_manager" to filter on, and `issue_project_id.Id in colMyProjects.ID`
+              // does NOT delegate — it would cap at the data row limit and undercount silently.
+              // The cost is one round trip per project managed, not one per issue.
+              Set( gIssLed,
+                   Coalesce( Sum( ForAll( colMyProjects As p,
+                                          CountRows( Filter( OpenIssues,
+                                                             issue_project_id.Id = p.ID ) ) ),
+                                  Value ),
+                             0 ) );
+              Set( gIssMine, CountRows(colMyIssues) );
+              Set( gMyPercent,
+                   If( CountRows(colMyTasks) = 0, 0,
+                       RoundDown( Average( AddColumns( colMyTasks, wgt,
+                           Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
+              // ---- Chart source: open tasks I lead ---------------------------------
+              // ONE FOLD FOR BOTH CHARTS, so they cannot disagree about what "open" means.
+              // Health is EFFECTIVE health — the stored issue-derived half with overdue folded in,
+              // per rollups.task_health in schema.yaml — resolved once here, not per slice.
+              // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale; the end
+              // buckets mean "10 or more". No target date gets 9999, lands in no bucket, and is
+              // counted separately — a distribution that silently drops rows misstates its total.
+              ClearCollect( colDueSrc,
+                  ForAll( Filter(colMyTasks, task_stage.Value <> "Completed") As t,
+                      { hl: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(),
+                                "Red", Coalesce(t.task_status.Value, "") ),
+                        dd: If( IsBlank(t.task_date_target), 9999,
+                                Max( -10, Min( 10, DateDiff(Today(), t.task_date_target, TimeUnit.Days) ) ) ) } ) );
+              Set( gDueNoDate, CountRows( Filter(colDueSrc, dd = 9999) ) );
+              // 21 BUCKETS, WRITTEN OUT. A bucket only exists when a row has that value, so
+              // grouping would CLOSE UP the gaps — and a gap at zero tasks is what a distribution
+              // exists to show.
+              ClearCollect( colDueBuckets,
+                  ForAll( Sequence(21) As s,
+                      With( { dv: s.Value - 11 },
+                          { i: s.Value, d: dv,
+                            n: CountRows( Filter(colDueSrc, dd = dv) ) } ) ) )
       - bodyRoot:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -152,65 +182,22 @@ Screens:
                               Subtitle: ="Everything you lead or own, across every open project"
                               ShowAction: =true
                               ActionLabel: ="Refresh Stats"
-                              # THIS BLOCK MUST STAY IDENTICAL TO OnVisible ABOVE. There is no shared
-                              # function to call, and a divergence shows up as the dashboard reading one
-                              # set of numbers on open and a different set after a Refresh.
+                              # THE SAME FOLD THE SCREEN OPENS WITH — btnHomeRecompute, not a copy of
+                              # it. This handler is authored in SCREEN scope even though it hangs off a
+                              # component instance, which is what lets it name a sibling screen control.
+                              #
+                              # THE TOAST FIRES BEFORE THE NUMBERS LAND, deliberately. Select QUEUES the
+                              # fold for after this formula finishes, so no statement written after it can
+                              # run later than the fold; "Refreshed" therefore means the refresh was
+                              # issued. Do not move the toast into btnHomeRecompute to "fix" the order —
+                              # it would then fire on every screen open too.
                               OnAction: |
-                                =Refresh(taskmaster_projects); Refresh(taskmaster_tasks); Refresh(taskmaster_issues);
-                                Concurrent(
-                                    ClearCollect( colMyProjects,
-                                        Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
-                                    ClearCollect( colMyTasks,
-                                        Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
-                                    ClearCollect( colMyIssues,
-                                        Filter( OpenIssues, issue_assignee.Email = gUserEmail ) )
-                                );
-                                Set( gPrjLed,
-                                     CountRows( Filter(colMyProjects, project_phase.Value <> "Complete") ) );
-                                Set( gPrjLedOverdue,
-                                     CountRows( Filter( colMyProjects,
-                                         project_phase.Value <> "Complete"
-                                      && !IsBlank(project_date_target) && project_date_target < Today() ) ) );
-                                Set( gTaskLed,
-                                     CountRows( Filter(colMyTasks, task_stage.Value <> "Completed") ) );
-                                Set( gTaskLedOverdue,
-                                     CountRows( Filter( colMyTasks,
-                                         task_stage.Value <> "Completed"
-                                      && !IsBlank(task_date_target) && task_date_target < Today() ) ) );
-                                Set( gIssLed,
-                                     Coalesce( Sum( ForAll( colMyProjects As p,
-                                                            CountRows( Filter( OpenIssues,
-                                                                               issue_project_id.Id = p.ID ) ) ),
-                                                    Value ),
-                                               0 ) );
-                                Set( gIssMine, CountRows(colMyIssues) );
-                                Set( gMyPercent,
-                                     If( CountRows(colMyTasks) = 0, 0,
-                                         RoundDown( Average( AddColumns( colMyTasks, wgt,
-                                             Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-                                // ONE FOLD FOR BOTH CHARTS, so they cannot disagree about what "open" means.
-                                // Health is EFFECTIVE health — the stored issue-derived half with overdue folded in,
-                                // per rollups.task_health in schema.yaml — resolved once here, not per slice.
-                                // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale; the end
-                                // buckets mean "10 or more". No target date gets 9999, lands in no bucket, and is
-                                // counted separately — a distribution that silently drops rows misstates its total.
-                                ClearCollect( colDueSrc,
-                                    ForAll( Filter(colMyTasks, task_stage.Value <> "Completed") As t,
-                                        { hl: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(),
-                                                  "Red", Coalesce(t.task_status.Value, "") ),
-                                          dd: If( IsBlank(t.task_date_target), 9999,
-                                                  Max( -10, Min( 10, DateDiff(Today(), t.task_date_target, TimeUnit.Days) ) ) ) } ) );
-                                Set( gDueNoDate, CountRows( Filter(colDueSrc, dd = 9999) ) );
-                                // 21 BUCKETS, WRITTEN OUT. A bucket only exists when a row has that value, so
-                                // grouping would CLOSE UP the gaps — and a gap at zero tasks is what a distribution
-                                // exists to show.
-                                ClearCollect( colDueBuckets,
-                                    ForAll( Sequence(21) As s,
-                                        With( { dv: s.Value - 11 },
-                                            { i: s.Value, d: dv,
-                                              n: CountRows( Filter(colDueSrc, dd = dv) ) } ) ) );
+                                =Concurrent( Refresh(taskmaster_projects),
+                                             Refresh(taskmaster_tasks),
+                                             Refresh(taskmaster_issues) );
                                 Set(gToastShow, false);
-                                Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
+                                Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true);
+                                Select( btnHomeRecompute )
                   - btnNewProject:
                       Control: Classic/Button@2.2.0
                       Properties:
