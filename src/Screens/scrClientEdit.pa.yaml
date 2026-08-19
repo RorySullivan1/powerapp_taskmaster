@@ -9,8 +9,17 @@ Screens:
         =Set( gSaving, false );   // see btnClSave
         Set( gClName,   If( gClMode = "Edit", Coalesce(gEditClient.client_name, ""), "" ) );
         // Choice values come from the column itself — never a literal here.
-        ClearCollect( colClTypeChoices, Choices([@taskmaster_clients].client_type) );
-        ClearCollect( colClCovChoices,  Choices([@taskmaster_clients].client_coverage) );
+        // ONCE PER SESSION, NOT ONCE PER VISIT. The region list joins the two vocabularies
+        // here because all three are reference data and independent of the record; an EMPTY
+        // collection is the only reason to fetch one again, and a new value is picked up on
+        // the next app start. IsEmpty, never IsBlank: these are tables.
+        Concurrent(
+            If( IsEmpty(colClTypeChoices),
+                ClearCollect( colClTypeChoices, Choices([@taskmaster_clients].client_type) ) ),
+            If( IsEmpty(colClCovChoices),
+                ClearCollect( colClCovChoices,  Choices([@taskmaster_clients].client_coverage) ) ),
+            If( IsEmpty(colMapRegionCl),
+                ClearCollect( colMapRegionCl, mapping_regions ) ) );
         Set( gClType, If( gClMode = "Edit", Coalesce(gEditClient.client_type.Value, ""), "" ) );
         Set( gClCov,  If( gClMode = "Edit", Coalesce(gEditClient.client_coverage.Value, ""), "" ) );
         Set( gClSales,
@@ -21,7 +30,6 @@ Screens:
         Set( gClRegionId,   If( gClMode = "Edit", Coalesce(gEditClient.client_region_id, 0), 0 ) );
         Set( gClRegionPath, If( gClMode = "Edit", Coalesce(gEditClient.client_region_path, ""), "" ) );
         Set( gClNotes, If( gClMode = "Edit", Coalesce(gEditClient.client_notes, ""), "" ) );
-        ClearCollect( colMapRegionCl, mapping_regions );
         Set( gClPicker, "" );
         Reset( txtClName ); Reset( txtClNotes );
         Reset( cboClType ); Reset( cboClCov );

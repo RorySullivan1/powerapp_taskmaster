@@ -48,16 +48,19 @@ Screens:
         // at the DATA ROW LIMIT and a project with more tasks than that gets a silently short
         // dropdown. Accepted because the alternative is a search picker over the whole
         // tenant; revisit if a project ever nears the limit.
-        ClearCollect( colIssTaskOpts, { Id: 0, Label: "(none)" } );
-        Collect( colIssTaskOpts,
+        // BOTH LISTS ARE PER-PROJECT, so neither can be cached across visits the way the
+        // vocabularies below are — but they are independent of each other, so they go
+        // together. One ClearCollect each: "(none)" is the first ITEM, and a Concurrent arm
+        // is one formula.
+        Concurrent(
+            ClearCollect( colIssTaskOpts, { Id: 0, Label: "(none)" },
                  ForAll( Filter( taskmaster_tasks,
                                  task_project_id.Id = gIssProject.Id ) As t,
-                         { Id: t.ID, Label: t.task_name } ) );
-        ClearCollect( colIssTxOpts, { Id: 0, Label: "(none)" } );
-        Collect( colIssTxOpts,
+                         { Id: t.ID, Label: t.task_name } ) ),
+            ClearCollect( colIssTxOpts, { Id: 0, Label: "(none)" },
                  ForAll( Filter( taskmaster_transactions,
                                  transaction_project_id.Id = gIssProject.Id ) As x,
-                         { Id: x.ID, Label: x.transaction_name } ) );
+                         { Id: x.ID, Label: x.transaction_name } ) ) );
         If( gIssTask.Id > 0 && IsBlank( LookUp(colIssTaskOpts, Id = gIssTask.Id) ),
             Collect( colIssTaskOpts, { Id: gIssTask.Id, Label: gIssTask.Value } ) );
         If( gIssTx.Id > 0 && IsBlank( LookUp(colIssTxOpts, Id = gIssTx.Id) ),
@@ -67,21 +70,29 @@ Screens:
         // two values the app never enumerated, so those projects simply vanished.
         // All three are REQUIRED, so none carries a blank row: the seed always lands on a
         // real member and the save writes it unguarded.
-        ClearCollect( colIssStatusOpts,
-                      With( { ch: Choices([@taskmaster_issues].issue_status) },
-                            ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — never hard-code
         // one; each DefaultId looks its value up by Label. Required columns get no blank row.
-        ClearCollect( colIssTypeOpts,
+        // ONCE PER SESSION, NOT ONCE PER VISIT: an EMPTY list is the only reason to fetch a
+        // vocabulary again, and a new value is picked up on the next app start. These three
+        // MUST be loaded before the gIssType / gIssImpact seeds below, which test the stored
+        // value against the vocabulary.
+        Concurrent(
+            If( IsEmpty(colIssStatusOpts),
+                ClearCollect( colIssStatusOpts,
+                      With( { ch: Choices([@taskmaster_issues].issue_status) },
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ),
+            If( IsEmpty(colIssTypeOpts),
+                ClearCollect( colIssTypeOpts,
                       With( { ch: Choices([@taskmaster_issues].issue_type) },
                             ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
-        ClearCollect( colIssImpactOpts,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ),
+            If( IsEmpty(colIssImpactOpts),
+                ClearCollect( colIssImpactOpts,
                       With( { ch: Choices([@taskmaster_issues].issue_impact) },
                             ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
         // THE SEED IS TESTED AGAINST THE VOCABULARY, not just against blank. A legacy row
         // can hold a RETIRED value, which is not blank, so a Coalesce alone would carry it

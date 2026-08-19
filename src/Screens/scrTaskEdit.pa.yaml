@@ -64,14 +64,20 @@ Screens:
         // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — never
         // hard-code one, look it up by Label, which is what each DefaultId does.
         // Both columns are REQUIRED with a default, so neither gets a "(none)" row.
-        ClearCollect( colTkStageOpts,
+        // ONCE PER SESSION, NOT ONCE PER VISIT. A Choice vocabulary changes on the order of
+        // weeks, so an EMPTY list is the only reason to pay for it again — a new value is
+        // picked up on the next app start. IsEmpty, never IsBlank: these are tables.
+        Concurrent(
+            If( IsEmpty(colTkStageOpts),
+                ClearCollect( colTkStageOpts,
                       With( { ch: Choices([@taskmaster_tasks].task_stage) },
                             ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
-        ClearCollect( colTkPriorityOpts,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ),
+            If( IsEmpty(colTkPriorityOpts),
+                ClearCollect( colTkPriorityOpts,
                       With( { ch: Choices([@taskmaster_tasks].task_priority) },
                             ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ) );
         Set( gTkStage,    If( gEditMode = "Edit", Coalesce(gEditTask.task_stage.Value, "Not Started"), "Not Started" ) );
         Set( gTkPriority, If( gEditMode = "Edit", Coalesce(gEditTask.task_priority.Value, "Moderate"), "Moderate" ) );
         Set( gTkLanguage, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_language.Value, "(none)"), "(none)" ) );
@@ -85,37 +91,45 @@ Screens:
         Set( gTkQuery, "" );
         Reset( txtTkApprovalId );
         // THE OPTION LISTS LOAD HERE, after the modal and query state is cleared and before
-        // the combo Resets that read them. Order is defensive: a Choices() call that errors
-        // stops the whole OnVisible, so nothing that decides whether the screen is USABLE may
-        // sit below this block.
+        // the combo Resets that read them: nothing that decides whether the screen is USABLE
+        // may sit below this block. Concurrent's arms fail INDEPENDENTLY — a Choices() that
+        // errors leaves its own list empty and the rest still load, where the serial chain
+        // this replaces stopped dead at the first failure.
         // EVERY OPTION LIST COMES FROM ITS COLUMN, not a literal copy — a literal drifts
-        // silently both ways when someone edits the Choice in SharePoint. "(none)" is
-        // Collected FIRST so it sorts to the top; it is an app concept, and the save maps it
-        // back to Blank().
+        // silently both ways when someone edits the Choice in SharePoint. "(none)" is the
+        // FIRST ITEM so it sorts to the top; it is an app concept, and the save maps it back
+        // to Blank(). ClearCollect takes several items, which is what keeps each list to ONE
+        // statement — and a Concurrent arm is one formula.
         // THE Opts SUFFIX IS LOAD-BEARING. This screen names its column containers col* too
         // (colTkFormat, colTkLang, colTkBrand are CONTROLS), so a collection named after the
         // container it sits in resolves to the control instead, and every reader of it fails
         // as an incompatible type one hop from the cause.
-        ClearCollect( colTkFmtOpts, { Value: "(none)" } );
-        Collect( colTkFmtOpts,
-                 ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
-                         { Value: c.Value } ) );
-        ClearCollect( colTkLangOpts, { Value: "(none)" } );
-        Collect( colTkLangOpts,
-                 ForAll( Choices([@taskmaster_tasks].task_output_language) As c,
-                         { Value: c.Value } ) );
-        ClearCollect( colTkBrandOpts, { Value: "(none)" } );
-        Collect( colTkBrandOpts,
-                 ForAll( Choices([@taskmaster_tasks].task_output_branding) As c,
-                         { Value: c.Value } ) );
-        ClearCollect( colTkAudOpts, { Value: "(none)" } );
-        Collect( colTkAudOpts,
-                 ForAll( Choices([@taskmaster_tasks].task_output_audience) As c,
-                         { Value: c.Value } ) );
-        ClearCollect( colTkCliStageOpts, { Value: "(none)" } );
-        Collect( colTkCliStageOpts,
-                 ForAll( Choices([@taskmaster_tasks].task_client_stage) As c,
-                         { Value: c.Value } ) );
+        // <= 1, NOT IsEmpty, AND THE DIFFERENCE MATTERS. These five carry a "(none)" row this
+        // screen adds itself, so a Choices() that returned nothing still leaves the list
+        // non-empty — IsEmpty would latch that one-row list for the whole session and every
+        // save would write Blank() from a dropdown that offered nothing else. Counting the
+        // sentinel out means "the fetch delivered no members", which is worth retrying.
+        Concurrent(
+            If( CountRows(colTkFmtOpts) <= 1,
+                ClearCollect( colTkFmtOpts, { Value: "(none)" },
+                         ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+                                 { Value: c.Value } ) ) ),
+            If( CountRows(colTkLangOpts) <= 1,
+                ClearCollect( colTkLangOpts, { Value: "(none)" },
+                         ForAll( Choices([@taskmaster_tasks].task_output_language) As c,
+                                 { Value: c.Value } ) ) ),
+            If( CountRows(colTkBrandOpts) <= 1,
+                ClearCollect( colTkBrandOpts, { Value: "(none)" },
+                         ForAll( Choices([@taskmaster_tasks].task_output_branding) As c,
+                                 { Value: c.Value } ) ) ),
+            If( CountRows(colTkAudOpts) <= 1,
+                ClearCollect( colTkAudOpts, { Value: "(none)" },
+                         ForAll( Choices([@taskmaster_tasks].task_output_audience) As c,
+                                 { Value: c.Value } ) ) ),
+            If( CountRows(colTkCliStageOpts) <= 1,
+                ClearCollect( colTkCliStageOpts, { Value: "(none)" },
+                         ForAll( Choices([@taskmaster_tasks].task_client_stage) As c,
+                                 { Value: c.Value } ) ) ) );
         // cmpSelection re-reads its DefaultId ONLY on Reset — without these the previous
         // task's stage/priority survive and the strip DISAGREES WITH THE SAVE.
         Reset( selTkStage ); Reset( selTkPriority );

@@ -34,8 +34,12 @@ Screens:
         // Priority opens on its column default. The phase is DERIVED on scrProject and this
         // screen offers no control for it.
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
-        ClearCollect( colMapRegion,   mapping_regions );
-        ClearCollect( colMapActivity, mapping_activitytype );
+        // ONCE PER SESSION, NOT ONCE PER VISIT. Both are whole reference lists that change on
+        // the order of weeks; an EMPTY collection is the only reason to pull one again, and a
+        // new term is picked up on the next app start. IsEmpty, never IsBlank: these are tables.
+        Concurrent(
+            If( IsEmpty(colMapRegion),   ClearCollect( colMapRegion,   mapping_regions ) ),
+            If( IsEmpty(colMapActivity), ClearCollect( colMapActivity, mapping_activitytype ) ) );
         Set( gPrRegionId,   If( gEditMode = "Edit", Coalesce(gEditProject.project_region_id, 0), 0 ) );
         Set( gPrRegionPath, If( gEditMode = "Edit", Coalesce(gEditProject.project_region_path, ""), "" ) );
         Set( gPrTypeId,     If( gEditMode = "Edit", Coalesce(gEditProject.project_type_id, 0), 0 ) );
@@ -43,14 +47,19 @@ Screens:
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — never hard-code
         // one; each DefaultId looks its value up by Label. Required columns get no blank row.
-        ClearCollect( colPrPriorityOpts,
+        // Cached for the session like the mapping lists above; colPrCovOpts MUST be loaded
+        // before the gPrCov seed below, which resolves the stored value against it.
+        Concurrent(
+            If( IsEmpty(colPrPriorityOpts),
+                ClearCollect( colPrPriorityOpts,
                       With( { ch: Choices([@taskmaster_projects].project_priority) },
                             ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
-        ClearCollect( colPrCovOpts,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ),
+            If( IsEmpty(colPrCovOpts),
+                ClearCollect( colPrCovOpts,
                       With( { ch: Choices([@taskmaster_projects].project_coverage) },
                             ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ) );
         // THREE BRANCHES, AND THE THIRD IS NOT PARANOIA. project_coverage is the ONE column
         // whose real vocabulary this repo has never been told — schema.yaml still carries a
         // PLACEHOLDER beside the one confirmed value — so "Internal" is a literal the app
@@ -76,12 +85,15 @@ Screens:
         // carries a "(none)" row — both columns are REQUIRED. The Opts suffix keeps these
         // clear of the col* CONTAINER names this screen also uses: a collection named after
         // a control resolves to the control.
-        ClearCollect( colNtPrioOpts,
+        Concurrent(
+            If( IsEmpty(colNtPrioOpts),
+                ClearCollect( colNtPrioOpts,
                       ForAll( Choices([@taskmaster_tasks].task_priority) As c,
-                              { Value: c.Value } ) );
-        ClearCollect( colNxCcyOpts,
+                              { Value: c.Value } ) ) ),
+            If( IsEmpty(colNxCcyOpts),
+                ClearCollect( colNxCcyOpts,
                       ForAll( Choices([@taskmaster_transactions].transaction_currency) As c,
-                              { Value: c.Value } ) );
+                              { Value: c.Value } ) ) ) );
         // Every default below is a REAL member of the matching Choice column in
         // schema/schema.yaml. Do not seed a value the list does not have.
         Set( gNtPriority, "Moderate" );

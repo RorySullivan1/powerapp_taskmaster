@@ -23,10 +23,14 @@ Screens:
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — DefaultId looks
         // the value up by Label. No "(none)" row: the column is REQUIRED.
-        ClearCollect( colTxCurrencyOpts,
+        // ONCE PER SESSION, NOT ONCE PER VISIT: an EMPTY list is the only reason to fetch the
+        // vocabulary again, and a new currency is picked up on the next app start. No
+        // Concurrent here — this screen has exactly one cacheable list, and Concurrent needs two.
+        If( IsEmpty(colTxCurrencyOpts),
+            ClearCollect( colTxCurrencyOpts,
                       With( { ch: Choices([@taskmaster_transactions].transaction_currency) },
                             ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) );
         If( gTxResume,
          Set( gTxResume, false ),
          Set( gTxProject,
