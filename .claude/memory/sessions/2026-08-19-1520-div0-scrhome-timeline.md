@@ -72,9 +72,9 @@
   stripped: **49 code lines identical.** Keep them that way.
 
 ## Open threads
-- **`scrHome` IS AUTHORED BUT NOT LANDED — the paste queue is no longer empty.**
-  One full-file `scrHome` paste outstanding; DELETE the screen in Studio before
-  pasting it back (the no-orphaned-controls rule). The only return signal will be
-  whether the banner stops appearing on a cold start, and note it needs the
-  triggering condition to be visible at all: the user must lead at least one
-  non-complete project WITH a target date.
+- **LANDED (user, 2026-08-19).** `scrHome` is in Studio. Paste queue clear.
+- **NOT YET EXERCISED.** "Landed" here means the paste took, not that the banner is gone.
+  The error only ever appeared for a user leading at least one non-complete project WITH a
+  target date, and only on the first visit after a cold start — so a clean run on an empty
+  or already-warm dashboard is not evidence. The proof is a cold start, with timeline data
+  on screen, and no banner.

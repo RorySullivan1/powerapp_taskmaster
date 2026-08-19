@@ -51,22 +51,23 @@
 - **claudeBrain PR #36 is OPEN and unmerged** (2026-08-19) — the canvas-app family ported out.
   It asks one question back: genericise the ported skills' `tools/` / `schema/` path references,
   or leave them as worked-example voice? Answer it before assuming the port is finished.
-- **DIVISION BY 0 IS FIXED IN THE REPO AND `scrHome` IS NOW THE ONE UNLANDED PASTE
-  (2026-08-19) — THE PASTE QUEUE IS NO LONGER EMPTY.** `imgTimeline.Image` divided by
-  `gTlSpan`, which `OnVisible` set LAST, after `colTimeline` already had rows; an unset
-  global is blank and blank divides as zero. Two changes, both in `src/Screens/scrHome.pa.yaml`:
-  the Image formula seeds `sp: Max(7, gTlSpan)` and divides by `sp` at all four sites, and the
-  three `Set(gTlStart/gTlEnd/gTlSpan)` calls moved ABOVE `Clear/Collect(colTimeline)` in BOTH
-  `OnVisible` and the `Refresh Stats` `OnAction` (the two blocks were re-diffed after the move:
-  49 code lines identical, comments aside). 22/22 valid. **NOT YET IN STUDIO — a full-file
-  `scrHome` paste is outstanding, and the user must DELETE the screen before pasting it back.**
-  Nothing else in the app divides unguarded; that audit is complete, see the session log.
-- **#21 IS BUILT AND UNLANDED (2026-08-19) — TWO SCREENS ARE NOW QUEUED FOR PASTE:
-  `scrHome` and `scrTaskEdit`.** #21 replaces #13's audience-derived approval rule with an
-  explicit per-task boolean, `task_output_approval_flag` (**already live in SharePoint**, the
-  user created it). New gate: Output on AND stage Completed AND flag on AND id blank → blocked.
-  The audience VALUE now gates nothing, but audience is STILL required whenever Output is on —
-  that rule was deliberately kept, see the session log. 22/22 valid.
+- **BOTH QUEUED SCREENS LANDED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY AGAIN.**
+  `scrHome` (Division by 0) and `scrTaskEdit` (#21) are in Studio, and
+  **`task_output_approval_flag`'s internal name is CONFIRMED** — the write target is right.
+  - **Division by 0:** `imgTimeline.Image` divided by `gTlSpan`, which `OnVisible` set LAST,
+    after `colTimeline` already had rows; an unset global is blank and blank divides as zero.
+    Fixed by seeding `sp: Max(7, gTlSpan)` in the Image formula and dividing by `sp`, plus
+    moving the three `Set(gTlStart/gTlEnd/gTlSpan)` calls above `Clear/Collect(colTimeline)`
+    in BOTH `OnVisible` and the `Refresh Stats` `OnAction`. Nothing else in the app divides
+    unguarded — that audit is complete.
+  - **#21:** approval is gated by the per-task `task_output_approval_flag` and its
+    `tglTkApprovalReq` toggle, NOT by the audience value. Audience is still required whenever
+    Output is on (deliberately kept — #21 asked only to drop the Internal-Only test).
+  - **LANDED IS NOT EXERCISED, and neither of these has been.** Nobody has yet seen the
+    Division-by-0 banner FAIL to appear on a cold start (it only ever showed for a user
+    leading a non-complete project WITH a target date, so an empty dashboard proves nothing),
+    and the completion gate has never once blocked a save — it was unexercised under #13 too.
+  - **#21 is still OPEN on GitHub.**
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-19] **A MULTI-COLUMN GALLERY ROW IS ONE HORIZONTAL AUTO-LAYOUT CONTAINER INSIDE THE TEMPLATE — NEVER ABSOLUTELY-POSITIONED SIBLING CELLS.** The person overlay's task row was built as six cells on a hand-computed X grid (8 · 296 · 394 · 472 · 564) each with a declared `Width`. The arithmetic was correct and no two boxes overlapped ON PAPER; it overlapped ON SCREEN (user, 2026-08-19), because **a modern `Label@2.5.1` does not hold a declared Width the way that assumed**. The working idiom is `galRptPeople`'s and now `galRptOvlTask`'s: ONE `GroupContainer` AutoLayout child at `X: =0, Y: =0, Width: =Parent.TemplateWidth, Height: =Parent.TemplateHeight - 1`, whose cells carry **`FillPortions` + `LayoutMinWidth` and NO `X` and NO `Width`**. The caption row above carries the IDENTICAL portions pair-for-pair, so both derive their columns from the same numbers — two hand-kept X grids are the bug, not the spacing. A cell needing two controls (dot + word) gets TWO columns, the spare one captioned blank, rather than a second container nested inside a template — that nesting is ungrounded here. Absolute positioning inside a template is still right for things measured against the TEMPLATE rather than the row: the hairline separator and a full-template hit target — INDEX Decisions
@@ -343,3 +344,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | intermittent "Division by 0" at app start traced to scrHome's timeline dividing by gTlSpan before OnVisible sets it; every other divisor in src/ audited and cleared; fix specified, NOT applied | sessions/2026-08-19-1520-div0-scrhome-timeline.md
 - 2026-08-19 | Division-by-0 FIXED in src: scrHome timeline divides by Max(7, gTlSpan) and the three Sets moved above the Collect in both duplicated blocks; awaiting a full-file scrHome paste | sessions/2026-08-19-1520-div0-scrhome-timeline.md
 - 2026-08-19 | #21: scrTaskEdit approvals moved off the audience value onto task_output_approval_flag; new tglTkApprovalReq between the audience and the id; schema + two reference docs corrected. Authored, not landed | sessions/2026-08-19-1537-issue21-approval-flag.md
+- 2026-08-19 | scrHome + scrTaskEdit both LANDED; task_output_approval_flag internal name confirmed; paste queue empty. Neither behaviour exercised yet | INDEX State

@@ -47,15 +47,18 @@
   Heights 18 + 4 + 30 = 52 in a 62 row. No collision at any width this app targets.
 
 ## State at end
-- Authored, validated, committed and pushed to `claude/powerapp-repo-init-xymvlm`.
-  **NOT on main** — the earlier "push to main" was scoped to the Division-by-0 fix.
-- **`scrTaskEdit` and `scrHome` are BOTH unlanded pastes now.**
+- Authored, validated 22/22, pushed to `claude/powerapp-repo-init-xymvlm` AND to `main`
+  (user asked for main; both were clean fast-forwards, nothing unrelated rode along).
+- **LANDED IN STUDIO (user, 2026-08-19)**, together with `scrHome`. Paste queue empty.
+- **`task_output_approval_flag`'s internal name is CONFIRMED by the user** — the one risk
+  flagged before the paste (a display name with spaces yielding a different internal name)
+  is closed. The Patch target is right.
 
 ## Open threads
-- **VERIFY THE INTERNAL NAME BEFORE PASTING.** The app writes `task_output_approval_flag`
-  exactly. If SharePoint created it from a display name with spaces the internal name differs,
-  the write fails, and across the gap that returns as "it didn't work" with nothing to say why.
-- Two full-file pastes outstanding: `scrTaskEdit` (#21) and `scrHome` (Division by 0). Delete
-  each screen in Studio before pasting it back.
-- The completion gate has STILL never been exercised by anyone — it was unexercised under #13
-  and this reworks it. First real test of the rule.
+- **NOT YET EXERCISED — the gate has never blocked a save.** It was unexercised under #13 and
+  this reworks it, so no version of this rule has ever run in anger. The test is: a task with
+  Output on, `Approval required?` on, the id EMPTY, stage moved to Completed, Save — expect
+  the save refused and `lblTkMissing` naming "an approval ID before completing".
+- **#21 is still OPEN on GitHub.** Landed but unexercised; closing it is the user's call.
+- One judgement call still unconfirmed: the audience-required-when-Output-on rule was KEPT.
+  If the user meant #21 to drop that too, it is a one-line deletion in `lblTkMissing`.
