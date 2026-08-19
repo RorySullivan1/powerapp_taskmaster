@@ -2765,6 +2765,13 @@ Screens:
             # THE CAPTIONS LINE UP BY CONSTRUCTION, not by eye: PaddingLeft 8 and LayoutGap 8
             # over widths 280/90/70/84 put each caption at 8, 296, 394, 472, 564 — exactly the
             # absolute X the gallery template below uses. Change one and change both.
+            # THE CAPTIONS AND THE ROW BELOW SHARE FillPortions AND LayoutMinWidth, PAIR FOR
+            # PAIR, and neither declares an X or a Width. That is the idiom the people table
+            # already uses, and it is the reason the columns cannot drift apart: the layout
+            # engine derives both from the same portions against the same width. An earlier
+            # version positioned the cells absolutely on a hand-computed X grid and the row
+            # overlapped — a modern Label does not hold a declared Width the way that
+            # arithmetic assumed.
             - rowRptOvlTaskHead:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -2773,6 +2780,7 @@ Screens:
                   LayoutAlignItems: =LayoutAlignItems.Center
                   LayoutGap: =8
                   PaddingLeft: =8
+                  PaddingRight: =8
                   Fill: =gTheme.Color.Bg
                   FillPortions: =0
                   LayoutMinHeight: =24
@@ -2787,9 +2795,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinWidth: =280
-                        Width: =280
+                        FillPortions: =4
+                        LayoutMinWidth: =180
                         Height: =24
                   - hdRptOvlStg:
                       Control: Label@2.5.1
@@ -2799,9 +2806,22 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =80
+                        Height: =24
+                  # A BLANK CAPTION OVER THE HEALTH DOT. The dot is its own column so the
+                  # row needs no nested container, and pairing stays one caption to one cell —
+                  # which is the whole guarantee. "Health" sits over the word beside it.
+                  - hdRptOvlDot:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =""
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        VerticalAlign: =VerticalAlign.Middle
                         FillPortions: =0
-                        LayoutMinWidth: =90
-                        Width: =90
+                        LayoutMinWidth: =14
                         Height: =24
                   - hdRptOvlHth:
                       Control: Label@2.5.1
@@ -2811,9 +2831,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinWidth: =70
-                        Width: =70
+                        FillPortions: =1
+                        LayoutMinWidth: =62
                         Height: =24
                   - hdRptOvlDst:
                       Control: Label@2.5.1
@@ -2823,9 +2842,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
-                        LayoutMinWidth: =84
-                        Width: =84
+                        FillPortions: =1
+                        LayoutMinWidth: =80
                         Height: =24
                   - hdRptOvlDtl:
                       Control: Label@2.5.1
@@ -2835,9 +2853,8 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =0
+                        FillPortions: =2
                         LayoutMinWidth: =150
-                        Width: =150
                         Height: =24
             - galRptOvlTask:
                 Control: Gallery@2.15.0
@@ -2857,97 +2874,107 @@ Screens:
                   Width: =Parent.Width - 40
                   Height: =Parent.Height - 200
                 Children:
-                  # ABSOLUTE inside the template, on the same X grid as the captions above.
-                  - cellRptOvlTNm:
-                      Control: Label@2.5.1
+                  # ONE AUTO-LAYOUT CHILD holding every cell, exactly as the people gallery
+                  # does. The separator is the template's only other child and stays absolute,
+                  # because it is positioned against the template rather than the row.
+                  - rowRptOvlTaskBody:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Text: =ThisItem.TNm
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Body
-                        Color: =gTheme.Color.TextPrimary
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =8
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        PaddingLeft: =8
+                        PaddingRight: =8
+                        X: =0
                         Y: =0
-                        Width: =280
-                        Height: =32
-                  - cellRptOvlStg:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.Stg
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =296
-                        Y: =0
-                        Width: =90
-                        Height: =32
-                  # A DOT, not a coloured word: the health vocabulary IS colour names, and
-                  # "Green" printed in green says the same thing twice.
-                  - dotRptOvlHth:
-                      Control: Rectangle@2.3.0
-                      Properties:
-                        Fill: |
-                          =Switch( ThisItem.Hth,
-                                   "Green", gTheme.Color.Success,
-                                   "Amber", gTheme.Color.Warning,
-                                   "Red",   gTheme.Color.Danger,
-                                            gTheme.Color.Border )
-                        X: =394
-                        Y: =12
-                        Width: =10
-                        Height: =10
-                  - cellRptOvlHth:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: =ThisItem.Hth
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =410
-                        Y: =0
-                        Width: =54
-                        Height: =32
-                  - cellRptOvlDst:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =If( IsBlank(ThisItem.Dst), "—",
-                               Text(ThisItem.Dst, "[$-en-US]d mmm yy") )
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =472
-                        Y: =0
-                        Width: =84
-                        Height: =32
-                  # THE PARENTHETICAL IS ONLY ON OPEN WORK. Days left against today is
-                  # meaningless once a task is finished, and printing it there would invite
-                  # someone to read a completed task as overdue.
-                  - cellRptOvlDtl:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =If( IsBlank(ThisItem.Dtl), "—",
-                               Text(ThisItem.Dtl, "[$-en-US]d mmm yy")
-                               & If( ThisItem.Op <> 1, "",
-                                     With( { d: DateDiff(Today(), ThisItem.Dtl, TimeUnit.Days) },
-                                         If( d < 0, "  (" & -d & "d overdue)",
-                                             d = 0,  "  (due today)",
-                                                     "  (" & d & "d left)" ) ) ) )
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: |
-                          =If( ThisItem.Op = 1 && !IsBlank(ThisItem.Dtl)
-                               && ThisItem.Dtl < Today(),
-                               gTheme.Color.Danger, gTheme.Color.TextMuted )
-                        VerticalAlign: =VerticalAlign.Middle
-                        X: =564
-                        Y: =0
-                        Width: =150
-                        Height: =32
+                        Width: =Parent.TemplateWidth
+                        Height: =Parent.TemplateHeight - 1
+                      Children:
+                        - cellRptOvlTNm:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =ThisItem.TNm
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Body
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =4
+                              LayoutMinWidth: =180
+                              Height: =32
+                        - cellRptOvlStg:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =ThisItem.Stg
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =80
+                              Height: =32
+                        # A DOT, not a coloured word: the health vocabulary IS colour names,
+                        # and "Green" printed in green says the same thing twice.
+                        - dotRptOvlHth:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              Fill: |
+                                =Switch( ThisItem.Hth,
+                                         "Green", gTheme.Color.Success,
+                                         "Amber", gTheme.Color.Warning,
+                                         "Red",   gTheme.Color.Danger,
+                                                  gTheme.Color.Border )
+                              FillPortions: =0
+                              LayoutMinWidth: =14
+                              Height: =10
+                        - cellRptOvlHth:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =ThisItem.Hth
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =62
+                              Height: =32
+                        - cellRptOvlDst:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( IsBlank(ThisItem.Dst), "—",
+                                     Text(ThisItem.Dst, "[$-en-US]d mmm yy") )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =80
+                              Height: =32
+                        # THE PARENTHETICAL IS ONLY ON OPEN WORK. Days left against today is
+                        # meaningless once a task is finished, and printing it there would
+                        # invite someone to read a completed task as overdue.
+                        - cellRptOvlDtl:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( IsBlank(ThisItem.Dtl), "—",
+                                     Text(ThisItem.Dtl, "[$-en-US]d mmm yy")
+                                     & If( ThisItem.Op <> 1, "",
+                                           With( { d: DateDiff(Today(), ThisItem.Dtl, TimeUnit.Days) },
+                                               If( d < 0, "  (" & -d & "d overdue)",
+                                                   d = 0,  "  (due today)",
+                                                           "  (" & d & "d left)" ) ) ) )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: |
+                                =If( ThisItem.Op = 1 && !IsBlank(ThisItem.Dtl)
+                                     && ThisItem.Dtl < Today(),
+                                     gTheme.Color.Danger, gTheme.Color.TextMuted )
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =2
+                              LayoutMinWidth: =150
+                              Height: =32
                   - rowRptOvlTaskLine:
                       Control: Rectangle@2.3.0
                       Properties:
