@@ -6,12 +6,16 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. #27 AND #31 ARE LANDED AND CLOSED; the other 12 are not
-  started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md.
-- **THE PASTE QUEUE IS EMPTY AGAIN (user, 2026-08-19)** — all six perf screens landed clean.
-  Live in Studio: `scrProject` folds tasks/transactions/issues once in `Concurrent`
-  (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads the
-  collections; the five edit screens cache 20 reference fetches once per session, also in
+- **PERF BACKLOG — GitHub #27–#40. #27 AND #31 ARE LANDED AND CLOSED. #29 AND #36 ARE BUILT AND
+  UNPASTED. The other 10 are not started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md.
+- **PASTE QUEUE: `scrTaskEdit` AND `scrIssueEdit`** (#29 + #36, sessions/2026-08-19-2012-*).
+  Save handlers now hoist their pre-Patch reads into one `Concurrent` — `gTkParentProj` /
+  `gIssParentProj` replace two LookUps each, keyed on the screen's OWN parent id, not
+  `gSelProject.ID` — and `scrTaskEdit` skips the whole taskproduct reconcile when the staged set
+  matches `colTkProductsLoaded`. `scrTransactionEdit` was deliberately left alone.
+- **LIVE IN STUDIO from #27/#31:** `scrProject` folds tasks/transactions/issues once in
+  `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
+  the collections; the five edit screens cache 20 reference fetches once per session, also in
   `Concurrent`. **Both landed on the paste alone — the round-trip counts were never measured,
   and the Concurrent independent-failure path is unexercised.**
 - **BUILT — editing and refining, not creating.** 11 screens, 10 components, the App object.
@@ -332,6 +336,10 @@ not know them will author something broken:
 
 - 2026-08-19 | #27 and #31 LANDED and CLOSED — all six screens pasted clean first time. The perf work is live: scrProject reads three collections instead of re-querying three lists ~8 times, and the five edit screens fetch their vocabularies once per session. NEITHER GAIN IS MEASURED — landing is a paste confirmation, not a Live Monitor count | GitHub #27, #31
 
+- 2026-08-19 | #29 BUILT: the save handlers on scrTaskEdit and scrIssueEdit hoist their pre-Patch reads into one Concurrent. scrTaskEdit read the PARENT PROJECT ROW TWICE per save (the archived mirror inline in the Patch record, then the C3 rollup) — now once into gTkParentProj, paired with the health fetch; the rollup's own Concurrent collapsed to a bare Set because CONCURRENT NEEDS TWO ARMS. **MERGING TWO LOOKUPS FORCES ONE KEY, AND THE KEY IS NOW THE SCREEN'S OWN PARENT ID** (gTkProject.Id / gIssProject.Id), NOT gSelProject.ID: that is the record's stored parent, where gSelProject is only equal to it because every entry path happens to come from that project. The "read LIVE, never a snapshot" invariant is untouched — the id is a key, the record is still fetched at save time. scrIssueEdit's close-date arm KEEPS its Edit-and-closing guard inside the Concurrent, because hoisting it unconditionally would ADD a read to the common save. **scrTransactionEdit was deliberately NOT changed** — one pre-Patch read, nothing independent to pair it with, so hoisting moves code without removing a round trip | GitHub #29
+
+- 2026-08-19 | #36 BUILT: scrTaskEdit skips the whole taskproduct reconcile — three junction reads and a second task Patch — when the staged product set matches the set loaded in OnVisible (colTkProductsLoaded, copied from colTkProducts and seeded INSIDE the resume guard). **THE GATE IS ON THE STAGED SET, NEVER ON tglTkOutput**: gating on the toggle is what once made it a silent delete button, and clearing every product is still a set difference, so the deletes still run. Both tests are collection-against-collection, so the gate costs no round trip. Consequence accepted: task_product_summary is left UNWRITTEN on a products-untouched save, so a new task with no products keeps Blank() where it used to get "" — no control in src/ reads that column | GitHub #36
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
@@ -389,3 +397,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | perf review -> 14 issues #27–#40 | sessions/2026-08-19-1853-perf-review-issues.md
 - 2026-08-19 | #27 and #31 built, six screens queued for paste | sessions/2026-08-19-1939-issues-27-31-built.md
 - 2026-08-19 | #27 and #31 landed and closed; paste queue empty | sessions/2026-08-19-1939-issues-27-31-built.md
+- 2026-08-19 | #29 and #36 built; scrTaskEdit and scrIssueEdit queued for paste | sessions/2026-08-19-2012-issues-29-36-built.md
