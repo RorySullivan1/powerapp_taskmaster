@@ -51,11 +51,16 @@
 - **claudeBrain PR #36 is OPEN and unmerged** (2026-08-19) — the canvas-app family ported out.
   It asks one question back: genericise the ported skills' `tools/` / `schema/` path references,
   or leave them as worked-example voice? Answer it before assuming the port is finished.
-- **OPEN DEFECT, DIAGNOSED BUT NOT FIXED (2026-08-19): intermittent "Division by 0" at app
-  start.** Cause is `scrHome.pa.yaml:1069/1073/1090/1092` — `imgTimeline.Image` divides by
-  `gTlSpan`, which `OnVisible` sets LAST, six statements after `colTimeline` is populated.
-  Blank divisor = 0 = error. Fix is written up in Decisions; **the user has not yet said to
-  land it.** Nothing else in the app divides unguarded — that audit is done, see the session log.
+- **DIVISION BY 0 IS FIXED IN THE REPO AND `scrHome` IS NOW THE ONE UNLANDED PASTE
+  (2026-08-19) — THE PASTE QUEUE IS NO LONGER EMPTY.** `imgTimeline.Image` divided by
+  `gTlSpan`, which `OnVisible` set LAST, after `colTimeline` already had rows; an unset
+  global is blank and blank divides as zero. Two changes, both in `src/Screens/scrHome.pa.yaml`:
+  the Image formula seeds `sp: Max(7, gTlSpan)` and divides by `sp` at all four sites, and the
+  three `Set(gTlStart/gTlEnd/gTlSpan)` calls moved ABOVE `Clear/Collect(colTimeline)` in BOTH
+  `OnVisible` and the `Refresh Stats` `OnAction` (the two blocks were re-diffed after the move:
+  49 code lines identical, comments aside). 22/22 valid. **NOT YET IN STUDIO — a full-file
+  `scrHome` paste is outstanding, and the user must DELETE the screen before pasting it back.**
+  Nothing else in the app divides unguarded; that audit is complete, see the session log.
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-19] **A MULTI-COLUMN GALLERY ROW IS ONE HORIZONTAL AUTO-LAYOUT CONTAINER INSIDE THE TEMPLATE — NEVER ABSOLUTELY-POSITIONED SIBLING CELLS.** The person overlay's task row was built as six cells on a hand-computed X grid (8 · 296 · 394 · 472 · 564) each with a declared `Width`. The arithmetic was correct and no two boxes overlapped ON PAPER; it overlapped ON SCREEN (user, 2026-08-19), because **a modern `Label@2.5.1` does not hold a declared Width the way that assumed**. The working idiom is `galRptPeople`'s and now `galRptOvlTask`'s: ONE `GroupContainer` AutoLayout child at `X: =0, Y: =0, Width: =Parent.TemplateWidth, Height: =Parent.TemplateHeight - 1`, whose cells carry **`FillPortions` + `LayoutMinWidth` and NO `X` and NO `Width`**. The caption row above carries the IDENTICAL portions pair-for-pair, so both derive their columns from the same numbers — two hand-kept X grids are the bug, not the spacing. A cell needing two controls (dot + word) gets TWO columns, the spare one captioned blank, rather than a second container nested inside a template — that nesting is ungrounded here. Absolute positioning inside a template is still right for things measured against the TEMPLATE rather than the row: the hairline separator and a full-template hit target — INDEX Decisions
@@ -328,3 +333,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #20 built: 4 optional product columns. Two calls taken to the user first because names freeze — underlying is plain Text with an EMERGENT chip list (fill-in Choice rejected: Choices() cannot return fill-ins), maturity is YEARS not a date. Normalisation is at write time; maturity uses the classic number idiom because no modern number token is grounded | sessions/2026-08-19-issue20-product-columns.md
 - 2026-08-19 | #20 CLOSED — four optional product columns landed with scrProductEdit and the scrReference rows. The paste also settled Split(...).Value, which had shipped as the change's one ungrounded token | GitHub #20
 - 2026-08-19 | intermittent "Division by 0" at app start traced to scrHome's timeline dividing by gTlSpan before OnVisible sets it; every other divisor in src/ audited and cleared; fix specified, NOT applied | sessions/2026-08-19-1520-div0-scrhome-timeline.md
+- 2026-08-19 | Division-by-0 FIXED in src: scrHome timeline divides by Max(7, gTlSpan) and the three Sets moved above the Collect in both duplicated blocks; awaiting a full-file scrHome paste | sessions/2026-08-19-1520-div0-scrhome-timeline.md

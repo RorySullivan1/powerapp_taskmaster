@@ -4,8 +4,7 @@
 (user: "when the app starts sometimes an error states Division by 0")
 
 ## What happened
-- **DIAGNOSIS ONLY — NOTHING EDITED.** The user asked for a review and the
-  sources highlighted; the fix is written out below but not applied.
+- **DIAGNOSED, THEN FIXED IN THE REPO (user said apply).** Not in Studio yet.
 - Enumerated EVERY division in `src/` with a script (strip `#` and `//` comments,
   strip `Classic/Icon@2.5.0`-style control tokens, strip `data:image/svg+xml`
   and single-quoted SVG attributes, then take the token after each surviving `/`).
@@ -54,8 +53,28 @@
   Cosmetic, self-corrects — it is not a second bug.
 
 ## State at end
-- Unchanged. Working tree clean, nothing authored, nothing to paste.
+- `src/Screens/scrHome.pa.yaml` edited, 22/22 valid, committed and pushed to
+  **main** (user asked for main explicitly; the branch was a clean fast-forward,
+  0 behind / 1 ahead, so nothing unrelated rode along).
+- The fix is two parts. **The guard is the fix; the reorder is defence in depth:**
+  - `imgTimeline.Image` seeds `sp: Max(7, gTlSpan)` in its existing `With` and
+    divides by `sp` at all four sites. `Max(7, Blank())` is 7, which is
+    `gTlSpan`'s own floor, so nothing changes once the variable is populated.
+  - The three `Set(gTlStart/gTlEnd/gTlSpan)` calls moved ABOVE
+    `Clear/Collect(colTimeline)` in BOTH `OnVisible` and the `Refresh Stats`
+    `OnAction`. This removes the wrong-scale frame the guard alone would still
+    draw, but it is NOT what makes the error impossible — a render that beats
+    `OnVisible` entirely is still covered only by the guard.
+- **Watch the semicolons if this is ever re-ordered again.** `OnVisible` ends on
+  the `Collect` (no trailing `;`) while the `OnAction` copy continues into the
+  toast `Set`s (keeps its `;`). Moving statements across that boundary changes
+  which one is last. Both blocks were re-diffed after the move with comments
+  stripped: **49 code lines identical.** Keep them that way.
 
 ## Open threads
-- **The fix is not applied.** Offered to the user; awaiting a go-ahead. Landing
-  it means a full-file `scrHome` paste across the gap.
+- **`scrHome` IS AUTHORED BUT NOT LANDED — the paste queue is no longer empty.**
+  One full-file `scrHome` paste outstanding; DELETE the screen in Studio before
+  pasting it back (the no-orphaned-controls rule). The only return signal will be
+  whether the banner stops appearing on a cold start, and note it needs the
+  triggering condition to be visible at all: the user must lead at least one
+  non-complete project WITH a target date.

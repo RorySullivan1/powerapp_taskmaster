@@ -108,6 +108,13 @@ Screens:
                                   project_phase.Value <> "Complete"
                                && !IsBlank(project_date_target) ),
                           project_date_target ), 10 ) );
+        // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
+        // Min/Max over a date column would come back as a number.
+        Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
+                           Today(), First(colTlSrc).project_date_target ) );
+        Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
+                           Last(colTlSrc).project_date_target ) );
+        Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) );
         Clear( colTimeline );
         Collect( colTimeline,
             ForAll( Sequence( CountRows(colTlSrc) ) As s,
@@ -115,14 +122,7 @@ Screens:
                     { idx: s.Value,
                       nm:  r.project_name,
                       d0:  Coalesce(r.project_date_start, Today()),
-                      d1:  r.project_date_target } ) ) );
-        // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
-        // Min/Max over a date column would come back as a number.
-        Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
-                           Today(), First(colTlSrc).project_date_target ) );
-        Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
-                           Last(colTlSrc).project_date_target ) );
-        Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) )
+                      d1:  r.project_date_target } ) ) )
     Children:
       - bodyRoot:
           Control: GroupContainer@1.5.0
@@ -232,6 +232,13 @@ Screens:
                                                           project_phase.Value <> "Complete"
                                                        && !IsBlank(project_date_target) ),
                                                   project_date_target ), 10 ) );
+                                // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
+                                // Min/Max over a date column would come back as a number.
+                                Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
+                                                   Today(), First(colTlSrc).project_date_target ) );
+                                Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
+                                                   Last(colTlSrc).project_date_target ) );
+                                Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) );
                                 Clear( colTimeline );
                                 Collect( colTimeline,
                                     ForAll( Sequence( CountRows(colTlSrc) ) As s,
@@ -240,13 +247,6 @@ Screens:
                                               nm:  r.project_name,
                                               d0:  Coalesce(r.project_date_start, Today()),
                                               d1:  r.project_date_target } ) ) );
-                                // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
-                                // Min/Max over a date column would come back as a number.
-                                Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
-                                                   Today(), First(colTlSrc).project_date_target ) );
-                                Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
-                                                   Last(colTlSrc).project_date_target ) );
-                                Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) );
                                 Set(gToastShow, false);
                                 Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
                   - btnNewProject:
@@ -1044,7 +1044,12 @@ Screens:
                               # chart renders SMALLER inside a fixed panel — the cap is what
                               # keeps the bars legible, not a data limit.
                               Image: |
-                                =With( { n: CountRows(colTimeline) },
+                                =With( { n: CountRows(colTimeline), sp: Max(7, gTlSpan) },
+                                    // `sp`, NOT gTlSpan. A global reads BLANK until its Set has run and blank
+                                    // divides as zero, so a bare gTlSpan here is a Division by 0 on any render
+                                    // that beats OnVisible. The three Sets sit above the Collect for the same
+                                    // reason; this guard is what stops the chart depending on that ordering.
+                                    // 7 is gTlSpan's own floor, so nothing changes once the variable arrives.
                                     // charset IS load-bearing: project names are the only
                                     // user-supplied text in any of these charts, and a data URI
                                     // defaults to US-ASCII, which mangles any accented name.
@@ -1066,11 +1071,11 @@ Screens:
                                           & "' width='224' height='10' rx='5' fill='#F2F4F7'/>"
                                           & "<rect x='"
                                           & ( 92 + Round( Max(0, DateDiff(gTlStart, d0, TimeUnit.Days))
-                                                          / gTlSpan * 224, 0 ) )
+                                                          / sp * 224, 0 ) )
                                           & "' y='" & (16 + (idx - 1) * 20 + 5) & "' width='"
                                           & Max( 3, Round( ( DateDiff(gTlStart, d1, TimeUnit.Days)
                                                            - Max(0, DateDiff(gTlStart, d0, TimeUnit.Days)) )
-                                                           / gTlSpan * 224, 0 ) )
+                                                           / sp * 224, 0 ) )
                                           & "' height='10' rx='5' fill='"
                                           & If(d1 < Today(), "#C53A3A", "#005A9E") & "'/>" )
                                       & If( n = 0,
@@ -1087,9 +1092,9 @@ Screens:
                                           & " with a target date</text>",
                                             // TODAY marker, drawn last so it sits over the bars.
                                             "<line x1='"
-                                          & (92 + Round(DateDiff(gTlStart, Today(), TimeUnit.Days) / gTlSpan * 224, 0))
+                                          & (92 + Round(DateDiff(gTlStart, Today(), TimeUnit.Days) / sp * 224, 0))
                                           & "' y1='12' x2='"
-                                          & (92 + Round(DateDiff(gTlStart, Today(), TimeUnit.Days) / gTlSpan * 224, 0))
+                                          & (92 + Round(DateDiff(gTlStart, Today(), TimeUnit.Days) / sp * 224, 0))
                                           & "' y2='" & (16 + n * 20 + 2)
                                           & "' stroke='#C53A3A' stroke-width='0.8' stroke-dasharray='2 2'/>" )
                                       & "</svg>" ) )
