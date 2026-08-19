@@ -6,6 +6,9 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
+- **PERF BACKLOG FILED 2026-08-19 — GitHub #27–#40 (14 issues), NONE BUILT.** Screen-transition
+  and save-path round trips, dashboard N+1s, two scale cliffs, two guards. Ranked in
+  sessions/2026-08-19-1853-perf-review-issues.md.
 - **BUILT — editing and refining, not creating.** 11 screens, 10 components, the App object.
   22/22 valid. **The published app renders properly** (user, 2026-08-12).
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
@@ -316,6 +319,9 @@ not know them will author something broken:
 
 - [2026-08-19] **BEFORE MIGRATING A COMMENT'S REASONING INTO MEMORY, CHECK WHETHER IT IS ALREADY THERE — IT USUALLY IS, AND THEN THE JOB IS DELETE, NOT MOVE.** The purge began expecting to distil ~2900 lines of prose into `.claude/memory/`. Checking the eight load-bearing invariants first (the locale-decimal SVG trap, the gallery N+1 rule, `Select()` queues, no component inside a gallery, `Max(1, ...)` at the point of division, the circumference-100 pie, Explicit Column Selection dropping a column, cumulative-not-independent bar boundaries) found **all eight already recorded** in memory, a skill, or `docs/reports-screen-design.md`. The comments were not the source; they were an uncontrolled COPY of notes that already had a better home, and copies drift. Almost nothing needed writing down — only three negative-space notes ("`gProjArchived` was removed because the query could only ever return 0") that existed nowhere else, and those went to the session log. **The general shape: a repo with a real memory layer accumulates comment prose that duplicates it, and the duplicate is always the one that goes stale. Grep the memory before you write anything down** — INDEX Decisions
 
+- 2026-08-19 | Perf review filed #27–#40. Two finder claims verified FALSE and not filed: the health recompute is no project-wide N+1 (colHlTasks only ever holds 1-2 ids) and the task-edit picker queries nothing while closed (gTkPicker cleared on cancel). Donut-SVG inline recompute and a recompute staleness guard deliberately not filed | sessions/2026-08-19-1853-perf-review-issues.md
+- 2026-08-19 | #30 is written as an AMENDMENT to the 2026-08-13 gIssLed decision, not a reversal: single truncation-guarded OpenIssues fetch, with the per-project counts kept as the >=2000 fallback | GitHub #30
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
@@ -370,3 +376,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #23 BUILT: issue_type and issue_impact required with defaults Question/Moderate, "(none)" dropped from both pickers, save unguarded. Two traps handled that the bare requirement misses — the seed is tested against the VOCABULARY (a retired value is not blank) and the DefaultId fallback resolves the default BY LABEL, not Id 1 | GitHub #23
 - 2026-08-19 | #24 BUILT: scrHome gains a Projects-I-lead gallery and swaps the timeline for a clamped days-to-due bar chart plus an effective-health donut; rowLists is now the widest band (1252 vs rowCharts 1204) and the old comment claiming the charts govern is corrected | GitHub #24
 - 2026-08-19 | #23 and #24 LANDED and CLOSED. #25 BUILT: project_coverage required, default Internal, three-branch seed because the coverage vocabulary is the one this repo has never been told — a wrong default degrades to a real member rather than losing the insert | GitHub #25
+- 2026-08-19 | perf review -> 14 issues #27–#40 | sessions/2026-08-19-1853-perf-review-issues.md
