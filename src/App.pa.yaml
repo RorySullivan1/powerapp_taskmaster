@@ -53,6 +53,15 @@ App:
           { Stage: "Completed",     Weight: 100 }
        ) );
 
+       // MUST EQUAL Settings > General > Data row limit. That setting does NOT travel in a
+       // paste or an export and Power Fx cannot read it, so this constant is the app's only
+       // record of it. If the two disagree every truncation sentinel compares against the
+       // wrong ceiling and goes dead at the same moment — silently, because the one mechanism
+       // built to notice truncation is its own first casualty.
+       // scrHome and scrReports seed the same value if OnStart has not finished. Keep the
+       // three in step: `grep -rn gDataRowLimit src/` finds all of them.
+       Set( gDataRowLimit, 2000 );
+
        // Prefix + lowercased UPN forms a Person column's Claims. Community-confirmed shape,
        // not first-party: first suspect if a Person write fails.
        Set( gClaimPrefix, "i:0#.f|membership|" );

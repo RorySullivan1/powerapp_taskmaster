@@ -10,7 +10,8 @@
 # FIVE RULES THIS SCREEN BREAKS IF THEY ARE IGNORED:
 #  1. Narrow SERVER-side, aggregate LOCALLY — Sum, CountRows and Average never
 #     delegate. A delegable Filter still returns at most the DATA ROW LIMIT into a
-#     collection, so Settings > General > Data row limit must be 2000.
+#     collection, so Settings > General > Data row limit must be 2000 AND gDataRowLimit
+#     (App.OnStart) must say the same number — nothing checks that they agree.
 #  2. EVERY VALUE POWER FX FEEDS AN SVG ATTRIBUTE IS A WHOLE NUMBER. A fraction has
 #     to go through Text(), which drags the viewer's decimal separator into the
 #     attribute; an attribute Power Fx cannot render comes out EMPTY, and an empty
@@ -41,6 +42,10 @@ Screens:
         // NOTHING, and those KPIs are imperative Sets that never re-fire — the dashboard
         // latches at zero until a manual refresh. Declarative properties self-heal; these cannot.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+        // SAME REASON. Blank compares as ZERO, so an unseeded gDataRowLimit makes the fold's
+        // truncation test true and forces gIssLed down the expensive per-project arm on every
+        // cold start. Must match App.OnStart.
+        If( IsBlank(gDataRowLimit), Set( gDataRowLimit, 2000 ) );
         // KEEP Select LAST. It QUEUES the target OnSelect for after this formula finishes
         // rather than running it inline, so the seed above is guaranteed to have landed
         // before the fold reads gUserEmail — but nothing written after it can be relied on
@@ -120,11 +125,12 @@ Screens:
               // question in one fetch.
               //
               // But a delegable Filter still returns at most the DATA ROW LIMIT, so once open
-              // issues reach 2000 the map is a partial page and a local count would UNDERCOUNT
+              // issues reach it the map is a partial page and a local count would UNDERCOUNT
               // WITH NO SIGN OF IT. At the limit, pay the queries rather than report a wrong
               // number. If arms are lazily evaluated, so the fallback costs nothing below it.
+              // gDataRowLimit, never a literal — the ceiling is a Studio setting no paste carries.
               Set( gIssLed,
-                   If( CountRows(colIssByPrj) >= 2000,
+                   If( CountRows(colIssByPrj) >= gDataRowLimit,
                        Coalesce( Sum( ForAll( colMyProjects As p,
                                               CountRows( Filter( OpenIssues,
                                                                  issue_project_id.Id = p.ID ) ) ),

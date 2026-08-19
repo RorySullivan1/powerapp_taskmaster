@@ -26,6 +26,10 @@ Screens:
         =
         // App.OnStart is non-blocking, so this screen can run before gUserEmail is set.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+        // SAME REASON, AND THE COST OF MISSING IT IS A FALSE BANNER: blank compares as zero, so
+        // an unseeded gDataRowLimit makes every `>= gDataRowLimit` below true and gRptTrunc
+        // reports all six datasets truncated. Must match App.OnStart.
+        If( IsBlank(gDataRowLimit), Set( gDataRowLimit, 2000 ) );
         If( IsBlank(gRptPeriod), Set( gRptPeriod, "1QTR" ) );
         // "" is the All value and is itself blank, so IsBlank cannot seed this.
         Set( gRptScope, Coalesce(gRptScope, "") );
@@ -138,14 +142,16 @@ Screens:
               ClearCollect( colRptProducts,
                   ShowColumns( taskmaster_products, ID, product_uid, product_type_path ) );
               // Aggregates never delegate, so this is the only place the app can notice it ran out.
+              // gDataRowLimit, never a literal: the ceiling is a Studio setting no paste carries,
+              // and six copies of it is six places to miss when the app is rebuilt.
               Set( gRptTrunc,
                    Trim(
-                     If( CountRows(colRptOpen) >= 2000, "open tasks  ", "" ) &
-                     If( CountRows(colRptDoneAll) >= 2000, "completed tasks  ", "" ) &
-                     If( CountRows(colRptTx)   >= 2000, "transactions  ", "" ) &
-                     If( CountRows(colRptPrj)  >= 2000, "projects  ", "" ) &
-                     If( CountRows(colRptIss)      >= 2000, "issues  ", "" ) &
-                     If( CountRows(colRptProducts) >= 2000, "products  ", "" ) ) );
+                     If( CountRows(colRptOpen) >= gDataRowLimit, "open tasks  ", "" ) &
+                     If( CountRows(colRptDoneAll) >= gDataRowLimit, "completed tasks  ", "" ) &
+                     If( CountRows(colRptTx)   >= gDataRowLimit, "transactions  ", "" ) &
+                     If( CountRows(colRptPrj)  >= gDataRowLimit, "projects  ", "" ) &
+                     If( CountRows(colRptIss)      >= gDataRowLimit, "issues  ", "" ) &
+                     If( CountRows(colRptProducts) >= gDataRowLimit, "products  ", "" ) ) );
               // Transactions inside the CURRENT window; colRptTx holds two windows.
               ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
               // Level 1 of an "A | B | C" path with Find/Left, NOT Split — the separator is part
