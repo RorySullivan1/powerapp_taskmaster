@@ -14,22 +14,17 @@
 - **EVERYTHING IN `src/` HAS LANDED AND THE PASTE QUEUE IS EMPTY (user, 2026-08-19).** All 11
   screens, all 10 components and the App object are in Studio and current with this repo.
   **`task_output_audience` and `task_output_approval_flag` are LIVE** on `taskmaster_tasks`.
+- **#23 AND #24 ARE LANDED AND CLOSED (user, 2026-08-19).** `scrIssueEdit` carries required
+  type/impact with defaults Question/Moderate; `scrHome` carries the Projects-I-lead gallery
+  and, in place of the timeline, a clamped days-to-due bar chart and an effective-health donut.
+- **#25 IS BUILT AND UNLANDED — `scrProjectEdit` QUEUED, AND SHAREPOINT MUST CHANGE FIRST.**
+  `project_coverage` is `required: true` with default **Internal**; "(none)" is gone and the
+  save is unguarded. **THE COVERAGE VOCABULARY IS STILL UNKNOWN TO THIS REPO** — schema.yaml
+  carries `Internal` plus a PLACEHOLDER — so the seed falls back to the first offered option if
+  `Internal` is not actually a member. Supply the real list before provisioning.
+- **BACKLOG: #26 [REWORK] scrReports Project Charting**, not started.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **#23 IS BUILT AND UNLANDED — `scrIssueEdit` QUEUED FOR PASTE, AND SHAREPOINT MUST CHANGE
-  FIRST.** `issue_type` and `issue_impact` are now `required: true` with defaults Question and
-  Moderate; the "(none)" option is gone from both pickers and the save writes both unguarded.
-  **DO THE SHAREPOINT CHANGE BEFORE PASTING** — set both columns required with those defaults.
-  **Existing issues holding blank or a RETIRED type are edited into a default on open**, which
-  is a silent back-fill on save; scrHome and scrProject still Coalesce blanks and must keep
-  doing so for rows nobody has touched.
-- **#24 IS BUILT AND UNLANDED — `scrHome` QUEUED FOR PASTE** (alongside #23's `scrIssueEdit`).
-  A third gallery "Projects I lead" leads rowLists; the timeline is GONE, replaced by a
-  days-to-due bar chart clamped to -10..+10 and an open-tasks-by-health donut. Both read one
-  fold, `colDueSrc`, with EFFECTIVE health resolved once. **Removing the timeline deleted
-  `gTlSpan`** — the Division by 0 fixed earlier today no longer has a call site.
-- **BACKLOG: #25 scrProjectEdit schema rework**, not started. Everything #9-#22 is closed. #25 is SCHEMA work: `schema/schema.yaml` is the
-  golden source and internal names FREEZE at creation, so settle columns before provisioning.
 - **STANDING RISKS AND UNEXERCISED BEHAVIOUR — landed is not the same as exercised.** Do not
   claim any of these work:
   - **scrProjects contains-search is bounded by the DATA ROW LIMIT and fails SILENTLY.** Confirm
@@ -343,3 +338,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #22 (derived task health) LANDED and CLOSED after its ForAll paste defect was fixed; backlog is now #23, #24, #25, none started. State block consolidated — the closed-issue narrative moved out, the standing risks kept | GitHub #22
 - 2026-08-19 | #23 BUILT: issue_type and issue_impact required with defaults Question/Moderate, "(none)" dropped from both pickers, save unguarded. Two traps handled that the bare requirement misses — the seed is tested against the VOCABULARY (a retired value is not blank) and the DefaultId fallback resolves the default BY LABEL, not Id 1 | GitHub #23
 - 2026-08-19 | #24 BUILT: scrHome gains a Projects-I-lead gallery and swaps the timeline for a clamped days-to-due bar chart plus an effective-health donut; rowLists is now the widest band (1252 vs rowCharts 1204) and the old comment claiming the charts govern is corrected | GitHub #24
+- 2026-08-19 | #23 and #24 LANDED and CLOSED. #25 BUILT: project_coverage required, default Internal, three-branch seed because the coverage vocabulary is the one this repo has never been told — a wrong default degrades to a real member rather than losing the insert | GitHub #25
