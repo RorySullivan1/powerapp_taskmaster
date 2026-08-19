@@ -79,3 +79,21 @@
   replaced, and nothing read them after. Removing `Fam` removed the per-task
   `LookUp(colRptPrjMap, ...)` behind it, so `colRptOpenTag` is now the ONLY place that join runs.
   `colRptDoneAll` stopped fetching `task_output_format` for the same reason.
+
+## Paste defect 1 (user, 2026-08-19) — FIXED, unverified
+- Studio rejected the `colRptPersonSrc` Collect: **"the TNm column expects a text type and you're
+  using an error type"**.
+- `TNm: t.task_name` is the ONLY field in that record read RAW. Every other one is wrapped in
+  `Coalesce` or reached through `.Value` / `.Email`, which forces a type and masks the fault —
+  that is why TNm alone surfaced, and why `task_name` sat in the fetch UNREAD for weeks without
+  anyone noticing. `TId: t.ID` sits immediately before it and resolves fine, so the collection is
+  not wholly broken; it is the plain Text column that goes missing.
+- Root cause: `colRptOpen` / `colRptDoneAll` were `ShowColumns` over `Filter(LiveTasks, ...)`.
+  **LiveTasks is a NAMED FORMULA, and wrapping one in a Filter does NOT restore the schema.** The
+  file's own comment claimed it did — that claim is now disproved and deleted.
+- Same symptom, same fix as `p.project_name` off `ActiveProjects` on 2026-08-17: an explicit
+  `ForAll(... As x, { col: x.col, ... })` projection. Two independent instances now.
+- `colRptTx` deliberately KEEPS ShowColumns — it filters `taskmaster_transactions` directly, and
+  its raw `transaction_date` / `transaction_notional` reads have been working, which is what
+  isolates the fault to the named-formula root rather than to ShowColumns itself.
+- Commit `3818e40`. **NOT yet confirmed in Studio.**
