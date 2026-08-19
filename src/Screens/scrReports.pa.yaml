@@ -1120,18 +1120,12 @@ Screens:
                       Control: Label@2.5.1
                       Properties:
                         Text: |
-                          ="Task volume and elapsed time — the model holds no hours, so this is not effort. "
-                           & "Owns and supports count every task in that role, open or finished in "
-                           & "the period. Counted separately, never summed."
+                          ="Volume and elapsed time, never effort. Owns and supports never summed."
                            & If( gRptNoSup > 0,
-                                 "   ·   " & gRptNoSup & " of " & CountRows(colRptOpen)
-                                 & " open tasks record no supporter.", "" )
-                           // A completed task with no date cannot be placed in a period, so it
-                           // counts in every one.
+                                 "   ·   " & gRptNoSup & " no supporter", "" )
+                           // A completed task with no date counts in every period.
                            & If( gRptDoneNoDate > 0,
-                                 "   ·   " & gRptDoneNoDate
-                                 & " completed tasks record no completion date and count in "
-                                 & "every period.", "" )
+                                 "   ·   " & gRptDoneNoDate & " no completion date", "" )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
@@ -1665,12 +1659,11 @@ Screens:
                             Properties:
                               Text: |
                                 =If( LookUp(colRptAudBar, K = "Other", N) > 0,
-                                     "Other is NON-ZERO — tasks hold an audience the column no longer offers.",
+                                     "Other is non-zero — a value the column no longer offers.",
                                      LookUp(colRptAudBar, K = "Unspecified", N) > 0,
                                      LookUp(colRptAudBar, K = "Unspecified", N) & " of "
-                                       & CountRows(colRptOpenTag)
-                                       & " predate the column or produce no output.",
-                                     "Required on any task that produces output." )
+                                       & CountRows(colRptOpenTag) & " unspecified.",
+                                     "Open tasks that produce output." )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: |
@@ -1760,13 +1753,12 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Top 6, from the parent project. "
-                                 // colRptReqAll, NOT colRptReqBar: the bar collection holds only the
-                                 // top six, so a large Unassigned outside them would report as zero.
+                                ="Top 6, from the parent project."
+                                 // colRptReqAll, NOT colRptReqBar: the bar holds only the top six,
+                                 // so a large Unassigned outside them would report as zero.
                                  & If( LookUp(colRptReqAll, K = "Unassigned", N) > 0,
-                                       LookUp(colRptReqAll, K = "Unassigned", N)
-                                       & " record no requestor.",
-                                       "The column is optional." )
+                                       "   ·   " & LookUp(colRptReqAll, K = "Unassigned", N)
+                                       & " unassigned", "" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -1935,8 +1927,7 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Blue started · green completed · line is cumulative net open. "
-                                 & "Archived projects are outside the query, so their completions are not counted."
+                                ="Blue started · green completed · line is net open. Excludes archived."
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -2028,9 +2019,8 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Where every live project stands now — not a window. "
-                                 & "Archived is outside the query. "
-                                 & gRptNoTarget & " open with no target date."
+                                ="Live projects now, not a window.   ·   "
+                                 & gRptNoTarget & " no target date"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -2113,9 +2103,9 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Target dates only, weekends shaded, today first. "
+                                ="Weekends shaded, today first.   ·   "
                                  & gRptDueOver & " overdue · " & gRptDueBeyond
-                                 & " due later · " & gRptDueNone & " with no target date."
+                                 & " later · " & gRptDueNone & " no date"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -2225,8 +2215,7 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Top 6 by count of transactions on projects they manage. "
-                                 & "A count, never a notional — those are never blended."
+                                ="Top 6 by transactions on projects they manage. A count, not a notional."
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -2437,9 +2426,7 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Level 1 left, level 2 right — top 5 and Other on each. "
-                                 & "A product whose path has only one segment counts under "
-                                 & "Top level only rather than being dropped."
+                                ="Level 1 left, level 2 right. Top 5 and Other on each."
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -2665,9 +2652,7 @@ Screens:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
-                    ="Every task this person leads or supports — open work, plus anything "
-                     & "finished inside the selected period. A task held in both roles is "
-                     & "listed once."
+                    ="Open work, plus anything finished in the period. Listed once."
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
