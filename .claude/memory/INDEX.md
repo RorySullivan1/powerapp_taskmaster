@@ -11,8 +11,9 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **THE PASTE QUEUE IS EMPTY AGAIN (user, 2026-08-19).** All 11 screens, all 10 components and
-  the App object are in Studio. `scrProject` / `scrProjects` / `scrTaskEdit` /
+- **EVERYTHING HAS LANDED AT LEAST ONCE (user, 2026-08-19).** All 11 screens, all 10 components
+  and the App object are in Studio — but see the paste-queue bullet below: `scrProjects` has
+  been re-authored since. `scrProject` / `scrProjects` / `scrTaskEdit` /
   `scrTransactionEdit` / `scrIssueEdit` landed carrying issues #13, #15 and #17, and
   **`scrIssueEdit` landed again on 2026-08-19 carrying #9 — LANDED AND FULLY EXERCISED**, all
   four checks clear including the re-save that proves the date does not creep forward.
@@ -22,7 +23,7 @@
   junction write.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **#11 IS DONE AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** scrReports landed in
+- **#11 IS DONE AND CLOSED (user, 2026-08-19).** scrReports landed in
   full: all five rework steps, both paste defects fixed, band 5 at three columns, the person
   overlay at 1200 wide. **Landed is not the same as exercised** — on scrReports nobody has yet
   seen the truncation banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the
