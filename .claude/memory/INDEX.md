@@ -361,4 +361,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | scrHome + scrTaskEdit both LANDED; task_output_approval_flag internal name confirmed; paste queue empty. Neither behaviour exercised yet | INDEX State
 - 2026-08-19 | #21 debriefed and CLOSED (completed). Closed on landing; the completion gate remains unexercised | GitHub #21
 - 2026-08-19 | #22: task health derived, not chosen. issue_type re-vocabularied to 7 values; stored issue-half + live overdue half; recompute wired to every issue change; scrReports folds overdue in | sessions/2026-08-19-1600-issue22-derived-health.md
-- 2026-08-19 | Set() removed from the health-recompute ForAll on scrIssueEdit and scrProject; gHlScrapI/gHlScrapP/gHlErr were all write-only and are gone. Scan of all 91 ForAll sites finds no other occurrence | GitHub —
+- 2026-08-19 | #22 paste defect: Set() removed from the health-recompute ForAll on scrIssueEdit and scrProject; gHlScrapI/gHlScrapP/gHlErr were all write-only and are gone. LANDED clean. Scan of all 91 ForAll sites finds no other occurrence | GitHub #22

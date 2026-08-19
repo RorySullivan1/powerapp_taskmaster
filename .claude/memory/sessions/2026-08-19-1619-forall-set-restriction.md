@@ -9,7 +9,8 @@
   `ClearCollect` because ForAll may run records in any order and in parallel. `Set` is the
   global twin of `UpdateContext`.
 - Fixed both bodies identically (they are duplicated by design and their own comment says so).
-- Commit `4511d3c`. NOT yet pasted.
+- Commit `4511d3c`. **LANDED clean (user, 2026-08-19)** and written up on GitHub #22,
+  comment 5344974660 — the defect was in the #22 health build (`a6da5d9`), not pre-existing code.
 
 ## Gotchas & dead ends
 - **The `Set(scrap, Patch(...))` wrapper was doing the opposite of what it looked like.** It was
@@ -26,7 +27,9 @@
   dead weight and could be tidied — deliberately not touched in a paste meant to fix errors.
 
 ## State at end
-- Authored and unpasted: `scrIssueEdit` and `scrProject`, both carrying only this change.
+- `scrIssueEdit` and `scrProject` LANDED. #22's own outstanding items are untouched by this
+  fix: the seven `issue_type` values are still unverified, existing rows still hold their last
+  user-chosen `task_status`, and there is still no bulk recompute.
 
 ## Open threads
 - Offer to tidy `gPrjPhaseScrap` / `gPrjPhaseErr` in `btnPrjRecompute.OnSelect` — same dead-weight
