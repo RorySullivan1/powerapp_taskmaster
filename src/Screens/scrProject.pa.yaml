@@ -11,8 +11,10 @@
 #  3. That button is TemplateWidth - 46, stopping short of the delete icon's strip, or
 #     it sits over the icon and swallows every tap meant for it.
 #
-# COUNTS COME FROM THE QUERY, never a gallery's AllItems: a gallery bound to a data
-# source pages as the user scrolls, so AllItems is "what is on screen so far".
+# EVERY CHILD COUNT, GALLERY AND TOTAL READS ONE OF THE THREE COLLECTIONS btnPrjRecompute
+# folds — colProjectTasks, colProjectTx, colProjectIss. Never a gallery's AllItems (that is
+# "what is on screen so far"), and never a fresh Filter of the list: those round trips are
+# what the collections exist to remove. Anything that changes a child re-Selects the recompute.
 #
 # IfError( Remove(...), Notify(...) ) — MS Learn's own idiom — is REJECTED by Studio:
 # Remove and ForAll/Patch return a TABLE while Notify and Set return a boolean, and
@@ -111,27 +113,34 @@ Screens:
             Width: =1
             Height: =1
             OnSelect: |
-              =ClearCollect( colProjectTasks,
-                  Filter( taskmaster_tasks,
-                      task_project_id.Id = gSelProject.ID ) );
+              =// ONE FETCH PER CHILD LIST, ISSUED TOGETHER — every count, gallery, title and total
+              // on this screen reads these three collections, so nothing below re-queries a list.
+              // Concurrent's arms must not share state: three arms, three collections.
+              // Each Filter is a delegable = on an indexed FK, so each fetch is one server call.
+              Concurrent(
+                  ClearCollect( colProjectTasks,
+                      Filter( taskmaster_tasks,
+                          task_project_id.Id = gSelProject.ID ) ),
+                  ClearCollect( colProjectTx,
+                      Filter( taskmaster_transactions,
+                          transaction_project_id.Id = gSelProject.ID ) ),
+                  ClearCollect( colProjectIss,
+                      Filter( taskmaster_issues,
+                          issue_project_id.Id = gSelProject.ID ) ) );
               // PHASE IS DERIVED HERE, not chosen by anyone — scrProjectEdit has no phase control.
               //   any OPEN issue                        -> Stalled
               //   any started task, or any transaction  -> Active
               //   any child at all, no started task     -> Planning
               //   nothing attached                      -> Not Started
               Set( gPrjOpenIss,
-                   CountRows( Filter( taskmaster_issues,
-                                      issue_project_id.Id = gSelProject.ID
-                                   && issue_status.Value = "Open" ) ) );
+                   CountRows( Filter( colProjectIss, issue_status.Value = "Open" ) ) );
               Set( gPrjOpenTasks,
                    CountRows( Filter( colProjectTasks, task_stage.Value <> "Completed" ) ) );
               Set( gPrjDerived,
                    With( { nT: CountRows(colProjectTasks),
                            nStarted: CountRows( Filter(colProjectTasks, task_stage.Value <> "Not Started") ),
-                           nX: CountRows( Filter( taskmaster_transactions,
-                                                  transaction_project_id.Id = gSelProject.ID ) ),
-                           nI: CountRows( Filter( taskmaster_issues,
-                                                  issue_project_id.Id = gSelProject.ID ) ) },
+                           nX: CountRows(colProjectTx),
+                           nI: CountRows(colProjectIss) },
                        If( gPrjOpenIss > 0,          "Stalled",
                            nStarted > 0 || nX > 0,   "Active",
                            nT + nX + nI > 0,         "Planning",
@@ -730,6 +739,8 @@ Screens:
                                                      Set( gSelProject, Blank() );
                                                      Set( gEditProject, Blank() );
                                                      Clear( colProjectTasks );
+                                                     Clear( colProjectTx );
+                                                     Clear( colProjectIss );
                                                      Notify( "Project deleted, with everything attached to it.",
                                                              NotificationType.Success );
                                                      Navigate( scrProjects, ScreenTransition.UnCover ) );
@@ -1146,10 +1157,7 @@ Screens:
                                     - lblTxTitle:
                                         Control: Label@2.5.1
                                         Properties:
-                                          Text: |
-                                            =
-                                             "Transactions   " & CountRows( Filter( taskmaster_transactions,
-                                                                                    transaction_project_id.Id = gSelProject.ID ) )
+                                          Text: ="Transactions   " & CountRows(colProjectTx)
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.H3
                                           FontWeight: =FontWeight.Semibold
@@ -1179,7 +1187,7 @@ Screens:
                               - lblTxEmpty:
                                   Control: Label@2.5.1
                                   Properties:
-                                    Visible: =CountRows(galTransactions.AllItems) = 0
+                                    Visible: =IsEmpty(colProjectTx)
                                     Text: ="No transactions on this project yet."
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.Small
@@ -1194,9 +1202,7 @@ Screens:
                                   Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                                   Properties:
                                     Items: |
-                                      =Sort( Filter( taskmaster_transactions,
-                                      transaction_project_id.Id = gSelProject.ID ),
-                                      transaction_date, SortOrder.Descending )
+                                      =Sort( colProjectTx, transaction_date, SortOrder.Descending )
                                     WrapCount: =1
                                     TemplateSize: =52
                                     TemplatePadding: =0
@@ -1358,15 +1364,13 @@ Screens:
                                                 Navigate( scrTransactionEdit, ScreenTransition.Cover ) )
                         # CROSS-CURRENCY CONVERSION IS OUT OF SCOPE for this project — the app stores
                         # only the native notional, so no blended figure is owed here and none should be
-                        # invented. Sum and CountRows never delegate, so this is the RETURNED PAGE only.
+                        # invented. Sum never delegates, so this totals the collection, which is the
+                        # project's transactions up to the data row limit.
                         - lblTxTotal:
                             Control: Label@2.5.1
                             Properties:
-                              # Sums what the gallery has LOADED, not the whole query. Accepted: a project
-                              # holds well under a page. Do not "fix" it by widening the query — Sum does not
-                              # delegate either way, so the only real fix is collecting the rows in OnVisible.
                               Text: |
-                                =With( { rows: galTransactions.AllItems },
+                                =With( { rows: colProjectTx },
                                     With( { u: Sum(Filter(rows, transaction_currency.Value = "USD"), Coalesce(transaction_notional, 0)),
                                             e: Sum(Filter(rows, transaction_currency.Value = "EUR"), Coalesce(transaction_notional, 0)),
                                             g: Sum(Filter(rows, transaction_currency.Value = "GBP"), Coalesce(transaction_notional, 0)),
@@ -1419,11 +1423,8 @@ Screens:
                                   Control: Label@2.5.1
                                   Properties:
                                     Text: |
-                                      =
-                                       With( { rows: Filter( taskmaster_issues,
-                                                             issue_project_id.Id = gSelProject.ID ) },
-                                             "Issues   " & CountRows( Filter(rows, issue_status.Value = "Open") )
-                                             & " open of " & CountRows(rows) )
+                                      ="Issues   " & CountRows( Filter(colProjectIss, issue_status.Value = "Open") )
+                                       & " open of " & CountRows(colProjectIss)
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.H3
                                     FontWeight: =FontWeight.Semibold
@@ -1453,7 +1454,7 @@ Screens:
                         - lblIssuesEmpty:
                             Control: Label@2.5.1
                             Properties:
-                              Visible: =CountRows(galIssues.AllItems) = 0
+                              Visible: =IsEmpty(colProjectIss)
                               Text: ="No issues raised against this project."
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
@@ -1468,12 +1469,9 @@ Screens:
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
                               # Impact, then days until due, on ONE composite key: Power Fx does not
-                              # guarantee a stable sort, so chaining two Sorts could undo the first. The
-                              # sort runs LOCALLY (an expression, not a column), acceptable only because
-                              # this query is already scoped to a single project.
+                              # guarantee a stable sort, so chaining two Sorts could undo the first.
                               Items: |
-                                =Sort( Filter( taskmaster_issues,
-                                               issue_project_id.Id = gSelProject.ID ),
+                                =Sort( colProjectIss,
                                        Switch( issue_impact.Value,
                                                "Critical", 1, "High", 2,
                                                "Moderate", 3, "Low", 4, 5 ) * 100000
