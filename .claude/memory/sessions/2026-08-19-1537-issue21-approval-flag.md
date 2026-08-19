@@ -59,6 +59,7 @@
   this reworks it, so no version of this rule has ever run in anger. The test is: a task with
   Output on, `Approval required?` on, the id EMPTY, stage moved to Completed, Save — expect
   the save refused and `lblTkMissing` naming "an approval ID before completing".
-- **#21 is still OPEN on GitHub.** Landed but unexercised; closing it is the user's call.
+- **#21 is CLOSED (completed, 2026-08-19)**, debriefed on the issue. **Closed on LANDING, not
+  on exercising** — do not read the closure as evidence the gate works.
 - One judgement call still unconfirmed: the audience-required-when-Output-on rule was KEPT.
   If the user meant #21 to drop that too, it is a one-line deletion in `lblTkMissing`.

@@ -67,7 +67,8 @@
     Division-by-0 banner FAIL to appear on a cold start (it only ever showed for a user
     leading a non-complete project WITH a target date, so an empty dashboard proves nothing),
     and the completion gate has never once blocked a save — it was unexercised under #13 too.
-  - **#21 is still OPEN on GitHub.**
+  - **#21 IS CLOSED (completed, 2026-08-19)** with a debrief comment on the issue. Closed on
+    LANDING, not on exercising — the gate itself is still unproven, see the bullet above.
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-19] **A MULTI-COLUMN GALLERY ROW IS ONE HORIZONTAL AUTO-LAYOUT CONTAINER INSIDE THE TEMPLATE — NEVER ABSOLUTELY-POSITIONED SIBLING CELLS.** The person overlay's task row was built as six cells on a hand-computed X grid (8 · 296 · 394 · 472 · 564) each with a declared `Width`. The arithmetic was correct and no two boxes overlapped ON PAPER; it overlapped ON SCREEN (user, 2026-08-19), because **a modern `Label@2.5.1` does not hold a declared Width the way that assumed**. The working idiom is `galRptPeople`'s and now `galRptOvlTask`'s: ONE `GroupContainer` AutoLayout child at `X: =0, Y: =0, Width: =Parent.TemplateWidth, Height: =Parent.TemplateHeight - 1`, whose cells carry **`FillPortions` + `LayoutMinWidth` and NO `X` and NO `Width`**. The caption row above carries the IDENTICAL portions pair-for-pair, so both derive their columns from the same numbers — two hand-kept X grids are the bug, not the spacing. A cell needing two controls (dot + word) gets TWO columns, the spare one captioned blank, rather than a second container nested inside a template — that nesting is ungrounded here. Absolute positioning inside a template is still right for things measured against the TEMPLATE rather than the row: the hairline separator and a full-template hit target — INDEX Decisions
@@ -345,3 +346,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | Division-by-0 FIXED in src: scrHome timeline divides by Max(7, gTlSpan) and the three Sets moved above the Collect in both duplicated blocks; awaiting a full-file scrHome paste | sessions/2026-08-19-1520-div0-scrhome-timeline.md
 - 2026-08-19 | #21: scrTaskEdit approvals moved off the audience value onto task_output_approval_flag; new tglTkApprovalReq between the audience and the id; schema + two reference docs corrected. Authored, not landed | sessions/2026-08-19-1537-issue21-approval-flag.md
 - 2026-08-19 | scrHome + scrTaskEdit both LANDED; task_output_approval_flag internal name confirmed; paste queue empty. Neither behaviour exercised yet | INDEX State
+- 2026-08-19 | #21 debriefed and CLOSED (completed). Closed on landing; the completion gate remains unexercised | GitHub #21
