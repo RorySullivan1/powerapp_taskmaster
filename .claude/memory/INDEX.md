@@ -22,13 +22,16 @@
   junction write.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **#11 IS DONE AND THE PASTE QUEUE IS EMPTY AGAIN (user, 2026-08-19).** scrReports landed in
-  full: all five rework steps, both paste defects fixed (`task_name` error type, overlay row
-  overlap), band 5 extended to three columns, and the person overlay at 1200 wide. **THE BACKLOG
-  IS EMPTY** — #9, #10 and #12-#17 are closed and #11 is finished but still OPEN on GitHub.
-  **Landed is not the same as exercised**: on scrReports nobody has yet seen the truncation
-  banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the audience pie, or a
-  multi-currency stack in the trend bars.
+- **#11 IS DONE AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** scrReports landed in
+  full: all five rework steps, both paste defects fixed, band 5 at three columns, the person
+  overlay at 1200 wide. **Landed is not the same as exercised** — on scrReports nobody has yet
+  seen the truncation banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the
+  audience pie, or a multi-currency stack in the trend bars.
+- **THE BACKLOG IS TWO NEW ISSUES, both filed 2026-08-19 and neither started:** **#19 REWORK -
+  scrProjects** (the lead filter returns nothing; replace it with an "Only Show my Tasks"
+  checkbox on the coverage/search line) and **#20 [Enhancement] - scrProductEdit** (four new
+  optional product columns: underlying, wrapper, maturity, features). **#20 NEEDS SCHEMA WORK
+  FIRST** — `schema/schema.yaml` is the golden source and internal names freeze at creation.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
