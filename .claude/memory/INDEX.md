@@ -29,7 +29,7 @@
   seen the truncation banner fire, a non-zero `gRptDoneNoDate`, a non-zero `Other` slice on the
   audience pie, or a multi-currency stack in the trend bars.
 - **THE PASTE QUEUE IS `scrProjects`, ALONE (authored 2026-08-19, NOT landed).** #19 is built:
-  the #17 lead filter and its `cmpPicker` instance are deleted, an "Only Show my Tasks" toggle
+  the #17 lead filter and its `cmpPicker` instance are deleted, an "Only show my projects" toggle
   sits on the one filter row, `Items` is eight branches, and the gallery moved back up to 220.
   Check FIRST after the paste: the screen now opens showing EVERY project (the old lead filter
   seeded itself to you), and the toggle must return your projects with coverage and search

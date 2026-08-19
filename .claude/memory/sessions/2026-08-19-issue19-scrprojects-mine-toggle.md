@@ -64,7 +64,9 @@ after the paste.
 ## State
 Authored, validated 22/22, **NOT landed**. `scrProjects` is the whole paste queue.
 
-## Open — the label says "Tasks" on a screen of projects
-"Only Show my Tasks" is the issue's own wording and is what shipped, unedited. It filters
-`project_manager`, so what it actually means is "only projects I lead". If that reads wrong in
-Studio it is one string in `lblOnlyMine.Text` — flagged on the issue, not silently changed.
+## The label — RESOLVED
+Shipped first as the issue's own wording, "Only Show my Tasks", unedited, with the mismatch
+flagged rather than silently corrected: the toggle filters `project_manager`, so what it means
+is "only projects I lead". **The user chose "Only show my projects" (2026-08-19)** and that is
+what `lblOnlyMine.Text` now carries, along with the empty-state sentence that names the toggle.
+Nothing else moved — no predicate reads the string.
