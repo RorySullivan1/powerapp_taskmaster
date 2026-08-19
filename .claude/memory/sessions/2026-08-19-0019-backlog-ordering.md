@@ -1,6 +1,6 @@
 # 2026-08-19 00:19 · backlog-ordering
 
-**Goal:** Review open issues and order the development
+**Goal:** Review open issues, order the development, and build #9
 
 ## What happened
 Read the remote backlog and ordered it. **Only #9 and #11 are open** — #10, #12–#17 are all
@@ -25,6 +25,20 @@ any future issue-cycle report reads. Fix the writer before reworking the readers
 5. **Transactions (band 5)** — product-type pies (L1+L2), currency-coloured bars. Last so the pie
    renderer is proven in step 4's simpler section (single-level path, no join) before step 5 asks
    it to carry a two-level path AND a `transaction_product_id` join.
+
+**#9 IS BUILT AND UNPASTED** (`b46a17a`). Plan posted on the issue first and confirmed by the
+user ("remove the opened by box outright"). Removed `lblIssCloseCap`/`dtpIssClose`, the
+`Reset(dtpIssClose)`, and `colIssOpened` with its provenance comment; `colIssAssignee` took the
+whole of `rowIss6`; `gridIss5` KEPT its two columns so Related transaction holds its width and
+stays aligned under Related task. 22/22 valid.
+
+**The late hardening that matters:** the derived date reads the stored value with
+`LookUp(taskmaster_issues, ID = gEditIssue.ID, issue_date_close)`, NOT `gEditIssue.issue_date_close`.
+`gEditIssue` is set once, on scrProject (`:1761`), and carried across the screen boundary in a
+global — and now that NO CONTROL reads `issue_date_close`, that is precisely the record shape
+Explicit Column Selection trims. Off the snapshot the Coalesce would have seen blank and restamped
+`Now()` on every save, defeating the preserve branch IN SILENCE. The LookUp also fixes
+close-reopen-close inside one session, which off the snapshot restored the original date.
 
 ## Gotchas & dead ends
 - **THE PIE PROBLEM IS ALREADY SOLVED — DO NOT WRITE ARC PATHS.** `scrReports.pa.yaml:1645`

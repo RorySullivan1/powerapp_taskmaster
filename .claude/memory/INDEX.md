@@ -11,7 +11,9 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **THE PASTE QUEUE IS EMPTY (user, 2026-08-18).** All 11 screens, all 10 components and the
+- **THE PASTE QUEUE HOLDS ONE FILE: `scrIssueEdit` (issue #9, built 2026-08-19, `b46a17a`).**
+  Nothing else is outstanding. Everything below was true as of 2026-08-18:
+- **(was) THE PASTE QUEUE IS EMPTY (user, 2026-08-18).** All 11 screens, all 10 components and the
   App object are in Studio, and `scrProject` / `scrProjects` / `scrTaskEdit` /
   `scrTransactionEdit` / `scrIssueEdit` all landed carrying issues #13, #15 and #17.
   **`task_output_audience` IS LIVE** on `taskmaster_tasks`, so #13's gate has a column behind it.
@@ -266,3 +268,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-18 | issue #16 CLOSED: project_perc_completion read 0% because gStageWeights was never loaded; task_stage corrected to "Completed" across 22 sites, scrProject now derives and back-fills the value | GitHub #16
 - 2026-08-18 | issue #14 diagnosed read-only: the taskmaster_taskproduct reconcile is unguarded so a rejected write reports success, the summary is written before it and independently of it, the output toggle silently deletes links, and the RemoveIf does not delegate; probe-first plan posted, NOTHING written | sessions/2026-08-18-1118-issue14-multiproduct-diagnosis.md
 - 2026-08-19 | backlog reviewed and ordered: only #9 and #11 remain; #14 confirmed closed and the stale State block corrected; #9 planned in full (not a pure deletion — the resolution date becomes a derived stamp) | sessions/2026-08-19-0019-backlog-ordering.md
+- 2026-08-19 | issue #9 BUILT, unpasted: the resolution-date picker and the opened-by box removed from scrIssueEdit, issue_date_close now derived from the status transition; the stored date is read with a delegable LookUp because ECS would trim it off the gEditIssue snapshot once no control reads it | GitHub #9
