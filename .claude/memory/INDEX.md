@@ -37,6 +37,9 @@
   flow, which now also owns the three `*_project_archived` child flags. Complete and Archived
   are terminal. PENDING IN SHAREPOINT: set the column default to `Not Started`. **No orphaned controls: the user DELETES a screen before pasting it back.**
 - Six superseded components still ship inside the `.msapp` — see Threads.
+- **claudeBrain PR #36 is OPEN and unmerged** (2026-08-19) — the canvas-app family ported out.
+  It asks one question back: genericise the ported skills' `tools/` / `schema/` path references,
+  or leave them as worked-example voice? Answer it before assuming the port is finished.
 
 ## Decisions        (append-only; supersede, never delete)
 Pre-2026-08-13 entries: `sessions/ARCHIVE-2026.md`. Kept here because a session that does
@@ -246,6 +249,18 @@ not know them will author something broken:
   automatically, where an enumerated list would silently never stamp it. Opposite trade-off from
   the App.Formulas allow-lists, deliberately.
 
+- **2026-08-19 — Porting to claudeBrain: the Power BI scope edits stay HERE.** The flow is
+  outward (second port confirms it; nothing was imported). But this repo's "Power BI is OUT OF
+  SCOPE" rewrites are **project-local** — claudeBrain still ships `power-bi-dax` and
+  `power-query-m`, so porting them would make the factory contradict its own catalog.
+  `power-apps-svg` went over with its boundary rewritten to defer *outward* reporting to the BI
+  skills; the `graph-api-integration` / `power-fx-review` / `power-apps-components` diffs were
+  **only** that scope rewrite and were dropped whole. Also never port: the meta-skill edits (they
+  just swap worked examples VBA→Power Fx, correct here and wrong there),
+  `pre_write_column_guard.py` (needs a `schema/schema.yaml` the example project lacks), and
+  `delegation.md` — **claudeBrain's copy is better than ours**, generalised during the last port.
+  Test each hunk: *true for a generic consumer, or only because we ruled Power BI out?*
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-18 | issue #15: delete for tasks/transactions/issues from scrProject and the three edit screens; issues DETACHED not cascaded; the OnVisible derivation moved into a hidden btnPrjRecompute called by four sites after the probe confirmed Select() fires on an invisible control | sessions/2026-08-18-issue15-delete-children.md
@@ -278,3 +293,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #11 planned in full and posted to the issue for review, nothing written. Five findings reshaped it: dropping the coverage grid orphans the Coverage combo; the people measures fail UPSTREAM (a Completed task with a blank task_date_completion never enters colRptDone at all, so Done/median/on-time read empty and the screen cannot say why); Tx is project-attributed among task measures; the overlay replacement can read colRptPersonSrc and refetch nothing if it gains 4 fields + a Dup flag; the pie is cmpKpiRing's stroke-dasharray, not arc math | GitHub #11
 - 2026-08-19 | #11 BUILT in five commits: the coverage grid, the gap list, the median-cycle chart and the now-orphaned Coverage combo dropped; completed tasks fetched on stage alone because `task_date_completion >= gRptFrom` is FALSE for a blank date and silently emptied every completion measure; Tx dropped from the people table; the person overlay became a task list; band 3 is four columns with two pies; the transaction bars stack by currency beside product-type L1/L2 pies | sessions/2026-08-19-0111-issue11-scrreports-rework.md
 - 2026-08-19 | #11 follow-up: the output pie switched from task_output_format to task_output_audience because scrTaskEdit ENFORCES the audience whenever the Output section is on and never enforces the format — so audience stays complete and format accumulates blanks; the young column's Unspecified count is stated in the subtitle because on a pie that case and a broken report look identical. Fam/Fmt dropped from colRptPersonSrc, taking a per-task project LookUp with them | GitHub #11
+- 2026-08-19 | outbound port #2 to claudeBrain: the canvas-app family (7 skills, 2 agents, the air-gap brief) plus 4 generic corrections, opened as claudeBrain#36. Nothing imported — the factory's Power Platform copies remain downstream of this repo. Open question asked in the PR: whether the ported skills' `tools/` and `schema/` path references should be genericised | sessions/2026-08-19-0258-claudebrain-canvas-port.md
