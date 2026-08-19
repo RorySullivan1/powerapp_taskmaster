@@ -11,7 +11,8 @@
   in sessions/2026-08-19-2047-issues-39-33-37-built.md.
 - **#33 AND #37 LANDED (user, 2026-08-19); #39 is done on BOTH sides** — `transaction_product_id`
   is indexed on the live list, so schema and SharePoint agree.
-- **PASTE QUEUE: #40 — `App.OnStart` (FORMULA BAR, no code view), `scrReports`, `scrHome`.**
+- **#40 LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** `App.OnStart` went
+  through the formula bar, `scrReports` and `scrHome` through code view, all clean.
 - **#34 is BLOCKED ON A USER DECISION** (prefix search vs substring + a truncation banner);
   **#35 is BLOCKED ON A PROBE** that must be pasted first; **#38 is deferred to its own pass**
   (rewrites the destructive path).
@@ -379,6 +380,8 @@ not know them will author something broken:
 - 2026-08-19 | #40 BUILT: `Set( gDataRowLimit, 2000 )` in App.OnStart, and all SEVEN `>= 2000` sentinels (six in gRptTrunc, one in gIssLed) now read it. **THE ISSUE'S PROPOSAL AS WRITTEN WOULD HAVE SHIPPED A COLD-START REGRESSION** it does not mention: App.OnStart is NON-BLOCKING and **a blank compares as ZERO**, so an unseeded gDataRowLimit makes every `>=` test TRUE — gRptTrunc would show a false all-six-truncated banner and gIssLed would take the expensive per-project arm #30 removed. **Fixed by seeding it in the two OnVisible handlers beside the existing gUserEmail self-heal**, which is there for the identical reason. **The number therefore lives in THREE places, not one — a deliberate trade**: still down from seven, all three are `gDataRowLimit` sites one grep finds, and a mismatch now degrades gracefully instead of going silently dead. REJECTED a named formula in App.Formulas (the repo has a recorded published-app failure — it is why gTheme is a Set) and `Coalesce(gDataRowLimit, 2000)` per sentinel (seven literals again). **A wrong value is still UNDETECTABLE** — Power Fx cannot read the Studio setting; the checklist guarding it is in gitignored CLAUDE.local.md | GitHub #40
 
 - 2026-08-19 | **PAREN-BALANCE CHECKING NEEDS A CHARACTER STATE MACHINE, NOT A REGEX** — now `tools/balance_check.py`. Stripping `//` comments before string literals eats `http://www.w3.org/2000/svg` in every SVG Image property and reports false unbalanced; stripping `'...'` first eats prose apostrophes ("the fold's") and the parens after them. Both wrong answers were produced against known-good committed source before the state machine agreed the whole repo balances. Do not re-derive a regex version | tools/balance_check.py
+
+- 2026-08-19 | #40 LANDED and CLOSED (user) — App.OnStart via the FORMULA BAR plus scrReports and scrHome via code view, all clean. `gDataRowLimit` is live and no `>= 2000` literal remains in src/. **The perf backlog's buildable half is finished: #27–#33, #36, #37, #39, #40 are all done and closed.** What remains is blocked, not unstarted: #34 on a user decision, #35 on a probe, #38 deferred to its own pass. **A wrong gDataRowLimit is STILL UNDETECTABLE** — Power Fx cannot read the Studio setting — and the checklist guarding it lives in gitignored CLAUDE.local.md, so it would not survive a fresh clone; move it to docs/ if that matters. Neither the OnVisible seeds nor any sentinel has been observed firing (the latter needs a 2,000-row dataset) | GitHub #40
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.

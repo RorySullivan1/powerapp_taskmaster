@@ -40,7 +40,8 @@
 ## State at end
 - 22/22 valid; state-machine balance clean across all 22 files; column guard run manually over
   the three edited files (python edits bypass the Write/Edit hook).
-- **QUEUED FOR PASTE:** `App.OnStart` (FORMULA BAR — no code view), `scrReports`, `scrHome`.
+- **LANDED AND CLOSED (user, 2026-08-19).** `App.OnStart` through the formula bar, `scrReports`
+  and `scrHome` through code view — all clean, first try. The paste queue is empty.
 - #33 and #37 **LANDED (user)** before this was started; #39 done on both sides.
 
 ## Open threads
