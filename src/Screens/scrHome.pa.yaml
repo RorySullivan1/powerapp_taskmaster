@@ -92,37 +92,31 @@ Screens:
              If( CountRows(colMyTasks) = 0, 0,
                  RoundDown( Average( AddColumns( colMyTasks, wgt,
                      Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-        // ---- Timeline rows -------------------------------------------------
-        // BUILT AS COLLECTIONS, not inline in the chart's Image formula. Across a
-        // one-way gap a chart that draws nothing is indistinguishable from a chart
-        // whose data never arrived; a collection can be opened in Studio's
-        // Collections pane, so this splits "the maths is wrong" from "there is
-        // nothing to plot".
+        // ---- Chart source: open tasks I lead ---------------------------------
+        // ONE FOLD FOR BOTH CHARTS, so they cannot disagree about what "open" means.
+        // Health is EFFECTIVE health — the stored issue-derived half with overdue folded
+        // in, per rollups.task_health in schema.yaml — resolved once here rather than
+        // re-tested per slice.
         //
-        // `Sequence(CountRows(...))` + `Index(...)` is the only way a row gets a
-        // POSITION, which is what a y-coordinate needs. The count comes from the
-        // same table Index reads, so Index can never be out of range — it ERRORS
-        // out of range, it does not return blank.
-        ClearCollect( colTlSrc,
-            FirstN( Sort( Filter( colMyProjects,
-                                  project_phase.Value <> "Complete"
-                               && !IsBlank(project_date_target) ),
-                          project_date_target ), 10 ) );
-        // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
-        // Min/Max over a date column would come back as a number.
-        Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
-                           Today(), First(colTlSrc).project_date_target ) );
-        Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
-                           Last(colTlSrc).project_date_target ) );
-        Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) );
-        Clear( colTimeline );
-        Collect( colTimeline,
-            ForAll( Sequence( CountRows(colTlSrc) ) As s,
-                With( { r: Index(colTlSrc, s.Value) },
-                    { idx: s.Value,
-                      nm:  r.project_name,
-                      d0:  Coalesce(r.project_date_start, Today()),
-                      d1:  r.project_date_target } ) ) )
+        // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale and
+        // flatten every bar that matters; the end buckets mean "10 or more". A task with
+        // no target date gets 9999, which lands in no bucket at all, and is counted
+        // separately — a distribution that silently drops rows misstates its own total.
+        ClearCollect( colDueSrc,
+            ForAll( Filter(colMyTasks, task_stage.Value <> "Completed") As t,
+                { hl: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(),
+                          "Red", Coalesce(t.task_status.Value, "") ),
+                  dd: If( IsBlank(t.task_date_target), 9999,
+                          Max( -10, Min( 10, DateDiff(Today(), t.task_date_target, TimeUnit.Days) ) ) ) } ) );
+        Set( gDueNoDate, CountRows( Filter(colDueSrc, dd = 9999) ) );
+        // 21 BUCKETS, WRITTEN OUT — not derived from the data. A bucket only exists when a
+        // row has that value, so grouping would drop every empty day and CLOSE UP the gaps —
+        // and a gap at zero tasks is exactly what a distribution has to show.
+        ClearCollect( colDueBuckets,
+            ForAll( Sequence(21) As s,
+                With( { dv: s.Value - 11 },
+                    { i: s.Value, d: dv,
+                      n: CountRows( Filter(colDueSrc, dd = dv) ) } ) ) )
     Children:
       - bodyRoot:
           Control: GroupContainer@1.5.0
@@ -216,37 +210,31 @@ Screens:
                                      If( CountRows(colMyTasks) = 0, 0,
                                          RoundDown( Average( AddColumns( colMyTasks, wgt,
                                              Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ), wgt ), 0 ) ) );
-                                // ---- Timeline rows -------------------------------------------------
-                                // BUILT AS COLLECTIONS, not inline in the chart's Image formula. Across a
-                                // one-way gap a chart that draws nothing is indistinguishable from a chart
-                                // whose data never arrived; a collection can be opened in Studio's
-                                // Collections pane, so this splits "the maths is wrong" from "there is
-                                // nothing to plot".
+                                // ---- Chart source: open tasks I lead ---------------------------------
+                                // ONE FOLD FOR BOTH CHARTS, so they cannot disagree about what "open" means.
+                                // Health is EFFECTIVE health — the stored issue-derived half with overdue folded
+                                // in, per rollups.task_health in schema.yaml — resolved once here rather than
+                                // re-tested per slice.
                                 //
-                                // `Sequence(CountRows(...))` + `Index(...)` is the only way a row gets a
-                                // POSITION, which is what a y-coordinate needs. The count comes from the
-                                // same table Index reads, so Index can never be out of range — it ERRORS
-                                // out of range, it does not return blank.
-                                ClearCollect( colTlSrc,
-                                    FirstN( Sort( Filter( colMyProjects,
-                                                          project_phase.Value <> "Complete"
-                                                       && !IsBlank(project_date_target) ),
-                                                  project_date_target ), 10 ) );
-                                // colTlSrc is sorted ASCENDING, so First and Last ARE the date range.
-                                // Min/Max over a date column would come back as a number.
-                                Set( gTlStart, If( IsEmpty(colTlSrc) || First(colTlSrc).project_date_target >= Today(),
-                                                   Today(), First(colTlSrc).project_date_target ) );
-                                Set( gTlEnd,   If( IsEmpty(colTlSrc), DateAdd(Today(), 30, TimeUnit.Days),
-                                                   Last(colTlSrc).project_date_target ) );
-                                Set( gTlSpan,  Max( 7, DateDiff(gTlStart, gTlEnd, TimeUnit.Days) ) );
-                                Clear( colTimeline );
-                                Collect( colTimeline,
-                                    ForAll( Sequence( CountRows(colTlSrc) ) As s,
-                                        With( { r: Index(colTlSrc, s.Value) },
-                                            { idx: s.Value,
-                                              nm:  r.project_name,
-                                              d0:  Coalesce(r.project_date_start, Today()),
-                                              d1:  r.project_date_target } ) ) );
+                                // dd is CLAMPED to -10..+10 so one task six months out cannot set the scale and
+                                // flatten every bar that matters; the end buckets mean "10 or more". A task with
+                                // no target date gets 9999, which lands in no bucket at all, and is counted
+                                // separately — a distribution that silently drops rows misstates its own total.
+                                ClearCollect( colDueSrc,
+                                    ForAll( Filter(colMyTasks, task_stage.Value <> "Completed") As t,
+                                        { hl: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(),
+                                                  "Red", Coalesce(t.task_status.Value, "") ),
+                                          dd: If( IsBlank(t.task_date_target), 9999,
+                                                  Max( -10, Min( 10, DateDiff(Today(), t.task_date_target, TimeUnit.Days) ) ) ) } ) );
+                                Set( gDueNoDate, CountRows( Filter(colDueSrc, dd = 9999) ) );
+                                // 21 BUCKETS, WRITTEN OUT — not derived from the data. A bucket only exists when a
+                                // row has that value, so grouping would drop every empty day and CLOSE UP the gaps —
+                                // and a gap at zero tasks is exactly what a distribution has to show.
+                                ClearCollect( colDueBuckets,
+                                    ForAll( Sequence(21) As s,
+                                        With( { dv: s.Value - 11 },
+                                            { i: s.Value, d: dv,
+                                              n: CountRows( Filter(colDueSrc, dd = dv) ) } ) ) );
                                 Set(gToastShow, false);
                                 Set(gToastMsg, "Refreshed"); Set(gToastTone, "Info"); Set(gToastShow, true)
                   - btnNewProject:
@@ -510,6 +498,229 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =Parent.Height - 572
                 Children:
+                  # PROJECTS FIRST, then the work under them. Fewer columns than the two
+                  # beside it — there is no parent to name, because the row IS the parent —
+                  # so it takes the smaller share rather than an equal third.
+                  - secMyProjects:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =2
+                        LayoutMinWidth: =340
+                        Height: =Parent.Height
+                      Children:
+                        - lblMyProjectsTitle:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Projects I lead   (" & gPrjLed & ")"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =28
+                              Width: =Parent.Width - 32
+                              Height: =28
+                        - lblMyProjectsEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(galMyProjects.AllItems)
+                              Text: ="Nothing open — no live project has you as its manager."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        - galMyProjects:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              # SAME COMPOSITE SORT KEY AS THE TASK LIST, for the same reasons:
+                              # one Sort because Power Fx does not guarantee a stable sort,
+                              # priority dominating, the day count breaking ties inside a band,
+                              # and +50000 keeping an overdue negative count positive so a
+                              # missing target date still sorts last within its priority.
+                              # Complete is excluded here exactly as Completed is there.
+                              Items: |
+                                =Sort( Filter(colMyProjects, project_phase.Value <> "Complete"),
+                                       Switch( project_priority.Value,
+                                               "Critical", 1, "High", 2, "Moderate", 3,
+                                               "Low", 4, "Lowest", 5, 6 ) * 100000
+                                       + If( IsBlank(project_date_target), 99999,
+                                             DateDiff(Today(), project_date_target, TimeUnit.Days) + 50000 ) )
+                              WrapCount: =1
+                              TemplateSize: =48
+                              TemplatePadding: =0
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              ShowScrollbar: =true
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 76
+                            Children:
+                              - rowMyProjectBody:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =10
+                                    PaddingLeft: =8
+                                    PaddingRight: =8
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight - 1
+                                  Children:
+                                    # PHASE glyph, the project-level counterpart of the task
+                                    # stage glyph beside it. Six values, and the fallback is the
+                                    # dashed question mark for the same reason: a phase the app
+                                    # does not know must be visible, not invisible.
+                                    # HEX TEXT, not gTheme.Color.* — these drop straight into the
+                                    # SVG string and Power Fx has no Color-to-hex conversion.
+                                    - icoMyProjectPhase:
+                                        Control: Image@2.2.3
+                                        Properties:
+                                          ImagePosition: =ImagePosition.Fit
+                                          FillPortions: =0
+                                          LayoutMinWidth: =22
+                                          Width: =22
+                                          Height: =22
+                                          Image: |
+                                            =With(
+                                                { g: Switch( Coalesce(ThisItem.project_phase.Value, ""),
+                                                      "Not Started",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#B9C0C8' stroke-width='2.5'/>",
+                                                      "Planning",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'/>"
+                                                        & "<circle cx='12.5' cy='18' r='1.7' fill='#6E7882'/>"
+                                                        & "<circle cx='18'   cy='18' r='1.7' fill='#6E7882'/>"
+                                                        & "<circle cx='23.5' cy='18' r='1.7' fill='#6E7882'/>",
+                                                      "Active",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#005A9E' stroke-width='3'/>"
+                                                        & "<circle cx='18' cy='18' r='5' fill='#005A9E'/>",
+                                                      "Stalled",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#C53A3A' stroke-width='3'/>"
+                                                        & "<rect x='14.5' y='11' width='2.5' height='14' fill='#C53A3A'/>"
+                                                        & "<rect x='19' y='11' width='2.5' height='14' fill='#C53A3A'/>",
+                                                      "Complete",
+                                                          "<circle cx='18' cy='18' r='14.5' fill='#31825D'/>"
+                                                        & "<path d='M11 18.5 L16 23.5 L25 13.5' fill='none' stroke='#FFFFFF'"
+                                                        & " stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/>",
+                                                      "Archived",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#B9C0C8' stroke-width='2.5'/>"
+                                                        & "<rect x='11' y='16.5' width='14' height='3' fill='#B9C0C8'/>",
+                                                          "<circle cx='18' cy='18' r='13' fill='none' stroke='#6E7882' stroke-width='2.5'"
+                                                        & " stroke-dasharray='4 3'/>"
+                                                        & "<text x='18' y='22.5' text-anchor='middle' font-size='13'"
+                                                        & " font-family='Segoe UI, sans-serif' fill='#6E7882'>?</text>" ) },
+                                                "data:image/svg+xml," & EncodeUrl(
+                                                    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'>" & g & "</svg>" )
+                                            )
+                                    - cellMyProjectPriority:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =Coalesce(ThisItem.project_priority.Value, "—")
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =64
+                                          Height: =32
+                                    - cellMyProjectName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.project_name
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Body
+                                          Color: =gTheme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =3
+                                          LayoutMinWidth: =120
+                                          Height: =32
+                                    # THE STORED ROLLUP, and it can be STALE — it only moves when
+                                    # a task save changes a stage, and scrProject repairs it on
+                                    # open. Shown because it is the project-level progress signal
+                                    # the cards and the ring already trade in; do not compute a
+                                    # live one here, that is a per-row scan of the task list.
+                                    - cellMyProjectPc:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =Coalesce(ThisItem.project_perc_completion, 0) & "%"
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          Align: =Align.Right
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =56
+                                          Height: =32
+                                    - cellMyProjectDue:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            =If( IsBlank(ThisItem.project_date_target), "—",
+                                                 Text(ThisItem.project_date_target, "[$-en-US]d mmm") )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: |
+                                            =If( !IsBlank(ThisItem.project_date_target)
+                                                 && ThisItem.project_date_target < Today(),
+                                                 gTheme.Color.Danger, gTheme.Color.TextMuted )
+                                          Align: =Align.Right
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =66
+                                          Height: =32
+                              - rowMyProjectLine:
+                                  Control: Rectangle@2.3.0
+                                  Properties:
+                                    Fill: =gTheme.Color.Border
+                                    X: =0
+                                    Y: =Parent.TemplateHeight - 1
+                                    Width: =Parent.TemplateWidth
+                                    Height: =1
+                              # DECLARED LAST, full template. A gallery's own OnSelect does not
+                              # reliably fire when the click lands on a child control.
+                              - galMyProjectsHit:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Text: =""
+                                    Fill: =RGBA(0, 0, 0, 0)
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderThickness: =0
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight
+                                    # RE-READ FROM THE LIST, not handed ThisItem. colMyProjects is
+                                    # a snapshot; scrProject derives a phase and can Patch it, so
+                                    # it must open on a live record. The LookUp can miss.
+                                    OnSelect: |
+                                      =Select(Parent);
+                                      Set( gSelProject,
+                                           LookUp(taskmaster_projects, ID = ThisItem.ID) );
+                                      If( IsBlank(gSelProject.ID),
+                                          Notify( "That project is no longer available. Refresh the dashboard.",
+                                                  NotificationType.Error ),
+                                          Navigate( scrProject, ScreenTransition.Cover ) )
                   - secMyTasks:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -524,13 +735,13 @@ Screens:
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
-                        # 480 IS NOT ROUND, IT IS THE TASK ROW'S FLOOR PLUS THE PANEL:
-                        # 22 + 70 + 130 + 100 + 70 columns, 40 of gaps, 16 of row padding,
-                        # 32 of panel padding. Raising it further would make rowLists the
-                        # widest band on the screen; rowCharts is 978 and this pair is 976,
-                        # so the charts still govern the minimum width and nothing clips.
-                        FillPortions: =1
-                        LayoutMinWidth: =480
+                        # 440 IS NOT ROUND: it is the task row's floor (22 + 70 + 130 + 100 +
+                        # 70 columns, 40 of gaps, 16 of row padding, 32 of panel padding = 480)
+                        # less the 40 the cells can absorb now that a THIRD panel shares this
+                        # row. rowLists is the widest band on the screen at 1252 against
+                        # rowCharts' 1204 — the two are no longer matched, and rowLists governs.
+                        FillPortions: =3
+                        LayoutMinWidth: =440
                         Height: =Parent.Height
                       Children:
                         - lblMyTasksTitle:
@@ -789,8 +1000,8 @@ Screens:
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
-                        FillPortions: =1
-                        LayoutMinWidth: =480
+                        FillPortions: =3
+                        LayoutMinWidth: =440
                         Height: =Parent.Height
                       Children:
                         - lblMyIssuesTitle:
@@ -998,17 +1209,24 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =320
                 Children:
-                  - pnlTimeline:
+                  # DAYS TO DUE, CLAMPED TO -10..+10. Negative is overdue. The clamp is what
+                  # makes the chart readable: without it one task six months out sets the
+                  # scale and every bar that matters collapses to nothing. The end bars are
+                  # therefore "10 or more", not "exactly 10", and the caption says so.
+                  #
+                  # Tasks with NO target date are not plotted and are counted separately — a
+                  # distribution that silently drops rows misstates its own total.
+                  - pnlDueBars:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
                         LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =8
                         PaddingTop: =12
                         PaddingBottom: =12
-                        PaddingLeft: =16
-                        PaddingRight: =16
+                        PaddingLeft: =12
+                        PaddingRight: =12
                         Fill: =gTheme.Color.Surface
                         BorderColor: =gTheme.Color.Border
                         BorderThickness: =1
@@ -1016,88 +1234,175 @@ Screens:
                         LayoutMinWidth: =300
                         Height: =Parent.Height
                       Children:
-                        - lblTimelineTitle:
+                        - lblDueBarsTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Timeline"
+                              Text: ="Days to due"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
                               Color: =gTheme.Color.Primary
+                              Align: =Align.Center
                               VerticalAlign: =VerticalAlign.Middle
                               FillPortions: =0
                               LayoutMinHeight: =24
-                              Width: =Parent.Width - 32
+                              Width: =Parent.Width - 24
                               Height: =24
-                        - imgTimeline:
+                        - lblDueBarsSub:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Open tasks I lead. Overdue is negative; the end bars are 10 or more."
+                                 & If( gDueNoDate > 0,
+                                       "   " & gDueNoDate & " with no due date are not plotted.", "" )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Center
+                              FillPortions: =0
+                              LayoutMinHeight: =30
+                              Width: =Parent.Width - 24
+                              Height: =30
+                        - imgDueBars:
                             Control: Image@2.2.3
                             Properties:
                               ImagePosition: =ImagePosition.Fit
                               FillPortions: =1
                               LayoutMinHeight: =90
-                              Width: =Parent.Width - 32
-                              Height: =Parent.Height - 48
-                              # GANTT of the projects you lead, soonest target first, over
-                              # colTimeline / gTlStart / gTlEnd / gTlSpan built in OnVisible.
+                              Width: =Parent.Width - 24
+                              Height: =Parent.Height - 78
+                              # BUILT FROM colDueBuckets, not inline. Across a one-way gap a chart
+                              # that draws nothing is indistinguishable from a chart whose data
+                              # never arrived, and a collection can be opened in Studio's
+                              # Collections pane. Same reason the timeline this replaces did it.
                               #
-                              # TEN ROWS. The viewBox grows with the row count, so a taller
-                              # chart renders SMALLER inside a fixed panel — the cap is what
-                              # keeps the bars legible, not a data limit.
+                              # EVERY COORDINATE IS A WHOLE NUMBER. 21 buckets across a 1050-wide
+                              # viewBox gives each a 50-unit slot, so nothing here divides into a
+                              # fraction that would have to go through Text().
                               Image: |
-                                =With( { n: CountRows(colTimeline), sp: Max(7, gTlSpan) },
-                                    // `sp`, NOT gTlSpan. A global reads BLANK until its Set has run and blank
-                                    // divides as zero, so a bare gTlSpan here is a Division by 0 on any render
-                                    // that beats OnVisible. The three Sets sit above the Collect for the same
-                                    // reason; this guard is what stops the chart depending on that ordering.
-                                    // 7 is gTlSpan's own floor, so nothing changes once the variable arrives.
-                                    // charset IS load-bearing: project names are the only
-                                    // user-supplied text in any of these charts, and a data URI
-                                    // defaults to US-ASCII, which mangles any accented name.
-                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
-                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 "
-                                      & If(n = 0, 62, 16 + n * 20 + 6) & "'>"
-                                      & "<text x='92' y='9' font-size='7' font-family='Segoe UI, sans-serif'"
-                                      & " fill='#6E7882'>" & Text(gTlStart, "d mmm") & "</text>"
-                                      & "<text x='316' y='9' text-anchor='end' font-size='7'"
-                                      & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                      & Text(gTlEnd, "d mmm") & "</text>"
-                                      & Concat( colTimeline,
-                                            "<text x='0' y='" & (16 + (idx - 1) * 20 + 13) & "' font-size='8.5'"
-                                          & " font-family='Segoe UI, sans-serif' fill='#20262D'>"
-                                          & EncodeHTML( If( Len(Trim(nm)) > 15,
-                                                            Left(Trim(nm), 14) & "..",
-                                                            Trim(nm) ) ) & "</text>"
-                                          & "<rect x='92' y='" & (16 + (idx - 1) * 20 + 5)
-                                          & "' width='224' height='10' rx='5' fill='#F2F4F7'/>"
-                                          & "<rect x='"
-                                          & ( 92 + Round( Max(0, DateDiff(gTlStart, d0, TimeUnit.Days))
-                                                          / sp * 224, 0 ) )
-                                          & "' y='" & (16 + (idx - 1) * 20 + 5) & "' width='"
-                                          & Max( 3, Round( ( DateDiff(gTlStart, d1, TimeUnit.Days)
-                                                           - Max(0, DateDiff(gTlStart, d0, TimeUnit.Days)) )
-                                                           / sp * 224, 0 ) )
-                                          & "' height='10' rx='5' fill='"
-                                          & If(d1 < Today(), "#C53A3A", "#005A9E") & "'/>" )
-                                      & If( n = 0,
-                                            // THE EMPTY STATE COUNTS OUT LOUD. "Nothing to plot" and
-                                            // "the chart is broken" look identical across a one-way
-                                            // gap, so it says which of the two filters emptied it.
-                                            "<text x='160' y='30' text-anchor='middle' font-size='10'"
-                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                          & "Nothing to plot</text>"
-                                          & "<text x='160' y='45' text-anchor='middle' font-size='7.5'"
-                                          & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>"
-                                          & CountRows(colMyProjects) & " project(s) led · "
-                                          & CountRows( Filter(colMyProjects, !IsBlank(project_date_target)) )
-                                          & " with a target date</text>",
-                                            // TODAY marker, drawn last so it sits over the bars.
-                                            "<line x1='"
-                                          & (92 + Round(DateDiff(gTlStart, Today(), TimeUnit.Days) / sp * 224, 0))
-                                          & "' y1='12' x2='"
-                                          & (92 + Round(DateDiff(gTlStart, Today(), TimeUnit.Days) / sp * 224, 0))
-                                          & "' y2='" & (16 + n * 20 + 2)
-                                          & "' stroke='#C53A3A' stroke-width='0.8' stroke-dasharray='2 2'/>" )
+                                =With( { mx: Max( 1, Max(colDueBuckets, n) ) },
+                                    "data:image/svg+xml," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1050 340'>"
+                                      & "<line x1='0' y1='260' x2='1050' y2='260' stroke='#E1E5EB' stroke-width='3'/>"
+                                      & "<line x1='525' y1='20' x2='525' y2='260' stroke='#B9C0C8'"
+                                      & " stroke-width='2' stroke-dasharray='6 5'/>"
+                                      & Concat( colDueBuckets,
+                                            "<rect x='" & ((i - 1) * 50 + 8) & "' y='"
+                                          & (260 - Round(n / mx * 210, 0)) & "' width='34' height='"
+                                          & Round(n / mx * 210, 0) & "' rx='4' fill='"
+                                          & If( d < 0, "#C53A3A", If(d = 0, "#D69828", "#005A9E") ) & "'/>"
+                                          & If( n > 0,
+                                                "<text x='" & ((i - 1) * 50 + 25) & "' y='"
+                                              & (260 - Round(n / mx * 210, 0) - 8)
+                                              & "' text-anchor='middle' font-size='24'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#20262D'>" & n & "</text>", "" )
+                                          & If( Mod(d, 5) = 0,
+                                                "<text x='" & ((i - 1) * 50 + 25) & "' y='292'"
+                                              & " text-anchor='middle' font-size='24'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                              & If(d > 0, "+", "") & d & "</text>", "" ) )
+                                      & "<text x='525' y='330' text-anchor='middle' font-size='24'"
+                                      & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>days</text>"
                                       & "</svg>" ) )
+                  # HEALTH, NOT STAGE. task_status holds only the ISSUE-DERIVED half of health;
+                  # overdue changes with no write at all, so it is folded in HERE by the reader
+                  # — see rollups.task_health in schema.yaml. Reading task_status raw
+                  # UNDER-REPORTS Red, which is the one value that must not be missed. No join:
+                  # task_date_target is already on the row.
+                  - pnlPieHealth:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =12
+                        PaddingRight: =12
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =210
+                        Height: =Parent.Height
+                      Children:
+                        - lblPieHealthTitle:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks by health"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 24
+                              Height: =24
+                        - imgPieHealth:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =90
+                              Width: =Parent.Width - 24
+                              Height: =Parent.Height - 48
+                              # SAME DONUT CONSTRUCTION AS THE STAGE PIE BESIDE IT — written-out
+                              # category table so an unused value still holds its slot and its
+                              # colour, "Other" as the failsafe so a drifted vocabulary shows up
+                              # instead of silently rescaling, running total `uc` for the offset,
+                              # r 159.155 for a circumference of exactly 1000, and every value
+                              # Power Fx supplies a whole number. The full reasoning is on that
+                              # chart and is not restated here.
+                              #
+                              # colDueSrc is the SAME open-task set the bar chart plots, folded
+                              # once in OnVisible with health already resolved — so the two
+                              # charts cannot disagree about what "open" means, and neither
+                              # recomputes the overdue test per slice.
+                              Image: |
+                                =With(
+                                    { cats: AddColumns(
+                                                Table( { i: 1, k: "Green", c: "#31825D" },
+                                                       { i: 2, k: "Amber", c: "#D69828" },
+                                                       { i: 3, k: "Red",   c: "#C53A3A" },
+                                                       { i: 4, k: "Other", c: "#8A5AA8" } ) As cat,
+                                                n, If( cat.k = "Other",
+                                                       CountRows( Filter( colDueSrc,
+                                                           !( hl = "Green" || hl = "Amber" || hl = "Red" ) ) ),
+                                                       CountRows( Filter(colDueSrc, hl = cat.k) ) ) ) },
+                                    With( { tot: Max(1, Sum(cats, n)) },
+                                        With(
+                                            { arcs: AddColumns( cats As r,
+                                                        u, Round( r.n / tot * 1000, 0 ),
+                                                        uc, Round( Coalesce( Sum( Filter(cats, i < r.i), n ), 0 )
+                                                                   / tot * 1000, 0 ) ),
+                                              leg: ForAll( Sequence( CountRows(Filter(cats, n > 0)) ) As s,
+                                                       With( { g: Index(Filter(cats, n > 0), s.Value) },
+                                                           { j: s.Value, lk: g.k, ln: g.n, lc: g.c } ) ) },
+                                            "data:image/svg+xml," & EncodeUrl(
+                                                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 440 "
+                                              & (410 + CountRows(leg) * 34 + 12) & "'>"
+                                              & "<circle cx='220' cy='200' r='159.155' fill='none'"
+                                              & " stroke='#EEF1F5' stroke-width='40'/>"
+                                              & Concat( Filter(arcs, u > 0),
+                                                    "<circle cx='220' cy='200' r='159.155' fill='none' stroke='" & c
+                                                  & "' stroke-width='40' stroke-dasharray='"
+                                                  & u & " " & (1000 - u)
+                                                  & "' stroke-dashoffset='" & Mod(1250 - uc, 1000) & "'/>" )
+                                              & "<text x='220' y='215' text-anchor='middle' font-size='90'"
+                                              & " font-weight='600' font-family='Segoe UI, sans-serif' fill='#20262D'>"
+                                              & CountRows(colDueSrc) & "</text>"
+                                              & "<text x='220' y='262' text-anchor='middle' font-size='34'"
+                                              & " font-family='Segoe UI, sans-serif' fill='#6E7882'>OPEN</text>"
+                                              & Concat( leg,
+                                                    "<rect x='120' y='" & (410 + (j - 1) * 34 + 4)
+                                                  & "' width='26' height='26' rx='6' fill='" & lc & "'/>"
+                                                  & "<text x='158' y='" & (410 + (j - 1) * 34 + 24) & "' font-size='28'"
+                                                  & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                                  & EncodeHTML(lk) & "  " & ln & "</text>" )
+                                              & "</svg>" ) ) ) )
                   - pnlPieTasks:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
