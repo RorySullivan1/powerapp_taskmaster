@@ -77,10 +77,9 @@ Screens:
         // hard-coded list drifts from SharePoint silently — project_phase carried two
         // values the app never enumerated, and those projects simply vanished.
         //
-        // status is REQUIRED, so it gets no blank row. type and impact are optional,
-        // and "(none)" is Collected FIRST so it leads each list: an optional Choice has
-        // to be clearable and {Value: ""} is not a legal write, so the blank has to be
-        // a real option rather than an empty selection.
+        // ALL THREE ARE REQUIRED, so none of them carries a blank row. There is nothing
+        // to clear to: the seed below always lands on a real member, and the save writes
+        // it unguarded.
         ClearCollect( colIssStatusOpts,
                       With( { ch: Choices([@taskmaster_issues].issue_status) },
                             ForAll( Sequence( CountRows(ch) ) As n,
@@ -88,24 +87,29 @@ Screens:
         //
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY: Sequence() numbers the rows and Index() reads the
-        // nth choice back out. Row 1 is "(none)", so the real choices start at Id 2.
-        // The Ids mean nothing beyond "which row" — never hard-code one, look it up by
-        // Label, which is what each DefaultId does.
+        // nth choice back out. The Ids mean nothing beyond "which row" — never hard-code
+        // one, look it up by Label, which is what each DefaultId does.
         ClearCollect( colIssTypeOpts,
                       With( { ch: Choices([@taskmaster_issues].issue_type) },
-                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
-                                    { Id:    n.Value,
-                                      Label: If( n.Value = 1, "(none)",
-                                                 Index(ch, n.Value - 1).Value ) } ) ) );
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         ClearCollect( colIssImpactOpts,
                       With( { ch: Choices([@taskmaster_issues].issue_impact) },
-                            ForAll( Sequence( CountRows(ch) + 1 ) As n,
-                                    { Id:    n.Value,
-                                      Label: If( n.Value = 1, "(none)",
-                                                 Index(ch, n.Value - 1).Value ) } ) ) );
+                            ForAll( Sequence( CountRows(ch) ) As n,
+                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         Set( gIssStatus, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_status.Value, "Open"), "Open" ) );
-        Set( gIssType,   If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value,   "(none)"), "(none)" ) );
-        Set( gIssImpact, If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, "(none)"), "(none)" ) );
+        // THE SEED IS TESTED AGAINST THE VOCABULARY, not just against blank. A legacy row
+        // can hold a RETIRED value — issue_type's list was replaced wholesale on 2026-08-19
+        // — and that value is not blank, so a Coalesce alone would carry it through: the
+        // picker would fall back to showing the default while the global still held the
+        // retired value, and the save would write the retired value the display denied.
+        // Falling back to the DEFAULT here keeps what is shown and what is stored equal.
+        Set( gIssType,
+             With( { v: If( gEditMode = "Edit", Coalesce(gEditIssue.issue_type.Value, ""), "" ) },
+                 If( Len(v) > 0 && v in colIssTypeOpts.Label, v, "Question" ) ) );
+        Set( gIssImpact,
+             With( { v: If( gEditMode = "Edit", Coalesce(gEditIssue.issue_impact.Value, ""), "" ) },
+                 If( Len(v) > 0 && v in colIssImpactOpts.Label, v, "Moderate" ) ) );
         Reset( txtIssName ); Reset( txtIssDesc );
         Set( gIssPicker, "" ); Set( gIssQuery, "" ); Reset( cmpIssPick );
         // Re-read DefaultDate; see the note on the pickers themselves.
@@ -395,7 +399,11 @@ Screens:
                               # issues gallery sorts on impact via a Switch that ranks four known
                               # names; a value added in SharePoint appears here and sorts last.
                               Items: =colIssImpactOpts
-                              DefaultId: =Coalesce( LookUp(colIssImpactOpts, Label = gIssImpact, Id), 1 )
+                              # THE FALLBACK IS THE DEFAULT BY LABEL, not Id 1. Id 1 is
+                              # whichever value SharePoint returns first — Low, not Moderate.
+                              DefaultId: |
+                                =Coalesce( LookUp(colIssImpactOpts, Label = gIssImpact, Id),
+                                           LookUp(colIssImpactOpts, Label = "Moderate", Id), 1 )
                               OnChange: =Set(gIssImpact, selIssImpact.Selected.Label)
             # NO GRID HERE. Type is a full-width row, and a GridLayout child spanning
             # LayoutGridColumnStart 1 to LayoutGridColumnEnd 2 did NOT render full width
@@ -424,8 +432,6 @@ Screens:
                         LayoutMinHeight: =18
                         Width: =Parent.Width
                         Height: =18
-                  # "(none)" is a real option, not a placeholder: the column is optional,
-                  # and {Value: ""} is not a legal write, so the blank has to be selectable.
                   - selIssType:
                       Control: CanvasComponent
                       ComponentName: cmpSelection
@@ -438,7 +444,11 @@ Screens:
                         Items: =colIssTypeOpts
                         # BY LABEL, not a hard-coded Id: the Ids are positional and depend
                         # on the order SharePoint returns, so nothing may assume one.
-                        DefaultId: =Coalesce( LookUp(colIssTypeOpts, Label = gIssType, Id), 1 )
+                        # THE FALLBACK IS THE DEFAULT BY LABEL, not Id 1. Id 1 is whichever
+                        # value SharePoint returns first — Approval, not Question.
+                        DefaultId: |
+                          =Coalesce( LookUp(colIssTypeOpts, Label = gIssType, Id),
+                                     LookUp(colIssTypeOpts, Label = "Question", Id), 1 )
                         OnChange: =Set(gIssType, selIssType.Selected.Label)
             - gridIss4:
                 Control: GroupContainer@1.5.0
@@ -638,7 +648,12 @@ Screens:
                              // combo box can empty it (deselecting a selected item), and a
                              // legacy row holding a retired status seeds it to something
                              // the new Items cannot display.
-                             If( Len(gIssStatus) = 0,            "status   ", "" ) )
+                             If( Len(gIssStatus) = 0,            "status   ", "" ) &
+                             // SAME NET, same reason: type and impact are required too and
+                             // are now written unguarded, so an empty one sends {Value: ""}
+                             // and the connector rejects the whole insert.
+                             If( Len(gIssType) = 0,              "type   ", "" ) &
+                             If( Len(gIssImpact) = 0,            "impact   ", "" ) )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.Danger
@@ -814,10 +829,11 @@ Screens:
                                                                    issue_date_close ), Now() ),
                                                  Now() ),
                                              Blank() ),
-                                     issue_type:
-                                         If( gIssType <> "(none)", { Value: gIssType }, Blank() ),
-                                     issue_impact:
-                                         If( gIssImpact <> "(none)", { Value: gIssImpact }, Blank() ),
+                                     // UNGUARDED, like issue_status: both are required and the
+                                     // picker offers no blank, so there is no case left where
+                                     // Blank() is the right write.
+                                     issue_type:   { Value: gIssType },
+                                     issue_impact: { Value: gIssImpact },
                                      issue_task_name:
                                          If( gIssTask.Id > 0, { Id: gIssTask.Id, Value: gIssTask.Value }, Blank() ),
                                      issue_transaction_name:

@@ -382,8 +382,8 @@ lists:
       # THE THREE RED TYPES ARE READ BY NAME in scrTaskEdit/scrIssueEdit's health
       # derivation. Renaming one here without renaming it in SharePoint does not break the
       # app loudly — the issue simply stops counting as Red and the task reads Amber.
-      - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue. DRIVES TASK HEALTH: Blockage/Exception/Limitation -> Red; any other open issue -> Amber.", values: [Approval, "Change Request", Question, Other, Blockage, Exception, Limitation] }
-      - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact. DRIVES TASK HEALTH: Critical on an open issue -> Red regardless of type.", values: [Low, Moderate, High, Critical] }
+      - { name: issue_type,             type: Choice,   required: true,                  default: Question, desc: "Type of issue. DRIVES TASK HEALTH: Blockage/Exception/Limitation -> Red; any other open issue -> Amber. Required since #23 — the app always writes one and offers no blank option. EXISTING ROWS MAY STILL HOLD BLANK: SharePoint enforces required only on write, and nothing back-fills." }
+      - { name: issue_impact,           type: Choice,   required: true,                  default: Moderate, desc: "Severity / impact. DRIVES TASK HEALTH: Critical on an open issue -> Red regardless of type. Required since #23, same terms as issue_type — readers must still tolerate a blank on a legacy row." }
       # PROVENANCE — who raised this issue, and when. Both are APP-WRITTEN, stamped
       # in a second Patch that runs on INSERT ONLY; the update path never names them,
       # so an edit leaves them alone. There is no picker and no form field for either:
