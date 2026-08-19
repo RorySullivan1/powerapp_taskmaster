@@ -22,14 +22,10 @@
   junction write.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **#11 IS BUILT AND UNPASTED (2026-08-19).** All five steps are in `main`: subtract, data
-  layer, people, task grouping, transactions. `src/Screens/scrReports.pa.yaml` is the whole
-  paste and nothing else in `src/` changed. **THE BACKLOG IS OTHERWISE EMPTY** — #9, #10 and
-  #12-#17 are all closed. The real #11 people bug was in the FETCH, not the fold: see the
-  session log before re-diagnosing anything about Done / median / on-time.
-  **The output pie groups by `task_output_audience`, NOT `task_output_format`** (user,
-  2026-08-19) — audience is enforced by `scrTaskEdit`, format never is. Format is now
-  reported nowhere.
+- **#11 HAS LANDED (user, 2026-08-19): pastes clean, ALL CHARTS RENDER.** Two paste defects
+  found and fixed since: the `task_name` error type (see Decisions) and the person-overlay task
+  row overlapping. **The overlay fix is authored but NOT yet pasted.** The rest of the backlog
+  is empty — #9, #10 and #12-#17 are all closed.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -42,6 +38,7 @@
   or leave them as worked-example voice? Answer it before assuming the port is finished.
 
 ## Decisions        (append-only; supersede, never delete)
+- [2026-08-19] **A MULTI-COLUMN GALLERY ROW IS ONE HORIZONTAL AUTO-LAYOUT CONTAINER INSIDE THE TEMPLATE — NEVER ABSOLUTELY-POSITIONED SIBLING CELLS.** The person overlay's task row was built as six cells on a hand-computed X grid (8 · 296 · 394 · 472 · 564) each with a declared `Width`. The arithmetic was correct and no two boxes overlapped ON PAPER; it overlapped ON SCREEN (user, 2026-08-19), because **a modern `Label@2.5.1` does not hold a declared Width the way that assumed**. The working idiom is `galRptPeople`'s and now `galRptOvlTask`'s: ONE `GroupContainer` AutoLayout child at `X: =0, Y: =0, Width: =Parent.TemplateWidth, Height: =Parent.TemplateHeight - 1`, whose cells carry **`FillPortions` + `LayoutMinWidth` and NO `X` and NO `Width`**. The caption row above carries the IDENTICAL portions pair-for-pair, so both derive their columns from the same numbers — two hand-kept X grids are the bug, not the spacing. A cell needing two controls (dot + word) gets TWO columns, the spare one captioned blank, rather than a second container nested inside a template — that nesting is ungrounded here. Absolute positioning inside a template is still right for things measured against the TEMPLATE rather than the row: the hairline separator and a full-template hit target — INDEX Decisions
 - [2026-08-19] **`ShowColumns` MUST NOT BE USED OVER ANYTHING ROOTED IN A NAMED FORMULA, AND WRAPPING THE NAMED FORMULA IN A `Filter` DOES NOT FIX IT.** The collection is created, `ID` and the Choice / Person / date columns resolve, and then a plain **Text** column reads back as an **error type**. TWO INDEPENDENT INSTANCES: `p.project_name` off `ActiveProjects` (bare, fixed 2026-08-17 with an explicit ForAll projection) and `t.task_name` off `Filter(LiveTasks, ...)` — Studio rejected the `colRptPersonSrc` Collect with "the TNm column expects a text type and you're using an error type" (user, 2026-08-19). The earlier comment claiming a Filter EXPRESSION made the three task/tx fetches immune was WRONG and is deleted. The safe forms are: (a) `ShowColumns` over a **data source** filtered directly — `Filter(taskmaster_transactions, ...)` — proven by colRptTx's raw date and currency reads; (b) an explicit `ForAll(... As x, { col: x.col, ... })` projection over anything else, copying Choice and Person columns WHOLE. A named-formula `ShowColumns` survives ONLY while nothing reads a field off it (colRptIss, one CountRows). **Diagnostic tell: the failing column is the one read RAW** — fields wrapped in `Coalesce` or reached through `.Value` / `.Email` mask the error and it surfaces on the first bare read — INDEX Decisions
 Pre-2026-08-13 entries: `sessions/ARCHIVE-2026.md`. Kept here because a session that does
 not know them will author something broken:
@@ -295,3 +292,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #11 BUILT in five commits: the coverage grid, the gap list, the median-cycle chart and the now-orphaned Coverage combo dropped; completed tasks fetched on stage alone because `task_date_completion >= gRptFrom` is FALSE for a blank date and silently emptied every completion measure; Tx dropped from the people table; the person overlay became a task list; band 3 is four columns with two pies; the transaction bars stack by currency beside product-type L1/L2 pies | sessions/2026-08-19-0111-issue11-scrreports-rework.md
 - 2026-08-19 | #11 follow-up: the output pie switched from task_output_format to task_output_audience because scrTaskEdit ENFORCES the audience whenever the Output section is on and never enforces the format — so audience stays complete and format accumulates blanks; the young column's Unspecified count is stated in the subtitle because on a pie that case and a broken report look identical. Fam/Fmt dropped from colRptPersonSrc, taking a per-task project LookUp with them | GitHub #11
 - 2026-08-19 | outbound port #2 to claudeBrain: the canvas-app family (7 skills, 2 agents, the air-gap brief) plus 4 generic corrections, opened as claudeBrain#36. Nothing imported — the factory's Power Platform copies remain downstream of this repo. Open question asked in the PR: whether the ported skills' `tools/` and `schema/` path references should be genericised | sessions/2026-08-19-0258-claudebrain-canvas-port.md
+- 2026-08-19 | #11 LANDED — pastes clean, all charts render. Two paste defects: the task_name error type (ShowColumns over a named formula) and the overlay task row overlapping (absolute cells vs the auto-layout idiom); both fixed, the second unpasted | GitHub #11

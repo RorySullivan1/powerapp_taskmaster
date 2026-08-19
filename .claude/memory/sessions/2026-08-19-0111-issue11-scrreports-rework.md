@@ -112,3 +112,22 @@
   is the easy mistake — the container notes say the minimum is "along the parent's Direction".
 - Row is `FillPortions` 1 : 2 : 2 and 360 high (was 420, two columns). Minimums ~1120px, matching
   band 3's ~1100.
+
+## Paste defect 1 — CONFIRMED FIXED
+- User, 2026-08-19: **"It pastes clean now, all charts render."** The explicit ForAll projection
+  over `Filter(LiveTasks, ...)` was the right fix, and it also confirms the pie renderer, the
+  currency stack and the `With({pm: LookUp(...)}, pm.Field)` record form all work.
+
+## Paste defect 2 (user, 2026-08-19) — FIXED, unpasted
+- The person overlay's task rows **overlapped**.
+- The cells were absolute on a hand-computed X grid with a declared `Width` each. **The
+  arithmetic was right — no two boxes overlapped on paper** (8..288, 296..386, 394..404,
+  410..464, 472..556, 564..714 inside 720). It overlapped anyway, so the premise was wrong:
+  a modern `Label@2.5.1` does not hold a declared Width the way that grid assumed.
+- Fixed by switching to the idiom `galRptPeople` already proves: ONE horizontal auto-layout
+  container inside the template, cells with `FillPortions` + `LayoutMinWidth` and NO `X`/`Width`,
+  captions above carrying the identical portions pair for pair.
+- The health dot is its own zero-portion column with a BLANK caption above it. That keeps one
+  caption to one cell without nesting a second container inside a gallery template — nesting is
+  proven container-in-container (band 5) but NOT container-in-template.
+- Commit `dc463a7`.
