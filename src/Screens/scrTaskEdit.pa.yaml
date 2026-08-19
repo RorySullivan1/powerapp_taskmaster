@@ -159,7 +159,7 @@ Screens:
         Reset( selTkStage ); Reset( selTkStatus ); Reset( selTkPriority );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset.
         Reset( cboTkLanguage ); Reset( cboTkFormat ); Reset( cboTkBranding ); Reset( cboTkAudience ); Reset( cboTkClientStage );
-        Reset( tglTkOutput ); Reset( tglTkClient );
+        Reset( tglTkOutput ); Reset( tglTkClient ); Reset( tglTkApprovalReq );
         // A date picker re-reads DefaultDate ONLY on Reset. Without these the seeds
         // never take on a second visit and the Patch writes Blank() over the stored
         // dates. The completion date is derived on save and has no picker at all.
@@ -885,6 +885,7 @@ Screens:
                                   || !IsBlank(gEditTask.task_output_branding.Value)
                                   || !IsBlank(gEditTask.task_output_audience.Value)
                                   || !IsBlank(gEditTask.task_output_approval_id)
+                                  || Coalesce(gEditTask.task_output_approval_flag, false)
                                   // colTkProducts, not the retired task_product_id. OnVisible
                                   // seeds it from the junction before this Default is read, so
                                   // a task whose ONLY output data is its products still opens
@@ -944,10 +945,8 @@ Screens:
                                     LayoutMinHeight: =18
                                     Width: =Parent.Width
                                     Height: =18
-                              # The audience decides whether an approval id is required to
-                              # COMPLETE the task. "Internal Only" is the one value that needs
-                              # none; every other value does. Enforced in lblTkMissing, which is
-                              # the only thing that can block the save and say why.
+                              # Descriptive only — the approval gate is tglTkApprovalReq, not a
+                              # value in this list. Every audience value behaves the same way.
                               - cboTkAudience:
                                   Control: ModernCombobox@1.1.1
                                   Properties:
@@ -964,6 +963,50 @@ Screens:
                                     Width: =Parent.Width
                                     Height: =36
                                     OnChange: =Set(gTkAudience, cboTkAudience.Selected.Value)
+                        # SITS BETWEEN THE AUDIENCE AND THE ID so the flag reads as part of
+                        # the approval pair rather than of the audience. Pinned at 150 and
+                        # FillPortions 0 — only the two text columns flex.
+                        - colTkApprovalReq:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Vertical
+                              LayoutAlignItems: =LayoutAlignItems.Start
+                              LayoutGap: =4
+                              FillPortions: =0
+                              LayoutMinWidth: =150
+                              Width: =150
+                              Height: =62
+                            Children:
+                              - lblTkApprovalReqCap:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: ="Approval required?"
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =0
+                                    LayoutMinHeight: =18
+                                    Width: =Parent.Width
+                                    Height: =18
+                              # THE GATE IS THIS FLAG, per task, not the audience value. While it
+                              # is on, lblTkMissing blocks stage Completed until the id beside it
+                              # is filled — that label is the only thing that stops the save and
+                              # says why.
+                              - tglTkApprovalReq:
+                                  Control: Classic/Toggle@2.1.0
+                                  Properties:
+                                    Default: |
+                                      =If( gEditMode = "Edit",
+                                           Coalesce(gEditTask.task_output_approval_flag, false),
+                                           false )
+                                    FalseText: =""
+                                    TrueText: =""
+                                    FillPortions: =0
+                                    LayoutMinWidth: =60
+                                    Width: =60
+                                    Height: =30
                         - colTkApproval:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -980,7 +1023,7 @@ Screens:
                                   Properties:
                                     Text: |
                                       ="Approval ID (external portal)" &
-                                       If( gTkAudience <> "(none)" && gTkAudience <> "Internal Only",
+                                       If( tglTkApprovalReq.Value,
                                            "  ·  required to complete", "" )
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.Small
@@ -1348,14 +1391,14 @@ Screens:
                     If( Len(gTkStage) = 0,             "a stage   ", "" ) &
                     If( Len(gTkStatus) = 0,            "a health   ", "" ) &
                     If( Len(gTkPriority) = 0,          "a priority   ", "" ) &
-                    // A task that produces output must say who for. A non-internal
-                    // audience must also carry an external approval id, but only once the
-                    // task is being COMPLETED — the approval portal issues that id late in
-                    // the lifecycle, so requiring it earlier would block ordinary drafting.
+                    // A task that produces output must say who for. A task FLAGGED as
+                    // needing approval must also carry the external id, but only once it
+                    // is being COMPLETED — the approval portal issues that id late in the
+                    // lifecycle, so requiring it earlier would block ordinary drafting.
                     If( tglTkOutput.Value && gTkAudience = "(none)",
                         "an output audience   ", "" ) &
                     If( tglTkOutput.Value && gTkStage = "Completed"
-                        && gTkAudience <> "(none)" && gTkAudience <> "Internal Only"
+                        && tglTkApprovalReq.Value
                         && Len(Trim(txtTkApprovalId.Text)) = 0,
                         "an approval ID before completing   ", "" ) )
                   Font: =gTheme.Font
@@ -1474,6 +1517,11 @@ Screens:
                     If( Len(gTkSupporter.Mail) > 0,
                     { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" },
                     Blank() ),
+                    // FALSE, never Blank(), when Output is off: this is a Yes/No column and
+                    // a blank one reads as No everywhere anyway, so writing the boolean keeps
+                    // the stored value and the toggle saying the same thing.
+                    task_output_approval_flag:
+                    tglTkOutput.Value && tglTkApprovalReq.Value,
                     task_output_approval_id:
                     If( tglTkOutput.Value && Len(Trim(txtTkApprovalId.Text)) > 0,
                     Trim(txtTkApprovalId.Text), Blank() ),

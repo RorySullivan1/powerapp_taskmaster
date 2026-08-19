@@ -326,9 +326,10 @@ form itself.
 - **`task_output_asset` is not editable.** `asset_library` has no schema, so there is nothing
   to bind to. The task editor says so on screen instead of offering a control that can't work.
 - **The Output section carries a conditional requirement the list cannot.** With the section on,
-  an audience is required to save at all, and a non-`Internal Only` audience additionally needs an
-  approval id to reach stage `Completed`. Enforced only in `lblTkMissing` — see
-  *Constraints SharePoint cannot hold* in `.claude/context/schema.md`.
+  an audience is required to save at all, and a task whose `Approval required?` toggle is on
+  additionally needs an approval id to reach stage `Completed`. The audience VALUE gates nothing.
+  Enforced only in `lblTkMissing` — see *Constraints SharePoint cannot hold* in
+  `.claude/context/schema.md`.
 - **No cross-currency figure exists in the app** (Q14). The transaction form writes the native
   notional and its currency only; conversion happens in Power BI against an FX dimension keyed on
   currency + trade date. `scrProject`'s transactions tab totals per currency and says so. Do not

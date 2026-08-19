@@ -244,7 +244,13 @@ lists:
       # when another field is set" — marking it required here would reject every task
       # that produces no output at all. scrTaskEdit enforces both this and the approval
       # rule in the desc below; SharePoint holds the value, not the constraint.
-      - { name: task_output_audience,  type: Choice,          required: false,                 desc: "Who the output is for. GATES task_output_approval_id: any value but 'Internal Only' must carry an approval id before the task can reach stage Completed.", values: ["Direct Retail", "Indirect Retail", "Client-Specific", "Generic", "Internal Only"] }
+      - { name: task_output_audience,  type: Choice,          required: false,                 desc: "Who the output is for. Descriptive only — it gates nothing; task_output_approval_flag decides whether an approval id is required.", values: ["Direct Retail", "Indirect Retail", "Client-Specific", "Generic", "Internal Only"] }
+      # THE APPROVAL GATE. Set per task rather than derived from the audience: the two
+      # are independent, and an audience value is a poor proxy for "someone must sign
+      # this off". scrTaskEdit blocks stage Completed while this is true and the id is
+      # empty. NOT list-required and NOT enforceable in SharePoint — a conditional
+      # requirement has no column-level expression, so the app holds the rule.
+      - { name: task_output_approval_flag, type: Boolean,      required: false,                 default: false, desc: "TRUE when this task's output needs an external approval. Gates task_output_approval_id: while true, the task cannot reach stage Completed without an id." }
       - { name: task_output_approval_id, type: Text,          required: false,                 desc: "ID of the approval task in the EXTERNAL approval portal (out of scope). Free-text pointer only — NOT a lookup, not validated, not indexed. Replaced the task_output_approval lookup on 2026-08-09 when asset_approval was retired." }
       - { name: task_output_language,  type: Choice,          required: false,                 desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
       - { name: task_output_format,    type: Choice,          required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
