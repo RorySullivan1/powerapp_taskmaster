@@ -23,8 +23,12 @@
   **Existing issues holding blank or a RETIRED type are edited into a default on open**, which
   is a silent back-fill on save; scrHome and scrProject still Coalesce blanks and must keep
   doing so for rows nobody has touched.
-- **BACKLOG: #24 scrHome project visibility + chart edits · #25 scrProjectEdit schema rework**,
-  neither started. Everything #9-#22 is closed. #25 is SCHEMA work: `schema/schema.yaml` is the
+- **#24 IS BUILT AND UNLANDED — `scrHome` QUEUED FOR PASTE** (alongside #23's `scrIssueEdit`).
+  A third gallery "Projects I lead" leads rowLists; the timeline is GONE, replaced by a
+  days-to-due bar chart clamped to -10..+10 and an open-tasks-by-health donut. Both read one
+  fold, `colDueSrc`, with EFFECTIVE health resolved once. **Removing the timeline deleted
+  `gTlSpan`** — the Division by 0 fixed earlier today no longer has a call site.
+- **BACKLOG: #25 scrProjectEdit schema rework**, not started. Everything #9-#22 is closed. #25 is SCHEMA work: `schema/schema.yaml` is the
   golden source and internal names FREEZE at creation, so settle columns before provisioning.
 - **STANDING RISKS AND UNEXERCISED BEHAVIOUR — landed is not the same as exercised.** Do not
   claim any of these work:
@@ -338,3 +342,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #22 paste defect: Set() removed from the health-recompute ForAll on scrIssueEdit and scrProject; gHlScrapI/gHlScrapP/gHlErr were all write-only and are gone. LANDED clean. Scan of all 91 ForAll sites finds no other occurrence | GitHub #22
 - 2026-08-19 | #22 (derived task health) LANDED and CLOSED after its ForAll paste defect was fixed; backlog is now #23, #24, #25, none started. State block consolidated — the closed-issue narrative moved out, the standing risks kept | GitHub #22
 - 2026-08-19 | #23 BUILT: issue_type and issue_impact required with defaults Question/Moderate, "(none)" dropped from both pickers, save unguarded. Two traps handled that the bare requirement misses — the seed is tested against the VOCABULARY (a retired value is not blank) and the DefaultId fallback resolves the default BY LABEL, not Id 1 | GitHub #23
+- 2026-08-19 | #24 BUILT: scrHome gains a Projects-I-lead gallery and swaps the timeline for a clamped days-to-due bar chart plus an effective-health donut; rowLists is now the widest band (1252 vs rowCharts 1204) and the old comment claiming the charts govern is corrected | GitHub #24
