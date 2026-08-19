@@ -698,6 +698,7 @@ Screens:
                                             =If( !gPrDelArm,
                                                  Set( gPrDelArm, true ),
                                                  Set( gPrDelErr, "" );
+                                                 Set( gPrDelErrI, "" ); Set( gPrDelErrX, "" ); Set( gPrDelErrT, "" );
                                                  // Children FIRST. Every child carries a REQUIRED lookup to the
                                                  // project, so removing the parent while they exist leaves rows
                                                  // SharePoint will not let anything edit afterwards.
@@ -706,23 +707,38 @@ Screens:
                                                  // row limit and deletes them one by one, and a partial pass raises
                                                  // NO error. COUNT, THEN REFUSE — never half-do it.
                                                  Set( gPrDelBlock, false );
-                                                 With( { nI: CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gSelProject.ID) ),
-                                                         nX: CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gSelProject.ID) ),
-                                                         nT: CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gSelProject.ID) ) },
-                                                     If( nI >= 500 || nX >= 500 || nT >= 500,
-                                                         Set( gPrDelBlock, true ),
-                                                         IfError( Set( gPrDelScrapI,
-                                                                       RemoveIf( taskmaster_issues,
-                                                                                 issue_project_id.Id = gSelProject.ID ) ),
-                                                                  Set( gPrDelErr, FirstError.Message ) );
+                                                 // THE THREE GUARD COUNTS, ISSUED TOGETHER. They cannot stay in a
+                                                 // `With`: Concurrent takes BEHAVIOUR formulas, so each count has to
+                                                 // land in a global before anything can test it.
+                                                 Concurrent(
+                                                     Set( gPrDelNI, CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gSelProject.ID) ) ),
+                                                     Set( gPrDelNX, CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gSelProject.ID) ) ),
+                                                     Set( gPrDelNT, CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gSelProject.ID) ) ) );
+                                                 If( gPrDelNI >= 500 || gPrDelNX >= 500 || gPrDelNT >= 500,
+                                                     Set( gPrDelBlock, true ),
+                                                     // ISSUES ALONE AND FIRST. issue_task_name and issue_transaction_name
+                                                     // point at the other two children, so an issue must never outlive
+                                                     // what it references. This one stage cannot be parallelised.
+                                                     IfError( Set( gPrDelScrapI,
+                                                                   RemoveIf( taskmaster_issues,
+                                                                             issue_project_id.Id = gSelProject.ID ) ),
+                                                              Set( gPrDelErrI, FirstError.Message ) );
+                                                     // Transactions and tasks reference each other in NEITHER direction,
+                                                     // so they go together. PER-ARM ERROR GLOBALS, not one shared
+                                                     // gPrDelErr — Concurrent's arms must not write the same state.
+                                                     Concurrent(
                                                          IfError( Set( gPrDelScrapX,
                                                                        RemoveIf( taskmaster_transactions,
                                                                                  transaction_project_id.Id = gSelProject.ID ) ),
-                                                                  Set( gPrDelErr, FirstError.Message ) );
+                                                                  Set( gPrDelErrX, FirstError.Message ) ),
                                                          IfError( Set( gPrDelScrapT,
                                                                        RemoveIf( taskmaster_tasks,
                                                                                  task_project_id.Id = gSelProject.ID ) ),
-                                                                  Set( gPrDelErr, FirstError.Message ) ) ) );
+                                                                  Set( gPrDelErrT, FirstError.Message ) ) ) );
+                                                 // ONE error string for everything below, which still reads only
+                                                 // gPrDelErr. Coalesce skips an EMPTY STRING as well as a blank, so the
+                                                 // three seeds above do not mask a real message.
+                                                 Set( gPrDelErr, Coalesce( gPrDelErrI, gPrDelErrX, gPrDelErrT, "" ) );
                                                  If( Len(gPrDelErr) = 0 && !gPrDelBlock,
                                                      IfError( Set( gPrDelScrapP,
                                                                    Remove( taskmaster_projects, gSelProject ) ),
