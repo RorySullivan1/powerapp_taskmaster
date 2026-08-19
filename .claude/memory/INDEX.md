@@ -6,15 +6,15 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. TEN ARE CLOSED (#27–#33, #36, #37, #39); #34, #35, #38 and
-  #40 are open and not started.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md; the
-  take-next assessment is in sessions/2026-08-19-2047-issues-39-33-37-built.md.
-- **#33, #37 AND #39 CLOSED AS BUILT, NOT AS LANDED (user instruction, 2026-08-19)** — the first
-  time the two have been separated. **The GitHub state no longer tracks what is in Studio.**
-- **PASTE QUEUE IS NOT EMPTY: `scrProjectEdit` (#33) and `scrProductEdit` (#37) are authored and
-  unpasted.** **A failed paste on either screen needs a NEW issue; the closed ones cannot track
-  it.** **#39 IS FULLY DONE — `transaction_product_id` is INDEXED ON THE LIVE LIST (user,
-  2026-08-19)**, so schema and SharePoint agree.
+- **PERF BACKLOG — GitHub #27–#40. ELEVEN DONE (#27–#33, #36, #37, #39, #40); #34, #35 and #38
+  remain.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md; the take-next assessment is
+  in sessions/2026-08-19-2047-issues-39-33-37-built.md.
+- **#33 AND #37 LANDED (user, 2026-08-19); #39 is done on BOTH sides** — `transaction_product_id`
+  is indexed on the live list, so schema and SharePoint agree.
+- **PASTE QUEUE: #40 — `App.OnStart` (FORMULA BAR, no code view), `scrReports`, `scrHome`.**
+- **#34 is BLOCKED ON A USER DECISION** (prefix search vs substring + a truncation banner);
+  **#35 is BLOCKED ON A PROBE** that must be pasted first; **#38 is deferred to its own pass**
+  (rewrites the destructive path).
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -374,8 +374,15 @@ not know them will author something broken:
 
 - 2026-08-19 | **#39 COMPLETE ON BOTH SIDES: `transaction_product_id` is INDEXED ON THE LIVE `taskmaster_transactions` LIST** (user, 2026-08-19), so the golden source and SharePoint agree and the pending marker in schema.yaml is gone. The list now carries six indexes (name, project_id, client_name, product_id, project_archived, date) against a documented max of 20. **The constraint that made this urgent, grounded on MS Learn: the list limit to ADD OR REMOVE an indexed column is 20,000 items** — above it the create is itself blocked by the threshold, so the remedy is unavailable exactly when it is needed. List View Threshold is 5,000 and is NOT adjustable in SharePoint Online. Single-value Lookup is stored as an int and is indexable; LookupMulti is not | GitHub #39
 
+- 2026-08-19 | #33 and #37 LANDED (user) — `scrProjectEdit` and `scrProductEdit` pasted clean. Concurrent over two ForAll+Collect loops is accepted by Studio, and so is the scratch-collection ticker merge. **Both had already been CLOSED as built**, so the landing is recorded as a follow-up comment rather than a state change. As always, a paste confirmation and not a measurement — #37's Live Monitor "Done when" was never taken | GitHub #33, #37
+
+- 2026-08-19 | #40 BUILT: `Set( gDataRowLimit, 2000 )` in App.OnStart, and all SEVEN `>= 2000` sentinels (six in gRptTrunc, one in gIssLed) now read it. **THE ISSUE'S PROPOSAL AS WRITTEN WOULD HAVE SHIPPED A COLD-START REGRESSION** it does not mention: App.OnStart is NON-BLOCKING and **a blank compares as ZERO**, so an unseeded gDataRowLimit makes every `>=` test TRUE — gRptTrunc would show a false all-six-truncated banner and gIssLed would take the expensive per-project arm #30 removed. **Fixed by seeding it in the two OnVisible handlers beside the existing gUserEmail self-heal**, which is there for the identical reason. **The number therefore lives in THREE places, not one — a deliberate trade**: still down from seven, all three are `gDataRowLimit` sites one grep finds, and a mismatch now degrades gracefully instead of going silently dead. REJECTED a named formula in App.Formulas (the repo has a recorded published-app failure — it is why gTheme is a Set) and `Coalesce(gDataRowLimit, 2000)` per sentinel (seven literals again). **A wrong value is still UNDETECTABLE** — Power Fx cannot read the Studio setting; the checklist guarding it is in gitignored CLAUDE.local.md | GitHub #40
+
+- 2026-08-19 | **PAREN-BALANCE CHECKING NEEDS A CHARACTER STATE MACHINE, NOT A REGEX** — now `tools/balance_check.py`. Stripping `//` comments before string literals eats `http://www.w3.org/2000/svg` in every SVG Image property and reports false unbalanced; stripping `'...'` first eats prose apostrophes ("the fold's") and the parens after them. Both wrong answers were produced against known-good committed source before the state machine agreed the whole repo balances. Do not re-derive a regex version | tools/balance_check.py
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
+- 2026-08-19 | issue #40: the data row limit named once as gDataRowLimit in App.OnStart, seven sentinels repointed, seeded in two OnVisible handlers because OnStart is non-blocking and blank compares as zero; rebuild checklist added to (gitignored) CLAUDE.local.md; tools/balance_check.py added | sessions/2026-08-19-2105-issue-40-datarowlimit.md
 - 2026-08-19 | issues #39, #33, #37 built: transaction_product_id indexed in the golden source (no paste); scrProjectEdit's two child-creation loops issued concurrently with split result collections; scrProductEdit's three reference fetches cached per session with a local ticker merge on save | sessions/2026-08-19-2047-issues-39-33-37-built.md
 - 2026-08-19 | comment purge across all 22 files in src/: 2914 -> 1689 comment lines, 1054 lines removed, density 18% -> 11%; repeats hoisted to file headers, changelog prose deleted, non-comment lines verified byte-identical per file | sessions/2026-08-19-1815-comment-purge.md
 - 2026-08-19 | issue #26: scrReports band 4 reworked to three columns — trend chart moved left and its viewBox cut 900->480, NEW projects-by-phase pie (enumerated, not Distinct), NEW open-tasks-due bars keyed on Today() + 14 days; rowRptAge and gRptAgeA..D/gRptStalled deleted, gRptNoTarget kept on the pie subtitle | INDEX Decisions 2026-08-19
