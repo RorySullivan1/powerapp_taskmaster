@@ -103,18 +103,39 @@ Screens:
               // or a quarter — 7, 5 and 13 bars, all within what the chart already sizes.
               Set( gRptBucketDays, If( gRptPeriod = "1W", 1, 7 ) );
               Set( gRptBucketN, RoundUp( gRptSpanDays / gRptBucketDays, 0 ) );
-              // ---- F1..F5, all delegable ------------------------------------------
+              // ---- F1..F5 ----------------------------------------------------------
+              // EVERY FILTER HERE DELEGATES; the ForAll around it is a LOCAL projection over
+              // the rows that come back, exactly as colRptPrj does below.
+              //
+              // ShowColumns MUST NOT BE USED OVER ANYTHING ROOTED IN A NAMED FORMULA, and a
+              // Filter wrapped around one does NOT fix it. The collection is created, ID and
+              // the Choice/Person/date columns resolve, and then a plain TEXT column reads
+              // back as an ERROR type — `task_name` off LiveTasks, exactly as `project_name`
+              // off ActiveProjects did. Two independent instances, same symptom, same fix:
+              // write the record out by hand so the shape is stated rather than inferred.
+              // colRptTx below keeps ShowColumns because it filters a DATA SOURCE directly,
+              // which is the only form that is actually safe.
+              //
               // F1 is unbounded but SELF-LIMITING: open work does not accumulate.
               // The stages are ENUMERATED because a Text <> does not delegate.
+              // The Choice and Person columns are copied WHOLE, so task_stage.Value and
+              // task_lead.Email still resolve downstream.
               Concurrent(
                   ClearCollect( colRptOpen,
-                      ShowColumns(
+                      ForAll(
                           Filter( LiveTasks,
                                   task_stage.Value = "Not Started" || task_stage.Value = "Planning"
-                               || task_stage.Value = "Drafting"    || task_stage.Value = "Finalizing" ),
-                          ID, task_name, task_stage, task_status, task_date_start,
-                          task_date_target, task_lead, task_supporter, task_project_id,
-                          task_output_audience ) ),
+                               || task_stage.Value = "Drafting"    || task_stage.Value = "Finalizing" ) As s,
+                          { ID:                   s.ID,
+                            task_name:            s.task_name,
+                            task_stage:           s.task_stage,
+                            task_status:          s.task_status,
+                            task_date_start:      s.task_date_start,
+                            task_date_target:     s.task_date_target,
+                            task_lead:            s.task_lead,
+                            task_supporter:       s.task_supporter,
+                            task_project_id:      s.task_project_id,
+                            task_output_audience: s.task_output_audience } ) ),
                   // BOUNDED ON STAGE ALONE; the period is applied locally below.
                   // task_date_completion is optional and `>= gRptFrom` is FALSE for a blank
                   // date, so a task that reached Completed without one never entered this
@@ -122,10 +143,16 @@ Screens:
                   // empty with nothing on screen to say why. Completed work DOES accumulate
                   // where open work does not, which is what the truncation banner is for.
                   ClearCollect( colRptDoneAll,
-                      ShowColumns(
-                          Filter( LiveTasks, task_stage.Value = "Completed" ),
-                          ID, task_name, task_status, task_date_start, task_date_completion,
-                          task_date_target, task_lead, task_supporter, task_project_id ) ),
+                      ForAll( Filter( LiveTasks, task_stage.Value = "Completed" ) As d,
+                          { ID:                   d.ID,
+                            task_name:            d.task_name,
+                            task_status:          d.task_status,
+                            task_date_start:      d.task_date_start,
+                            task_date_completion: d.task_date_completion,
+                            task_date_target:     d.task_date_target,
+                            task_lead:            d.task_lead,
+                            task_supporter:       d.task_supporter,
+                            task_project_id:      d.task_project_id } ) ),
                   // F3 is the LOAD-BEARING bound — transactions grow fastest.
                   ClearCollect( colRptTx,
                       ShowColumns(
@@ -134,17 +161,8 @@ Screens:
                                && transaction_date >= gRptFrom2x ),
                           ID, transaction_date, transaction_client_name, transaction_project_id,
                           transaction_product_id, transaction_currency, transaction_notional ) ),
-                  // AN EXPLICIT ForAll PROJECTION, NOT ShowColumns, AND THE ONLY FETCH ON
-                  // THIS SCREEN THAT NEEDS TO BE. ShowColumns over a BARE NAMED FORMULA
-                  // accepts the column names but does not carry the schema into the
-                  // collection, so `ClearCollect` reports no error while every later
-                  // `p.project_name` reads as "not recognized". The three fetches above
-                  // are immune because their first argument is a Filter EXPRESSION, whose
-                  // type resolves directly to the data source; colRptIss survives the same
-                  // bare-named-formula shape only because nothing ever reads a field off
-                  // it. Writing the record out by hand states the shape outright, which
-                  // is both the fix and a stronger guarantee than ShowColumns gave against
-                  // Explicit Column Selection dropping a column.
+                  // AN EXPLICIT ForAll PROJECTION for the same reason F1 and F2 are: this
+                  // one reads `p.project_name` off ActiveProjects, a named formula.
                   // The Choice and Person columns are copied WHOLE, so project_phase.Value
                   // and project_manager.Email still resolve downstream.
                   ClearCollect( colRptPrj,
@@ -161,6 +179,10 @@ Screens:
                             project_requestor:       p.project_requestor,
                             project_manager:         p.project_manager,
                             project_supporter:       p.project_supporter } ) ),
+                  // ShowColumns over a named formula, and only safe because NOTHING EVER
+                  // READS A FIELD OFF THIS. It feeds one CountRows. Reading a text column
+                  // off it would hit the same error type F1 and F2 exist to avoid — project
+                  // it by hand first if that day comes.
                   ClearCollect( colRptIss, ShowColumns( OpenIssues, ID, issue_project_id ) )
               );
               // A completed task with NO completion date is in, in every window: the app
