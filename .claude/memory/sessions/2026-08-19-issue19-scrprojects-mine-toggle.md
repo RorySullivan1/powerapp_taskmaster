@@ -70,3 +70,20 @@ flagged rather than silently corrected: the toggle filters `project_manager`, so
 is "only projects I lead". **The user chose "Only show my projects" (2026-08-19)** and that is
 what `lblOnlyMine.Text` now carries, along with the empty-state sentence that names the toggle.
 Nothing else moved — no predicate reads the string.
+
+## Follow-up (same day, after #19 landed) — contains-search
+User asked whether the name search can match anywhere in the name rather than at the start.
+It can, but not on the server: the SharePoint connector's delegable table gives Text only
+`=`, `Filter`, `Lookup`, `Sort`, `SortByColumns` and `StartsWith`, and neither `Search` nor the
+substring `in` appears in it — the SQL table lists both, so the absence is deliberate.
+
+Built as an OUTER `Filter` wrapping the delegated `If`, not as a flat predicate inside the eight
+branches. The branches keep folding — phase, coverage and lead still run server-side — and only
+the rows they return are scanned locally for the substring. Flattening it would take the WHOLE
+query non-delegable and leave the lead and phase tests reading one arbitrary page.
+
+The cost is stated in the file: the outer pass can only see what the inner query returned, so
+the search's completeness is bounded by the **data row limit**, and it fails silently. That is
+survivable only because the schema keeps every list "safely under 2000 rows in scope" — the
+limit must actually be set to 2000. Empty search is tested explicitly rather than relying on
+`"" in text` matching everything, for the reason recorded above.
