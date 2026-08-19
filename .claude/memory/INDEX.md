@@ -13,10 +13,13 @@
   is indexed on the live list, so schema and SharePoint agree.
 - **#40 LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** `App.OnStart` went
   through the formula bar, `scrReports` and `scrHome` through code view, all clean.
-- **THE WHOLE PERF BACKLOG #27–#40 IS BUILT.** #34, #35 and #38 are BUILT AND UNLANDED;
-  everything else is landed and closed.
-- **PASTE QUEUE: `scrProjects` (#34), `scrProject` (#38), `scrReports` (#35).**
-- The `scrProbeDateNull` probe HAS RUN and can be deleted from Studio.
+- **THE PERF BACKLOG #27–#40 IS COMPLETE — ALL FOURTEEN LANDED AND CLOSED (user, 2026-08-19).**
+  **THE PASTE QUEUE IS EMPTY.** There is no open perf work.
+- **NONE OF IT WAS EVER MEASURED.** Every one of the fourteen landed on a paste confirmation;
+  no Live Monitor count, payload figure or wall-time reading was taken before or after any of
+  them. The gains are what the source now does, not observed numbers. **Do not let a later
+  session cite these as measured results.**
+- The `scrProbeDateNull` probe HAS RUN and its result is recorded; it can be deleted from Studio.
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -395,6 +398,8 @@ not know them will author something broken:
 - 2026-08-19 | **PROBE RUN (#35): `task_date_completion = Blank()` DELEGATES on a DateTime column; `IsBlank(task_date_completion)` DOES NOT.** The asymmetry the issue was written on, confirmed. **THE PROBE WAS BADLY DESIGNED AND NEARLY UNREADABLE**: every sub-case is wrapped in `CountRows`, which is itself non-delegable, so all six labels carried an identical "CountRows Operation not supported" that says nothing about the Filter inside — **rule 4 again, the same instrument-sharing error that lost `scrProbeRerun` sub-case D.** It was saved by sub-case F, which was written to measure SCALE and happens to use `IsBlank()` where C/D/E use `= Blank()`: F returned "CountRows not supported **& task_date_completion - large dataset**", proving the checker reports predicate warnings ALONGSIDE the aggregate warning on the same label and is actively examining this column — which is what makes C/D/E's silence evidence of absence. **Next probe: no aggregate in the instrument** — a gallery `Items` or `First(Filter(...)).col` carries none. **RESIDUAL RISK IS NOT ZERO**: if the predicate does not fold, the fetch degrades from "completed tasks" to "first 2000 LIVE tasks then filtered", and `gRptTrunc` would NOT catch it because it counts AFTER the local filter | tests/README.md
 
 - 2026-08-19 | #35 BUILT: `colRptDoneAll` is bounded on `gRptFrom` with `|| task_date_completion = Blank()` beside it, on the probe result above. **Corroborated at data row limit 1: the count went 0 -> 1 on SET CUTOFF** — a non-delegating filter would have tested one locally-fetched row and shown 0. That is corroboration, not proof: one row could match by chance, so the WARNINGS remain the evidence. `gRptFrom`, not `gRptFrom2x` — only transactions need the prior window. **`colRptDone` still re-applies the window LOCALLY and that is not redundant**: a SharePoint DateTime is compared server-side in the LIST's timezone, so the fetch boundary can sit up to a day off the client's; the local pass is the boundary every figure uses and can only narrow, never widen. `IsBlank()` is correct there because a collection has no query behind it. **THE IN-FILE COMMENT WARNS AGAINST "TIDYING" `= Blank()` INTO `IsBlank()`** — same-looking test, un-delegates the whole fetch, fails silently, and gRptTrunc cannot see it | GitHub #35
+
+- 2026-08-19 | **#34, #35 AND #38 LANDED AND CLOSED (user) — THE PERF BACKLOG #27–#40 IS COMPLETE.** `scrProjects`, `scrReports` and `scrProject` all pasted clean. Live now: the projects search delegates as a PREFIX match (typing a word from the middle of a name finds nothing — deliberate, and the empty-state label says "starts with"); the completed-task report fetch is bounded on gRptFrom with the `= Blank()` null arm; and the project delete cascade issues its guard counts together and deletes transactions and tasks in parallel after issues. **ALL FOURTEEN ISSUES LANDED WITHOUT A SINGLE MEASUREMENT** — no Live Monitor count, payload figure or wall-time reading was ever taken. **UNEXERCISED AND WORTH A DELIBERATE RUN:** a project delete where transactions succeed and tasks fail, which is the only path that exercises #38's Coalesce of per-arm errors; the 500-item block path; and #35's `= Blank()` bound against a tenant large enough for delegation to matter | GitHub #34, #35, #38
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
