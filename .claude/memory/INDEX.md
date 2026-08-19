@@ -12,9 +12,9 @@
 - **#33, #37 AND #39 CLOSED AS BUILT, NOT AS LANDED (user instruction, 2026-08-19)** — the first
   time the two have been separated. **The GitHub state no longer tracks what is in Studio.**
 - **PASTE QUEUE IS NOT EMPTY: `scrProjectEdit` (#33) and `scrProductEdit` (#37) are authored and
-  unpasted.** #39 needs no paste but needs `transaction_product_id` indexed in SharePoint List
-  settings — the schema says so, the live list does not yet carry it. **A failed paste on either
-  screen needs a NEW issue; the closed ones cannot track it.**
+  unpasted.** **A failed paste on either screen needs a NEW issue; the closed ones cannot track
+  it.** **#39 IS FULLY DONE — `transaction_product_id` is INDEXED ON THE LIVE LIST (user,
+  2026-08-19)**, so schema and SharePoint agree.
 - **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
   in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
@@ -371,6 +371,8 @@ not know them will author something broken:
 - 2026-08-19 | #37 BUILT: `scrProductEdit.OnVisible` rebuilt three reference collections per visit, one of them (`colPdUndAll`) a non-delegable `Concat` over the WHOLE products list — paid at the deepest point of another workflow, since the pickers open this screen mid-save. All three now `If(IsEmpty(...))`-guarded in one Concurrent (the #31 pattern, sixth application). **`btnPdSave` merges the tickers it just wrote into the cache LOCALLY rather than refetching**, staged through `colPdUndMerge` because the obvious shape would ClearCollect over the collection it is reading — unverifiable across the gap, so not used. **THE SORT IN THAT MERGE IS LOAD-BEARING**: `galPdUndSug.Items` is `FirstN(..., 12)` over the order, so an appended tail would never be seen. Staleness moves from per-visit to per-session for OTHER people's additions only | GitHub #37
 
 - 2026-08-19 | **#33, #37 AND #39 CLOSED AS BUILT RATHER THAN AS LANDED** (user instruction). Every earlier perf issue was closed on the human's binary "it works" after a paste; these three were closed while `scrProjectEdit` and `scrProductEdit` were still authored-and-unpasted, and while `transaction_product_id` was indexed in the golden source but not on the live list. **CONSEQUENCE: closed-issue state is no longer a proxy for what is in Studio, and a paste failure on either screen must be filed as a NEW issue** — the closed one cannot track it. Each closing comment says plainly that it is not a landing, names what is outstanding, and lists what to check once pasted. #37's Live Monitor "Done when" was explicitly recorded as not taken and not planned | GitHub #33, #37, #39
+
+- 2026-08-19 | **#39 COMPLETE ON BOTH SIDES: `transaction_product_id` is INDEXED ON THE LIVE `taskmaster_transactions` LIST** (user, 2026-08-19), so the golden source and SharePoint agree and the pending marker in schema.yaml is gone. The list now carries six indexes (name, project_id, client_name, product_id, project_archived, date) against a documented max of 20. **The constraint that made this urgent, grounded on MS Learn: the list limit to ADD OR REMOVE an indexed column is 20,000 items** — above it the create is itself blocked by the threshold, so the remedy is unavailable exactly when it is needed. List View Threshold is 5,000 and is NOT adjustable in SharePoint Online. Single-value Lookup is stored as an int and is indexable; LookupMulti is not | GitHub #39
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
