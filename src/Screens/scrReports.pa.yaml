@@ -89,11 +89,24 @@ Screens:
                             task_supporter:       s.task_supporter,
                             task_project_id:      s.task_project_id,
                             task_output_audience: s.task_output_audience } ) ),
-                  // BOUNDED ON STAGE ALONE. task_date_completion is optional and `>= gRptFrom` is
-                  // FALSE for a blank date, so bounding the fetch on the period would drop every
-                  // dateless Completed task and leave Done and the medians silently empty.
+                  // BOUNDED ON THE PERIOD, AND THE NULL ARM IS WHAT MAKES THAT SAFE.
+                  // task_date_completion is OPTIONAL and `>= gRptFrom` is FALSE for a blank date,
+                  // so a bare date bound would drop every dateless Completed task and leave Done
+                  // and the medians silently short. `= Blank()` keeps them.
+                  //
+                  // `= Blank()` DELEGATES ON THIS COLUMN AND `IsBlank()` DOES NOT — probed in
+                  // Studio 2026-08-19, see tests/README.md. DO NOT "tidy" this to IsBlank(): it
+                  // reads as the same test, it un-delegates the WHOLE fetch, and the failure is
+                  // silent — the query would return the first page of LIVE tasks and filter them
+                  // locally, so completed tasks past that page would vanish from every figure on
+                  // this screen with no banner. gRptTrunc cannot see it either.
+                  //
+                  // gRptFrom, NOT gRptFrom2x — only transactions need the prior window.
                   ClearCollect( colRptDoneAll,
-                      ForAll( Filter( LiveTasks, task_stage.Value = "Completed" ) As d,
+                      ForAll( Filter( LiveTasks,
+                                      task_stage.Value = "Completed"
+                                   && ( task_date_completion >= gRptFrom
+                                     || task_date_completion = Blank() ) ) As d,
                           { ID:                   d.ID,
                             task_name:            d.task_name,
                             task_status:          d.task_status,
@@ -133,6 +146,14 @@ Screens:
               );
               // A completed task with NO completion date is in, in every window. The count is
               // stated beside the people table rather than dropped.
+              //
+              // The window is re-applied here even though the fetch is now bounded, and this is
+              // NOT redundant: a SharePoint DateTime is compared server-side in the LIST's
+              // timezone, so the fetch's boundary can sit up to a day off this one. THIS is the
+              // boundary every figure on the screen uses. It can only narrow the fetch, never
+              // widen it — accepted on a rolling 7/30/90-day window.
+              // IsBlank() is correct HERE: colRptDoneAll is a collection, so there is no query
+              // behind this and nothing to delegate.
               ClearCollect( colRptDone,
                   Filter( colRptDoneAll,
                           IsBlank(task_date_completion) || task_date_completion >= gRptFrom ) );
