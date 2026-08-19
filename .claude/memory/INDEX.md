@@ -22,11 +22,11 @@
   junction write.
 - **ISSUE #14 IS CLOSED** (completed, by user, 2026-08-18). The multi-product junction write is
   no longer an open defect; do not reopen the diagnosis.
-- **THE BACKLOG IS DOWN TO ONE: #11 (scrReports rework).** #9 is DONE (landed + exercised);
-  #10 and #12-#17 are closed. **A FULL PLAN IS POSTED ON #11** (comment 5336083698,
-  2026-08-19) and is AWAITING USER REVIEW — nothing is written yet. Five steps: subtract,
-  extend the data layer, people, task grouping, transactions. Four confirmations are
-  outstanding; step 1 is unblocked by all four.
+- **#11 IS BUILT AND UNPASTED (2026-08-19).** All five steps are in `main`: subtract, data
+  layer, people, task grouping, transactions. `src/Screens/scrReports.pa.yaml` is the whole
+  paste and nothing else in `src/` changed. **THE BACKLOG IS OTHERWISE EMPTY** — #9, #10 and
+  #12-#17 are all closed. The real #11 people bug was in the FETCH, not the fold: see the
+  session log before re-diagnosing anything about Done / median / on-time.
 - **`project_phase` is DERIVED BY THE APP, not picked** (2026-08-13): open issue -> Stalled;
   started task or any transaction -> Active; any child -> Planning; nothing -> Not Started.
   Vocabulary is exactly Not Started · Planning · Active · Stalled · Complete · Archived.
@@ -273,3 +273,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | issue #9 BUILT, unpasted: the resolution-date picker and the opened-by box removed from scrIssueEdit, issue_date_close now derived from the status transition; the stored date is read with a delegable LookUp because ECS would trim it off the gEditIssue snapshot once no control reads it | GitHub #9
 - 2026-08-19 | #9 LANDED AND EXERCISED — all four checks clear. The re-save check passing is the one that matters: it proves the derived `issue_date_close` reads the STORED value, so the ECS/snapshot hardening was necessary and correct | GitHub #9
 - 2026-08-19 | #11 planned in full and posted to the issue for review, nothing written. Five findings reshaped it: dropping the coverage grid orphans the Coverage combo; the people measures fail UPSTREAM (a Completed task with a blank task_date_completion never enters colRptDone at all, so Done/median/on-time read empty and the screen cannot say why); Tx is project-attributed among task measures; the overlay replacement can read colRptPersonSrc and refetch nothing if it gains 4 fields + a Dup flag; the pie is cmpKpiRing's stroke-dasharray, not arc math | GitHub #11
+- 2026-08-19 | #11 BUILT in five commits: the coverage grid, the gap list, the median-cycle chart and the now-orphaned Coverage combo dropped; completed tasks fetched on stage alone because `task_date_completion >= gRptFrom` is FALSE for a blank date and silently emptied every completion measure; Tx dropped from the people table; the person overlay became a task list; band 3 is four columns with two pies; the transaction bars stack by currency beside product-type L1/L2 pies | sessions/2026-08-19-0111-issue11-scrreports-rework.md

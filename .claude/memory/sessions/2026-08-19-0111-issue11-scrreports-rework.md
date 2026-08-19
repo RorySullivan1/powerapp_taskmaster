@@ -1,0 +1,65 @@
+# 2026-08-19 01:11 · issue11-scrreports-rework
+
+**Goal:** Implement #11: the scrReports rework, all five steps
+
+## What happened
+- Plan posted to GitHub #11 first (comment 5336083698) and approved with "Okay implement".
+  All four open questions were resolved on the recommendation given in the plan.
+- Five commits, one per step, `bdf1e04` → `8faa865`, plus `728fb56` for the design note.
+  `scrReports.pa.yaml` 2783 → 2833 lines. Validator 22/22 after every step.
+- **Step 1 (subtract).** `pnlRptCyc` + its three folds; the coverage × product grid, the ranked
+  gap list and their folds. **The Coverage combo went with them** — `gRptCoverage` was read in
+  five places, all inside the dropped block. `colRptClients`, `colRptCoverage`, `colRptCovOpts`
+  and `colRptProdL1` had no other consumer either, so `taskmaster_clients` and
+  `mapping_producttype` are no longer fetched or refreshed by this screen at all.
+- **Step 2 (data layer).** `colRptOpen` + `task_date_start`; `colRptPrj` + `project_region_path`
+  and `project_requestor`; `colRptPrjMap` splits region L1 and resolves a requestor label;
+  `colRptOpenTag` gains Rgn/Req off ONE hoisted LookUp; `colRptTxEnriched` gains product-type L2,
+  the transaction date, and loses Cov. New folds: requestor bars, region pie, product L1/L2 pies,
+  per-bucket-per-currency segments.
+- **Step 3 (people).** Tx column removed from the fold, the header, the sort switch and the body.
+  Subtitle now states the completed-tasks-with-no-date count. The 29-control overlay became a
+  task gallery reading `colRptPersonSrc`.
+- **Step 4 (band 3).** Two columns became four; output format became a pie; requestor bars and a
+  region pie added; panel `LayoutMinWidth` 320 → 260.
+- **Step 5 (band 5).** Trend bars stacked by currency; product-type pies added as a second column.
+
+## Gotchas & dead ends
+- **THE REAL #11 PEOPLE BUG WAS IN THE FETCH, not the fold.** `colRptPersonSrc` already ingested
+  completed work and Owns/Sups already counted it. `colRptDone` required
+  `task_date_completion >= gRptFrom`, and **that comparison is FALSE for a blank date**, so a task
+  at stage Completed with no completion date never entered the collection: Done read 0, median and
+  on-time read "—", and nothing said why. Now fetched on stage alone (still delegable) and
+  windowed locally, with `Days`/`OnT` guarded on `nod` so neither measures against a blank.
+  The cost — completed work accumulates where open work does not — is carried by the truncation
+  banner, which now watches `colRptDoneAll`.
+- **PIE PERCENTAGES COME FROM A RUNNING CUMULATIVE**, `Pct = Cum(i) - Cum(i-1)`, never rounded one
+  slice at a time. Rounding per slice drifts and the wedges stop closing the circle.
+- **`Li`, not `Idx`, positions a legend row.** `Idx` comes from the pre-filter sequence, so
+  dropping zero-count slices leaves holes in the legend. Bit the format pie specifically, whose
+  vocabulary deliberately includes zero-count values.
+- **A nested `Concat` would have had to reach an outer record scope** for the currency stack.
+  Avoided entirely: `colRptTxSeg` carries its own bucket index `Bi`, so the segments are a
+  SEPARATE `Concat` and no formula reaches outward.
+- **`Variant: ManualLayout` is NOT a grounded GroupContainer variant** — only `AutoLayout` and
+  `GridLayout` are (validator caught it). The overlay caption row became an AutoLayout whose
+  PaddingLeft 8 + LayoutGap 8 over widths 280/90/70/84 reproduce the gallery template's absolute
+  X grid exactly. Change one, change both.
+- **`ColorValue()`, `Char()` and 2-arg `Mid()` are not grounded anywhere else in this repo.**
+  All three replaced with constructs the file already uses — `RGBA()`, plain text, and
+  `Right(sp, Len(sp) - i - 2)`. Air-gap rule: prefer the grounded construct over the nicer one.
+- Deleting the `Cov:` field from `colRptTxEnriched` by line range removed the record literal's
+  opening `{`. Caught by the validator's bracket check, not by YAML parsing.
+- `gRptFmtMax` became dead when the format chart turned into a pie; a reference sweep for
+  set-but-never-read caught it.
+
+## State at end
+- **#11 IS BUILT AND UNPASTED.** `scrReports.pa.yaml` is the whole paste. Nothing else changed
+  in `src/`. 22/22 valid. Pushed to `main`.
+- Four checks to run in Studio after the paste are listed in the GitHub comment on #11.
+
+## Open threads
+- Nothing on this screen fetches `task_output_audience`. "Open tasks by output" was read as the
+  existing `task_output_format` chart converted to a pie, per the numbering in the issue.
+- `task_supporter` was deleted and recreated on 2026-08-17, so the supports column may still be
+  largely empty — a correct report over an empty column looks identical to a broken one.
