@@ -172,15 +172,27 @@ Screens:
                                      "Green" ) ) } ) );
                // WRITE ONLY ON A CHANGE, exactly like project_phase: most issue edits leave
                // the task's health where it was, and a no-op Patch is still a round trip.
+               //
+               // NO Set() INSIDE THIS ForAll. MS Learn sanctions Patch and Collect as the
+               // actions a ForAll body may take, and rules out the functions that HOLD A
+               // VARIABLE — UpdateContext, Clear, ClearCollect — because ForAll may run its
+               // records in any order and in parallel. Set is the global-scope twin of
+               // UpdateContext and Studio rejects it here for the same reason. Patch's
+               // return value is not captured either, and deliberately: the same page notes
+               // that an uncaptured ForAll result is never built, so there is no per-record
+               // data source copy to pay for.
+               //
                // A failed health write is NOT worth interrupting a save or a delete for —
                // the next recompute retries it and only a stale colour is wrong meanwhile.
+               // IfError is the documented way to catch a Patch failure; the error is
+               // DISCARDED on purpose. If it ever needs surfacing, Notify() or a Collect()
+               // into a log are the two things this body is allowed to do.
                ForAll( colHlWork As w,
                    With( { tk: LookUp(taskmaster_tasks, ID = w.Id) },
                        If( !IsBlank(tk.ID) && Coalesce(tk.task_status.Value, "") <> w.Hl,
-                           IfError( Set( gHlScrapI,
-                                         Patch( taskmaster_tasks, tk,
-                                                { task_status: { Value: w.Hl } } ) ),
-                                    Set( gHlErr, FirstError.Message ) ) ) ) )
+                           IfError( Patch( taskmaster_tasks, tk,
+                                           { task_status: { Value: w.Hl } } ),
+                                    Blank() ) ) ) )
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
