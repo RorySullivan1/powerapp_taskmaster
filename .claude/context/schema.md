@@ -47,7 +47,7 @@ taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name)
 
 | Column | Axis | Values |
 |---|---|---|
-| `task_status` | **Health** — how it's going | `Green`, `Amber`, `Red` |
+| `task_status` | **Health** — how it's going. **DERIVED, never picked** | `Green`, `Amber`, `Red` |
 | `task_stage` | **Lifecycle** — where it is | `Not Started`, `Planning`, `Drafting`, `Finalizing`, `Complete` |
 | `issue_status` | **Lifecycle + outcome** | `Open`, `Closed - Resolved`, `Closed - Unresolved`, `Closed - No Change` |
 
@@ -58,6 +58,19 @@ taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name)
 
 Health drives the RAG pill; stage drives the kanban columns. Both are Choice → **no join cost,
 delegable `=`, and sortable** (Managed Metadata was neither).
+
+> **Health became derived (#22).** `scrTaskEdit` has no health control. It is computed in two
+> halves that are deliberately **not stored together** — see `rollups.task_health` in
+> `schema/schema.yaml` for the rules:
+> - **Stored** in `task_status`: from the task's **open issues**. An open issue typed
+>   `Blockage`/`Exception`/`Limitation`, or of `Critical` impact → `Red`; any other open issue →
+>   `Amber`; none → `Green`. Recomputed wherever a task's open-issue set can change.
+> - **Live, never stored**: *not Completed AND past `task_date_target`* → `Red`. It changes with
+>   no write — a task turns red at midnight — so a stored copy could only be as fresh as the last
+>   save. `task_date_target` is on the task row, so folding it in at read time costs no join.
+>
+> **Consequence: a reader that shows `task_status` raw will under-report `Red`.** Today only
+> `scrReports` reads it, and it folds overdue in.
 
 ## Constraints SharePoint cannot hold
 

@@ -33,6 +33,71 @@ Screens:
       # snapshot: one delegable Filter on an indexed FK is cheaper than three delete
       # handlers each remembering to keep a collection in step, and it cannot drift.
       # =====================================================================
+      # =====================================================================
+      # HEALTH RECOMPUTE. Hidden, 1x1, declared FIRST so it can never cover a
+      # control — z-order is positional in this dialect. Select() DOES fire on an
+      # invisible control (probe, tests/README.md). Seed colHlTasks with the task
+      # ids to recompute, then Select this.
+      # =====================================================================
+      - btnPrjHealth:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =// Recomputes the STORED half of task health for every task in colHlTasks.
+               // The rules, and why OVERDUE IS DELIBERATELY NOT IN HERE, live in one place:
+               // rollups.task_health in schema.yaml. Do not restate them at the call sites.
+               //
+               // THIS BODY IS DUPLICATED ON scrIssueEdit AND scrProject and must stay
+               // identical — a control can only be Selected from its own screen, so there is
+               // no shared copy to call. Change one, change the other.
+               //
+               // NARROW SERVER-SIDE, TEST LOCALLY. The outer Filter uses issue_task_name and
+               // issue_status, both INDEXED, so it delegates; issue_type and issue_impact are
+               // NOT indexed and are only ever tested against the few rows it returns. Written
+               // as one flat Filter the whole query would go non-delegable and silently read a
+               // page of the issues list instead of one task's issues.
+               //
+               // The RAW list, not OpenIssues: that named formula also excludes archived
+               // projects, which would drive every task under one to Green rather than leave
+               // it alone. This query is already scoped to a single task.
+               ClearCollect( colHlWork,
+                   ForAll( colHlTasks As t,
+                       { Id: t.Id,
+                         Hl: With( { iss: Filter( taskmaster_issues,
+                                                  issue_task_name.Id = t.Id
+                                               && issue_status.Value = "Open" ) },
+                                 // AMBER IS THE RESIDUAL — "any other open issue" — NOT the
+                                 // four amber types enumerated. Enumerated, a type added in
+                                 // SharePoint and not added here falls through to GREEN: an
+                                 // allow-list failing CLOSED, silently, on the one signal that
+                                 // exists to warn people. As a residual it fails SAFE — an
+                                 // unknown or blank type reads Amber, which is visible.
+                                 If( CountRows( Filter( iss,
+                                         issue_impact.Value = "Critical"
+                                      || issue_type.Value = "Blockage"
+                                      || issue_type.Value = "Exception"
+                                      || issue_type.Value = "Limitation" ) ) > 0, "Red",
+                                     CountRows(iss) > 0, "Amber",
+                                     "Green" ) ) } ) );
+               // WRITE ONLY ON A CHANGE, exactly like project_phase: most issue edits leave
+               // the task's health where it was, and a no-op Patch is still a round trip.
+               // A failed health write is NOT worth interrupting a save or a delete for —
+               // the next recompute retries it and only a stale colour is wrong meanwhile.
+               ForAll( colHlWork As w,
+                   With( { tk: LookUp(taskmaster_tasks, ID = w.Id) },
+                       If( !IsBlank(tk.ID) && Coalesce(tk.task_status.Value, "") <> w.Hl,
+                           IfError( Set( gHlScrapP,
+                                         Patch( taskmaster_tasks, tk,
+                                                { task_status: { Value: w.Hl } } ) ),
+                                    Set( gHlErr, FirstError.Message ) ) ) ) )
       - btnPrjRecompute:
           Control: Classic/Button@2.2.0
           Properties:
@@ -1836,6 +1901,13 @@ Screens:
                // a delegable Filter, so past the data row limit it would clear SOME
                // references, raise NO error, and then delete the parent anyway. Same
                // shape as the project cascade above.
+               // THE ROW THAT KNOWS THE TASK IS ABOUT TO BE DELETED, so the link is read
+               // now. Deleting the last open Blockage on a task must take that task back
+               // off Red, and after the Remove there is nothing left to ask.
+               Set( gDelIssTask,
+                    If( gDelKind = "Issue",
+                        Coalesce( LookUp(taskmaster_issues, ID = gDelId).issue_task_name.Id, 0 ),
+                        0 ) );
                If( gDelRefs >= 500, Set( gDelBlock, true ) );
                If( !gDelBlock && gDelKind = "Task" && gDelRefs > 0,
                    IfError( Set( gDelScrapDT,
@@ -1874,6 +1946,9 @@ Screens:
                              & " Some issue links may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( gDelKind & " deleted.", NotificationType.Success );
+                   If( gDelIssTask > 0,
+                       ClearCollect( colHlTasks, { Id: gDelIssTask } );
+                       Select( btnPrjHealth ) );
                    // The ONE call that repairs project_phase and the completion rollup.
                    Select( btnPrjRecompute ) );
                Set( gDelKind, "" )

@@ -168,8 +168,9 @@ fixed list:
   **A strip lays every option across ONE row** (`WrapCount = CountRows(Items)`), so each chip gets
   `Width / N` — which is why long values need a `ModernCombobox` instead. Both stage
   (`cboTkStage`, 2026-08-07) and issue status (`cboIssStatus`, 2026-08-12, when its values became
-  `"Closed - Unresolved"` and friends) left the strip for exactly that reason. Health, type and
-  impact are still strips and should stay strips.
+  `"Closed - Unresolved"` and friends) left the strip for exactly that reason. Type and impact
+  are still strips and should stay strips. **Health has no control at all** — it is derived
+  (#22); see `rollups.task_health` in `schema/schema.yaml`.
   **If you swap a strip for a combo box, PIN BOTH CHILDREN** (`FillPortions: =0` +
   `LayoutMinHeight`). Auto-layout children are flexible by default, so the declared heights are
   otherwise ignored and the space splits evenly — a strip squashes gracefully, a combo box does not.

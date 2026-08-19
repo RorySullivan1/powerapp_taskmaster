@@ -116,6 +116,71 @@ Screens:
         // exactly this on 2026-08-11.
         Reset( selIssStatus ); Reset( selIssType ); Reset( selIssImpact )
     Children:
+      # =====================================================================
+      # HEALTH RECOMPUTE. Hidden, 1x1, declared FIRST so it can never cover a
+      # control — z-order is positional in this dialect. Select() DOES fire on an
+      # invisible control (probe, tests/README.md). Seed colHlTasks with the task
+      # ids to recompute, then Select this.
+      # =====================================================================
+      - btnIssHealth:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =// Recomputes the STORED half of task health for every task in colHlTasks.
+               // The rules, and why OVERDUE IS DELIBERATELY NOT IN HERE, live in one place:
+               // rollups.task_health in schema.yaml. Do not restate them at the call sites.
+               //
+               // THIS BODY IS DUPLICATED ON scrIssueEdit AND scrProject and must stay
+               // identical — a control can only be Selected from its own screen, so there is
+               // no shared copy to call. Change one, change the other.
+               //
+               // NARROW SERVER-SIDE, TEST LOCALLY. The outer Filter uses issue_task_name and
+               // issue_status, both INDEXED, so it delegates; issue_type and issue_impact are
+               // NOT indexed and are only ever tested against the few rows it returns. Written
+               // as one flat Filter the whole query would go non-delegable and silently read a
+               // page of the issues list instead of one task's issues.
+               //
+               // The RAW list, not OpenIssues: that named formula also excludes archived
+               // projects, which would drive every task under one to Green rather than leave
+               // it alone. This query is already scoped to a single task.
+               ClearCollect( colHlWork,
+                   ForAll( colHlTasks As t,
+                       { Id: t.Id,
+                         Hl: With( { iss: Filter( taskmaster_issues,
+                                                  issue_task_name.Id = t.Id
+                                               && issue_status.Value = "Open" ) },
+                                 // AMBER IS THE RESIDUAL — "any other open issue" — NOT the
+                                 // four amber types enumerated. Enumerated, a type added in
+                                 // SharePoint and not added here falls through to GREEN: an
+                                 // allow-list failing CLOSED, silently, on the one signal that
+                                 // exists to warn people. As a residual it fails SAFE — an
+                                 // unknown or blank type reads Amber, which is visible.
+                                 If( CountRows( Filter( iss,
+                                         issue_impact.Value = "Critical"
+                                      || issue_type.Value = "Blockage"
+                                      || issue_type.Value = "Exception"
+                                      || issue_type.Value = "Limitation" ) ) > 0, "Red",
+                                     CountRows(iss) > 0, "Amber",
+                                     "Green" ) ) } ) );
+               // WRITE ONLY ON A CHANGE, exactly like project_phase: most issue edits leave
+               // the task's health where it was, and a no-op Patch is still a round trip.
+               // A failed health write is NOT worth interrupting a save or a delete for —
+               // the next recompute retries it and only a stale colour is wrong meanwhile.
+               ForAll( colHlWork As w,
+                   With( { tk: LookUp(taskmaster_tasks, ID = w.Id) },
+                       If( !IsBlank(tk.ID) && Coalesce(tk.task_status.Value, "") <> w.Hl,
+                           IfError( Set( gHlScrapI,
+                                         Patch( taskmaster_tasks, tk,
+                                                { task_status: { Value: w.Hl } } ) ),
+                                    Set( gHlErr, FirstError.Message ) ) ) ) )
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -687,6 +752,11 @@ Screens:
                     // reject the write regardless; this only decides whether the user is told.
                     Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
                     NotificationType.Error ),
+                    // THE TASK LINK CAN MOVE, so the task this issue is LEAVING needs its
+                    // health recomputed too — captured here because after the Patch the old
+                    // value is gone. New mode has no previous link.
+                    Set( gIssOldTask,
+                         If( gEditMode = "Edit", Coalesce(gEditIssue.issue_task_name.Id, 0), 0 ) );
                     Set( gIssSaved, Blank() );
                     Set( gIssErr, "" );
                     Set( gIssWarn, "" );
@@ -763,6 +833,16 @@ Screens:
                                                Department: "", JobTitle: "", Picture: "" },
                                          issue_date_open: Now() } ) ),
                             Set( gIssWarn, gIssWarn & "who opened it and when: " & FirstError.Message & "   " ) ) );
+                    // HEALTH FOLLOWS THE ISSUE. type, impact, status and the task link all
+                    // feed a task's health, so every successful save recomputes it — for the
+                    // task gained AND the one lost. Only after the write: recomputing off a
+                    // save that failed would store health for a change that never happened.
+                    If( Len(gIssErr) = 0,
+                        Clear( colHlTasks );
+                        If( gIssOldTask > 0, Collect( colHlTasks, { Id: gIssOldTask } ) );
+                        If( gIssTask.Id > 0 && gIssTask.Id <> gIssOldTask,
+                            Collect( colHlTasks, { Id: gIssTask.Id } ) );
+                        Select( btnIssHealth ) );
                     If( Len(gIssErr) > 0,
                         Notify("Couldn't save the issue: " & gIssErr, NotificationType.Error) );
                     If( Len(gIssErr) = 0,
@@ -859,6 +939,13 @@ Screens:
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
+               // THE ROW THAT KNOWS THE TASK IS ABOUT TO BE DELETED, so the link is read
+               // now. Deleting the last open Blockage on a task must take that task back
+               // off Red, and after the Remove there is nothing left to ask.
+               Set( gDelIssTask,
+                    If( gDelKind = "Issue",
+                        Coalesce( LookUp(taskmaster_issues, ID = gDelId).issue_task_name.Id, 0 ),
+                        0 ) );
                If( Len(gDelErr) = 0 && !gDelBlock,
                    IfError( Set( gDelScrapI,
                                  Remove( taskmaster_issues, LookUp(taskmaster_issues, ID = gDelId) ) ),
@@ -871,6 +958,9 @@ Screens:
                              & " Some issue links may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( "Issue deleted.", NotificationType.Success );
+                   If( gDelIssTask > 0,
+                       ClearCollect( colHlTasks, { Id: gDelIssTask } );
+                       Select( btnIssHealth ) );
                    // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute —
                    // so project_phase and the completion rollup repair themselves with no
                    // second copy of that logic living here.

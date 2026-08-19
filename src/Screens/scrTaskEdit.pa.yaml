@@ -18,7 +18,8 @@
 #    itself on 2026-08-12 — task_stage no longer has an Archived value.)  It is shown
 #    read-only so the value is visible without being editable.
 #
-#  - STAGE / HEALTH / PRIORITY are combo boxes whose text colour follows the value.
+#  - STAGE / PRIORITY are combo boxes whose text colour follows the value.
+#    HEALTH IS DERIVED and has no control — see rollups.task_health in schema.yaml.
 #    `Color` is the current modern combo box's text colour (it was `FontColor` before
 #    the revision).
 #
@@ -87,20 +88,16 @@ Screens:
                                      taskproduct_task_id.Id = gEditTask.ID ) As lk,
                              { Id:  lk.taskproduct_product_id.Id,
                                Uid: lk.taskproduct_product_uid } ) ) );
-        // OPTION TABLES FOR THE THREE STRIPS. cmpSelection needs {Id, Label} and
+        // OPTION TABLES FOR THE TWO STRIPS. cmpSelection needs {Id, Label} and
         // Choices() returns only Value, so the Id is synthesised POSITIONALLY:
         // Sequence() numbers the rows and Index() reads the nth choice back out.
         // The Ids mean nothing beyond "which row" — never hard-code one, look it up
         // by Label, which is what each DefaultId does.
         //
-        // All three columns are REQUIRED with a default (C9), so none of them gets a
+        // Both columns are REQUIRED with a default (C9), so neither gets a
         // "(none)" row: there is no legal blank to write back.
         ClearCollect( colTkStageOpts,
                       With( { ch: Choices([@taskmaster_tasks].task_stage) },
-                            ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
-        ClearCollect( colTkStatusOpts,
-                      With( { ch: Choices([@taskmaster_tasks].task_status) },
                             ForAll( Sequence( CountRows(ch) ) As n,
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         ClearCollect( colTkPriorityOpts,
@@ -108,7 +105,6 @@ Screens:
                             ForAll( Sequence( CountRows(ch) ) As n,
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) );
         Set( gTkStage,    If( gEditMode = "Edit", Coalesce(gEditTask.task_stage.Value, "Not Started"), "Not Started" ) );
-        Set( gTkStatus,   If( gEditMode = "Edit", Coalesce(gEditTask.task_status.Value, "Green"), "Green" ) );
         Set( gTkPriority, If( gEditMode = "Edit", Coalesce(gEditTask.task_priority.Value, "Moderate"), "Moderate" ) );
         Set( gTkLanguage, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_language.Value, "(none)"), "(none)" ) );
         Set( gTkFormat,   If( gEditMode = "Edit", Coalesce(gEditTask.task_output_format.Value, "(none)"), "(none)" ) );
@@ -154,9 +150,9 @@ Screens:
                  ForAll( Choices([@taskmaster_tasks].task_client_stage) As c,
                          { Value: c.Value } ) );
         // cmpSelection re-reads its DefaultId ONLY on Reset — without these the
-        // previous task's stage/health/priority survive into the next one, and the
+        // previous task's stage/priority survive into the next one, and the
         // strip then DISAGREES WITH THE SAVE rather than failing visibly.
-        Reset( selTkStage ); Reset( selTkStatus ); Reset( selTkPriority );
+        Reset( selTkStage ); Reset( selTkPriority );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset.
         Reset( cboTkLanguage ); Reset( cboTkFormat ); Reset( cboTkBranding ); Reset( cboTkAudience ); Reset( cboTkClientStage );
         Reset( tglTkOutput ); Reset( tglTkClient ); Reset( tglTkApprovalReq );
@@ -377,7 +373,8 @@ Screens:
                         LayoutMinHeight: =26
                         Width: =Parent.Width - 40
                         Height: =26
-                  # STAGE ON ITS OWN ROW, health and priority sharing the next.
+                  # STAGE ON ITS OWN ROW, priority on the next. Health has no control:
+                  # it is derived, so there is nothing here for a user to set.
                   # A five-option strip in a third-width cell gives each label about
                   # 60px, and "Not Started" does not fit in 60px at any legible size.
                   # A vertical stack rather than a two-row grid because a GridLayout
@@ -439,38 +436,6 @@ Screens:
                               Width: =Parent.Width
                               Height: =62
                             Children:
-                              - colTkStatus:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
-                                  Properties:
-                                    LayoutDirection: =LayoutDirection.Vertical
-                                    LayoutAlignItems: =LayoutAlignItems.Start
-                                    LayoutGap: =4
-                                    FillPortions: =1
-                                    LayoutMinWidth: =200
-                                    Height: =62
-                                  Children:
-                                    - lblTkStatusCap:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: ="Health  *"
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          Color: =gTheme.Color.TextMuted
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =0
-                                          LayoutMinHeight: =18
-                                          Width: =Parent.Width
-                                          Height: =18
-                                    - selTkStatus:
-                                        Control: CanvasComponent
-                                        ComponentName: cmpSelection
-                                        Properties:
-                                          Width: =Parent.Width
-                                          Height: =40
-                                          Items: =colTkStatusOpts
-                                          DefaultId: =Coalesce( LookUp(colTkStatusOpts, Label = gTkStatus, Id), 1 )
-                                          OnChange: =Set(gTkStatus, selTkStatus.Selected.Label)
                               - colTkPriority:
                                   Control: GroupContainer@1.5.0
                                   Variant: AutoLayout
@@ -1389,7 +1354,6 @@ Screens:
                     If( Len(gTkLead.Mail) = 0,         "a lead   ", "" ) &
                     If( gTkProject.Id = 0,             "a parent project   ", "" ) &
                     If( Len(gTkStage) = 0,             "a stage   ", "" ) &
-                    If( Len(gTkStatus) = 0,            "a health   ", "" ) &
                     If( Len(gTkPriority) = 0,          "a priority   ", "" ) &
                     // A task that produces output must say who for. A task FLAGGED as
                     // needing approval must also carry the external id, but only once it
@@ -1472,6 +1436,36 @@ Screens:
                     Set( gTkSaved, Blank() );
                     Set( gTkErr, "" );
                     Set( gTkWarn, "" );
+                    // HEALTH IS DERIVED, NEVER CHOSEN — this screen has no health control.
+                    // Only the ISSUE-DERIVED half is stored; overdue is folded in by readers
+                    // because it changes with no write. See rollups.task_health in schema.yaml.
+                    //
+                    // A NEW TASK IS GREEN WITHOUT A QUERY, and that guard is load-bearing: in
+                    // New mode there is no ID yet, and `issue_task_name.Id = Blank()` matches
+                    // every issue that has NO task — which would open a brand-new task at Red.
+                    //
+                    // The RAW list, not OpenIssues: this is already scoped to one task, and
+                    // the named formula also excludes archived projects, which would force
+                    // every task under an archived project to Green instead of leaving it be.
+                    If( gEditMode = "Edit",
+                    ClearCollect( colTkHlIss,
+                    Filter( taskmaster_issues,
+                    issue_task_name.Id = gEditTask.ID
+                    && issue_status.Value = "Open" ) ),
+                    Clear( colTkHlIss ) );
+                    // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four amber
+                    // types enumerated. Enumerated, a type added in SharePoint and not added
+                    // here falls through to GREEN: an allow-list failing closed, silently, on
+                    // the one signal that exists to warn people. As a residual it fails SAFE
+                    // — an unknown or blank type reads Amber, which is visible and fixable.
+                    Set( gTkHealth,
+                    If( CountRows( Filter( colTkHlIss,
+                    issue_impact.Value = "Critical"
+                    || issue_type.Value = "Blockage"
+                    || issue_type.Value = "Exception"
+                    || issue_type.Value = "Limitation" ) ) > 0, "Red",
+                    CountRows(colTkHlIss) > 0, "Amber",
+                    "Green" ) );
                     IfError(
                     Set( gTkSaved,
                     Patch( taskmaster_tasks,
@@ -1489,7 +1483,7 @@ Screens:
                     task_project_id:  { Id: gTkProject.Id, Value: gTkProject.Value },
                     task_description: txtTkDesc.Text,
                     task_stage:       { Value: gTkStage },
-                    task_status:      { Value: gTkStatus },
+                    task_status:      { Value: gTkHealth },
                     task_priority:    { Value: gTkPriority },
                     task_lead: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gTkLead.Mail),   DisplayName: gTkLead.DisplayName,   Email:       gTkLead.Mail,   Department: "", JobTitle: "", Picture: "" },
                     task_date_start:  dtpTkStart.SelectedDate,

@@ -280,7 +280,17 @@ Screens:
                           With( { stg: Coalesce( t.task_stage.Value, "Unspecified" ),
                                   // Carried on the row so the person overlay can list the
                                   // TASKS themselves off this collection and refetch nothing.
-                                  hth: Coalesce( t.task_status.Value, "—" ),
+                                  //
+                                  // EFFECTIVE HEALTH, NOT THE STORED COLUMN. task_status holds
+                                  // only the issue-derived half; OVERDUE IS FOLDED IN HERE
+                                  // because it changes with no write — see rollups.task_health
+                                  // in schema.yaml. Reading task_status raw UNDER-REPORTS Red.
+                                  // No join: task_date_target is already on this row.
+                                  // colRptOpen is open stages only, so "not Completed" holds
+                                  // by construction and is not re-tested.
+                                  hth: If( !IsBlank(t.task_date_target)
+                                        && t.task_date_target < Today(), "Red",
+                                           Coalesce( t.task_status.Value, "—" ) ),
                                   // Hoisted: this is compared on every measure of the supports
                                   // row, and left inline it was six Lower/Coalesce pairs per task.
                                   dup: Lower(Coalesce(t.task_supporter.Email, "")) = Lower(Coalesce(t.task_lead.Email, "")) },
@@ -289,9 +299,9 @@ Screens:
                                 Nm: Coalesce(t.task_lead.DisplayName, ""),
                                 Role: "Owns", PId: t.task_project_id.Id, Op: 1,
                                 Ovd: If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ),
-                                Gc: If(t.task_status.Value = "Green", 1, 0),
-                                Ac: If(t.task_status.Value = "Amber", 1, 0),
-                                Rc: If(t.task_status.Value = "Red",   1, 0),
+                                Gc: If(hth = "Green", 1, 0),
+                                Ac: If(hth = "Amber", 1, 0),
+                                Rc: If(hth = "Red",   1, 0),
                                 Dn: 0, Days: -1, OnT: -1, Stg: stg,
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: false },
@@ -311,12 +321,9 @@ Screens:
                                                                 PId: t.task_project_id.Id, Op: 1,
                                 Ovd: If( dup, 0,
                                          If( !IsBlank(t.task_date_target) && t.task_date_target < Today(), 1, 0 ) ),
-                                Gc: If( dup, 0,
-                                        If(t.task_status.Value = "Green", 1, 0) ),
-                                Ac: If( dup, 0,
-                                        If(t.task_status.Value = "Amber", 1, 0) ),
-                                Rc: If( dup, 0,
-                                        If(t.task_status.Value = "Red",   1, 0) ),
+                                Gc: If( dup, 0, If(hth = "Green", 1, 0) ),
+                                Ac: If( dup, 0, If(hth = "Amber", 1, 0) ),
+                                Rc: If( dup, 0, If(hth = "Red",   1, 0) ),
                                 Dn: 0, Days: -1, OnT: -1, Stg: stg,
                                 TId: t.ID, TNm: t.task_name, Hth: hth,
                                 Dst: t.task_date_start, Dtl: t.task_date_target, Dup: dup } ) } ) ),
@@ -324,6 +331,9 @@ Screens:
               Collect( colRptPersonSrc,
                   Filter( Ungroup(
                       ForAll( colRptDone As t,
+                          // NO OVERDUE FOLD HERE, deliberately: these are COMPLETED tasks and
+                          // a finished task is not at risk for having landed late. Its Gc/Ac/Rc
+                          // are zero anyway — only the displayed Hth comes off this.
                           With( { hth: Coalesce( t.task_status.Value, "—" ),
                                   // A COMPLETED TASK MAY CARRY NO COMPLETION DATE — that is
                                   // exactly why colRptDoneAll is fetched on stage alone. Both

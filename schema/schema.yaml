@@ -194,7 +194,15 @@ lists:
       # UNASSOCIATES existing items, which is why it was fixed in the app instead.
       - { name: task_project_id,       type: Lookup,          required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
       - { name: task_description,      type: Note,            required: false,                 desc: "Instructions / details (display only)" }
-      - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH — how it is going", values: [Green, Amber, Red] }
+      # DERIVED, NEVER CHOSEN. scrTaskEdit has no health control; the app computes this.
+      #
+      # IT HOLDS ONLY THE ISSUE-DERIVED HALF OF HEALTH, and that is the trap in this
+      # column: OVERDUE IS NOT IN HERE. Overdue changes with no write — a task turns red
+      # at midnight — so a stored value could only ever be as fresh as the last save.
+      # Readers fold it in live instead: task_date_target is on the task row, so the test
+      # costs no join. **A reader that shows this column raw will under-report Red.**
+      # Recomputed wherever a task's OPEN issue set can change; see rollups.task_health.
+      - { name: task_status,           type: Choice,          required: true,  indexed: true,  default: Green,         desc: "HEALTH, issue-derived half only — Red: an open issue typed Blockage/Exception/Limitation or of Critical impact. Amber: any other open issue. Green: none. OVERDUE IS FOLDED IN BY READERS, not stored here.", values: [Green, Amber, Red] }
       # CHANGED 2026-08-12 — "Under Review" and "Archived" REMOVED. Review is signalled
       # by raising an ISSUE against the task, and archiving is a PROJECT state
       # (project_phase), not something a task carries. Removing "Archived" deletes the
@@ -371,8 +379,11 @@ lists:
       # which is always correct because the app does not let you add children to
       # an archived project.
       - { name: issue_project_archived, type: Boolean, required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Denormalised so the exclusion delegates; see the note above" }
-      - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue", values: [Approval, Process, Compliance, Branding, Technical] }
-      - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact", values: [Low, Moderate, High, Critical] }
+      # THE THREE RED TYPES ARE READ BY NAME in scrTaskEdit/scrIssueEdit's health
+      # derivation. Renaming one here without renaming it in SharePoint does not break the
+      # app loudly — the issue simply stops counting as Red and the task reads Amber.
+      - { name: issue_type,             type: Choice,   required: false,                 desc: "Type of issue. DRIVES TASK HEALTH: Blockage/Exception/Limitation -> Red; any other open issue -> Amber.", values: [Approval, "Change Request", Question, Other, Blockage, Exception, Limitation] }
+      - { name: issue_impact,           type: Choice,   required: false,                 desc: "Severity / impact. DRIVES TASK HEALTH: Critical on an open issue -> Red regardless of type.", values: [Low, Moderate, High, Critical] }
       # PROVENANCE — who raised this issue, and when. Both are APP-WRITTEN, stamped
       # in a second Patch that runs on INSERT ONLY; the update path never names them,
       # so an edit leaves them alone. There is no picker and no form field for either:
@@ -569,6 +580,42 @@ rollups:
       write-back snippet lives beside it. Consequence: a stage edited directly in
       SharePoint (or bulk-imported) leaves the value stale until the next in-app change
       to that project.
+
+  task_health:
+    description: >-
+      RAG health for a task. Users do NOT set it — scrTaskEdit has no health control.
+      It is computed in two halves that are deliberately NOT stored together.
+    source_list: taskmaster_issues
+    parent_key: issue_task_name
+    stored_half:
+      column: taskmaster_tasks.task_status
+      # OPEN issues only. A resolved blockage is not blocking, and issue_status is indexed
+      # so the test rides along with the FK in one delegable query.
+      formula: >-
+        over OPEN issues linked to the task:
+        any with impact=Critical, or type in (Blockage, Exception, Limitation)  -> Red;
+        else any open issue at all                                              -> Amber;
+        else                                                                    -> Green
+      # AMBER IS "ANY OTHER OPEN ISSUE", NOT AN ENUMERATED LIST OF THE FOUR AMBER TYPES.
+      # Enumerating would make a type added in SharePoint and not added here fall through
+      # to GREEN — an allow-list failing CLOSED, silently, on the one signal that exists to
+      # warn people. Written as a residual it fails SAFE: an unknown type reads Amber, which
+      # is visible and can be corrected. A blank type is Amber for the same reason.
+      writer: app-side
+      recomputed_at: >-
+        Every point where a task's OPEN issue set can change — scrIssueEdit's save (BOTH
+        the old and the new task when the issue's task link moves) and every issue delete
+        path. NOT on a task save: the stored half does not depend on the task's own row.
+        scrTaskEdit's save rewrites it anyway, which costs one delegable query and makes
+        opening a task repair any drift.
+    live_half:
+      rule: "not Completed AND task_date_target set AND task_date_target < today  ->  Red"
+      # NOT STORED, DELIBERATELY. It changes with no write — a task turns red at midnight —
+      # so any stored copy is only as fresh as the last save. task_date_target is on the
+      # task row, so folding it in at read time costs NO join and stays delegable.
+      applied_by: >-
+        Every reader of task_status. Today that is scrReports alone (the RAG rollups and
+        the person overlay). A reader that shows task_status raw will UNDER-REPORT Red.
 
 # =============================================================================
 # MIGRATION — how the LIVE lists reach the state defined above.
