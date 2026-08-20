@@ -10,17 +10,30 @@ authored here and carried across by hand. Nothing is read back, so these files a
 
 ```
 src/
-  App.pa.yaml              the App object — named formulas (Theme, NavMenu, …)
+  App.pa.yaml              the App object — OnStart constants + the Formulas filters
   Screens/                 one file per screen (11)
-  Components/              one file per component (12), definition and controls together
+  Components/              one file per component (10), definition and controls together
 schema/
   schema.yaml              GOLDEN SOURCE for the SharePoint backend
 tools/
   validate_pa_yaml.py      run before any hand-off
   pa.schema.v3.0.yaml      Microsoft's pa-yaml v3.0 schema, vendored
   studio-enums.json        grounded control tokens and the 180-value Icon enum
-docs/                      design notes, and build-history.md (closed record)
+docs/
+  manuals/                 the user manual and the maintainer manual
+  build-history.md         the paste log (closed record), plus design notes
 ```
+
+## Documentation
+
+Two manuals under **[`docs/manuals/`](docs/manuals/)**:
+
+- **[User manual](docs/manuals/user/)** — for people on the desk who use the app
+- **[Maintainer manual](docs/manuals/maintainer/)** — for whoever changes this repo and carries
+  the change into Studio
+
+They describe; they never define. The golden sources stay `schema/schema.yaml`, `src/`,
+`.claude/memory/` and `docs/build-history.md`.
 
 Everything under `src/` is [pa-yaml v3.0](https://github.com/microsoft/PowerApps-Tooling),
 the same dialect Power Apps Studio's code view emits.
