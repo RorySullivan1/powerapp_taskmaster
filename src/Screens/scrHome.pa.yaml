@@ -321,9 +321,12 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               # A percentage of nothing is not 0%, it is undefined — say so.
+                              # Max(1, ...) is NOT redundant with the `= 0` arm. This is a PROPERTY formula,
+                              # so it renders before OnVisible queues the fold, and an unset global is BLANK,
+                              # not 0 — blank divides as zero and raises Division by 0. Guard at the divide.
                               Text: |
                                 =If( gPrjLed = 0, "none open",
-                                     RoundDown(gPrjLedOverdue / gPrjLed * 100, 0) & "% overdue" )
+                                     RoundDown(gPrjLedOverdue / Max(1, gPrjLed) * 100, 0) & "% overdue" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: |
@@ -380,9 +383,10 @@ Screens:
                         - lblTaskLedSub:
                             Control: Label@2.5.1
                             Properties:
+                              # Max(1, ...) for the reason given on lblPrjLedSub.
                               Text: |
                                 =If( gTaskLed = 0, "none open",
-                                     RoundDown(gTaskLedOverdue / gTaskLed * 100, 0) & "% overdue" )
+                                     RoundDown(gTaskLedOverdue / Max(1, gTaskLed) * 100, 0) & "% overdue" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: |
