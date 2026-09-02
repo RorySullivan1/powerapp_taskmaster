@@ -56,7 +56,7 @@ Screens:
         Clear( colTkProducts );
         If( gEditMode = "Edit",
             Collect( colTkProducts,
-                     ForAll( Filter( taskmaster_taskproduct,
+                     ForAll( Filter( LiveTaskProducts,
                                      taskproduct_task_id.Id = gEditTask.ID ) As lk,
                              { Id:  lk.taskproduct_product_id.Id,
                                Uid: lk.taskproduct_product_uid } ) ) );
@@ -1522,6 +1522,10 @@ Screens:
                     // WHOLE junction list. Filtering on the indexed FK returns one task's links; the
                     // membership test then runs client-side over that handful.
                     // Remove() takes the SCOPE RECORD itself — never `lk.ID` projected into a collection.
+                    // THE RAW LIST HERE, deliberately, where every read below uses LiveTaskProducts:
+                    // Remove() needs a record of the data source itself, and this pass must see EVERY
+                    // link — a mis-flagged one hidden from it survives as a stale row. Same rule as
+                    // the delete cascade on scrProject.
                     ForAll( Filter( taskmaster_taskproduct,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
                     If( !(lk.taskproduct_product_id.Id in colTkWanted.Id),
@@ -1530,7 +1534,7 @@ Screens:
                     // subfield is projected — `<collection>.taskproduct_product_id.Id` is not a
                     // projection Power Fx will give you, which is why the shaping exists at all.
                     ClearCollect( colTkLinksNow,
-                    ForAll( Filter( taskmaster_taskproduct,
+                    ForAll( Filter( LiveTaskProducts,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
                     { ProdId: lk.taskproduct_product_id.Id } ) );
                     // The lookup pair is written as {Id, Value}, and taskproduct_product_uid is the
@@ -1544,7 +1548,12 @@ Screens:
                     { taskproduct_task_id:     { Id: gTkSaved.ID, Value: gTkSaved.task_name },
                     taskproduct_product_id:  { Id: add.Id, Value: add.Uid },
                     taskproduct_product_uid: add.Uid,
-                    taskproduct_project_id:  gTkProject.Id } ) );
+                    taskproduct_project_id:  gTkProject.Id,
+                    // FALSE EXPLICITLY, and NOT redundant with the column default. A `= false`
+                    // filter is an OData equality and does not match a null, so a link left
+                    // unwritten here is invisible to every query built on this column. The app
+                    // cannot add a child to an archived project, so false is always correct.
+                    taskproduct_project_archived: false } ) );
                     If( !IsEmpty( Errors(taskmaster_taskproduct) ),
                     Set( gTkWarn, gTkWarn & "the product links didn't save: "
                     & First(Errors(taskmaster_taskproduct)).Message & "   " ) );
@@ -1552,7 +1561,7 @@ Screens:
                     // a write dropped without throwing as well as one that threw. Also the source for
                     // the summary, so one read serves both and they cannot disagree.
                     ClearCollect( colTkLinksAfter,
-                    ForAll( Filter( taskmaster_taskproduct,
+                    ForAll( Filter( LiveTaskProducts,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
                     { Uid: lk.taskproduct_product_uid } ) );
                     If( CountRows(colTkLinksAfter) <> CountRows(colTkWanted),

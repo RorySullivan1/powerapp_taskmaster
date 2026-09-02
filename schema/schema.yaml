@@ -135,7 +135,7 @@ lists:
     columns:
       - { name: project_name,            type: Text,            required: true,  indexed: true,  desc: "User-facing project title (unique by convention only)" }
       - { name: project_manager,         type: Person, multi: false, required: true,  indexed: true,  desc: "Accountable owner" }
-      - { name: project_coverage,        type: Choice,          required: true,  default: Internal, desc: "Business/product coverage area. Required since #25, default Internal — the app offers no blank option and writes it unguarded. EXISTING ROWS MAY STILL HOLD BLANK: SharePoint enforces required only on write, and nothing back-fills.", values: [Internal, PLACEHOLDER_B], review: "VALUES STILL NOT FULLY SUPPLIED. `Internal` is CONFIRMED a member (user, #25, 2026-08-19); the rest of the list is unknown here. The app binds Choices() and never a literal, so the real values need no app change — but the DEFAULT is a literal, and scrProjectEdit falls back to the first offered option if `Internal` turns out not to be in the column." }
+      - { name: project_coverage,        type: Choice,          required: true,  default: INTERNAL, desc: "Business/product coverage area. Required since #25, default INTERNAL — the app offers no blank option and writes it unguarded. EXISTING ROWS MAY STILL HOLD BLANK: SharePoint enforces required only on write, and nothing back-fills.", values: [INTERNAL, PLACEHOLDER_B], review: "VALUES STILL NOT FULLY SUPPLIED. `INTERNAL` is CONFIRMED a member and CONFIRMED UPPERCASE (user, 2026-09-02 — it was recorded as `Internal` until then); the rest of the list is unknown here. CASING IS PART OF THE VALUE: a SharePoint Choice write is case-sensitive, while Power Fx `in` is not, so scrProjectEdit-s membership test passes on any casing and then writes its literal verbatim. Keep the literal there identical to this one. The app binds Choices() for the OPTIONS and never a literal, so the remaining values need no app change; only the DEFAULT is a literal." }
       - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
       - { name: project_region_id,       type: Number,          required: false, indexed: true,  desc: "ID of the mapping_regions row when the picked path names one exactly; 0 when it names a BRANCH the vocabulary has no row for. The path column is the authoritative value — see C11", maps_to: mapping_regions }
       - { name: project_region_path,     type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"EMEA | UK | London\". Denormalised so display needs no lookup and drill-down is StartsWith(), which delegates on Text" }
@@ -440,12 +440,14 @@ lists:
       - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, desc: "product_uid of the linked product, copied at write time. The app always writes it" }
       # WRITE-ONCE. The app has the parent to hand (gTkProject) and a task CANNOT be
       # re-parented — scrTaskEdit derives gTkProject in OnVisible and offers no picker
-      # — so this cannot drift. There is deliberately NO *_project_archived mirror
-      # here: nothing queries this list across projects (galleries read
-      # task_product_summary, the editor reads it one task at a time), and the
-      # archiving flow filters on this id instead. Adding a Yes/No later is cheap;
-      # an internal NAME is what freezes.
+      # — so this cannot drift.
       - { name: taskproduct_project_id,  type: Number, required: false, indexed: true, desc: "ID of the parent project, mirrored from the task. What the archiving flow filters on" }
+      # WRITTEN false BY scrTaskEdit's link insert, exactly as the other three child lists
+      # write their mirrors. Not redundant with the column default: `= false` is an OData
+      # equality and does NOT match a null, so a link left unwritten is invisible to every
+      # query built on this column. The app cannot add a child to an archived project, so
+      # false is always correct at insert.
+      - { name: taskproduct_project_archived, type: Boolean, required: false, desc: "TRUE when the PARENT project is archived. Mirrors project_phase = Archived, as on the three child lists", review: "ADDED IN SHAREPOINT BY THE USER (2026-09-02), so the internal name is already frozen. THREE THINGS UNCONFIRMED HERE: whether it is INDEXED (recorded as not, pending confirmation — an unindexed filter on this column fails outright once the list passes 5000 items), and whether the column DEFAULT is No. BACK-FILL IS DONE: every row on every archive column was populated by the user (2026-09-02), which is what makes LiveTaskProducts safe to read." }
 
   # ---------------------------------------------------------------------------
   taskmaster_clients:
