@@ -101,10 +101,9 @@ App:
       // the two into one.
       LiveIssues = Filter( taskmaster_issues, issue_project_archived = false );
 
-      // NOT SAFE TO CONSUME YET. taskproduct_project_archived was added to a list that already
-      // held rows, so every link predating it is BLANK — and `= false` is an OData equality
-      // that does not match a null, so this returns NOTHING for those rows. scrTaskEdit writes
-      // false on new links only. BACK-FILL THE COLUMN BEFORE ANY SCREEN READS THIS, or every
-      // existing product link disappears from the app.
+      // `= false` does not match a BLANK, so this depends on taskproduct_project_archived being
+      // populated on every row. It is (back-filled 2026-09-02) and scrTaskEdit writes false on
+      // every link it creates. A link that ever loses the value again vanishes from the app
+      // silently — the read paths use this, the delete path deliberately does not.
       LiveTaskProducts = Filter( taskmaster_taskproduct,
           taskproduct_project_archived = false );
