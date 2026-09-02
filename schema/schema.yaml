@@ -440,12 +440,16 @@ lists:
       - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, desc: "product_uid of the linked product, copied at write time. The app always writes it" }
       # WRITE-ONCE. The app has the parent to hand (gTkProject) and a task CANNOT be
       # re-parented — scrTaskEdit derives gTkProject in OnVisible and offers no picker
-      # — so this cannot drift. There is deliberately NO *_project_archived mirror
-      # here: nothing queries this list across projects (galleries read
-      # task_product_summary, the editor reads it one task at a time), and the
-      # archiving flow filters on this id instead. Adding a Yes/No later is cheap;
-      # an internal NAME is what freezes.
+      # — so this cannot drift.
       - { name: taskproduct_project_id,  type: Number, required: false, indexed: true, desc: "ID of the parent project, mirrored from the task. What the archiving flow filters on" }
+      # HAS NO WRITER IN THE APP, unlike the mirrors on the other three child lists.
+      # scrTaskEdit's link insert names four columns and this is not one of them, so
+      # every link the app creates leaves this BLANK — and blank is NOT false: `= false`
+      # is an OData equality that does not match a null, so those links are invisible to
+      # any filter built on it. Nothing reads the column yet, which is the only reason
+      # that is currently harmless. Give it a writer in the SAME change that gives it its
+      # first reader, or the filter drops every app-created link with nothing to see.
+      - { name: taskproduct_project_archived, type: Boolean, required: false, desc: "TRUE when the PARENT project is archived. Mirrors project_phase = Archived, as on the three child lists", review: "ADDED IN SHAREPOINT BY THE USER (2026-09-02), so the internal name is already frozen. THREE THINGS UNCONFIRMED HERE: whether it is INDEXED (recorded as not, pending confirmation — an unindexed filter on this column fails outright once the list passes 5000 items), whether the column DEFAULT is No, and whether the existing rows were BACK-FILLED. A default only applies to rows written after it is set; it does not populate rows that already exist." }
 
   # ---------------------------------------------------------------------------
   taskmaster_clients:
