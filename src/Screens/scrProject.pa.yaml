@@ -116,16 +116,22 @@ Screens:
               =// ONE FETCH PER CHILD LIST, ISSUED TOGETHER — every count, gallery, title and total
               // on this screen reads these three collections, so nothing below re-queries a list.
               // Concurrent's arms must not share state: three arms, three collections.
-              // Each Filter is a delegable = on an indexed FK, so each fetch is one server call.
+              //
+              // OVER THE NAMED FORMULAS, NOT THE RAW LISTS. The FK alone is enough to scope these
+              // rows, but against a raw list this screen came back EMPTY for recent projects
+              // (confirmed in Studio): the archived backlog fills the fetch before the live rows
+              // are reached. The named formulas narrow to live rows SERVER-SIDE first.
+              // They must stay named formulas — a collection cannot delegate at all, so filtering
+              // one would cap every fetch here at the data row limit with no warning.
               Concurrent(
                   ClearCollect( colProjectTasks,
-                      Filter( taskmaster_tasks,
+                      Filter( LiveTasks,
                           task_project_id.Id = gSelProject.ID ) ),
                   ClearCollect( colProjectTx,
-                      Filter( taskmaster_transactions,
+                      Filter( LiveTransactions,
                           transaction_project_id.Id = gSelProject.ID ) ),
                   ClearCollect( colProjectIss,
-                      Filter( taskmaster_issues,
+                      Filter( LiveIssues,
                           issue_project_id.Id = gSelProject.ID ) ) );
               // PHASE IS DERIVED HERE, not chosen by anyone — scrProjectEdit has no phase control.
               //   any OPEN issue                        -> Stalled

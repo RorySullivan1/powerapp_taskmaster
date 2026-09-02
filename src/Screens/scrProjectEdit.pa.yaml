@@ -73,8 +73,10 @@ Screens:
                                                                 First(colPrCovOpts).Label ) ) );
         Clear( colNewTasks ); Clear( colNewTransactions );
         If( gEditMode = "Edit",
-            ClearCollect( colLinkedTasks, Filter(taskmaster_tasks, task_project_id.Id = gEditProject.ID) );
-            ClearCollect( colLinkedTx,    Filter(taskmaster_transactions, transaction_project_id.Id = gEditProject.ID) ),
+            // Over the named formulas, for the reason given on scrProject's fold: against a raw
+            // list the archived backlog fills the fetch and a recent project reads as childless.
+            ClearCollect( colLinkedTasks, Filter(LiveTasks, task_project_id.Id = gEditProject.ID) );
+            ClearCollect( colLinkedTx,    Filter(LiveTransactions, transaction_project_id.Id = gEditProject.ID) ),
             Clear( colLinkedTasks ); Clear( colLinkedTx ) );
         Clear( colChildResult ); Clear( colChildErrors ); Clear( colChildOk );
         Set( gNtOpen, false ); Set( gNxOpen, false );

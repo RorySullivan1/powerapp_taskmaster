@@ -92,3 +92,19 @@ App:
       // save. A child row cannot otherwise answer "is my project archived" without a join,
       // and joins do not delegate.
       LiveTasks = Filter( taskmaster_tasks, task_project_archived = false );
+
+      LiveTransactions = Filter( taskmaster_transactions,
+          transaction_project_archived = false );
+
+      // EVERY live issue, open or closed. OpenIssues above is the NARROWER set and both are
+      // used — the dashboard wants open ones, a project wants all of them. Do not collapse
+      // the two into one.
+      LiveIssues = Filter( taskmaster_issues, issue_project_archived = false );
+
+      // NOT SAFE TO CONSUME YET. taskproduct_project_archived was added to a list that already
+      // held rows, so every link predating it is BLANK — and `= false` is an OData equality
+      // that does not match a null, so this returns NOTHING for those rows. scrTaskEdit writes
+      // false on new links only. BACK-FILL THE COLUMN BEFORE ANY SCREEN READS THIS, or every
+      // existing product link disappears from the app.
+      LiveTaskProducts = Filter( taskmaster_taskproduct,
+          taskproduct_project_archived = false );
