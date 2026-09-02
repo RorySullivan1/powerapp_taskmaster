@@ -62,14 +62,18 @@ Screens:
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ) );
         // THREE BRANCHES, AND THE THIRD IS NOT PARANOIA. project_coverage is the ONE column
         // whose real vocabulary this repo has never been told — schema.yaml still carries a
-        // PLACEHOLDER beside the one confirmed value — so "Internal" is a literal the app
+        // PLACEHOLDER beside the one confirmed value — so "INTERNAL" is a literal the app
         // cannot verify. Stored value if the column still offers it; else the default if the
         // column offers THAT; else whatever it does offer, so a wrong guess degrades to a real
         // member instead of writing one the connector will reject.
+        // CASING IS LOAD-BEARING AND THE `in` TEST WILL NOT PROTECT IT. Power Fx `in` is
+        // case-insensitive, so the membership arm passes against any casing and the app then
+        // writes THIS literal verbatim — and a SharePoint Choice write is case-sensitive.
+        // It must match the column exactly: INTERNAL, not Internal.
         Set( gPrCov,
              With( { v: If( gEditMode = "Edit", Coalesce(gEditProject.project_coverage.Value, ""), "" ) },
                  If( Len(v) > 0 && v in colPrCovOpts.Label, v,
-                     "Internal" in colPrCovOpts.Label,          "Internal",
+                     "INTERNAL" in colPrCovOpts.Label,          "INTERNAL",
                                                                 First(colPrCovOpts).Label ) ) );
         Clear( colNewTasks ); Clear( colNewTransactions );
         If( gEditMode = "Edit",
