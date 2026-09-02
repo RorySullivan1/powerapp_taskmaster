@@ -27,9 +27,10 @@
   their children are in the lists but not in the app. Diagnosed to three causes (see Decisions);
   **not yet resolved, and only the user can tell which one — it needs two SharePoint views:
   `project_phase` is empty, and `task_project_archived` is empty.**
-- **`taskproduct_project_archived` is LIVE in SharePoint and recorded in `schema/schema.yaml`.
-  Indexed/default/back-fill state is UNCONFIRMED (carried in the column's `review:`), and the app
-  has NO WRITER for it.**
+- **`taskproduct_project_archived` is LIVE in SharePoint, recorded in `schema/schema.yaml`, and
+  `scrTaskEdit` now WRITES it false on every link it creates (writer gap closed).** Indexed/default
+  state is still UNCONFIRMED (carried in the column's `review:`), and **links that predate the
+  column are blank until back-filled** — the writer covers new rows only.
 - **BRANCHES: `main` is authoritative and current.** Only `main` and
   `claude/powerapp-repo-init-xymvlm` exist; PR #41 merged the branch into `main` and the trees
   were IDENTICAL, so the branch was restarted from `origin/main` before the fix went on top.

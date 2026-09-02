@@ -1544,7 +1544,12 @@ Screens:
                     { taskproduct_task_id:     { Id: gTkSaved.ID, Value: gTkSaved.task_name },
                     taskproduct_product_id:  { Id: add.Id, Value: add.Uid },
                     taskproduct_product_uid: add.Uid,
-                    taskproduct_project_id:  gTkProject.Id } ) );
+                    taskproduct_project_id:  gTkProject.Id,
+                    // FALSE EXPLICITLY, and NOT redundant with the column default. A `= false`
+                    // filter is an OData equality and does not match a null, so a link left
+                    // unwritten here is invisible to every query built on this column. The app
+                    // cannot add a child to an archived project, so false is always correct.
+                    taskproduct_project_archived: false } ) );
                     If( !IsEmpty( Errors(taskmaster_taskproduct) ),
                     Set( gTkWarn, gTkWarn & "the product links didn't save: "
                     & First(Errors(taskmaster_taskproduct)).Message & "   " ) );
