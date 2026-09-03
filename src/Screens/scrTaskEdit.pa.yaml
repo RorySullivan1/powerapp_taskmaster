@@ -1417,13 +1417,16 @@ Screens:
                     // A NEW TASK IS GREEN WITHOUT A QUERY, and that guard is load-bearing: in New mode
                     // there is no ID, and `issue_task_name.Id = Blank()` matches every issue with NO
                     // task — which would open a brand-new task at Red.
-                    // The RAW list, not OpenIssues: this is already scoped to one task, and that named
-                    // formula also excludes archived projects, forcing every task under one to Green.
+                    // OpenIssues, NOT the raw list. It already carries `issue_status = "Open"`, so
+                    // that test is not repeated here. It also excludes archived PROJECTS, which
+                    // costs nothing: an archived project's tasks cannot be reached at all, because
+                    // every route to this screen runs through ActiveProjects. The raw list is the
+                    // unsafe option — it pages across archived issues before reaching this task's,
+                    // and a fetch that comes up short reads GREEN on a task that has open issues.
                     If( gEditMode = "Edit",
                     ClearCollect( colTkHlIss,
-                    Filter( taskmaster_issues,
-                    issue_task_name.Id = gEditTask.ID
-                    && issue_status.Value = "Open" ) ),
+                    Filter( OpenIssues,
+                    issue_task_name.Id = gEditTask.ID ) ),
                     Clear( colTkHlIss ) ) );
                     // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four amber types
                     // enumerated. Enumerated, a type added in SharePoint and not added here falls

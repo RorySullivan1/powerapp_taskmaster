@@ -72,9 +72,12 @@ Screens:
                ClearCollect( colHlWork,
                    ForAll( colHlTasks As t,
                        { Id: t.Id,
-                         Hl: With( { iss: Filter( taskmaster_issues,
-                                                  issue_task_name.Id = t.Id
-                                               && issue_status.Value = "Open" ) },
+                         // OpenIssues ALREADY carries `issue_status = "Open"` — do not re-test it
+                         // here, and do not "fix" this back to the raw list: raw makes the fetch
+                         // page across archived issues first, and a short fetch reads GREEN on a
+                         // task that has open ones.
+                         Hl: With( { iss: Filter( OpenIssues,
+                                                  issue_task_name.Id = t.Id ) },
                                  // AMBER IS THE RESIDUAL — "any other open issue" — NOT the four
                                  // amber types enumerated. Enumerated, a type added in SharePoint and
                                  // not added here falls through to GREEN: an allow-list failing closed,
