@@ -54,11 +54,11 @@ Screens:
         // is one formula.
         Concurrent(
             ClearCollect( colIssTaskOpts, { Id: 0, Label: "(none)" },
-                 ForAll( Filter( taskmaster_tasks,
+                 ForAll( Filter( LiveTasks,
                                  task_project_id.Id = gIssProject.Id ) As t,
                          { Id: t.ID, Label: t.task_name } ) ),
             ClearCollect( colIssTxOpts, { Id: 0, Label: "(none)" },
-                 ForAll( Filter( taskmaster_transactions,
+                 ForAll( Filter( LiveTransactions,
                                  transaction_project_id.Id = gIssProject.Id ) As x,
                          { Id: x.ID, Label: x.transaction_name } ) ) );
         If( gIssTask.Id > 0 && IsBlank( LookUp(colIssTaskOpts, Id = gIssTask.Id) ),

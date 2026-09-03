@@ -1586,8 +1586,10 @@ Screens:
                     // scored table out to the branches below.
                     Set( gTkRollupScored,
                     AddColumns(
-                    // Delegable: `=` on an indexed Lookup FK, and nothing else needed.
-                    Filter( taskmaster_tasks,
+                    // Over LiveTasks, not the raw list: this figure is WRITTEN BACK to the
+                    // project, so a fetch that pages across archived work first does not just
+                    // display wrong, it stores wrong.
+                    Filter( LiveTasks,
                     task_project_id.Id = gTkProject.Id ),
                     wgt, Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ) );
                     If( IsBlank(gTkParentProj),
