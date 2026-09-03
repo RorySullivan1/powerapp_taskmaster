@@ -38,7 +38,7 @@ Screens:
         // the order of weeks; an EMPTY collection is the only reason to pull one again, and a
         // new term is picked up on the next app start. IsEmpty, never IsBlank: these are tables.
         Concurrent(
-            If( IsEmpty(colMapRegion),   ClearCollect( colMapRegion,   mapping_regions ) ),
+            If( IsEmpty(colMapRegion),   ClearCollect( colMapRegion,   mapping_region ) ),
             If( IsEmpty(colMapActivity), ClearCollect( colMapActivity, mapping_activitytype ) ) );
         Set( gPrRegionId,   If( gEditMode = "Edit", Coalesce(gEditProject.project_region_id, 0), 0 ) );
         Set( gPrRegionPath, If( gEditMode = "Edit", Coalesce(gEditProject.project_region_path, ""), "" ) );
@@ -1327,7 +1327,7 @@ Screens:
                         With( { pid: gPrSaved.ID },
                             With( { scored:
                                       AddColumns(
-                                          Filter( taskmaster_tasks,
+                                          Filter( LiveTasks,
                                               task_project_id.Id = pid ),
                                           wgt, Coalesce(LookUp(gStageWeights, Stage = task_stage.Value, Weight), 0) ) },
                                 If( CountRows(scored) >= 500,
