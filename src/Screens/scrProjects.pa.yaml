@@ -158,19 +158,16 @@ Screens:
       # name finds nothing now: that is the accepted trade, not a defect.
       #
       # THE EMPTY-SEARCH CASE IS ITS OWN BRANCH, NOT `StartsWith(col, "")`. That trick reads
-      # as obviously true and HALVES this formula, and it is banned here: the lead filter was
-      # built on it and returned NOTHING for every choice in the app. Which half fails — the
-      # empty argument, or the subfield — could not be settled from this side of the gap, and
-      # a filter that silently returns zero rows is indistinguishable from an empty list to
-      # the only observer there is. An "off" state is a BRANCH.
+      # as obviously true and would HALVE this formula. It is banned because it DOES NOT RUN:
+      # `StartsWith(project_name, "")` is rejected outright — "the query is not valid" — on a
+      # plain indexed Text column, so the "off" state would take the whole gallery down rather
+      # than match everything. A non-empty argument on the same column is fine, and so is one
+      # on a Person subfield. THE EMPTY ARGUMENT IS THE WHOLE FAULT. An "off" state is a BRANCH.
       #
-      # EVERY BRANCH CARRIES ITS OWN PHASE PREDICATE, and the "show completed" ones look
-      # redundant against ActiveProjects. DO NOT SIMPLIFY THEM AWAY: sorting a bare
-      # `Filter(ActiveProjects, StartsWith(...))` returned "the query is not valid" from
-      # SharePoint while the identical shape WITH an explicit phase group did not — which is
-      # why the search predicate goes INSIDE each branch and never replaces one. The phases
-      # are ENUMERATED because a Text `<>` does not delegate.
-      #
+      # The phase vocabulary lives in ActiveProjects and OpenProjects, NOT inline here. Both
+      # are named formulas so the filter still folds into one server query, and both enumerate
+      # their phases because a Text `<>` does not delegate — keep them in step with
+      # project_phase's values in schema/schema.yaml or a new phase vanishes from the app.
       # "MINE" IS MANAGER OR SUPPORTER, not manager alone — schema decision C2. Both columns
       # are indexed, which is what keeps the Or-arm delegable; `project_requestor` is NOT
       # indexed and MUST NOT join it, because one unindexed arm drops delegation for the whole
@@ -189,163 +186,83 @@ Screens:
                    If( tglShowComplete.Value && tglOnlyMine.Value
                     && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                        Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" )
-                              && ( project_manager.Email = gUserEmail
+                                 ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
                              project_name ),
                        tglShowComplete.Value && tglOnlyMine.Value,
                        Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value
                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
                              project_name ),
                        tglShowComplete.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
-                         = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" ) ),
-                             project_name ),
+                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                       Sort( ActiveProjects, project_name ),
                        tglShowComplete.Value,
                        Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value ),
                              project_name ),
                        tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
-                         = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" )
-                              && ( project_manager.Email = gUserEmail
+                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                       Sort( Filter( OpenProjects,
+                                 ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
                              project_name ),
                        tglOnlyMine.Value,
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                       Sort( Filter( OpenProjects,
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value
                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
                              project_name ),
-                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
-                       = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" ) ),
-                             project_name ),
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                       Sort( OpenProjects, project_name ),
+                       Sort( Filter( OpenProjects,
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value ),
                              project_name ) ),
                    If( tglShowComplete.Value && tglOnlyMine.Value
                     && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                        Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" )
-                              && ( project_manager.Email = gUserEmail
+                                 ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglShowComplete.Value && tglOnlyMine.Value,
                        Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value
                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglShowComplete.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
-                         = "All coverage",
+                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
                        Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" )
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                                 StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglShowComplete.Value,
                        Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled"
-                                || project_phase.Value = "Complete" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
-                         = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" )
-                              && ( project_manager.Email = gUserEmail
+                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                       Sort( Filter( OpenProjects,
+                                 ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglOnlyMine.Value,
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                       Sort( Filter( OpenProjects,
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value
                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
-                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
-                       = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" )
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                       Sort( Filter( OpenProjects,
+                                 StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
-                       Sort( Filter( ActiveProjects,
-                                 ( project_phase.Value = "Not Started"
-                                || project_phase.Value = "Planning"
-                                || project_phase.Value = "Active"
-                                || project_phase.Value = "Stalled" )
-                              && project_coverage.Value = cboPrjCoverage.Selected.Value
+                       Sort( Filter( OpenProjects,
+                                 project_coverage.Value = cboPrjCoverage.Selected.Value
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ) ) )
             # EXPLICIT single column. Left unset, a wrapping gallery divides TemplateWidth

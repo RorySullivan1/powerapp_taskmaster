@@ -806,15 +806,26 @@ things that comment currently blames.
 raises a visible data-retrieval error. Whatever #17's observer saw as "returned NOTHING", the
 construct fails loudly today.
 
-### Still unrecorded from this run
+### 5b and 5c — the #17 post-mortem, closed
 
-**PC**, **5b** and **5c** were not reported, and the A/B triples produced no readable numbers —
-rows 2/3 error, so A2/A3 and B2/B3 error with them. The verdict came from rows 2 and 3 directly.
+```
+5c   a project name        manager.Email = User().Email          matches, as #46 established
+5b   the SAME project      StartsWith(manager.Email, Left(me,3))  MATCHES
+```
 
-**5b is the one still worth reading.** `StartsWith(manager.Email, Left(me,3))` — same Person
-subfield, **non-empty** argument. 5c matches and 5b errors → the subfield is broken as well and
-note 20 keeps its scope. 5b clean → the empty argument is the only fault and note 20 is not
-implicated in this app at all.
+**`StartsWith` over a Person subfield WORKS with a non-empty argument.** Same column, same row,
+only the argument differs from row 5 — which errors. **So the empty argument is the ONLY fault,
+and #17 is fully attributed to it.** Note 20 is not implicated in anything this app does.
+
+One scope note, so this is not over-read in the other direction: note 20 is about **delegation**,
+not validity, and a non-delegable filter still *returns rows* — locally, over the fetched page.
+5b matching therefore does not prove the subfield folds; it proves it does not *error*. Row 5b's
+delegation warning was not recorded, so whether that predicate delegates remains open. Nothing
+in this app depends on it — no shipping formula uses `StartsWith` on a Person column.
+
+**PC was not reported**, and the A/B triples produced no readable numbers: rows 2/3 error, so
+A2/A3 and B2/B3 error with them. The verdict came from rows 2 and 3 directly, and from the cross
+with ProbeNF row 6.
 
 ---
 
