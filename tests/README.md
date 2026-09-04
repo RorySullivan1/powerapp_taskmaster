@@ -470,9 +470,77 @@ then quoted as evidence the person predicate was at fault.
 **Rows 8 and 9 were added for a second pass** to settle it: row 8 is the gallery branch
 verbatim, row 9 reports the phase of the project row 3 keeps returning.
 
-### Result — second pass
+### Result — second pass, 2026-09-04, run by the user in Studio
 
-**Not yet run.** Read it as:
+```
+PC   no warning                       positive control PASSED
+NC   warned, naming "lower"           negative control PASSED
+3, 4, 5, 7   no warning               the person predicates FOLD
+M0, M3, M4, M5, M6   all warned       CountRows only. Noise, as designed
+M3 = M4 = M6
+THE TOGGLE DOES NOT FAIL FOR THE TESTER.
+```
+
+**THE PROBE IS SPENT AND THE MACHINERY IS SOUND.** Both controls behaved, so the sheet is
+readable: Studio flags a `project_manager` predicate when there is something to flag (NC) and
+stayed silent on rows 3, 4, 5 and 7 — **evidence of absence, not absence of evidence.**
+
+**`M3 = M4 = M6` is the strongest single line in the run.** M3 is the delegable shipping
+predicate, M4 the un-lowercased variant, M6 the *non-delegable local* ground truth. All three
+agree, so the server-side fold returns exactly what local evaluation returns: **nothing is
+being truncated or dropped.** (Caveat: M6 evaluates over the first 2,000 rows only, so the
+agreement also implies this tester's projects sit inside that page. It is not a statement
+about a user whose projects do not.)
+
+**And the toggle works for the tester.** That retires the sixth candidate *for this user* —
+their projects are in the four-phase set — and it retires the whole idea that the screen is
+broken for everyone.
+
+#### What is left, and it is not a code defect
+
+**Every candidate ranked in #45 is dead**: B and C on the first pass, D on the clean warnings
+plus `M3 = M6`, E on `row 7 = row 4` and on the toggle working. The screen does what it was
+written to do. **The report is from users for whom "what it was written to do" is the wrong
+thing**, and exactly two conditions produce an empty gallery with no fault anywhere:
+
+| | Condition | Behaviour |
+|---|---|---|
+| **A** | the user manages nothing — they support or requested the project | correct by the current definition of "mine" |
+| **6** | every project they manage is `Complete`, and "show completed" is off | correct by the current definition of the branch |
+
+Both are indistinguishable to the user, because **the empty-state message describes neither.**
+`scrProjects.pa.yaml:540` tests `tglOnlyMine.Value` first, so both render as *"No projects
+here are led by you"* — which is false in case 6 and misleading in case A.
+
+**That message is why this cost a five-candidate investigation and two probe passes.** #45
+opened by quoting it as evidence the person predicate was at fault. It never was.
+
+#### Settle A vs 6 without another paste
+
+Take one affected user and ask SharePoint two questions: do they appear in `project_manager`
+on any project, and if so what `project_phase` are those projects in. No probe can answer
+this — the condition is in another user's data, and the probe can only ever run as whoever
+pasted it.
+
+#### What this licenses
+
+Both conditions are covered by the same two changes, so neither needs the answer first:
+
+1. **Widen "mine" to manager-or-supporter** (#48). Decision **C2** already settled that "mine"
+   means lead-or-supporter and `scrProjects` never picked it up; `project_supporter` is
+   indexed, so the `Or` arm stays delegable — and rows 5 and PC together are the evidence that
+   a second person predicate folds. **`project_requestor` is NOT indexed and must stay out.**
+2. **Make the empty state tell the truth** — distinguish "you manage none of these" from
+   "all of yours are complete and completed are hidden". This is the change with the highest
+   value per line in the whole epic, and it is independent of everything else.
+
+**#47 drops in priority.** It exists to verify the live index on `project_manager`; the clean
+warnings and `M3 = M6` are a positive reading at the current list size. The 5,000-item
+threshold is still ahead, so #47 is not void — it is no longer blocking.
+
+### How the second pass was to be read
+
+Superseded by the run above, kept because the reasoning is what made the run legible:
 
 - **3 finds a project, 8 is `-- no match --`** → the phase group is the bug. #45's five
   candidates all close; the fix is the empty-state wording plus a decision about whether
