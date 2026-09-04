@@ -53,10 +53,18 @@
   by up to ~7px at the design width.
 
 ## State at end
-- **AUTHORED AND IN REVIEW, NOT PASTED.** Commits `7a2f286` + `96a51ba` on
-  `claude/projects-ready-to-complete-banner`, open as **PR #58** against main
-  (mergeable, no CI — this repo has none). **Merging it does NOT put the banner in
-  the app**: the only thing that does is a human pasting `scrProjects` into Studio.
+- **LANDED.** PR #58 merged to main at `6cba7a6`, then pasted into Studio and
+  confirmed working by the user, 2026-09-04. Nothing outstanding on this change.
+- **WHAT THE PASTE GROUNDS BEYOND THE FEATURE**, and this is the durable part:
+  (a) a `GroupContainer` NESTS inside a gallery template's row container — the
+  2026-08-19 ledger entry called that ungrounded and worked around it by spending
+  two columns with one captioned blank; that workaround is no longer needed.
+  (b) a hidden child takes no space HORIZONTALLY and inside a template, where the
+  only prior evidence was `cmpLookupField`'s vertical stack in a component.
+- **STILL UNTESTED: the suppression case.** That a project already at 100% AND
+  phased `Complete` shows no banner has not been seen — it needs "Show completed"
+  on and such a project to exist. The logic is a single `<>` clause, but nobody has
+  laid eyes on it.
 - Proof when it is pasted: a project at 100% still phased Active shows the green box
   in place of its due date and percent, and clicking it opens the project.
 - A project already phased `Complete` is deliberately EXCLUDED — only reachable with
@@ -65,4 +73,6 @@
 
 ## Open threads
 - Whether the banner should fire on 100% regardless of phase. Offered to the user as
-  a one-clause edit in two places; not answered.
+  a one-clause edit in two places; asked twice, not answered. The `Complete`-phase
+  exclusion is shipped and working, so this is a preference, not a defect.
+- The remote branch `claude/projects-ready-to-complete-banner` was never deleted.
