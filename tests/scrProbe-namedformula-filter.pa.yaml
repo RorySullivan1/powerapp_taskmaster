@@ -1,0 +1,287 @@
+# =============================================================================
+# scrProbe-namedformula-filter — does sorting a BARE Filter over a named formula
+# really return "the query is not valid"?
+#
+# Issue #51 claim 2, sub-issue of #50. scrProjects.pa.yaml:167-172 records that
+#
+#     Sort( Filter( ActiveProjects, StartsWith(...) ), project_name )
+#
+# was rejected by SharePoint while the identical shape WITH an explicit phase
+# OR-group AND'd in was not. That single observation is the entire justification
+# for restating the five-phase vocabulary in all sixteen branches of
+# galProjects.Items — about 120 of its 155 lines — and its mechanism is
+# unexplained: nothing in the delegation rules says a REDUNDANT predicate can
+# repair a query.
+#
+# THE CLAIM WAS NEVER ISOLATED. The formula under test at the time also carried
+# a StartsWith over a PERSON subfield, which MS Learn note 20 says does not
+# delegate. A non-delegable clause anywhere in a filter is an ordinary
+# explanation for the connector emitting a query the server rejects — the phase
+# group may simply have been the variable that happened to change.
+#
+# BREAKS RULE 1 ON PURPOSE — the connector's behaviour IS the claim.
+#
+# ---------------------------------------------------------------------------
+# THE FAILURE MODE HERE IS AN ERROR, NOT AN EMPTY RESULT, and those must not be
+# allowed to look alike on the sheet. Every measured row is wrapped in IfError
+# and prints one of THREE distinguishable outcomes:
+#
+#     <a project name>          the shape works and matched
+#     -- no rows (no error) --  the shape WORKS and simply matched nothing
+#     !! ERROR: <message>       the shape is rejected. THIS is claim 2
+#
+# "ab" is the literal #51 specifies. A no-match on it is expected and is NOT
+# the finding; an ERROR is the finding.
+#
+# Rows 6ns, 6r and 8ns are NOT IN #51. They exist because the recorded claim
+# names three things at once — Sort, a bare Filter, and a named formula — and
+# each row here holds two of them still while varying the third. #46 proved the
+# worth of exactly this: its raw-list row is what cleared the named formula.
+#
+# BEFORE PASTING: taskmaster_projects must be in the Data pane, and BOTH named
+# formulas must exist in App.Formulas. OpenProjects is NEW — src/App.pa.yaml
+# carries it, and App.Formulas is a FORMULA-BAR paste, not code view. The
+# prerequisite block below fails loudly if it has not landed.
+#
+# Paste onto a blank screen named exactly scrProbeNF. Set its Fill in the
+# formula bar; screens are not controls, so that cannot be pasted.
+# =============================================================================
+Screens:
+  scrProbeNF:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblNfTitle:
+          Control: Label@2.5.1
+          Properties:
+            # Block scalar, NOT inline: YAML reads " #" in a plain scalar as a comment
+            # and would eat the rest of the line, closing quote included.
+            Text: |
+              ="Named-formula bare-Filter probe  ·  issue #51 claim 2"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =900
+            Height: =28
+      - lblNfHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="Nothing to press. Every row is a property formula, so it has already run." &
+               Char(10) &
+               "1. READ THE PREREQUISITE BLOCK FIRST. If OpenProjects is missing, row 8 is meaningless and the rest is still readable." &
+               Char(10) &
+               "2. Three outcomes per row: a NAME, '-- no rows (no error) --', or '!! ERROR:'. Only the third is claim 2." &
+               Char(10) &
+               "3. Record the exact ERROR TEXT verbatim, and note any delegation warning on rows 6, 6ns, 6r and 8."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =50
+            Width: =900
+            Height: =74
+      # ----------------------------------------------------------- PREREQUISITE
+      - lblNfSecPre:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="PREREQUISITE  —  both named formulas must resolve. A failure here explains a failure anywhere below."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =136
+            Width: =900
+            Height: =22
+      - lblNfPre1:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="P1  First(ActiveProjects) ...................... " &
+               IfError( Coalesce( First( ActiveProjects ).project_name, "-- empty --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =162
+            Width: =900
+            Height: =22
+      - lblNfPre2:
+          Control: Label@2.5.1
+          Properties:
+            # If OpenProjects has not been pasted into App.Formulas this row is where it
+            # shows, rather than as a mystery on row 8.
+            Text: |
+              ="P2  First(OpenProjects)   NEW formula .......... " &
+               IfError( Coalesce( First( OpenProjects ).project_name, "-- empty --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =186
+            Width: =900
+            Height: =22
+      # ------------------------------------------------------------------ SHAPES
+      - lblNfSecShape:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="SHAPES  —  each row holds two of (Sort, bare Filter, named formula) still and varies the third."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =222
+            Width: =900
+            Height: =22
+      - lblNf7:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 7 — POSITIVE CONTROL, and the shape galProjects.Items ships today. It
+            # is known to work in the running app, so an ERROR here means the probe or
+            # the environment is wrong and nothing else on the sheet can be read.
+            Text: |
+              ="7   PRODUCTION: Sort(Filter(Active, phases && SW)) . " &
+               IfError( Coalesce( First( Sort( Filter( ActiveProjects,
+                                        ( project_phase.Value = "Not Started"
+                                       || project_phase.Value = "Planning"
+                                       || project_phase.Value = "Active"
+                                       || project_phase.Value = "Stalled"
+                                       || project_phase.Value = "Complete" )
+                                     && StartsWith( project_name, "ab" ) ),
+                                    project_name ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =248
+            Width: =900
+            Height: =22
+      - lblNf6:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 6 — THE DISPUTED SHAPE, verbatim. An ERROR here reproduces claim 2 and
+            # #52 closes won't-fix. A name or a clean no-match kills the claim and frees
+            # roughly 120 lines.
+            Text: |
+              ="6   DISPUTED: Sort(Filter(Active, SW)) no phases .. " &
+               IfError( Coalesce( First( Sort( Filter( ActiveProjects,
+                                        StartsWith( project_name, "ab" ) ),
+                                    project_name ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =272
+            Width: =900
+            Height: =22
+      - lblNf6ns:
+          Control: Label@2.5.1
+          Properties:
+            # SORT REMOVED, everything else identical to row 6. The recorded claim says
+            # SORTING the bare Filter failed. 6 errors and 6ns does not -> Sort is the
+            # trigger and the phase group is incidental, which is a different fix from
+            # the one #52 proposes.
+            Text: |
+              ="6ns same as 6, NO Sort ......................... " &
+               IfError( Coalesce( First( Filter( ActiveProjects,
+                                        StartsWith( project_name, "ab" ) ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =296
+            Width: =900
+            Height: =22
+      - lblNf6r:
+          Control: Label@2.5.1
+          Properties:
+            # THE RAW LIST instead of the named formula, otherwise identical to row 6.
+            # 6 errors and 6r does not -> the fault is composing over a named formula,
+            # not the missing phase group, and #52 is unsafe for a different reason than
+            # it thinks. Both error -> the phase group really is load-bearing.
+            Text: |
+              ="6r  same as 6, RAW list not named formula ...... " &
+               IfError( Coalesce( First( Sort( Filter( taskmaster_projects,
+                                        StartsWith( project_name, "ab" ) ),
+                                    project_name ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =320
+            Width: =900
+            Height: =22
+      - lblNf8:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 8 — THE PROPOSED SHAPE. This is what every branch of galProjects.Items
+            # becomes if #52 lands: a source chosen instead of a vocabulary restated.
+            Text: |
+              ="8   PROPOSED: Sort(Filter(OpenProjects, SW)) .... " &
+               IfError( Coalesce( First( Sort( Filter( OpenProjects,
+                                        StartsWith( project_name, "ab" ) ),
+                                    project_name ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =344
+            Width: =900
+            Height: =22
+      - lblNf8ns:
+          Control: Label@2.5.1
+          Properties:
+            # Row 8 without its Sort, for the same reason 6ns exists: if OpenProjects is
+            # only unsafe when sorted, that is worth knowing before the rewrite is built
+            # on it, because every branch keeps its own Sort.
+            Text: |
+              ="8ns same as 8, NO Sort ......................... " &
+               IfError( Coalesce( First( Filter( OpenProjects,
+                                        StartsWith( project_name, "ab" ) ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =368
+            Width: =900
+            Height: =22
+      - lblNfRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="HOW TO READ  ·  7 must come back clean; if it errors, stop, the environment is wrong.   " &
+               "6 clean -> CLAIM 2 IS DEAD, the phase groups are dead weight and #52 proceeds.   " &
+               "6 errors and 6ns clean -> Sort is the trigger, not the phase group.   " &
+               "6 errors and 6r clean -> composing over a named formula is the trigger.   " &
+               "6 and 6r both error -> the claim stands, #52 closes won't-fix and the comment gets the " &
+               "mechanism it has never had.   8 is what the rewrite would actually ship: it must be clean."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =404
+            Width: =900
+            Height: =84

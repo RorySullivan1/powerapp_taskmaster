@@ -1,0 +1,429 @@
+# =============================================================================
+# scrProbe-startswith-empty — does StartsWith on a TEXT column with an EMPTY
+# argument match every row?
+#
+# Issue #51 claim 1, sub-issue of #50. `galProjects.Items` spends EIGHT of its
+# sixteen branches on an outer If that exists only to avoid writing
+# `StartsWith(project_name, "")` as a match-everything off state. The ban came
+# from #17, where `StartsWith(person.Email, "")` returned nothing for every
+# choice — but that formula varied TWO things at once and neither was isolated:
+#
+#   the EMPTY ARGUMENT        vs   the PERSON SUBFIELD it was applied to
+#
+# MS Learn note 20 on the SharePoint delegation table says StartsWith does not
+# delegate on subfields of Choice or Lookup complex types. A Person column is
+# one. That explains #17 without implicating the empty string, and it does not
+# reach project_name, which is plain indexed Text. Explained is not tested.
+#
+# BREAKS RULE 1 ON PURPOSE, like scrProbe-mine-predicate, scrProbe-junction-write
+# and scrProbe-date-null-delegation: the connector's behaviour IS the claim, so
+# there is nothing to test without a source. Every other rule is kept.
+#
+# ---------------------------------------------------------------------------
+# TWO DELIBERATE DEPARTURES FROM THE SUB-CASE TABLE IN #51.
+#
+# 1. #51 asks for `CountRows(Filter(...))` on every case. CountRows is ITSELF
+#    non-delegable, so every such label carries an identical "CountRows Operation
+#    not supported" that says nothing about the Filter inside it. scrProbeRerun
+#    lost sub-case D to a shared instrument. So the instruments are SPLIT:
+#    First(Filter(...)).project_name for the delegation reading, CountRows
+#    quarantined in its own block for numbers.
+#
+# 2. #51 EXPECTS "N" FROM CountRows(ActiveProjects) AND THAT NUMBER DOES NOT
+#    EXIST. There are 2000+ projects and the data row limit is 2000, so an
+#    unbounded count returns the CEILING — a truncation, not a total — and
+#    "case 2 should equal N" is unmeasurable as written.
+#
+#    So match-all is measured over a BOUNDED subset instead: count one phase,
+#    then count the same phase AND'd with the StartsWith. Two numbers that are
+#    equal AND below 2000 prove the StartsWith removed nothing. Two phases are
+#    offered because neither's size is known here; read whichever pair lands
+#    clear of the ceiling. THIS PAIRED READING IS THE VERDICT OF THIS PROBE.
+#
+# THE NUMBERS ARE THE VERDICT, NOT THE WARNINGS. The #46 run came back with
+# "delegation warnings were not recorded on this pass" — so nothing here that
+# decides the issue is allowed to depend on a warning being noticed.
+#
+# BEFORE PASTING: taskmaster_projects must be in the Data pane. ActiveProjects
+# is an App named formula and already exists app-wide.
+# Paste onto a blank screen named exactly scrProbeSW. Set its Fill in the
+# formula bar; screens are not controls, so that cannot be pasted.
+# =============================================================================
+Screens:
+  scrProbeSW:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblSwTitle:
+          Control: Label@2.5.1
+          Properties:
+            # Block scalar, NOT inline: YAML reads " #" in a plain scalar as a comment
+            # and would eat the rest of the line, closing quote included.
+            Text: |
+              ="StartsWith empty-argument probe  ·  issue #51 claim 1"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =900
+            Height: =28
+      - lblSwHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="LEAVE THE SEARCH BOX BELOW EMPTY for the first read. Everything else is a property formula and has already run." &
+               Char(10) &
+               "1. DELEGATION block: PC must be CLEAN and NC must WARN, or Studio is not flagging what it claims." &
+               Char(10) &
+               "2. MAGNITUDE block: this is where the verdict is. Compare A1 vs A2 vs A3, and B1 vs B2 vs B3." &
+               Char(10) &
+               "3. Then type a known project-name prefix into the box and re-read rows 4 and A3/B3 only."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =50
+            Width: =900
+            Height: =74
+      # ------------------------------------------------------------------ INPUT
+      - lblSwSecIn:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="INPUT  —  this is case 3's whole point: a control property that HAPPENS to be empty is not the literal """"."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =136
+            Width: =900
+            Height: =22
+      - txtProbeSearch:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            # Same control and same reader (.Text) as the shipping txtProjSearch. A probe
+            # that used a different input control would be testing a different construct.
+            Type: =TextInputType.Search
+            Placeholder: ="leave empty for the first read"
+            X: =16
+            Y: =162
+            Width: =400
+            Height: =32
+      - lblSwEcho:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="box = [" & txtProbeSearch.Text & "]   Trim = [" & Trim(txtProbeSearch.Text) &
+               "]   Len(Trim) = " & Len( Trim(txtProbeSearch.Text) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =202
+            Width: =900
+            Height: =22
+      # ------------------------------------------------------------- DELEGATION
+      - lblSwSecDel:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="DELEGATION  —  no aggregates here. A warning on one of these rows is about the FILTER. A name means the predicate matched."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =238
+            Width: =900
+            Height: =22
+      - lblSwPC:
+          Control: Label@2.5.1
+          Properties:
+            # POSITIVE CONTROL. `=` on an indexed Choice subfield is delegable, so this
+            # must be CLEAN and must return a name. Its own instrument, shared with
+            # nothing measured — the rule scrProbeRerun's sub-case D was lost to.
+            Text: |
+              ="PC  phase = Active (must be CLEAN) .......... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        project_phase.Value = "Active" ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =264
+            Width: =900
+            Height: =22
+      - lblSwNC:
+          Control: Label@2.5.1
+          Properties:
+            # NEGATIVE CONTROL. Lower() around a column is not delegable, so this must
+            # WARN — which is what proves the checker actively examines a project_name
+            # StartsWith predicate, and therefore that silence on rows 2/3/4 is a
+            # reading rather than a gap.
+            Text: |
+              ="NC  StartsWith(Lower(name),""a"") (must WARN) .. " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        StartsWith( Lower(project_name), "a" ) ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(197, 58, 58, 1)
+            X: =16
+            Y: =288
+            Width: =900
+            Height: =22
+      - lblSw2:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 2. The literal empty argument on a TEXT column.
+            Text: |
+              ="2   StartsWith(project_name, """") ............. " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        StartsWith( project_name, "" ) ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =312
+            Width: =900
+            Height: =22
+      - lblSw3:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 3. THE ROW THE REWRITE ACTUALLY DEPENDS ON — the real shipping input,
+            # a search box that happens to be empty, which #17 is the reason for not
+            # assuming behaves like the literal on row 2.
+            Text: |
+              ="3   StartsWith(name, Trim(box))  box EMPTY ... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        StartsWith( project_name,
+                                                    Trim(txtProbeSearch.Text) ) ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =336
+            Width: =900
+            Height: =22
+      - lblSw4:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 4. Same formula, non-empty box. Read this AFTER typing a prefix: it is
+            # the sanity check that row 3 is wired to the box at all, and it is the
+            # construct the search branches already ship today.
+            Text: |
+              ="4   same, AFTER you type a prefix ............ " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        StartsWith( project_name,
+                                                    Trim(txtProbeSearch.Text) ) ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =360
+            Width: =900
+            Height: =22
+      - lblSw5ctl:
+          Control: Label@2.5.1
+          Properties:
+            # CONTROL FOR ROW 5, and the reason row 5's no-match will mean something.
+            # #46 established this exact predicate RETURNS A PROJECT for this tester. So
+            # if 5ctl finds one and 5/5b do not, the difference is StartsWith on the
+            # subfield and nothing else — not the data, not the user.
+            Text: |
+              ="5c  manager.Email = User().Email  (known: MATCHES) " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        project_manager.Email = User().Email ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =384
+            Width: =900
+            Height: =22
+      - lblSw5:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 5 — the #17 construct verbatim. Expect a no-match and/or a warning.
+            Text: |
+              ="5   StartsWith(manager.Email, """")  the #17 shape . " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        StartsWith( project_manager.Email, "" ) ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(197, 58, 58, 1)
+            X: =16
+            Y: =408
+            Width: =900
+            Height: =22
+      - lblSw5b:
+          Control: Label@2.5.1
+          Properties:
+            # CASE 5b — NOT IN #51, AND IT IS THE ROW THAT ACTUALLY ISOLATES THE TWO
+            # VARIABLES. Same Person subfield, NON-empty argument: a real prefix of the
+            # tester's own address, so 5c having matched guarantees a row exists for this
+            # to find. 5c matches and 5b does not -> StartsWith over the subfield is the
+            # broken half, the empty argument is exonerated, and #17 is finally attributed.
+            Text: |
+              ="5b  StartsWith(manager.Email, Left(me,3)) ...... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        StartsWith( project_manager.Email,
+                                                    Left( User().Email, 3 ) ) ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(197, 58, 58, 1)
+            X: =16
+            Y: =432
+            Width: =900
+            Height: =22
+      # -------------------------------------------------------------- MAGNITUDE
+      - lblSwSecMag:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="MAGNITUDE  —  THE VERDICT IS HERE. Every row warns about CountRows; that warning is NOISE. Read the numbers."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(214, 152, 40, 1)
+            X: =16
+            Y: =468
+            Width: =900
+            Height: =22
+      - lblSwM0:
+          Control: Label@2.5.1
+          Properties:
+            # Reachability only. THIS NUMBER IS NOT A TOTAL: 2000 is the data row limit,
+            # so 2000 here means truncated. It is why the pairs below are bounded.
+            Text: |
+              ="M0  CountRows(ActiveProjects)  (2000 = CEILING) " & CountRows( ActiveProjects )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =494
+            Width: =900
+            Height: =22
+      - lblSwA1:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="A1  phase = Stalled ......................... " &
+               CountRows( Filter( ActiveProjects, project_phase.Value = "Stalled" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =518
+            Width: =900
+            Height: =22
+      - lblSwA2:
+          Control: Label@2.5.1
+          Properties:
+            # A2 = A1 means the literal empty argument removed NOTHING from a bounded set.
+            Text: |
+              ="A2   + StartsWith(name, """")   must EQUAL A1 ... " &
+               CountRows( Filter( ActiveProjects,
+                                  project_phase.Value = "Stalled"
+                               && StartsWith( project_name, "" ) ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =542
+            Width: =900
+            Height: =22
+      - lblSwA3:
+          Control: Label@2.5.1
+          Properties:
+            # A3 = A1 with the box EMPTY is the single reading #53 turns on.
+            Text: |
+              ="A3   + StartsWith(name, Trim(box))  must EQUAL A1 " &
+               CountRows( Filter( ActiveProjects,
+                                  project_phase.Value = "Stalled"
+                               && StartsWith( project_name, Trim(txtProbeSearch.Text) ) ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =566
+            Width: =900
+            Height: =22
+      - lblSwB1:
+          Control: Label@2.5.1
+          Properties:
+            # SECOND PAIR on a different phase. Neither phase's size is known from this
+            # side of the gap, so two are offered: read whichever pair is clear of both
+            # 0 and the 2000 ceiling. A pair reading 0/0 proves nothing.
+            Text: |
+              ="B1  phase = Not Started ..................... " &
+               CountRows( Filter( ActiveProjects, project_phase.Value = "Not Started" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =590
+            Width: =900
+            Height: =22
+      - lblSwB2:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="B2   + StartsWith(name, """")   must EQUAL B1 ... " &
+               CountRows( Filter( ActiveProjects,
+                                  project_phase.Value = "Not Started"
+                               && StartsWith( project_name, "" ) ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =614
+            Width: =900
+            Height: =22
+      - lblSwB3:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="B3   + StartsWith(name, Trim(box))  must EQUAL B1 " &
+               CountRows( Filter( ActiveProjects,
+                                  project_phase.Value = "Not Started"
+                               && StartsWith( project_name, Trim(txtProbeSearch.Text) ) ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =638
+            Width: =900
+            Height: =22
+      - lblSwRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="HOW TO READ  ·  A2=A1 AND A3=A1 (or the B pair), with rows 2 and 3 returning names -> " &
+               "the halving is SAFE, #53 proceeds.   A3 < A1, or row 3 reads no-match while row 2 does " &
+               "not -> the CONTROL PROPERTY is the failing half, #53 closes won't-fix.   Row 5c matches " &
+               "and 5/5b do not -> the ban belongs to the PERSON SUBFIELD, and #17 is finally attributed " &
+               "no matter what the rest of the sheet says."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =674
+            Width: =900
+            Height: =70

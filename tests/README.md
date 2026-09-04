@@ -685,3 +685,253 @@ Both work, so this was a choice, not a constraint:
 
 D stays the cheaper option for any screen that genuinely wants a full reload, and the choice is
 reversible in one line.
+
+---
+
+## `scrProbe-startswith-empty.pa.yaml` — does `StartsWith` on a **Text** column with an empty argument match every row?
+
+Issue **#51 claim 1**, sub-issue of #50. Eight of `galProjects.Items`' sixteen branches exist
+only to avoid writing `StartsWith(project_name, "")` as a match-everything off state. The ban
+was written after #17, where `StartsWith(person.Email, "")` returned nothing for every choice —
+but that formula varied **two things at once**:
+
+| Variable | Status |
+|---|---|
+| the **empty argument** | never isolated |
+| the **Person subfield** it was applied to | [MS Learn note 20](https://learn.microsoft.com/power-apps/maker/canvas-apps/connections/connection-sharepoint-online) — `StartsWith` does not delegate on subfields of Choice or Lookup complex types |
+
+That explains #17 without implicating the empty string, and it does not reach `project_name`,
+which is plain indexed **Text**. **Explained is not tested**, and the cost of being wrong is the
+exact failure the rule was written to prevent: a filter that silently returns zero rows.
+
+### Why this departs from the sub-case table in #51
+
+**Two departures, and the second one matters more.**
+
+1. **#51 asks for `CountRows` on every case.** Same rule-4 violation this directory has now paid
+   for three times — `CountRows` is itself non-delegable, so every label carries an identical
+   *"CountRows Operation not supported"* that says nothing about the `Filter` inside it. The
+   instruments are split: `First(Filter(…)).project_name` for delegation, `CountRows` quarantined.
+
+2. **#51 expects `N` from `CountRows(ActiveProjects)` and that number does not exist.** There are
+   2000+ projects and the data row limit is 2000, so an unbounded count returns **the ceiling, a
+   truncation, not a total** — and "case 2 should equal N" is unmeasurable as written.
+
+   So match-all is measured over a **bounded subset**: count one phase, then count the same phase
+   AND'd with the `StartsWith`. Two numbers equal **and below 2000** prove the `StartsWith`
+   removed nothing. Two phases are offered because neither's size is known from this side of the
+   gap — read whichever pair lands clear of both `0` and the ceiling.
+
+**The numbers are the verdict, not the warnings.** The #46 run came back *"delegation warnings
+were not recorded on this pass"*, so nothing here that decides the issue depends on a warning
+being noticed.
+
+### The sub-cases
+
+| Row | Expression | Decides |
+|---|---|---|
+| **PC** | `phase = "Active"` | Positive control — `=` on an indexed Choice, must be CLEAN |
+| **NC** | `StartsWith(Lower(name), "a")` | Negative control — `Lower()` on a column must WARN, proving the checker examines a `project_name` `StartsWith` at all |
+| **2** | `StartsWith(project_name, "")` | The literal empty argument on Text |
+| **3** | `StartsWith(name, Trim(box))`, box **empty** | **The row the rewrite depends on** — the real shipping input, which #17 is the reason for not assuming behaves like row 2 |
+| **4** | same, after typing a prefix | Sanity check that row 3 is wired to the box; the construct the search branches ship today |
+| **5c** | `manager.Email = User().Email` | Control for row 5. #46 established this **matches** for this tester |
+| **5** | `StartsWith(manager.Email, "")` | The #17 construct verbatim |
+| **5b** | `StartsWith(manager.Email, Left(me,3))` | **Not in #51, and the row that actually isolates the two variables** — same subfield, non-empty argument |
+| **A1/A2/A3** | `phase = "Stalled"`, then `+ StartsWith("")`, then `+ StartsWith(Trim(box))` | **The verdict.** A2 and A3 must equal A1 |
+| **B1/B2/B3** | the same triple on `"Not Started"` | Spare pair, in case the A phase reads 0 or hits the ceiling |
+
+**Row 5b is the one that closes the old post-mortem.** 5c matched and 5b did not → `StartsWith`
+over the Person subfield is the broken half, the empty argument is exonerated, and #17 is finally
+attributed — **regardless of what the rest of the sheet says**.
+
+### Protocol
+
+1. Blank screen named exactly `scrProbeSW`, `Fill` set in the formula bar. `taskmaster_projects`
+   in the Data pane; `ActiveProjects` already exists app-wide.
+2. Paste the `Children:` block. **Leave the search box empty for the first read.**
+3. Check PC and NC before anything else.
+4. Read A1/A2/A3 (or B1/B2/B3). **This is the verdict.**
+5. Then type a known project-name prefix and re-read rows 4 and A3/B3 only.
+
+### How to read it
+
+- **A2 = A1 and A3 = A1**, rows 2 and 3 returning names → the halving is **safe**, #53 proceeds.
+- **A3 < A1**, or row 3 no-match while row 2 matches → the **control property** is the failing
+  half; #53 closes won't-fix and the comment at `scrProjects.pa.yaml:160-165` gets the grounded
+  two-rule version.
+- **5c matches, 5/5b do not** → the ban belongs to the **Person subfield**, independently of
+  everything above.
+- **A1 = 0, or A1 = 2000** → that pair is unreadable, use the B pair.
+
+### Result — 2026-09-04, run by the user in Studio
+
+```
+NC       warns on StartsWith                     negative control PASSED
+2        !! ERROR  "the query is not valid"      StartsWith(project_name, "")
+3        !! ERROR  "the query is not valid"      StartsWith(name, Trim(box)), box empty
+4        !! ERROR  "the query is not valid"      same construct
+5        !! ERROR  "the query is not valid"      StartsWith(manager.Email, "")
+M0..B3   all warn about CountRows                quarantined noise, as designed
+```
+
+**CLAIM 1 STANDS, AND THE MECHANISM IS FINALLY IDENTIFIED — IT IS THE EMPTY ARGUMENT.**
+
+`StartsWith( project_name, "" )` on a plain indexed **Text** column is rejected outright:
+*"the query is not valid"*. The Person subfield is not required to break it, so **MS Learn
+note 20 is not the explanation for #17 that the 2026-09-04 assessment took it for.**
+
+### Read this with `scrProbe-namedformula-filter` — the pair is the isolation
+
+| Argument | Shape | Result |
+|---|---|---|
+| `"ab"` non-empty | bare `Filter` over a named formula, wrapped in `Sort`, **no phase group** | **clean** (ProbeNF row 6) |
+| `""` empty | `Filter` over the same named formula | **"the query is not valid"** (row 2) |
+
+**Two probes, one variable each, and they cross.** The empty argument is the broken half; the
+phase group, the `Sort`, the named formula and the Person subfield are all exonerated as causes.
+That is the mechanism `scrProjects.pa.yaml:160-172` has never had, and it is neither of the two
+things that comment currently blames.
+
+### What this settles
+
+- **#53 closes won't-fix.** The halving depends on `StartsWith(col, "")` as a match-everything
+  off state. It does not match everything — it does not run. **"An off state is a BRANCH" is now
+  grounded**, for a reason the original ban only half-guessed.
+- **#52 proceeds**, on the ProbeNF result, and is now the whole of #50's available win.
+- **#17 is attributed.** The empty argument, not the Person subfield.
+
+**One correction to the old comment beyond the mechanism:** it says the failure is a filter that
+*"silently returns zero rows"*, indistinguishable from an empty list. It is not silent — it
+raises a visible data-retrieval error. Whatever #17's observer saw as "returned NOTHING", the
+construct fails loudly today.
+
+### 5b and 5c — the #17 post-mortem, closed
+
+```
+5c   a project name        manager.Email = User().Email          matches, as #46 established
+5b   the SAME project      StartsWith(manager.Email, Left(me,3))  MATCHES
+```
+
+**`StartsWith` over a Person subfield WORKS with a non-empty argument.** Same column, same row,
+only the argument differs from row 5 — which errors. **So the empty argument is the ONLY fault,
+and #17 is fully attributed to it.** Note 20 is not implicated in anything this app does.
+
+One scope note, so this is not over-read in the other direction: note 20 is about **delegation**,
+not validity, and a non-delegable filter still *returns rows* — locally, over the fetched page.
+5b matching therefore does not prove the subfield folds; it proves it does not *error*. Row 5b's
+delegation warning was not recorded, so whether that predicate delegates remains open. Nothing
+in this app depends on it — no shipping formula uses `StartsWith` on a Person column.
+
+**PC was not reported**, and the A/B triples produced no readable numbers: rows 2/3 error, so
+A2/A3 and B2/B3 error with them. The verdict came from rows 2 and 3 directly, and from the cross
+with ProbeNF row 6.
+
+---
+
+## `scrProbe-namedformula-filter.pa.yaml` — does sorting a bare `Filter` over a named formula really fail?
+
+Issue **#51 claim 2**, sub-issue of #50. `scrProjects.pa.yaml:167-172` records that
+
+```powerfx
+Sort( Filter( ActiveProjects, StartsWith(...) ), project_name )
+```
+
+was rejected by SharePoint — *"the query is not valid"* — while the identical shape **with** an
+explicit phase OR-group AND'd in was not. That single observation justifies restating the
+five-phase vocabulary in all sixteen branches, roughly **120 of the block's 155 lines**, and its
+mechanism is unexplained: nothing in the delegation rules says a *redundant* predicate repairs a
+query.
+
+**The claim was never isolated.** The formula under test also carried a `StartsWith` over a
+Person subfield, which note 20 says does not delegate. A non-delegable clause anywhere in a
+filter is an ordinary explanation for a rejected query; the phase group may simply have been the
+variable that happened to change.
+
+### The instrument
+
+**The failure mode is an ERROR, not an empty result, and those must not look alike on the sheet.**
+Every measured row is wrapped in `IfError` and prints one of three distinguishable outcomes:
+
+| Printed | Means |
+|---|---|
+| a project name | the shape works and matched |
+| `-- no rows (no error) --` | the shape **works** and simply matched nothing |
+| `!! ERROR: <message>` | the shape is rejected — **this is claim 2** |
+
+`"ab"` is the literal #51 specifies. **A no-match on it is expected and is not the finding.**
+
+### The sub-cases
+
+| Row | Shape | Decides |
+|---|---|---|
+| **P1/P2** | `First(ActiveProjects)`, `First(OpenProjects)` | Prerequisite. P2 fails loudly if `OpenProjects` has not been pasted into `App.Formulas` |
+| **7** | production: `Sort(Filter(Active, phases && SW))` | Positive control — known to work in the running app. An error here invalidates the sheet |
+| **6** | **disputed**: `Sort(Filter(Active, SW))`, no phases | **The verdict.** Clean → claim 2 is dead |
+| **6ns** | row 6 without `Sort` | *Not in #51.* 6 errors, 6ns clean → **`Sort` is the trigger**, not the phase group |
+| **6r** | row 6 over the **raw list** | *Not in #51.* 6 errors, 6r clean → **composing over a named formula** is the trigger |
+| **8** | proposed: `Sort(Filter(OpenProjects, SW))` | What the rewrite would actually ship |
+| **8ns** | row 8 without `Sort` | Every branch keeps its own `Sort`, so this matters before building on it |
+
+**6ns, 6r and 8ns exist because the recorded claim names three things at once** — `Sort`, a bare
+`Filter`, and a named formula. Each row holds two still and varies the third. #46 proved the
+worth of exactly this: its raw-list row is what cleared the named formula.
+
+### Prerequisite — `OpenProjects` is new
+
+`src/App.pa.yaml` now carries it alongside `ActiveProjects`:
+
+```powerfx
+OpenProjects = Filter( taskmaster_projects,
+    project_phase.Value = "Not Started" || project_phase.Value = "Planning"
+ || project_phase.Value = "Active"      || project_phase.Value = "Stalled" );
+```
+
+`App.Formulas` is a **formula-bar paste, not code view** — see the `studio-transfer` skill;
+`tools/formula_bar_body.py` strips the comments. **If claim 2 stands and #52 closes won't-fix,
+this named formula becomes dead weight and should be removed in the same pass.**
+
+### Protocol
+
+1. Paste the `OpenProjects` addition into `App.Formulas` via the formula bar.
+2. Blank screen named exactly `scrProbeNF`, `Fill` set in the formula bar.
+3. Paste the `Children:` block. Read the prerequisite block first.
+4. **Record the exact error text verbatim** on any row that errors, and note delegation warnings
+   on rows 6, 6ns, 6r and 8.
+
+### How to read it
+
+- **7 errors** → stop; the environment is wrong and nothing else is readable.
+- **6 clean** → **claim 2 is dead**, the phase groups are dead weight, #52 proceeds.
+- **6 errors, 6ns clean** → `Sort` is the trigger; a different fix from the one #52 proposes.
+- **6 errors, 6r clean** → composing over a named formula is the trigger; #52 is unsafe for a
+  reason it does not anticipate.
+- **6 and 6r both error** → the claim stands, #52 closes won't-fix, and the comment finally gets
+  the mechanism it has never had.
+- **8 must be clean** for the rewrite to be buildable at all.
+
+### Result — 2026-09-04, run by the user in Studio
+
+```
+P1, P2   two different projects        prerequisite OK, OpenProjects resolves
+7        -- no rows (no error) --      positive control PASSED (no error)
+6        -- no rows (no error) --      THE DISPUTED SHAPE DOES NOT ERROR
+6ns      -- no rows (no error) --
+6r       a project name                raw list holds a row matching "ab"
+8        -- no rows (no error) --
+8ns      -- no rows (no error) --
+```
+
+**CLAIM 2 IS DEAD.** Row 6 is `Sort( Filter( ActiveProjects, StartsWith(project_name,"ab") ) )`
+with **no phase group** — the exact shape `scrProjects.pa.yaml:167-172` records as rejected — and
+it came back clean. No error. The no-match is expected: `"ab"` is an arbitrary literal, and 6r
+finding one only means the raw list carries an archived project that matches.
+
+**Nothing about a redundant phase predicate repairs a query, and now nothing claims it does.**
+The ~120 lines restating the five-phase vocabulary across sixteen branches are dead weight, and
+#52 proceeds. Row 8 clean means the rewrite is buildable: `Sort( Filter( OpenProjects, … ) )` is
+a valid shape.
+
+**The original observation is not reproduced, so the phase group was never the variable that
+mattered.** See the `scrProbe-startswith-empty` result above, which found the variable that was:
+the empty `StartsWith` argument.
