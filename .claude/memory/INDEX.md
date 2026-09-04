@@ -9,9 +9,13 @@
 > refuted in place rather than deleted. Read the marker before the entry.**
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **THE APP IS BUILT AND FULLY LANDED (2026-09-04).** 11 screens, 10 components, the App object;
-  22/22 valid; `src/` matches Studio. **NO OPEN GITHUB ISSUES (0 open / 40 closed) AND AN EMPTY
-  PASTE QUEUE.** There is no queued work — **do not invent a backlog from these notes; ask.**
+- **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid. **NO OPEN GITHUB
+  ISSUES (0 open / 40 closed).** No queued work beyond the paste below — **do not invent a
+  backlog from these notes; ask.**
+- **PASTE QUEUE — 2 SCREENS, AUTHORED 2026-09-04, NOT YET LANDED.** `scrTransactionEdit` and
+  `scrProjectEdit`: `transaction_client_name` and `transaction_sales` are now OPTIONAL, with both
+  writes guarded by `Blank()` at both writer sites. **Proof is saving a transaction with neither
+  set, and clearing a set one on an existing row.** Everything else in `src/` is landed.
 - **THE APP IS PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
   2026-09-02), plus a working archival flow.** The 5,000 list-view threshold — not the 2,000 data
   row limit — is now the live constraint on every unindexed filter. **UNRESOLVED:** recent
@@ -131,6 +135,8 @@ not know them will author something broken:
 
 - [2026-09-04] **A BARE `Sort( <namedFormula>, <col> )` WITH NO `Filter` IS GROUNDED — it works.** This was the ONE unprobed shape #52 shipped (`galProjects.Items` branches 3 and 7, `Sort( ActiveProjects, project_name )` / `Sort( OpenProjects, project_name )`), one layer simpler than ProbeNF row 6 which had only proven `Sort(Filter(namedFormula, …))`. The user pasted `scrProjects` and confirmed it working against the case that exercises those branches — "show completed" on, no coverage or mine filter — so the shape is safe to reuse. **EVIDENCE GRADE, stated so it is not over-read: this is a LIVE SCREEN WORKING, not a probe.** A probe isolates one variable; a working screen is weaker but real evidence, and it is enough to stop treating this construct as a risk. If a future change makes the shape load-bearing somewhere subtler, probe it properly rather than citing this line — INDEX Decisions
 
+- [2026-09-04] **`transaction_client_name` AND `transaction_sales` ARE OPTIONAL (user changed SharePoint) — SECOND INSTANCE OF THE SAME PATTERN IN ONE DAY, AND THE PATTERN IS NOW NAMED.** **RELAXING A REQUIRED COLUMN IS NEVER JUST THE VALIDATION LADDER — THE UNGUARDED WRITE IS THE DEFECT.** A column that was required has an unconditional `Patch` behind it, because the form guaranteed a value. Drop the gate alone and the unset state reaches the connector as `{Id: 0}` for a Lookup or `gClaimPrefix & ""` for a Person; **both are rejected on the WHOLE Patch, not the one field, so a save the app politely blocked becomes a save that fails.** The fix is `Blank()`, which is also what CLEARS either column — so the field's clear button only starts working at the same moment. **THE CHECKLIST, in the order that matters:** guard every write first, then the validation ladder, then the caption asterisk, then any comment that justifies behaviour by calling the column required, then `schema.yaml`. **AND SEARCH FOR SECOND WRITERS:** `transaction_*` is written from TWO screens — `scrTransactionEdit` and the staged-transaction modal inside `scrProjectEdit`, which also carries its own captions and an Add-button `DisplayMode` gate. `client_sales` earlier the same day had one writer and looked like the whole job; this one had two. Grep the column name across `src/` before assuming the form is the only site — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -141,3 +147,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | client_sales made optional across 5 sites (schema + scrClientEdit header, caption, validation ladder, guarded Patch). AWAITING PASTE with the picker fix | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | user confirmed BOTH open verification items tested and working: the two picker/client_sales proof cases, and the older main-side queue (scrHome dfb5080, raw-list audit, OpenIssues health derivations). Paste queue empty bar #52's scrProjects, never explicitly asked about | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | #52's scrProjects confirmed pasted and tested. Paste queue fully empty, GitHub backlog at zero open issues, and the bare Sort-over-a-named-formula shape is grounded by a working screen | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | transaction_client_name + transaction_sales made optional across 11 sites (schema, scrTransactionEdit, and the staged-transaction modal in scrProjectEdit). AWAITING PASTE — 2 screens | sessions/2026-09-04-1650-picker-empty-query-defect.md
