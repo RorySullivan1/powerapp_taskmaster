@@ -9,9 +9,15 @@
 > refuted in place rather than deleted. Read the marker before the entry.**
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid. **NO OPEN GITHUB
-  ISSUES (0 open / 40 closed).** No queued work beyond the paste below — **do not invent a
-  backlog from these notes; ask.**
+- **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid.
+- **OPEN BACKLOG — EPIC #60 "Project comments" ONLY (filed 2026-09-04, nothing authored yet).**
+  A fourth child list `taskmaster_projectcomments` read/written on scrProject. Sub-issues, in
+  order: **#61 [SCHEMA]** (BLOCKS the rest — five columns, not the user's three: `_author` and
+  `_date` are forced because `'Created By'`/`Created` do not resolve in the app; FK is a Number,
+  not a Lookup) → **#62 panel+gallery**, **#63 add dialog**, **#64 delete cascade** (three issues,
+  ONE file, ONE paste of scrProject) → **#65 [EXTERNAL]** archival flow sets the fourth flag.
+  Comments must NOT count as a child for the phase derivation. Nothing else is queued — **do not
+  invent work beyond #60–#65; ask.**
 - **PASTE QUEUE — ALL 6 EDIT SCREENS + scrReports, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE
   NEEDS SHAREPOINT FIRST.** The required-fields message is reworked on ALL SIX edit screens to
   `Required Fields Remaining: A | B` (so scrClientEdit / scrProductEdit / scrTaskEdit / scrIssueEdit
@@ -171,3 +177,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | required-fields message reworked to `Required Fields Remaining: A | B` across all six edit screens (Concat separator); two captions removed, six Notify prefixes changed. AWAITING PASTE — 6 screens | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | scrProjects: "Ready To Mark Completed" banner on any project at 100% not yet phased Complete — sibling swap in the row container, no overlay and no geometry; a Label-with-Fill first draft was caught as ungrounded (0 of 270 landed labels set Fill) and rebuilt as a filled container. Branch `claude/projects-ready-to-complete-banner`, cut off main per the user; PR #58. Validator 22/22, AWAITING PASTE | sessions/2026-09-04-1958-scrprojects-ready-banner.md
 - 2026-09-04 | scrProjects banner wording: "Ready To Mark Completed" -> "Ready To Mark Complete" (user; it names the `✓ Mark complete` button on scrProject, so it must not read as a past state). Two lines in scrProjects.pa.yaml, no structural change, 22/22. **scrProjects IS BACK IN THE PASTE QUEUE** — it landed earlier today with the old wording. Branch `claude/powerapp-repo-init-xymvlm`, PR #59. NOTE: the memory commit for the banner's landing is still unmerged on `claude/memory-ready-banner-landed`; that branch also touches this Log, so expect a trivial conflict | (no session file — one-word change)
+- 2026-09-04 | epic #60 Project comments filed with sub-issues #61–#65 (schema, panel, dialog, cascade, external flow). Design grounded in the recorded traps: Created By / Created do not resolve, so author+date are app-stamped columns; FK is a Number like the junction | sessions/2026-09-04-1650-picker-empty-query-defect.md
