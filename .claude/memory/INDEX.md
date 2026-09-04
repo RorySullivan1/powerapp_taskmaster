@@ -6,47 +6,42 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. ELEVEN DONE (#27–#33, #36, #37, #39, #40); #34, #35 and #38
-  remain.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md; the take-next assessment is
-  in sessions/2026-08-19-2047-issues-39-33-37-built.md.
-- **#33 AND #37 LANDED (user, 2026-08-19); #39 is done on BOTH sides** — `transaction_product_id`
-  is indexed on the live list, so schema and SharePoint agree.
-- **#40 LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** `App.OnStart` went
-  through the formula bar, `scrReports` and `scrHome` through code view, all clean.
-- **THE PERF BACKLOG #27–#40 IS COMPLETE — ALL FOURTEEN LANDED AND CLOSED (user, 2026-08-19).**
-  **THE PASTE QUEUE IS EMPTY.** There is no open perf work.
-- **NONE OF IT WAS EVER MEASURED.** Every one of the fourteen landed on a paste confirmation;
-  no Live Monitor count, payload figure or wall-time reading was taken before or after any of
-  them. The gains are what the source now does, not observed numbers. **Do not let a later
-  session cite these as measured results.**
-- **PASTE QUEUE IS FOUR SCREENS + THE APP OBJECT.** `App.Formulas` (formula bar) gains
-  LiveTransactions/LiveIssues/LiveTaskProducts; `scrProject` and `scrProjectEdit` reroute their
-  child folds onto the named formulas; `scrTaskEdit` writes taskproduct_project_archived; and
-  `scrHome` still carries the unexercised Division-by-0 fix.
-  **ALL ARCHIVE COLUMNS ARE BACK-FILLED (user, 2026-09-02)**, which unblocked `LiveTaskProducts`;
-  `scrTaskEdit`'s three READ paths now use it, its delete path deliberately still does not.
-- **PASTE QUEUE: `scrHome` (full file, code view) — the Division-by-0 fix, `dfb5080`.** The two
-  KPI-card subtitles now divide by `Max(1, gPrjLed)` / `Max(1, gTaskLed)`. **NOT EXERCISED** —
-  proof is a cold start with at least one non-complete project led and no banner.
-- **THE APP IS NOW PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
+- **OPEN BACKLOG — GitHub #45–#53, all filed 2026-09-04, nothing built.** Two epics on
+  `scrProjects`: **#45** the "only mine" toggle returns an empty gallery (five ranked candidates,
+  sub-issues #46 probe / #47 verify live indexes / #48 widen "mine" / #49 casing), and **#50**
+  `galProjects.Items` is 155 lines and 16 branches (#51 probe / #52 named formulas / #53 collapse
+  the search axis). **#45 lands BEFORE #50** — both rewrite the same eight person predicates.
+  **Both epics start with a PROBE, not a fix; do not paste a guess.**
+  Detail: sessions/2026-09-04-scrprojects-mine-and-items-epics.md
+- **THE PERF BACKLOG #27–#40 IS COMPLETE — all fourteen landed and closed (user, 2026-08-19).**
+  **NONE OF IT WAS EVER MEASURED**: every one landed on a paste confirmation, with no Live
+  Monitor count, payload figure or wall-time reading taken before or after. The gains are what
+  the source now does, not observed numbers. **Do not let a later session cite them as results.**
+- **PASTE QUEUE — NOT EMPTY, and unverified.** `scrHome`'s Division-by-0 fix (`dfb5080`, the two
+  KPI-card subtitles now divide by `Max(1, gPrjLed)` / `Max(1, gTaskLed)`) is **NOT EXERCISED** —
+  proof is a cold start with at least one non-complete project led and no banner. The 2026-09-03
+  raw-list audit (5 sites) and the three health derivations moved onto `OpenIssues` are authored
+  and carry no landing confirmation either. Confirm what is live before authoring on top.
+- **THE APP IS PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
   2026-09-02), plus a working archival flow.** Reported symptom: recent non-archived projects and
-  their children are in the lists but not in the app. Diagnosed to three causes (see Decisions);
-  **not yet resolved, and only the user can tell which one — it needs two SharePoint views:
-  `project_phase` is empty, and `task_project_archived` is empty.**
+  their children are in the lists but not in the app. Three causes identified (see Decisions);
+  **unresolved, and only the user can discriminate — it needs two SharePoint views: `project_phase`
+  is empty, and `task_project_archived` is empty.** The 5,000 list-view threshold is now the
+  live constraint on every unindexed filter — #47 checks the projects list against it.
 - **`taskproduct_project_archived` is LIVE in SharePoint, recorded in `schema/schema.yaml`, and
-  `scrTaskEdit` now WRITES it false on every link it creates (writer gap closed).** Indexed/default
+  `scrTaskEdit` WRITES it false on every link it creates (writer gap closed).** Indexed/default
   state is still UNCONFIRMED (carried in the column's `review:`), and **links that predate the
   column are blank until back-filled** — the writer covers new rows only.
-- **BRANCHES: `main` is authoritative and current.** Only `main` and
-  `claude/powerapp-repo-init-xymvlm` exist; PR #41 merged the branch into `main` and the trees
-  were IDENTICAL, so the branch was restarted from `origin/main` before the fix went on top.
+- **BRANCHES: `main` is authoritative.** Only `main` and `claude/powerapp-repo-init-xymvlm` exist;
+  PR #41 merged the branch into `main` with identical trees, and the branch was restarted from
+  `origin/main` before later work went on top.
 - The `scrProbeDateNull` probe HAS RUN and its result is recorded; it can be deleted from Studio.
-- **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
-  in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
+- **LIVE IN STUDIO, the whole perf set:** `scrProject` folds tasks/transactions/issues once in
+  `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
   `scrTaskEdit` / `scrIssueEdit` save handlers hoist their pre-Patch reads into one `Concurrent`
   (`gTkParentProj` / `gIssParentProj` replace two LookUps each, keyed on the screen's OWN parent
-  id, not `gSelProject.ID`); and `scrTaskEdit` skips the taskproduct reconcile when the staged set
+  id, not `gSelProject.ID`); `scrTaskEdit` skips the taskproduct reconcile when the staged set
   matches `colTkProductsLoaded`; and `scrHome` holds its whole dashboard fold in ONE hidden
   button (`btnHomeRecompute`, two callers), resolves work-list project names from `colPrjNames`
   instead of per visible row, and counts `gIssLed` off one `colIssByPrj` fetch with a `>= 2000`
@@ -59,8 +54,10 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **EVERYTHING IN `src/` HAS LANDED (user, 2026-08-19).** All 11 screens, all 10 components and
-  the App object are in Studio and current with this repo.
+- **`src/` WAS FULLY LANDED AS OF 2026-08-19** — all 11 screens, all 10 components and the App
+  object were in Studio and current with the repo on that date. **That claim is now STALE, not
+  current truth:** the 2026-09-02/03 work (Division-by-0, the raw-list audit, the health
+  derivations) carries no landing confirmation. See the paste-queue line above.
   **`task_output_audience` and `task_output_approval_flag` are LIVE** on `taskmaster_tasks`.
 - **#23 AND #24 ARE LANDED AND CLOSED (user, 2026-08-19).** `scrIssueEdit` carries required
   type/impact with defaults Question/Moderate; `scrHome` carries the Projects-I-lead gallery
@@ -122,6 +119,7 @@
   `maintainer/03-making-a-change.md` is the only new synthesis — check it before a hand-off.
   **`docs/screen-map.md` is HISTORICAL and reads as current** (tmTickets, an Admin screen,
   tmLookups — none of which shipped); labelled as such in `docs/README.md`, not edited.
+
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-19] **NO `Set()` INSIDE A `ForAll` — Studio rejects it.** MS Learn's ForAll page sanctions **Patch** and **Collect** as the actions a ForAll body may take, and rules out the functions that HOLD A VARIABLE — `UpdateContext`, `Clear`, `ClearCollect` — because ForAll may process records **in any order and in parallel**. `Set` is the global-scope twin of `UpdateContext` and falls to the same rule; the docs do not list it only because they list the context-variable form. Hit on `btnIssHealth.OnSelect` / `btnPrjHealth.OnSelect` (user, 2026-08-19), where `Set(gHlScrap*, Patch(...))` wrapped the write purely to swallow Patch's return value. **That wrapper was backwards**: the same page states an UNCAPTURED ForAll result is never built, so capturing it was the only thing creating a per-record data-source copy. `IfError` is fine inside a ForAll and is the documented way to catch a Patch failure. If an error ever needs surfacing from inside one, the two legal options are `Notify()` or a `Collect()` into a log — Collect is explicitly allowed, order undefined — INDEX Decisions
