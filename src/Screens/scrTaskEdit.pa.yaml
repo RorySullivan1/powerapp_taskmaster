@@ -1325,22 +1325,20 @@ Screens:
                 Properties:
                   Visible: =Len(Self.Text) > 0
                   Text: |
-                    =Trim(
-                    If( Len(Trim(txtTkName.Text)) = 0, "a task name   ", "" ) &
-                    If( Len(gTkLead.Mail) = 0,         "a lead   ", "" ) &
-                    If( gTkProject.Id = 0,             "a parent project   ", "" ) &
-                    If( Len(gTkStage) = 0,             "a stage   ", "" ) &
-                    If( Len(gTkPriority) = 0,          "a priority   ", "" ) &
-                    // A task that produces output must say who for. A task FLAGGED as needing
-                    // approval must also carry the external id, but only once it is being
-                    // COMPLETED — the portal issues that id late, so requiring it earlier would
-                    // block ordinary drafting.
-                    If( tglTkOutput.Value && gTkAudience = "(none)",
-                        "an output audience   ", "" ) &
-                    If( tglTkOutput.Value && gTkStage = "Completed"
-                        && tglTkApprovalReq.Value
-                        && Len(Trim(txtTkApprovalId.Text)) = 0,
-                        "an approval ID before completing   ", "" ) )
+                    =With(
+                       { m: Concat( Filter( Table(
+                              { L: "Task Name",       M: Len(Trim(txtTkName.Text)) = 0 },
+                              { L: "Lead",            M: Len(gTkLead.Mail) = 0 },
+                              { L: "Parent Project",  M: gTkProject.Id = 0 },
+                              { L: "Stage",           M: Len(gTkStage) = 0 },
+                              { L: "Priority",        M: Len(gTkPriority) = 0 },
+                              // A task that produces output must say who for.
+                              { L: "Output Audience", M: tglTkOutput.Value && gTkAudience = "(none)" },
+                              // Only once the task is being COMPLETED — the portal issues that id late, so
+                              // requiring it earlier would block ordinary drafting.
+                              { L: "Approval ID",     M: tglTkOutput.Value && gTkStage = "Completed" && tglTkApprovalReq.Value && Len(Trim(txtTkApprovalId.Text)) = 0 } ),
+                            M ), L, " | " ) },
+                       If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.Danger
@@ -1396,7 +1394,7 @@ Screens:
                     // Enforced HERE so a blocked save says which field is blocking it. All three are
                     // `required: true`, so SharePoint would reject the write anyway — this only
                     // decides whether the user is TOLD.
-                    Notify( "Can't save yet — this task still needs: " & lblTkMissing.Text,
+                    Notify( "Can't save yet. " & lblTkMissing.Text,
                     NotificationType.Error ),
                     Set( gTkSaved, Blank() );
                     Set( gTkErr, "" );

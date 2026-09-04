@@ -549,8 +549,13 @@ Screens:
                                   With( { j: Find(" | ", rest) },
                                       { Prd: If( IsBlank(sp), "Unclassified",
                                                  If( i > 0, Left(sp, i - 1), sp ) ),
-                                        Pr2: If( Len(rest) = 0, "Top level only",
-                                                 If( j > 0, Left(rest, j - 1), rest ) ),
+                                        // Blank path FIRST: transaction_product_id is optional, so a
+                                        // transaction with no product at all reaches here with sp = "".
+                                        // Without this it would read "Top level only", which claims a
+                                        // product that stops at level 1 rather than one that is absent.
+                                        Pr2: If( IsBlank(sp), "Unclassified",
+                                                 If( Len(rest) = 0, "Top level only",
+                                                     If( j > 0, Left(rest, j - 1), rest ) ) ),
                                         // Resolved here so the display name and the email fallback travel together.
                                         Ld:  With( { n: Coalesce(pm.MgrNm, ""),
                                                      e: Coalesce(pm.Mgr, "") },

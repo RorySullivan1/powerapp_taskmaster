@@ -262,11 +262,14 @@ Screens:
           Properties:
             Visible: =Len(Self.Text) > 0
             Text: |
-              =Trim(
-              If( Len(Trim(txtClName.Text)) = 0, "a name   ", "" ) &
-              If( Len(gClType) = 0,              "a type   ", "" ) &
-              If( Len(gClCov) = 0,               "a coverage group   ", "" ) &
-              If( Len(gClRegionPath) = 0,        "a region   ", "" ) )
+              =With(
+                 { m: Concat( Filter( Table(
+                        { L: "Name",           M: Len(Trim(txtClName.Text)) = 0 },
+                        { L: "Type",           M: Len(gClType) = 0 },
+                        { L: "Coverage Group", M: Len(gClCov) = 0 },
+                        { L: "Region",         M: Len(gClRegionPath) = 0 } ),
+                      M ), L, " | " ) },
+                 If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
             Font: =gTheme.Font
             Size: =gTheme.Size.Small
             Color: =gTheme.Color.Danger
@@ -315,7 +318,7 @@ Screens:
               false,
               Set( gSaving, true );
               If( Len(lblClMissing.Text) > 0,
-              Notify( "Can't save yet — this client still needs: " & lblClMissing.Text,
+              Notify( "Can't save yet. " & lblClMissing.Text,
               NotificationType.Error ),
               // BLANK THE RECORD, NOT JUST THE MESSAGE. Left holding the last successful save,
               // this makes the IsBlank(.ID) guard below pass on a PREVIOUS record — so a write that

@@ -55,12 +55,12 @@ Screens:
                   { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
                     Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
                   // NOT User(). The sales owner is usually somebody else — defaulting to whoever is
-                  // entering it writes a wrong name silently, and transaction_sales is required, so the
-                  // empty state is caught by lblTxMissing instead.
+                  // entering it writes a wrong name silently. The column is OPTIONAL, so an empty
+                  // state is a legitimate save, not something lblTxMissing has to catch.
                   { DisplayName: "", Mail: "" } ) );
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
-        Reset( txtTxName );
+        Reset( txtTxName ); Reset( txtTxComment );
         Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the date —
         // it blocked the save outright on every edit. A text input re-reads Default ONLY on
@@ -133,6 +133,8 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height - gTheme.Space.HeaderH - 88
           Children:
+            # ROW 1 — the label spans BOTH columns: it is what a user scans for, and its
+            # placeholder is long enough that a half-width box truncated it.
             - gridTx1:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
@@ -140,7 +142,7 @@ Screens:
                   LayoutGridColumns: =2
                   LayoutGridRows: =10
                   Width: =Parent.Width - 48
-                  Height: =78
+                  Height: =62
                 Children:
                   - lblTxNameCap:
                       Control: Label@2.5.1
@@ -150,7 +152,7 @@ Screens:
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
                         LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =1
+                        LayoutGridColumnEnd: =2
                         LayoutGridRowStart: =1
                         LayoutGridRowEnd: =3
                         Height: =18
@@ -163,11 +165,51 @@ Screens:
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Body
                         LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =1
+                        LayoutGridColumnEnd: =2
                         LayoutGridRowStart: =4
                         LayoutGridRowEnd: =10
                         Height: =40
-                  - colTxCurrency:
+            # ROW 2 — the two record lookups together. Client used to sit alone in a two-column
+            # grid, wasting the entire right-hand half.
+            - gridTx2:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - colTxClient:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - fldClient:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
+                            Properties:
+                              Caption: ="Client"
+                              PickLabel: ="＋  Choose a client"
+                              HasValue: =gTxClient.Id > 0
+                              Display: =gTxClient.Value
+                              Width: =Parent.Width
+                              Height: =62
+                              OnPick: |
+                                =Set( gTxPicker, "Client" );
+                                 Reset( cmpTxPick );
+                                 Set( gTxQuery, "" )
+                              OnClear: |
+                                =Set( gTxClient, { Id: 0, Value: "" } )
+                  - colTxProduct:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
@@ -180,35 +222,88 @@ Screens:
                         LayoutGridRowEnd: =10
                         Height: =62
                       Children:
-                        - lblTxCcyCap:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Currency  *"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: =gTheme.Color.TextMuted
-                              Width: =Parent.Width
-                              Height: =18
-                        # A COMBO BOX, not a cmpSelection strip. The strip raises OnChange with
-                        # `Select(Parent); cmpSelection.OnChange()`, so the consumer reads `Selected` in the
-                        # same behaviour chain that just changed it and can get the PREVIOUS pick.
-                        # transaction_currency is REQUIRED, so that lands as the wrong currency on a real
-                        # trade rather than as a missing field.
-                        # No "(none)" row: the column is required, so the empty state is not a legal value.
-                        - selTxCurrency:
+                        - fldProduct:
                             Control: CanvasComponent
-                            ComponentName: cmpSelection
+                            ComponentName: cmpLookupField
                             Properties:
+                              Caption: ="Product"
+                              PickLabel: ="＋  Choose a product"
+                              HasValue: =gTxProduct.Id > 0
+                              Display: =gTxProduct.Value
                               Width: =Parent.Width
-                              Height: =40
-                              Items: =colTxCurrencyOpts
-                              # BY LABEL, not a hard-coded Id. A literal position table fell through to 5 for
-                              # everything unlisted, so CHF resolved only because 5 happened to be its row.
-                              DefaultId: |
-                                =Coalesce( LookUp(colTxCurrencyOpts, Label = gTxCurrency, Id), 1 )
-                              OnChange: |
-                                =Set(gTxCurrency, selTxCurrency.Selected.Label)
-            - gridTx2:
+                              Height: =62
+                              OnPick: |
+                                =Set( gTxPicker, "Product" );
+                                 Reset( cmpTxPick );
+                                 Set( gTxQuery, "" )
+                              OnClear: |
+                                =Set( gTxProduct, { Id: 0, Value: "" } )
+            # ROW 3 — the remaining person field, paired with the date.
+            - gridTx3:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - colTxSales:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - fldSales:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
+                            Properties:
+                              Caption: ="Sales owner"
+                              PickLabel: ="＋  Choose a sales owner"
+                              HasValue: =Len(gTxSales.Mail) > 0
+                              Display: =gTxSales.DisplayName
+                              Width: =Parent.Width
+                              Height: =62
+                              OnPick: |
+                                =Set( gTxPicker, "Sales" );
+                                 Reset( cmpTxPick );
+                                 Set( gTxQuery, "" )
+                              OnClear: |
+                                =Set( gTxSales, { DisplayName: "", Mail: "" } )
+                  - lblTxDateCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Trade date  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Height: =18
+                  - dtpTxDate:
+                      Control: ModernDatePicker@1.0.1
+                      Properties:
+                        DefaultDate: =If(gEditMode = "Edit", gEditTransaction.transaction_date, Blank())
+                        Placeholder: ="Trade date"
+                        Format: =DatePickerFormat.LongAbbreviated
+                        StartOfWeek: =StartOfWeek.Monday
+                        IsEditable: =true
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Height: =32
+            # ROW 4 — notional and its currency are ONE fact; they were split across two rows.
+            - gridTx4:
                 Control: GroupContainer@1.5.0
                 Variant: GridLayout
                 Properties:
@@ -263,176 +358,117 @@ Screens:
                               Width: =Parent.Width
                               Height: =36
                               VerticalAlign: =VerticalAlign.Middle
-                  - lblTxDateCap:
+                  - colTxCurrency:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =8
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =10
+                        Height: =62
+                      Children:
+                        - lblTxCcyCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Currency  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Width: =Parent.Width
+                              Height: =18
+                        # A COMBO BOX, not a cmpSelection strip. The strip raises OnChange with
+                        # `Select(Parent); cmpSelection.OnChange()`, so the consumer reads `Selected` in the
+                        # same behaviour chain that just changed it and can get the PREVIOUS pick.
+                        # transaction_currency is REQUIRED, so that lands as the wrong currency on a real
+                        # trade rather than as a missing field.
+                        # No "(none)" row: the column is required, so the empty state is not a legal value.
+                        - selTxCurrency:
+                            Control: CanvasComponent
+                            ComponentName: cmpSelection
+                            Properties:
+                              Width: =Parent.Width
+                              Height: =40
+                              Items: =colTxCurrencyOpts
+                              # BY LABEL, not a hard-coded Id. A literal position table fell through to 5 for
+                              # everything unlisted, so CHF resolved only because 5 happened to be its row.
+                              DefaultId: |
+                                =Coalesce( LookUp(colTxCurrencyOpts, Label = gTxCurrency, Id), 1 )
+                              OnChange: |
+                                =Set(gTxCurrency, selTxCurrency.Selected.Label)
+            # FULL WIDTH, and last before the validation line. It is the only free-text field
+            # here and the only one that can run long; a half-width multiline box is unusable
+            # for it. PLAIN multiline — transaction_comment is Note, not rich text, and a
+            # ModernTextInput cannot render markup either way.
+            - colTxComment:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =8
+                  Width: =Parent.Width - 48
+                  Height: =110
+                Children:
+                  - lblTxCommentCap:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="Trade date  *"
+                        Text: ="Comment"
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
                         Height: =18
-                  - dtpTxDate:
-                      Control: ModernDatePicker@1.0.1
+                  - txtTxComment:
+                      Control: ModernTextInput@1.1.1
                       Properties:
-                        DefaultDate: =If(gEditMode = "Edit", gEditTransaction.transaction_date, Blank())
-                        Placeholder: ="Trade date"
-                        Format: =DatePickerFormat.LongAbbreviated
-                        StartOfWeek: =StartOfWeek.Monday
-                        IsEditable: =true
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =4
-                        LayoutGridRowEnd: =10
-                        Height: =32
-            - gridTx3:
-                Control: GroupContainer@1.5.0
-                Variant: GridLayout
-                Properties:
-                  LayoutGridColumns: =2
-                  LayoutGridRows: =10
-                  Width: =Parent.Width - 48
-                  Height: =62
-                Children:
-                  - colTxClient:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =1
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =10
-                        Height: =62
-                      Children:
-                        - fldClient:
-                            Control: CanvasComponent
-                            ComponentName: cmpLookupField
-                            Properties:
-                              Caption: ="Client  *"
-                              PickLabel: ="＋  Choose a client"
-                              HasValue: =gTxClient.Id > 0
-                              Display: =gTxClient.Value
-                              Width: =Parent.Width
-                              Height: =62
-                              OnPick: |
-                                =Set( gTxPicker, "Client" );
-                                 Reset( cmpTxPick );
-                                 Set( gTxQuery, "" )
-                              OnClear: |
-                                =Set( gTxClient, { Id: 0, Value: "" } )
-            - gridTx4:
-                Control: GroupContainer@1.5.0
-                Variant: GridLayout
-                Properties:
-                  LayoutGridColumns: =2
-                  LayoutGridRows: =10
-                  Width: =Parent.Width - 48
-                  Height: =62
-                Children:
-                  - colTxProduct:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        LayoutGridColumnStart: =1
-                        LayoutGridColumnEnd: =1
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =10
-                        Height: =62
-                      Children:
-                        - fldProduct:
-                            Control: CanvasComponent
-                            ComponentName: cmpLookupField
-                            Properties:
-                              Caption: ="Product  *"
-                              PickLabel: ="＋  Choose a product"
-                              HasValue: =gTxProduct.Id > 0
-                              Display: =gTxProduct.Value
-                              Width: =Parent.Width
-                              Height: =62
-                              OnPick: |
-                                =Set( gTxPicker, "Product" );
-                                 Reset( cmpTxPick );
-                                 Set( gTxQuery, "" )
-                              OnClear: |
-                                =Set( gTxProduct, { Id: 0, Value: "" } )
-                  - colTxSales:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =8
-                        LayoutGridColumnStart: =2
-                        LayoutGridColumnEnd: =2
-                        LayoutGridRowStart: =1
-                        LayoutGridRowEnd: =10
-                        Height: =62
-                      Children:
-                        - fldSales:
-                            Control: CanvasComponent
-                            ComponentName: cmpLookupField
-                            Properties:
-                              Caption: ="Sales owner  *"
-                              PickLabel: ="＋  Choose a sales owner"
-                              HasValue: =Len(gTxSales.Mail) > 0
-                              Display: =gTxSales.DisplayName
-                              Width: =Parent.Width
-                              Height: =62
-                              OnPick: |
-                                =Set( gTxPicker, "Sales" );
-                                 Reset( cmpTxPick );
-                                 Set( gTxQuery, "" )
-                              OnClear: |
-                                =Set( gTxSales, { DisplayName: "", Mail: "" } )
+                        Default: |
+                          =If(gEditMode = "Edit", gEditTransaction.transaction_comment, "")
+                        Placeholder: ="Optional — anything worth recording about this trade"
+                        Type: =TextInputType.Multiline
+                        TriggerOutput: =TriggerOutput.Delayed
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FillPortions: =0
+                        LayoutMinHeight: =84
+                        Width: =Parent.Width
+                        Height: =84
+            # GATED ON THE MESSAGE, not just its two children. Both were already Visible-gated,
+            # so this row sat as 62px of blank space on every valid form. Reading a hidden
+            # control's .Text is fine and is already how btnTxSave gates the save — same
+            # pattern as lblClMissing on scrClientEdit.
             - colTxMissing:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
+                  Visible: =Len(lblTxMissing.Text) > 0
                   LayoutDirection: =LayoutDirection.Vertical
                   LayoutAlignItems: =LayoutAlignItems.Center
                   LayoutGap: =4
                   Width: =Parent.Width - 48
                   Height: =62
                 Children:
-                  - lblTxMissingCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Still required:"
-                        Visible: =Len(lblTxMissing.Text) > 0
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        Width: =Parent.Width
-                        Height: =18
                   - lblTxMissing:
                       Control: Label@2.5.1
                       Properties:
                         Text: |
-                          =Trim(
-                             If( Len(Trim(txtTxName.Text)) = 0,  "label   ",   "" ) &
-                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
-                             // but a blank one would still be rejected by SharePoint — silently, since there is
-                             // nothing on screen to point at.
-                             If( gTxProject.Id <= 0,             "a parent project (not set — reopen from the project screen)   ", "" ) &
-                             If( gTxClient.Id  <= 0,             "client   ",  "" ) &
-                             If( gTxProduct.Id <= 0,             "product   ", "" ) &
-                             If( Len(gTxSales.Mail) = 0,         "sales owner   ", "" ) &
-                             If( IsBlank(dtpTxDate.SelectedDate),
-                                 "a valid trade date   ", "" ) &
-                             // transaction_notional is optional, so an EMPTY box is fine; only text that will
-                             // not parse is an error, and that is silent otherwise.
-                             If( Len(Trim(numTxNotional.Text)) > 0
-                              && IsBlank(Value(numTxNotional.Text)),
-                                 "a numeric notional (that entry is not a number)   ", "" ) )
+                          =With(
+                             { m: Concat( Filter( Table(
+                                    { L: "Label",          M: Len(Trim(txtTxName.Text)) = 0 },
+                                    // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
+                                    // so a user cannot act on this one — reopen the transaction from the project
+                                    // screen. A blank would otherwise be rejected by SharePoint silently.
+                                    { L: "Parent Project", M: gTxProject.Id <= 0 },
+                                    { L: "Trade Date",     M: IsBlank(dtpTxDate.SelectedDate) },
+                                    // THE ONE VALIDITY TEST IN THIS LIST, not a missing-field test: the notional is
+                                    // OPTIONAL, so an empty box is fine and only an entry that will not parse fires
+                                    // this. It reads as a required field because the list has one format.
+                                    { L: "Notional",       M: Len(Trim(numTxNotional.Text)) > 0 && IsBlank(Value(numTxNotional.Text)) } ),
+                                  M ), L, " | " ) },
+                             If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.Danger
@@ -522,7 +558,7 @@ Screens:
                     If( Len(lblTxMissing.Text) > 0,
                     // Enforced here so a blocked save names the field. All six are required in
                     // schema.yaml, so SharePoint would reject the write regardless.
-                    Notify( "Can't save yet — this still needs: " & lblTxMissing.Text,
+                    Notify( "Can't save yet. " & lblTxMissing.Text,
                     NotificationType.Error ),
                     Set( gTxSaved, Blank() );
                     Set( gTxErr, "" );
@@ -541,18 +577,31 @@ Screens:
                                                        project_phase.Value ), "" ) = "Archived",
                                transaction_name:        Trim(txtTxName.Text),
                                  transaction_project_id:  { Id: gTxProject.Id, Value: gTxProject.Value },
-                                 transaction_client_name: { Id: gTxClient.Id,  Value: gTxClient.Value },
-                                 transaction_product_id:  { Id: gTxProduct.Id, Value: gTxProduct.Value },
+                                 // BOTH OPTIONAL. An unset lookup must write Blank(), never {Id: 0};
+                                 // an unset person must write Blank(), never a record built on an empty
+                                 // Mail — `gClaimPrefix & ""` is a malformed claim and the connector
+                                 // rejects the WHOLE Patch. Blank() is also what CLEARS either column.
+                                 transaction_client_name:
+                                     If( gTxClient.Id > 0,
+                                         { Id: gTxClient.Id, Value: gTxClient.Value },
+                                         Blank() ),
+                                 transaction_product_id:
+                                     If( gTxProduct.Id > 0,
+                                         { Id: gTxProduct.Id, Value: gTxProduct.Value },
+                                         Blank() ),
                                  transaction_sales:
-                                     { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                       Claims:      gClaimPrefix & Lower(gTxSales.Mail),
-                                       DisplayName: gTxSales.DisplayName,
-                                       Email:       gTxSales.Mail,
-                                       Department: "", JobTitle: "", Picture: "" },
+                                     If( Len(gTxSales.Mail) > 0,
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                           Claims:      gClaimPrefix & Lower(gTxSales.Mail),
+                                           DisplayName: gTxSales.DisplayName,
+                                           Email:       gTxSales.Mail,
+                                           Department: "", JobTitle: "", Picture: "" },
+                                         Blank() ),
                                  transaction_currency:    { Value: gTxCurrency },
                                  transaction_notional:
                                      Value(numTxNotional.Text),
-                                 transaction_date:        dtpTxDate.SelectedDate } ) ),
+                                 transaction_date:        dtpTxDate.SelectedDate,
+                                 transaction_comment:     txtTxComment.Text } ) ),
                         Set( gTxErr, FirstError.Message )
                     );
                     // Trust the RECORD, never the message: a write can fail and still leave

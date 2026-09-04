@@ -1061,26 +1061,31 @@ Screens:
             Width: =Parent.Width
             Height: =88
           Children:
-            # The "Still required:" caption is folded into this one label, so
-            # `Len(Self.Text) = 0` is the exact test btnPrSave.DisplayMode needs.
+            # The caption is folded into this one label, so `Len(Self.Text) = 0` is still the
+            # exact test the save handler needs.
             - lblPrMissing:
                 Control: Label@2.5.1
                 Properties:
-                  # ONE SOURCE OF TRUTH FOR "what is still missing", and it is this Text. A literal
-                  # prefix here would make `Len(Self.Text)` always non-zero, so the emptiness could not
-                  # be tested and btnPrSave would have to restate the whole condition — two copies of
-                  # one rule is how they drift. Same shape as lblTxMissing / lblIssMissing / lblTkMissing.
+                  # ONE SOURCE OF TRUTH FOR "what is still missing", and it is this Text.
+                  # THE PREFIX SITS INSIDE THE `If`, AND MUST STAY THERE. An unconditional
+                  # "Required Fields Remaining: " would make `Len(Self.Text)` always non-zero, so
+                  # the emptiness could not be tested and the save handler would have to restate
+                  # the whole condition — two copies of one rule is how they drift.
+                  # Same shape as lblTxMissing / lblIssMissing / lblTkMissing / lblClMissing / lblPdMissing.
                   Visible: =Len(Self.Text) > 0
                   Text: |
-                    =Trim(
-                       If( Len(Trim(txtPrName.Text)) = 0, "project name   ", "" ) &
-                       If( Len(gPrManager.Mail) = 0,      "project manager   ", "" ) &
-                       If( gEditMode = "New" && Len(gPrRegionPath) = 0, "Region   ", "" ) &
-                       If( gEditMode = "New" && Len(gPrTypePath) = 0,   "Project type   ", "" ) &
-                       // Reachable only if Choices() came back empty — the seed cannot otherwise
-                       // leave this blank. That is exactly the case worth catching: an empty
-                       // vocabulary would send {Value: ""} and lose the whole insert.
-                       If( Len(gPrCov) = 0,                             "Coverage   ", "" ) )
+                    =With(
+                       { m: Concat( Filter( Table(
+                              { L: "Project Name",    M: Len(Trim(txtPrName.Text)) = 0 },
+                              { L: "Project Manager", M: Len(gPrManager.Mail) = 0 },
+                              { L: "Region",          M: gEditMode = "New" && Len(gPrRegionPath) = 0 },
+                              { L: "Project Type",    M: gEditMode = "New" && Len(gPrTypePath) = 0 },
+                              // Reachable only if Choices() came back empty — the seed cannot otherwise leave
+                              // this blank. That is exactly the case worth catching: an empty vocabulary would
+                              // send {Value: ""} and lose the whole insert.
+                              { L: "Coverage",        M: Len(gPrCov) = 0 } ),
+                            M ), L, " | " ) },
+                       If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.Danger
@@ -1129,7 +1134,7 @@ Screens:
                     // SECOND record. `Set` applies immediately within a behaviour chain.
                     false,
                     Len(lblPrMissing.Text) > 0,
-                    Notify( "Can't save yet — this project still needs: " & lblPrMissing.Text,
+                    Notify( "Can't save yet. " & lblPrMissing.Text,
                     NotificationType.Error ),
                     Set( gSaving, true );
                     // WHETHER THE C3 ROLLUP NEEDS TO RUN, DECIDED NOW AND NOT AT STEP 5. Only a brand
@@ -1279,14 +1284,23 @@ Screens:
                                                    { transaction_project_archived: false },
                                                 { transaction_name:        x.x_name,
                                                   transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
-                                                  transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
-                                                  transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
+                                                  // Optional — see scrTransactionEdit's Patch.
+                                                  transaction_client_name:
+                                                      If( x.x_clientId > 0,
+                                                          { Id: x.x_clientId, Value: x.x_clientValue },
+                                                          Blank() ),
+                                                  transaction_product_id:
+                                                      If( x.x_productId > 0,
+                                                          { Id: x.x_productId, Value: x.x_productValue },
+                                                          Blank() ),
                                                   transaction_sales:
-                                                      { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                        Claims:      gClaimPrefix & Lower(x.x_salesMail),
-                                                        DisplayName: x.x_salesName,
-                                                        Email:       x.x_salesMail,
-                                                        Department: "", JobTitle: "", Picture: "" },
+                                                      If( Len(x.x_salesMail) > 0,
+                                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                                            Claims:      gClaimPrefix & Lower(x.x_salesMail),
+                                                            DisplayName: x.x_salesName,
+                                                            Email:       x.x_salesMail,
+                                                            Department: "", JobTitle: "", Picture: "" },
+                                                          Blank() ),
                                                   transaction_currency:    { Value: x.x_ccy },
                                                   transaction_notional:
                                                       x.x_notional,
@@ -1801,7 +1815,7 @@ Screens:
                       Control: CanvasComponent
                       ComponentName: cmpLookupField
                       Properties:
-                        Caption: ="Client  *"
+                        Caption: ="Client"
                         PickLabel: ="＋  Choose a client"
                         HasValue: =gNxClient.Id > 0
                         Display: =gNxClient.Value
@@ -1827,7 +1841,7 @@ Screens:
                       Control: CanvasComponent
                       ComponentName: cmpLookupField
                       Properties:
-                        Caption: ="Product  *"
+                        Caption: ="Product"
                         PickLabel: ="＋  Choose a product"
                         HasValue: =gNxProduct.Id > 0
                         Display: =gNxProduct.Value
@@ -1853,7 +1867,7 @@ Screens:
                       Control: CanvasComponent
                       ComponentName: cmpLookupField
                       Properties:
-                        Caption: ="Sales owner  *  —  anyone in the directory"
+                        Caption: ="Sales owner  —  anyone in the directory"
                         PickLabel: ="＋  Choose a sales owner"
                         HasValue: =Len(gNxSales.Mail) > 0
                         Display: =gNxSales.DisplayName
@@ -1877,8 +1891,10 @@ Screens:
             Size: =gTheme.Size.Body
             Text: =If( gNxEditSid > 0, "Save transaction", "Add transaction" )
             DisplayMode: |
-              =If( Len(Trim(txtNxName.Text)) > 0 && gNxClient.Id > 0 && gNxProduct.Id > 0
-                && !IsBlank(dtpNxDate.SelectedDate) && Len(gNxSales.Mail) > 0,
+              =// Only the label and the date are gated. Client, product and sales owner are
+               // all optional columns, so none of them can block staging a transaction.
+               If( Len(Trim(txtNxName.Text)) > 0
+                && !IsBlank(dtpNxDate.SelectedDate),
                    DisplayMode.Edit, DisplayMode.Disabled )
             X: =(Parent.Width - 780) / 2 + 780 - 24 - 170
             Y: =(Parent.Height - 680) / 2 + 680 - 24 - 40
