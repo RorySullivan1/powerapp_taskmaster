@@ -12,10 +12,11 @@
 - **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid. **NO OPEN GITHUB
   ISSUES (0 open / 40 closed).** No queued work beyond the paste below — **do not invent a
   backlog from these notes; ask.**
-- **PASTE QUEUE — 2 SCREENS, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE NEEDS SHAREPOINT FIRST.**
-  `scrProjectEdit`: `transaction_client_name` / `transaction_sales` optional at the staged writer.
-  `scrTransactionEdit`: the same two optional, PLUS the new `transaction_comment` field and a
-  regrouped/compacted layout. **PROVISION `transaction_comment` ON `taskmaster_transactions` BEFORE
+- **PASTE QUEUE — 3 SCREENS, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE NEEDS SHAREPOINT FIRST.**
+  `scrProjectEdit`: `transaction_client_name` / `transaction_sales` / `transaction_product_id`
+  optional at the staged writer, and its Add button now gates on label + date only.
+  `scrTransactionEdit`: the same three optional, PLUS the new `transaction_comment` field and a
+  regrouped/compacted layout. `scrReports`: level-2 product bucket handles a blank path. **PROVISION `transaction_comment` ON `taskmaster_transactions` BEFORE
   PASTING `scrTransactionEdit`** — Multiple lines of text, rich text OFF; pasting first stops the
   screen saving transactions at all. **Proof: save a transaction with no client and no sales owner,
   clear a set one on an existing row, and round-trip a comment.** Everything else in `src/` is landed.
@@ -142,6 +143,8 @@ not know them will author something broken:
 
 - [2026-09-04] **`transaction_comment` IS AUTHORED AHEAD OF ITS SHAREPOINT COLUMN — THE ORDER OF OPERATIONS IS LOAD-BEARING.** It is a `Note` (plain multiline, rich text OFF), optional, and NOT indexed because Note columns cannot be. **PROVISION IT BEFORE PASTING `scrTransactionEdit`:** a `Patch` naming a column the list does not have fails the WHOLE write, so pasting first stops the screen saving transactions at all — not just the comment. Same trap `schema.yaml` already records for the four #20 product columns. **THE LAYOUT LESSON, worth more than the column:** regrouping a grid does NOT make it shorter. The four rows were {78,110,62,62} before and after — pairing client+product and notional+currency fixed the GROUPING (currency had been sitting a row away from its own notional) but recovered zero height, because 7 fields in 2 columns always leaves one half empty. Real compaction came from two other places: a row sized 78 for 58px of content, and **`colTxMissing` reserving 62px permanently for a message that is usually absent**. Gating the CONTAINER on `Len(lblTxMissing.Text) > 0` is safe in both directions — if auto-layout skips invisible children it reclaims 74px, and if it does not, the row was blank anyway. **Measure the arithmetic before claiming a layout is more compact; the intuition that better grouping saves space is wrong here** — INDEX Decisions
 
+- [2026-09-04] **`transaction_product_id` IS OPTIONAL TOO — AND THE THIRD PASS FOUND THE THING THE FIRST TWO DID NOT: A DOWNSTREAM READER THAT BREAKS ON THE NEW BLANK.** `taskmaster_transactions` now requires only label, parent project, trade date and a parsable notional; client, product and sales owner are all optional. The write guards and the caption/ladder/gate work were mechanical (see the two entries above). **THE NEW LESSON IS THE READER SWEEP.** `scrReports` derives two product-type buckets from `LookUp(colRptProducts, ID = x.transaction_product_id.Id).product_type_path`; a product-less transaction reaches it with `sp = ""` for the FIRST time. Level 1 was already safe by luck — `IsBlank("")` is TRUE in Power Fx, so it fell to "Unclassified" — but level 2 tested `Len(rest) = 0` and would have reported **"Top level only", asserting a product classified at level 1 rather than one that is ABSENT.** A quiet wrong label in a report, not an error. **RULE: making a column optional is a change to every READER of it, not just the writers. Grep the column across `src/`, and for each reader ask what it does with blank — a `Coalesce(..., "")` upstream only moves the question to whoever tests that string.** `scrProject`'s `Coalesce(..., "—")` display was genuinely fine; this one was not — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -154,3 +157,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | #52's scrProjects confirmed pasted and tested. Paste queue fully empty, GitHub backlog at zero open issues, and the bare Sort-over-a-named-formula shape is grounded by a working screen | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | transaction_client_name + transaction_sales made optional across 11 sites (schema, scrTransactionEdit, and the staged-transaction modal in scrProjectEdit). AWAITING PASTE — 2 screens | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | transaction_comment added (schema + full-width multiline on scrTransactionEdit) and the edit screen regrouped/compacted. NEEDS A SHAREPOINT COLUMN FIRST, then a paste | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | transaction_product_id made optional (schema, both edit screens) + scrReports level-2 bucket fixed for a blank product path. AWAITING PASTE — 3 screens now | sessions/2026-09-04-1650-picker-empty-query-defect.md
