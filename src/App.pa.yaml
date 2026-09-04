@@ -84,6 +84,15 @@ App:
        || project_phase.Value = "Active"      || project_phase.Value = "Stalled"
        || project_phase.Value = "Complete" );
 
+      // The same vocabulary MINUS "Complete" — the set behind the "show completed" toggle
+      // when it is OFF. Enumerated for the same reason ActiveProjects is, and failing closed
+      // the same way: this and ActiveProjects must both stay in step with project_phase's
+      // values in schema/schema.yaml, so a phase added there and not here disappears from
+      // the app rather than erroring.
+      OpenProjects = Filter( taskmaster_projects,
+          project_phase.Value = "Not Started" || project_phase.Value = "Planning"
+       || project_phase.Value = "Active"      || project_phase.Value = "Stalled" );
+
       // Two axes at once: the project is live, and the issue's own status is Open.
       OpenIssues = Filter( taskmaster_issues,
           issue_project_archived = false && issue_status.Value = "Open" );
