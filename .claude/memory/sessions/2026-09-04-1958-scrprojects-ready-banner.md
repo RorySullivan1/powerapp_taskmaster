@@ -53,8 +53,10 @@
   by up to ~7px at the design width.
 
 ## State at end
-- **AUTHORED, NOT PASTED.** Committed `7a2f286` and pushed to
-  `claude/projects-ready-to-complete-banner`. No PR opened — the user did not ask.
+- **AUTHORED AND IN REVIEW, NOT PASTED.** Commits `7a2f286` + `96a51ba` on
+  `claude/projects-ready-to-complete-banner`, open as **PR #58** against main
+  (mergeable, no CI — this repo has none). **Merging it does NOT put the banner in
+  the app**: the only thing that does is a human pasting `scrProjects` into Studio.
 - Proof when it is pasted: a project at 100% still phased Active shows the green box
   in place of its due date and percent, and clicking it opens the project.
 - A project already phased `Complete` is deliberately EXCLUDED — only reachable with
