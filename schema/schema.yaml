@@ -329,6 +329,14 @@ lists:
       # If you ever reinstate it, reinstate a WRITER at the same time.
       # - { name: transaction_notional_usd, type: Currency, required: false, indexed: true, desc: "Notional normalised to USD at WRITE time" }
       - { name: transaction_date,       type: DateTime, required: true,  indexed: true,  desc: "Actual trade date" }
+      # ---- NOT YET IN SHAREPOINT ------------------------------------------------
+      # PROVISION THIS BEFORE PASTING scrTransactionEdit. A Patch that names a column
+      # the list does not have fails the WHOLE write, so the screen would stop saving
+      # transactions at all — not just the comment.
+      # PLAIN text, NOT rich: create it as "Multiple lines of text" with rich text OFF.
+      # Not indexed, and it cannot be — Note columns are not indexable, and nothing
+      # filters or sorts on it.
+      - { name: transaction_comment,    type: Note,     required: false,                 desc: "Free-form comment on the transaction. Display and entry only — never filtered or sorted on, and Note delegates nothing" }
 
   # ---------------------------------------------------------------------------
   taskmaster_issues:
