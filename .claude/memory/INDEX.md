@@ -15,24 +15,25 @@
   phase vocab hoisted onto `ActiveProjects` / the new `OpenProjects`. Watch branches 3 and 7 —
   a bare `Sort(<namedFormula>, project_name)` with no Filter is the one UNPROBED shape shipped.
   Detail: sessions/2026-09-04-scrprojects-mine-and-items-epics.md
-- **LANDED 2026-09-04, user confirmed "it works" on all four screens:** the picker empty-query
-  fix (`scrTaskEdit` / `scrProjectEdit` / `scrTransactionEdit` — each record kind split into a
-  typed branch and a no-Filter off state) and `client_sales` made OPTIONAL in `scrClientEdit` +
-  `schema/schema.yaml`, with the Person write guarded by `Blank()`.
-  **SCOPE OF THAT CONFIRMATION: those four screens only** — it does NOT extend to the older
-  `main`-side queue below. **AND IT IS A PASTE CONFIRMATION, NOT A TEST RESULT:** the two proof
-  cases (open a picker without typing; clear a set sales owner and save) were not asked for by
-  name, so do not cite them as exercised.
+- **LANDED AND EXERCISED 2026-09-04 (merged, PR #56).** The picker empty-query fix
+  (`scrTaskEdit` / `scrProjectEdit` / `scrTransactionEdit` — each record kind split into a typed
+  branch and a no-Filter off state) and `client_sales` made OPTIONAL in `scrClientEdit` +
+  `schema/schema.yaml`, Person write guarded by `Blank()`. **The user confirmed BOTH proof cases
+  tested and working: opening a picker without typing, and clearing a set sales owner and saving.**
+  This one is a genuine behavioural confirmation, not merely a paste that Studio accepted — the
+  distinction the perf backlog below exists to warn about.
   Detail: sessions/2026-09-04-1650-picker-empty-query-defect.md
 - **THE PERF BACKLOG #27–#40 IS COMPLETE — all fourteen landed and closed (user, 2026-08-19).**
   **NONE OF IT WAS EVER MEASURED**: every one landed on a paste confirmation, with no Live
   Monitor count, payload figure or wall-time reading taken before or after. The gains are what
   the source now does, not observed numbers. **Do not let a later session cite them as results.**
-- **PASTE QUEUE — NOT EMPTY, and unverified.** `scrHome`'s Division-by-0 fix (`dfb5080`, the two
-  KPI-card subtitles now divide by `Max(1, gPrjLed)` / `Max(1, gTaskLed)`) is **NOT EXERCISED** —
-  proof is a cold start with at least one non-complete project led and no banner. The 2026-09-03
-  raw-list audit (5 sites) and the three health derivations moved onto `OpenIssues` are authored
-  and carry no landing confirmation either. Confirm what is live before authoring on top.
+- **PASTE QUEUE — EMPTY as of 2026-09-04, bar one unasked item.** `scrHome`'s Division-by-0 fix
+  (`dfb5080`), the 2026-09-03 raw-list audit (5 sites) and the three health derivations moved onto
+  `OpenIssues` are all **PASTED, TESTED AND CONFIRMED by the user**. The long-standing "authored
+  but unverified" caveat on them is discharged — it no longer applies and should not be repeated.
+  **STILL UNASKED: #52's `scrProjects`** — never explicitly confirmed, and it carries the one
+  UNPROBED shape (bare `Sort(<namedFormula>, project_name)`, branches 3 and 7). Ask before
+  authoring on top of that screen.
 - **THE APP IS PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
   2026-09-02), plus a working archival flow.** Reported symptom: recent non-archived projects and
   their children are in the lists but not in the app. Three causes identified (see Decisions);
@@ -550,3 +551,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | question-only session on the lookup pickers: the 2000 ceiling is NOT the constraint (people are a connector action; product/client folds on indexed Text), but the empty-argument `StartsWith` fault from #51 was found LIVE in six client/product picker branches. Nothing authored | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | picker empty-query fix authored across scrTaskEdit / scrProjectEdit / scrTransactionEdit — six branches split into typed + off-state, validator 22/22, AWAITING PASTE | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | client_sales made optional across 5 sites (schema + scrClientEdit header, caption, validation ladder, guarded Patch). AWAITING PASTE with the picker fix | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | user confirmed BOTH open verification items tested and working: the two picker/client_sales proof cases, and the older main-side queue (scrHome dfb5080, raw-list audit, OpenIssues health derivations). Paste queue empty bar #52's scrProjects, never explicitly asked about | sessions/2026-09-04-1650-picker-empty-query-defect.md
