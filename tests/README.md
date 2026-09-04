@@ -341,6 +341,95 @@ reads as the same test, un-delegates the whole fetch, and fails silently.
 
 ---
 
+## `scrProbe-mine-predicate.pa.yaml` — does `project_manager.Email = gUserEmail` match anything?
+
+**Status: NOT YET RUN.** Written 2026-09-04 for issue #46, sub-issue of #45.
+
+### The claim under test
+
+Turning on **Only show my projects** empties the gallery. It is not a rendering fault —
+`ProjectsEmptyLabel` fires its own sentence — so the `Items` predicate is returning zero
+rows. Three candidates produce that identical symptom and cannot be separated from this
+side of the gap:
+
+- **A** — the predicate works, but "mine" means *managed by me* and nothing else
+- **B** — a case mismatch between the lowercased `gUserEmail` and the raw stored `.Email`
+- **C** — `gUserEmail` is blank when `Items` first evaluates
+
+### Why this departs from the sub-case table in #46
+
+**#46 specifies `CountRows(Filter(...))` for five of its six sub-cases. That is rule 4
+violated in exactly the way this directory has already paid for twice.** `CountRows` is
+itself non-delegable, so every such label carries an identical *"CountRows Operation not
+supported"* that says nothing whatever about the `Filter` inside it. `scrProbeRerun` lost
+sub-case D to a shared instrument; `scrProbe-date-null-delegation` was readable only
+because one sub-case happened to carry a second warning **by accident**, and its write-up
+ends by telling the next author to fix it:
+
+> *"A gallery `Items`, or `First(Filter(...)).task_name`, would have carried no aggregate
+> and read cleanly. Fix it that way before reusing this file."*
+
+So the instruments are split into two blocks that never share a label:
+
+| Block | Instrument | Read it for |
+|---|---|---|
+| **DELEGATION** | `First(Filter(…)).project_name` — no aggregate anywhere | **The verdict.** A warning on one of these rows is about the `Filter` |
+| **MAGNITUDE** | the `CountRows` figures #46 asked for, quarantined | Numbers only. Every row warns about `CountRows`; that warning is noise |
+
+`First(…)` answers "greater than zero" without an aggregate: a project name means the
+predicate matched, `-- no match --` means it did not.
+
+### The sub-cases
+
+| Row | Expression | Decides |
+|---|---|---|
+| **PC** | `phase = "Active"` | **Positive control.** `=` on an indexed Choice — must be CLEAN |
+| **NC** | `Lower(manager) = Lower(me)` | **Negative control** — `Lower()` on a column must WARN. Also #46's case 6, the local ground truth |
+| **3** | `manager.Email = gUserEmail` | The shipping predicate, exactly as `galProjects.Items` writes it |
+| **4** | `manager.Email = User().Email` | **B** — does un-lowercased match where lowercased did not |
+| **5** | `supporter.Email = User().Email` | **A** — and the delegation reading #48 needs before putting this column in an `Or` |
+| **7** | raw list, `manager.Email = User().Email` | **E**, isolated — is the nested `Filter` over `ActiveProjects` the problem, or the predicate? |
+
+**NC is what makes silence on rows 3/4/5 a reading rather than a gap.** It proves Studio is
+actively examining a `project_manager` predicate and will report one; the date-null probe
+only got that property by luck.
+
+**Row 7 is not redundant with row 4.** This repo has already been burned by a named formula
+behaving differently from the source beneath it — `ShowColumns` over one reads text columns
+back as an ERROR type — and #45 candidate E blames the nested-`Filter` shape rather than the
+person column. 4 clean and 7 clean clears the shape; 7 clean and 4 warning convicts it.
+
+### Protocol
+
+1. Create a blank screen named exactly `scrProbeMine` and set its `Fill` in the formula bar.
+   `taskmaster_projects` must be in the Data pane; `ActiveProjects` is an App named formula
+   and already exists.
+2. Paste the `Children:` block. Nothing needs pressing — every row is a property formula.
+3. **Read the DELEGATION block first, and check PC and NC before anything else.** If PC warns
+   or NC does not, Studio is not flagging what it claims and no other row means anything.
+4. Then read MAGNITUDE for numbers. **M6 larger than M3 is the finding to watch for** — it
+   means rows exist that the shipping predicate misses.
+5. Optional, and the same corroboration the date-null probe used: set the data row limit to 1
+   and re-read. **Put it back to 2000 afterwards**, or every truncation sentinel in the app
+   goes dead.
+
+### How to read it
+
+- **3 finds a project** → the predicate is fine; the cause is **A**, go to #48.
+- **3 no-match, 4 finds one** → **B**, casing. Go to #49.
+- **3 and 4 no-match, NC finds one** → the fold is dropping rows. **D** or **E**, go to #47.
+- **5 finds one where 3 did not** → **A**, and the tester is exactly the affected profile.
+- **`gUserEmail` empty** → **C**, and nothing else on the sheet can be trusted.
+
+Also record, per row: whether Studio shows a delegation warning, and if Live Monitor is
+available, the row count the server actually returned. #45 candidate D turns on that reading.
+
+### Result
+
+**Not yet run.**
+
+---
+
 ## `scrProbeRerun.pa.yaml` + `scrProbeRerunB.pa.yaml` — how does a screen re-run a behaviour block in place?
 
 **Status: RUN 2026-08-18 by the user in Studio. BOTH ANSWERS ARE POSITIVE — `Select()` fires

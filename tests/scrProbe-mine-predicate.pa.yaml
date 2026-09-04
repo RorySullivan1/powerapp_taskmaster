@@ -1,0 +1,351 @@
+# =============================================================================
+# scrProbe-mine-predicate — does `project_manager.Email = gUserEmail` match anything?
+#
+# Issue #46, sub-issue of #45. "Only show my projects" returns an empty gallery.
+# Three candidates produce an IDENTICAL symptom — zero rows, no error — and
+# cannot be told apart from this side of the gap:
+#
+#   A  the predicate works, but "mine" is defined too narrowly (manager only)
+#   B  a case mismatch between lowercased gUserEmail and the raw stored .Email
+#   C  gUserEmail is blank when Items first evaluates
+#
+# BREAKS RULE 1 ON PURPOSE, like scrProbe-junction-write and
+# scrProbe-date-null-delegation: the connector's behaviour IS the claim, so there
+# is nothing to test without a source. Every other rule is kept — no gTheme, no
+# component, literal colours, one claim, sub-cases separated, positive AND
+# negative controls each with their own instrument, result recorded in
+# tests/README.md.
+#
+# ---------------------------------------------------------------------------
+# THIS PROBE DELIBERATELY DEPARTS FROM THE SUB-CASE TABLE IN #46, AND THE REASON
+# IS THE ONE THIS DIRECTORY KEEPS PAYING FOR.
+#
+# #46 specifies `CountRows(Filter(...))` for five of its six sub-cases. That is
+# rule 4 violated in the same way twice already recorded here: `CountRows` is
+# ITSELF non-delegable, so every such label carries an identical
+# "CountRows Operation not supported" that says NOTHING about the Filter inside
+# it. scrProbeRerun lost sub-case D to a shared instrument, and
+# scrProbe-date-null-delegation was only readable because one sub-case happened
+# to carry a second warning by accident. The README already says how to fix it:
+#
+#     "A gallery Items, or First(Filter(...)).task_name, would have carried no
+#      aggregate and read cleanly. Fix it that way before reusing this file."
+#
+# So the instruments are SPLIT into two blocks that never share a label:
+#
+#   DELEGATION BLOCK — `First(Filter(...)).project_name`, no aggregate anywhere.
+#                      A warning on one of these is about the FILTER. This is
+#                      the block the verdict rests on.
+#   MAGNITUDE BLOCK  — the CountRows figures #46 asked for, quarantined. EVERY
+#                      label here warns about CountRows and that means nothing.
+#                      Read the numbers, never the warnings.
+#
+# `First(...)` answers "> 0" without an aggregate: a project name means the
+# predicate matched, "-- no match --" means it did not.
+# ---------------------------------------------------------------------------
+#
+# BEFORE PASTING: taskmaster_projects must be in the Data pane. `ActiveProjects`
+# is an App named formula and already exists app-wide. Case 7 tests the RAW list
+# against case 4's named-formula version precisely because this repo has been
+# burned by a named formula behaving differently from the source under it
+# (ShowColumns over one reads text columns back as an ERROR type), and because
+# #45 candidate E blames the nested-Filter shape rather than the predicate.
+#
+# Paste onto a blank screen named exactly scrProbeMine. Set its Fill in the
+# formula bar; screens are not controls, so that cannot be pasted.
+# =============================================================================
+Screens:
+  scrProbeMine:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblPmTitle:
+          Control: Label@2.5.1
+          Properties:
+            # Block scalar, NOT inline: YAML reads " #" in a plain scalar as a comment
+            # and would eat the rest of the line, closing quote included.
+            Text: |
+              ="Only-mine predicate probe  ·  issue #46"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =900
+            Height: =28
+      - lblPmHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="Nothing to press. Every row below is a property formula, so it has already run." &
+               Char(10) &
+               "1. Read the DELEGATION block first. Click each label, check the formula bar and the App checker." &
+               Char(10) &
+               "2. PC must be CLEAN and NC must WARN. If either is wrong, Studio is not flagging what it claims and nothing else here means anything." &
+               Char(10) &
+               "3. Only then read the MAGNITUDE block, for numbers. Every label in it warns about CountRows; that warning is noise."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =50
+            Width: =900
+            Height: =74
+      # ---------------------------------------------------------------- VARIABLES
+      - lblPmSecVar:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="VARIABLES  —  candidate C. If gUserEmail is empty, nothing below can be trusted."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =136
+            Width: =900
+            Height: =22
+      - lblPmV1:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="gUserEmail    = [" & gUserEmail & "]"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =162
+            Width: =900
+            Height: =22
+      - lblPmV2:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="User().Email  = [" & User().Email & "]"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =186
+            Width: =900
+            Height: =22
+      # -------------------------------------------------------------- DELEGATION
+      - lblPmSecDel:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="DELEGATION  —  no aggregates here. A warning on one of these rows is about the FILTER. THIS BLOCK IS THE VERDICT."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =222
+            Width: =900
+            Height: =22
+      - lblPmPC:
+          Control: Label@2.5.1
+          Properties:
+            # POSITIVE CONTROL. `=` on an indexed Choice subfield is delegable, so this
+            # must come back CLEAN. Its own instrument — it shares no label with a
+            # measured case, which is the rule scrProbeRerun's sub-case D was lost to.
+            Text: |
+              ="PC  phase = Active (must be CLEAN) ....... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        project_phase.Value = "Active" ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =248
+            Width: =900
+            Height: =22
+      - lblPmNC:
+          Control: Label@2.5.1
+          Properties:
+            # NEGATIVE CONTROL, and #46's case 6. Lower() around a column is not
+            # delegable, so this must WARN — that is what proves the checker is
+            # actively examining a project_manager predicate, which is what makes
+            # silence on rows 3/4/5 a reading rather than a gap.
+            # It is also the local GROUND TRUTH: it truncates, but if this finds a
+            # row and row 3 does not, the fault is in the fold, not in the data.
+            Text: |
+              ="NC  Lower(manager)=Lower(me) (must WARN) . " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        Lower( Coalesce(project_manager.Email, "") )
+                                          = Lower( User().Email ) ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(197, 58, 58, 1)
+            X: =16
+            Y: =272
+            Width: =900
+            Height: =22
+      - lblPm3:
+          Control: Label@2.5.1
+          Properties:
+            # THE SHIPPING PREDICATE, exactly as galProjects.Items writes it.
+            Text: |
+              ="3   manager.Email = gUserEmail ........... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        project_manager.Email = gUserEmail ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =296
+            Width: =900
+            Height: =22
+      - lblPm4:
+          Control: Label@2.5.1
+          Properties:
+            # CANDIDATE B. Same predicate, un-lowercased right-hand side. If 3 is a
+            # no-match and this is not, the cause is casing.
+            Text: |
+              ="4   manager.Email = User().Email ......... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        project_manager.Email = User().Email ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =320
+            Width: =900
+            Height: =22
+      - lblPm5:
+          Control: Label@2.5.1
+          Properties:
+            # CANDIDATE A. project_supporter is indexed in the golden source, so this
+            # is also the delegation reading that #48 depends on before it may put
+            # this column into an Or-arm.
+            Text: |
+              ="5   supporter.Email = User().Email ....... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                        project_supporter.Email = User().Email ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =344
+            Width: =900
+            Height: =22
+      - lblPm7:
+          Control: Label@2.5.1
+          Properties:
+            # CANDIDATE E, isolated. Same predicate as row 4 but against the RAW list
+            # instead of the named formula. 4 clean and 7 clean means the nested
+            # Filter over ActiveProjects is not the problem; 7 clean and 4 warning
+            # means it is, and #45 goes to candidate E rather than to a person column.
+            Text: |
+              ="7   raw list, manager.Email = User().Email  " &
+               Coalesce( First( Filter( taskmaster_projects,
+                                        project_manager.Email = User().Email ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =368
+            Width: =900
+            Height: =22
+      # --------------------------------------------------------------- MAGNITUDE
+      - lblPmSecMag:
+          Control: Label@2.5.1
+          Properties:
+            Text: ="MAGNITUDE  —  EVERY row below warns about CountRows and that warning is NOISE. Read the numbers only."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(214, 152, 40, 1)
+            X: =16
+            Y: =404
+            Width: =900
+            Height: =22
+      - lblPmM0:
+          Control: Label@2.5.1
+          Properties:
+            # Reachability. A number here proves the source and the named formula
+            # resolve at all; 0 means stop and fix the Data pane.
+            Text: ="M0  CountRows(ActiveProjects) ........... " & CountRows( ActiveProjects )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =430
+            Width: =900
+            Height: =22
+      - lblPmM3:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="M3  manager = gUserEmail ................ " &
+               CountRows( Filter( ActiveProjects, project_manager.Email = gUserEmail ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =454
+            Width: =900
+            Height: =22
+      - lblPmM4:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="M4  manager = User().Email .............. " &
+               CountRows( Filter( ActiveProjects, project_manager.Email = User().Email ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =478
+            Width: =900
+            Height: =22
+      - lblPmM5:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="M5  supporter = User().Email ............ " &
+               CountRows( Filter( ActiveProjects, project_supporter.Email = User().Email ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =502
+            Width: =900
+            Height: =22
+      - lblPmM6:
+          Control: Label@2.5.1
+          Properties:
+            # The local ground truth as a count. Non-delegable and WILL truncate at the
+            # data row limit, so a low number here is not news — a number LARGER than
+            # M3 is, because it means rows exist that the shipping predicate misses.
+            Text: |
+              ="M6  Lower(manager) = Lower(me), local .... " &
+               CountRows( Filter( ActiveProjects,
+                                  Lower( Coalesce(project_manager.Email, "") )
+                                    = Lower( User().Email ) ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =526
+            Width: =900
+            Height: =22
+      - lblPmRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="HOW TO READ  ·  3 finds a project -> the predicate is fine, cause is A, go to " &
+               "#48.   3 no-match and 4 finds one -> B, casing, go to #49.   3 and 4 no-match but " &
+               "NC finds one -> the fold is dropping rows, go to #47.   5 finds one where 3 did " &
+               "not -> A, and you are the affected profile.   gUserEmail empty -> C."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =562
+            Width: =900
+            Height: =56
