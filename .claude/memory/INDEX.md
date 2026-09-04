@@ -12,10 +12,13 @@
 - **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid. **NO OPEN GITHUB
   ISSUES (0 open / 40 closed).** No queued work beyond the paste below — **do not invent a
   backlog from these notes; ask.**
-- **PASTE QUEUE — 2 SCREENS, AUTHORED 2026-09-04, NOT YET LANDED.** `scrTransactionEdit` and
-  `scrProjectEdit`: `transaction_client_name` and `transaction_sales` are now OPTIONAL, with both
-  writes guarded by `Blank()` at both writer sites. **Proof is saving a transaction with neither
-  set, and clearing a set one on an existing row.** Everything else in `src/` is landed.
+- **PASTE QUEUE — 2 SCREENS, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE NEEDS SHAREPOINT FIRST.**
+  `scrProjectEdit`: `transaction_client_name` / `transaction_sales` optional at the staged writer.
+  `scrTransactionEdit`: the same two optional, PLUS the new `transaction_comment` field and a
+  regrouped/compacted layout. **PROVISION `transaction_comment` ON `taskmaster_transactions` BEFORE
+  PASTING `scrTransactionEdit`** — Multiple lines of text, rich text OFF; pasting first stops the
+  screen saving transactions at all. **Proof: save a transaction with no client and no sales owner,
+  clear a set one on an existing row, and round-trip a comment.** Everything else in `src/` is landed.
 - **THE APP IS PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
   2026-09-02), plus a working archival flow.** The 5,000 list-view threshold — not the 2,000 data
   row limit — is now the live constraint on every unindexed filter. **UNRESOLVED:** recent
@@ -137,6 +140,8 @@ not know them will author something broken:
 
 - [2026-09-04] **`transaction_client_name` AND `transaction_sales` ARE OPTIONAL (user changed SharePoint) — SECOND INSTANCE OF THE SAME PATTERN IN ONE DAY, AND THE PATTERN IS NOW NAMED.** **RELAXING A REQUIRED COLUMN IS NEVER JUST THE VALIDATION LADDER — THE UNGUARDED WRITE IS THE DEFECT.** A column that was required has an unconditional `Patch` behind it, because the form guaranteed a value. Drop the gate alone and the unset state reaches the connector as `{Id: 0}` for a Lookup or `gClaimPrefix & ""` for a Person; **both are rejected on the WHOLE Patch, not the one field, so a save the app politely blocked becomes a save that fails.** The fix is `Blank()`, which is also what CLEARS either column — so the field's clear button only starts working at the same moment. **THE CHECKLIST, in the order that matters:** guard every write first, then the validation ladder, then the caption asterisk, then any comment that justifies behaviour by calling the column required, then `schema.yaml`. **AND SEARCH FOR SECOND WRITERS:** `transaction_*` is written from TWO screens — `scrTransactionEdit` and the staged-transaction modal inside `scrProjectEdit`, which also carries its own captions and an Add-button `DisplayMode` gate. `client_sales` earlier the same day had one writer and looked like the whole job; this one had two. Grep the column name across `src/` before assuming the form is the only site — INDEX Decisions
 
+- [2026-09-04] **`transaction_comment` IS AUTHORED AHEAD OF ITS SHAREPOINT COLUMN — THE ORDER OF OPERATIONS IS LOAD-BEARING.** It is a `Note` (plain multiline, rich text OFF), optional, and NOT indexed because Note columns cannot be. **PROVISION IT BEFORE PASTING `scrTransactionEdit`:** a `Patch` naming a column the list does not have fails the WHOLE write, so pasting first stops the screen saving transactions at all — not just the comment. Same trap `schema.yaml` already records for the four #20 product columns. **THE LAYOUT LESSON, worth more than the column:** regrouping a grid does NOT make it shorter. The four rows were {78,110,62,62} before and after — pairing client+product and notional+currency fixed the GROUPING (currency had been sitting a row away from its own notional) but recovered zero height, because 7 fields in 2 columns always leaves one half empty. Real compaction came from two other places: a row sized 78 for 58px of content, and **`colTxMissing` reserving 62px permanently for a message that is usually absent**. Gating the CONTAINER on `Len(lblTxMissing.Text) > 0` is safe in both directions — if auto-layout skips invisible children it reclaims 74px, and if it does not, the row was blank anyway. **Measure the arithmetic before claiming a layout is more compact; the intuition that better grouping saves space is wrong here** — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -148,3 +153,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | user confirmed BOTH open verification items tested and working: the two picker/client_sales proof cases, and the older main-side queue (scrHome dfb5080, raw-list audit, OpenIssues health derivations). Paste queue empty bar #52's scrProjects, never explicitly asked about | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | #52's scrProjects confirmed pasted and tested. Paste queue fully empty, GitHub backlog at zero open issues, and the bare Sort-over-a-named-formula shape is grounded by a working screen | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | transaction_client_name + transaction_sales made optional across 11 sites (schema, scrTransactionEdit, and the staged-transaction modal in scrProjectEdit). AWAITING PASTE — 2 screens | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | transaction_comment added (schema + full-width multiline on scrTransactionEdit) and the edit screen regrouped/compacted. NEEDS A SHAREPOINT COLUMN FIRST, then a paste | sessions/2026-09-04-1650-picker-empty-query-defect.md
