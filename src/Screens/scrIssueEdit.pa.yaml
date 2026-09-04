@@ -592,35 +592,28 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =62
                 Children:
-                  - lblIssMissingCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Still required:"
-                        Visible: =Len(lblIssMissing.Text) > 0
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        Width: =Parent.Width
-                        Height: =18
                   - lblIssMissing:
                       Control: Label@2.5.1
                       Properties:
                         Text: |
-                          =Trim(
-                             If( Len(Trim(txtIssName.Text)) = 0, "summary   ", "" ) &
-                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on this
-                             // form, but a blank one would still be rejected by SharePoint — silently, since
-                             // there is nothing on screen to point at.
-                             If( gIssProject.Id <= 0,            "a parent project (not set — reopen from the project screen)   ", "" ) &
-                             If( Len(gIssAssignee.Mail) = 0,     "assignee   ", "" ) &
-                             // issue_status is required and the save writes it UNGUARDED, so an empty
-                             // gIssStatus sends {Value: ""} — not a member, and the connector rejects the
-                             // whole insert. The combo box can empty it, and a legacy row holding a retired
-                             // status seeds it to something the new Items cannot display.
-                             If( Len(gIssStatus) = 0,            "status   ", "" ) &
-                             // SAME NET, same reason: type and impact are required and written unguarded.
-                             If( Len(gIssType) = 0,              "type   ", "" ) &
-                             If( Len(gIssImpact) = 0,            "impact   ", "" ) )
+                          =With(
+                             { m: Concat( Filter( Table(
+                                    { L: "Summary",        M: Len(Trim(txtIssName.Text)) = 0 },
+                                    // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
+                                    // so a user cannot act on this one — reopen the issue from the project screen.
+                                    // A blank would otherwise be rejected by SharePoint silently.
+                                    { L: "Parent Project", M: gIssProject.Id <= 0 },
+                                    { L: "Assignee",       M: Len(gIssAssignee.Mail) = 0 },
+                                    // issue_status is required and the save writes it UNGUARDED, so an empty
+                                    // gIssStatus sends {Value: ""} — not a member, and the connector rejects the
+                                    // whole insert. The combo box can empty it, and a legacy row holding a retired
+                                    // status seeds it to something the new Items cannot display.
+                                    { L: "Status",         M: Len(gIssStatus) = 0 },
+                                    // SAME NET, same reason: type and impact are required and written unguarded.
+                                    { L: "Type",           M: Len(gIssType) = 0 },
+                                    { L: "Impact",         M: Len(gIssImpact) = 0 } ),
+                                  M ), L, " | " ) },
+                             If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.Danger
@@ -726,7 +719,7 @@ Screens:
                     // Enforced here so a blocked save names the field. These are required in
                     // schema.yaml, so SharePoint would reject the write regardless; this only
                     // decides whether the user is told.
-                    Notify( "Can't save yet — this still needs: " & lblIssMissing.Text,
+                    Notify( "Can't save yet. " & lblIssMissing.Text,
                     NotificationType.Error ),
                     // THE TASK LINK CAN MOVE, so the task this issue is LEAVING needs its health
                     // recomputed too — captured here because after the Patch the old value is gone.

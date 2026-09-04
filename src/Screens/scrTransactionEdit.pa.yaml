@@ -451,33 +451,24 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =62
                 Children:
-                  - lblTxMissingCap:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: ="Still required:"
-                        Visible: =Len(lblTxMissing.Text) > 0
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        Width: =Parent.Width
-                        Height: =18
                   - lblTxMissing:
                       Control: Label@2.5.1
                       Properties:
                         Text: |
-                          =Trim(
-                             If( Len(Trim(txtTxName.Text)) = 0,  "label   ",   "" ) &
-                             // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
-                             // but a blank one would still be rejected by SharePoint — silently, since there is
-                             // nothing on screen to point at.
-                             If( gTxProject.Id <= 0,             "a parent project (not set — reopen from the project screen)   ", "" ) &
-                             If( IsBlank(dtpTxDate.SelectedDate),
-                                 "a valid trade date   ", "" ) &
-                             // transaction_notional is optional, so an EMPTY box is fine; only text that will
-                             // not parse is an error, and that is silent otherwise.
-                             If( Len(Trim(numTxNotional.Text)) > 0
-                              && IsBlank(Value(numTxNotional.Text)),
-                                 "a numeric notional (that entry is not a number)   ", "" ) )
+                          =With(
+                             { m: Concat( Filter( Table(
+                                    { L: "Label",          M: Len(Trim(txtTxName.Text)) = 0 },
+                                    // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
+                                    // so a user cannot act on this one — reopen the transaction from the project
+                                    // screen. A blank would otherwise be rejected by SharePoint silently.
+                                    { L: "Parent Project", M: gTxProject.Id <= 0 },
+                                    { L: "Trade Date",     M: IsBlank(dtpTxDate.SelectedDate) },
+                                    // THE ONE VALIDITY TEST IN THIS LIST, not a missing-field test: the notional is
+                                    // OPTIONAL, so an empty box is fine and only an entry that will not parse fires
+                                    // this. It reads as a required field because the list has one format.
+                                    { L: "Notional",       M: Len(Trim(numTxNotional.Text)) > 0 && IsBlank(Value(numTxNotional.Text)) } ),
+                                  M ), L, " | " ) },
+                             If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.Danger
@@ -567,7 +558,7 @@ Screens:
                     If( Len(lblTxMissing.Text) > 0,
                     // Enforced here so a blocked save names the field. All six are required in
                     // schema.yaml, so SharePoint would reject the write regardless.
-                    Notify( "Can't save yet — this still needs: " & lblTxMissing.Text,
+                    Notify( "Can't save yet. " & lblTxMissing.Text,
                     NotificationType.Error ),
                     Set( gTxSaved, Blank() );
                     Set( gTxErr, "" );
