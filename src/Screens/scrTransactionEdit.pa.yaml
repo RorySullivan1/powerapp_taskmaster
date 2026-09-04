@@ -226,7 +226,7 @@ Screens:
                             Control: CanvasComponent
                             ComponentName: cmpLookupField
                             Properties:
-                              Caption: ="Product  *"
+                              Caption: ="Product"
                               PickLabel: ="＋  Choose a product"
                               HasValue: =gTxProduct.Id > 0
                               Display: =gTxProduct.Value
@@ -471,7 +471,6 @@ Screens:
                              // but a blank one would still be rejected by SharePoint — silently, since there is
                              // nothing on screen to point at.
                              If( gTxProject.Id <= 0,             "a parent project (not set — reopen from the project screen)   ", "" ) &
-                             If( gTxProduct.Id <= 0,             "product   ", "" ) &
                              If( IsBlank(dtpTxDate.SelectedDate),
                                  "a valid trade date   ", "" ) &
                              // transaction_notional is optional, so an EMPTY box is fine; only text that will
@@ -595,7 +594,10 @@ Screens:
                                      If( gTxClient.Id > 0,
                                          { Id: gTxClient.Id, Value: gTxClient.Value },
                                          Blank() ),
-                                 transaction_product_id:  { Id: gTxProduct.Id, Value: gTxProduct.Value },
+                                 transaction_product_id:
+                                     If( gTxProduct.Id > 0,
+                                         { Id: gTxProduct.Id, Value: gTxProduct.Value },
+                                         Blank() ),
                                  transaction_sales:
                                      If( Len(gTxSales.Mail) > 0,
                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",

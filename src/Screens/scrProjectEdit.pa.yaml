@@ -1284,7 +1284,10 @@ Screens:
                                                       If( x.x_clientId > 0,
                                                           { Id: x.x_clientId, Value: x.x_clientValue },
                                                           Blank() ),
-                                                  transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
+                                                  transaction_product_id:
+                                                      If( x.x_productId > 0,
+                                                          { Id: x.x_productId, Value: x.x_productValue },
+                                                          Blank() ),
                                                   transaction_sales:
                                                       If( Len(x.x_salesMail) > 0,
                                                           { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
@@ -1833,7 +1836,7 @@ Screens:
                       Control: CanvasComponent
                       ComponentName: cmpLookupField
                       Properties:
-                        Caption: ="Product  *"
+                        Caption: ="Product"
                         PickLabel: ="＋  Choose a product"
                         HasValue: =gNxProduct.Id > 0
                         Display: =gNxProduct.Value
@@ -1883,8 +1886,9 @@ Screens:
             Size: =gTheme.Size.Body
             Text: =If( gNxEditSid > 0, "Save transaction", "Add transaction" )
             DisplayMode: |
-              =// Client and sales owner are NOT gated — both columns are optional.
-               If( Len(Trim(txtNxName.Text)) > 0 && gNxProduct.Id > 0
+              =// Only the label and the date are gated. Client, product and sales owner are
+               // all optional columns, so none of them can block staging a transaction.
+               If( Len(Trim(txtNxName.Text)) > 0
                 && !IsBlank(dtpNxDate.SelectedDate),
                    DisplayMode.Edit, DisplayMode.Disabled )
             X: =(Parent.Width - 780) / 2 + 780 - 24 - 170
