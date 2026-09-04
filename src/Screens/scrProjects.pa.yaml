@@ -171,6 +171,11 @@ Screens:
       # why the search predicate goes INSIDE each branch and never replaces one. The phases
       # are ENUMERATED because a Text `<>` does not delegate.
       #
+      # "MINE" IS MANAGER OR SUPPORTER, not manager alone — schema decision C2. Both columns
+      # are indexed, which is what keeps the Or-arm delegable; `project_requestor` is NOT
+      # indexed and MUST NOT join it, because one unindexed arm drops delegation for the whole
+      # filter and truncates in silence.
+      #
       # `project_coverage` is NOT indexed in the golden source. Equality on it delegates, but
       # SharePoint refuses an unindexed filter past 5,000 items — index it before then.
       # THE COVERAGE TEST IS Coalesce'd: before OnVisible runs, Selected.Value is BLANK,
@@ -189,7 +194,8 @@ Screens:
                                 || project_phase.Value = "Active"
                                 || project_phase.Value = "Stalled"
                                 || project_phase.Value = "Complete" )
-                              && project_manager.Email = gUserEmail ),
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
                              project_name ),
                        tglShowComplete.Value && tglOnlyMine.Value,
                        Sort( Filter( ActiveProjects,
@@ -199,7 +205,8 @@ Screens:
                                 || project_phase.Value = "Stalled"
                                 || project_phase.Value = "Complete" )
                               && project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && project_manager.Email = gUserEmail ),
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
                              project_name ),
                        tglShowComplete.Value
                     && Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
@@ -228,7 +235,8 @@ Screens:
                                 || project_phase.Value = "Planning"
                                 || project_phase.Value = "Active"
                                 || project_phase.Value = "Stalled" )
-                              && project_manager.Email = gUserEmail ),
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
                              project_name ),
                        tglOnlyMine.Value,
                        Sort( Filter( ActiveProjects,
@@ -237,7 +245,8 @@ Screens:
                                 || project_phase.Value = "Active"
                                 || project_phase.Value = "Stalled" )
                               && project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && project_manager.Email = gUserEmail ),
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
                              project_name ),
                        Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
                        = "All coverage",
@@ -262,7 +271,8 @@ Screens:
                                 || project_phase.Value = "Active"
                                 || project_phase.Value = "Stalled"
                                 || project_phase.Value = "Complete" )
-                              && project_manager.Email = gUserEmail
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglShowComplete.Value && tglOnlyMine.Value,
@@ -273,7 +283,8 @@ Screens:
                                 || project_phase.Value = "Stalled"
                                 || project_phase.Value = "Complete" )
                               && project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && project_manager.Email = gUserEmail
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglShowComplete.Value
@@ -305,7 +316,8 @@ Screens:
                                 || project_phase.Value = "Planning"
                                 || project_phase.Value = "Active"
                                 || project_phase.Value = "Stalled" )
-                              && project_manager.Email = gUserEmail
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        tglOnlyMine.Value,
@@ -315,7 +327,8 @@ Screens:
                                 || project_phase.Value = "Active"
                                 || project_phase.Value = "Stalled" )
                               && project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && project_manager.Email = gUserEmail
+                              && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                              project_name ),
                        Coalesce(cboPrjCoverage.Selected.Value, "All coverage")
@@ -536,12 +549,19 @@ Screens:
       - ProjectsEmptyLabel:
           Control: Label@2.5.1
           Properties:
+            # ORDER IS THE WHOLE POINT OF THIS LADDER. Test the NARROWEST condition first:
+            # two toggles can empty the gallery at once, and naming only one of them sends
+            # the reader to the wrong control. `tglOnlyMine` was tested first here and the
+            # combined case never reached its own arm, so "all of mine are complete" read as
+            # "none are led by you" — a sentence about a filter that was not the cause.
             Text: |
-              =If( tglOnlyMine.Value,
-                   "No projects here are led by you. "
-                     & "Turn off Only show my projects to see the rest.",
-                   Len(Trim(txtProjSearch.Text)) > 0,
+              =If( Len(Trim(txtProjSearch.Text)) > 0,
                    "No project name starts with """ & Trim(txtProjSearch.Text) & """.",
+                   tglOnlyMine.Value && !tglShowComplete.Value,
+                   "None of your projects are still open. Turn on Show completed to include "
+                     & "finished ones, or turn off Only show my projects.",
+                   tglOnlyMine.Value,
+                   "You do not manage or support any projects here.",
                    !tglShowComplete.Value,
                    "Nothing open here. Turn on Show completed to include finished projects.",
                    "No projects match this coverage." )
