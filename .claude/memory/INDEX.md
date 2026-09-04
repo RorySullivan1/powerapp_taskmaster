@@ -6,14 +6,11 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **OPEN BACKLOG — GitHub #50–#53 ONLY. #45–#49 ARE CLOSED**: the "only mine" epic landed
-  (`968b7a1` — mine is manager-OR-supporter, empty-state ladder reordered; #46's probe proved
-  there was no code defect and the MESSAGE was the bug). What remains is **#50** —
-  **#51's probes HAVE RUN and #53 IS CLOSED won't-fix** — `StartsWith(<Text col>, "")` is
-  REJECTED OUTRIGHT ("the query is not valid"), so an off state must be a BRANCH.
-  **#52 IS BUILT AND AWAITS A PASTE**: `galProjects.Items` 155 -> 84 lines, still 16 branches,
-  phase vocab hoisted onto `ActiveProjects` / the new `OpenProjects`. Watch branches 3 and 7 —
-  a bare `Sort(<namedFormula>, project_name)` with no Filter is the one UNPROBED shape shipped.
+- **THE GITHUB BACKLOG IS EMPTY — ZERO OPEN ISSUES (verified 2026-09-04, 40 closed).** #45–#53
+  are all closed and LANDED, #52's `scrProjects` included (`galProjects.Items` 155 -> 84 lines,
+  phase vocab hoisted onto `ActiveProjects` / `OpenProjects`); `StartsWith(<Text col>, "")` is
+  REJECTED OUTRIGHT so an off state must be a BRANCH (#53 won't-fix). **There is no queued work.
+  Do not invent a backlog from these notes — ask.**
   Detail: sessions/2026-09-04-scrprojects-mine-and-items-epics.md
 - **LANDED AND EXERCISED 2026-09-04 (merged, PR #56).** The picker empty-query fix
   (`scrTaskEdit` / `scrProjectEdit` / `scrTransactionEdit` — each record kind split into a typed
@@ -27,19 +24,17 @@
   **NONE OF IT WAS EVER MEASURED**: every one landed on a paste confirmation, with no Live
   Monitor count, payload figure or wall-time reading taken before or after. The gains are what
   the source now does, not observed numbers. **Do not let a later session cite them as results.**
-- **PASTE QUEUE — EMPTY as of 2026-09-04, bar one unasked item.** `scrHome`'s Division-by-0 fix
+- **PASTE QUEUE — EMPTY as of 2026-09-04. Nothing is authored-but-unlanded.** `scrHome`'s Division-by-0 fix
   (`dfb5080`), the 2026-09-03 raw-list audit (5 sites) and the three health derivations moved onto
   `OpenIssues` are all **PASTED, TESTED AND CONFIRMED by the user**. The long-standing "authored
   but unverified" caveat on them is discharged — it no longer applies and should not be repeated.
-  **STILL UNASKED: #52's `scrProjects`** — never explicitly confirmed, and it carries the one
-  UNPROBED shape (bare `Sort(<namedFormula>, project_name)`, branches 3 and 7). Ask before
-  authoring on top of that screen.
+  **#52's `scrProjects` IS ALSO CONFIRMED** (user, 2026-09-04) — the paste queue is fully empty.
 - **THE APP IS PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
   2026-09-02), plus a working archival flow.** Reported symptom: recent non-archived projects and
   their children are in the lists but not in the app. Three causes identified (see Decisions);
   **unresolved, and only the user can discriminate — it needs two SharePoint views: `project_phase`
   is empty, and `task_project_archived` is empty.** The 5,000 list-view threshold is now the
-  live constraint on every unindexed filter — #47 checks the projects list against it.
+  live constraint on every unindexed filter (#47 checked the projects list against it and is closed).
 - **`taskproduct_project_archived` is LIVE in SharePoint, recorded in `schema/schema.yaml`, and
   `scrTaskEdit` WRITES it false on every link it creates (writer gap closed).** Indexed/default
   state is still UNCONFIRMED (carried in the column's `review:`), and **links that predate the
@@ -66,10 +61,10 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **`src/` WAS FULLY LANDED AS OF 2026-08-19** — all 11 screens, all 10 components and the App
-  object were in Studio and current with the repo on that date. **That claim is now STALE, not
-  current truth:** the 2026-09-02/03 work (Division-by-0, the raw-list audit, the health
-  derivations) carries no landing confirmation. See the paste-queue line above.
+- **`src/` IS FULLY LANDED AS OF 2026-09-04** — all 11 screens, all 10 components and the App
+  object are in Studio and current with the repo. The 2026-09-02/03 work (Division-by-0, the
+  raw-list audit, the health derivations) and the 2026-09-04 work (#52's scrProjects, the picker
+  empty-query fix, optional `client_sales`) are all pasted and confirmed.
   **`task_output_audience` and `task_output_approval_flag` are LIVE** on `taskmaster_tasks`.
 - **#23 AND #24 ARE LANDED AND CLOSED (user, 2026-08-19).** `scrIssueEdit` carries required
   type/impact with defaults Question/Moderate; `scrHome` carries the Projects-I-lead gallery
@@ -109,9 +104,9 @@
     saved. The overdue half is live and correct immediately.
   - **#22's seven `issue_type` values are taken on trust.** If SharePoint's Choice does not hold
     exactly Blockage / Exception / Limitation, those issues read Amber instead of Red — silently.
-  - The completion gate has never once blocked a save (unexercised under #13 and #21 alike), the
-    confirm dialog has never been seen to open, and the Division-by-0 fix has not been proven on
-    a cold start.
+  - The completion gate has never once blocked a save (unexercised under #13 and #21 alike), and
+    the confirm dialog has never been seen to open. (The Division-by-0 fix IS now proven —
+    confirmed by the user 2026-09-04.)
   - On scrReports: the truncation banner has never fired, `gRptDoneNoDate` has never been
     non-zero, the audience pie's `Other` slice has never been non-zero, and no trend bar has yet
     carried more than one currency.
@@ -480,6 +475,8 @@ not know them will author something broken:
 
 - [2026-09-04] **`client_sales` IS OPTIONAL — the user made it not-required in SharePoint, and the repo follows.** `schema/schema.yaml` updated (the golden source now records `required: false` and why). **THE NON-COSMETIC HALF IS THE PATCH, NOT THE VALIDATION LADDER:** `scrClientEdit` wrote `client_sales` UNCONDITIONALLY, so an unset owner would send `gClaimPrefix & ""` as the claim — malformed, and the connector rejects the WHOLE Patch, not the one field. Dropping the field from `lblClMissing` without guarding the write would have turned a blocked save into a FAILED save. Guarded with the optional-person idiom already shipping at `scrProjectEdit` for `project_requestor` / `project_supporter`: `If( Len(g.Mail) > 0, {SPListExpandedUser…}, Blank() )`. **`Blank()` is also what CLEARS a Person column**, so `fldSales`' existing clear button works end to end for the first time — it was previously unreachable in effect, since a cleared owner could never be saved. Nothing else in `src/` reads `client_sales` — INDEX Decisions
 
+- [2026-09-04] **A BARE `Sort( <namedFormula>, <col> )` WITH NO `Filter` IS GROUNDED — it works.** This was the ONE unprobed shape #52 shipped (`galProjects.Items` branches 3 and 7, `Sort( ActiveProjects, project_name )` / `Sort( OpenProjects, project_name )`), one layer simpler than ProbeNF row 6 which had only proven `Sort(Filter(namedFormula, …))`. The user pasted `scrProjects` and confirmed it working against the case that exercises those branches — "show completed" on, no coverage or mine filter — so the shape is safe to reuse. **EVIDENCE GRADE, stated so it is not over-read: this is a LIVE SCREEN WORKING, not a probe.** A probe isolates one variable; a working screen is weaker but real evidence, and it is enough to stop treating this construct as a risk. If a future change makes the shape load-bearing somewhere subtler, probe it properly rather than citing this line — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -552,3 +549,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | picker empty-query fix authored across scrTaskEdit / scrProjectEdit / scrTransactionEdit — six branches split into typed + off-state, validator 22/22, AWAITING PASTE | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | client_sales made optional across 5 sites (schema + scrClientEdit header, caption, validation ladder, guarded Patch). AWAITING PASTE with the picker fix | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | user confirmed BOTH open verification items tested and working: the two picker/client_sales proof cases, and the older main-side queue (scrHome dfb5080, raw-list audit, OpenIssues health derivations). Paste queue empty bar #52's scrProjects, never explicitly asked about | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | #52's scrProjects confirmed pasted and tested. Paste queue fully empty, GitHub backlog at zero open issues, and the bare Sort-over-a-named-formula shape is grounded by a working screen | sessions/2026-09-04-1650-picker-empty-query-defect.md
