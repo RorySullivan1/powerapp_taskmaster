@@ -15,6 +15,9 @@
   phase vocab hoisted onto `ActiveProjects` / the new `OpenProjects`. Watch branches 3 and 7 —
   a bare `Sort(<namedFormula>, project_name)` with no Filter is the one UNPROBED shape shipped.
   Detail: sessions/2026-09-04-scrprojects-mine-and-items-epics.md
+- **`client_sales` IS NOW OPTIONAL (user changed SharePoint 2026-09-04).** schema + scrClientEdit
+  updated; the Patch guards the Person write with `Blank()`, without which an unset owner FAILS
+  the whole write. AWAITING PASTE alongside the picker fix.
 - **PICKER EMPTY-QUERY DEFECT — FIXED IN SOURCE 2026-09-04, AWAITING PASTE (3 screens).** The
   same empty-argument fault was live in every client/product picker default page. Each record
   kind is now TWO branches: typed (`Len(q) > 0`, Filter+Sort+FirstN) and off-state
@@ -475,6 +478,8 @@ not know them will author something broken:
 
 - [2026-09-04] **THE PICKER OFF STATE IS NOW A BRANCH, AND THE PROJECTION IS DELIBERATELY DUPLICATED RATHER THAN LIFTED.** Fixing the six client/product branches needed a second arm per record kind; the compact alternative `ForAll( If(a, t1, t2) As x, … )` was REJECTED — the `As` alias over an `If` result is unproven in this dialect, #52 had already shipped one unprobed shape (bare `Sort(<namedFormula>, col)`), and two guesses in one paste cycle is not affordable when the only return signal is "it didn't work". ~12 duplicated lines per screen, accepted knowingly; revisit only if a probe grounds the compact form. **Second call: the typed branch is gated `Len(q) > 0`, NOT `>= 2`.** The empty string is the ONLY invalid input, so a one-character query must still narrow — gating at >= 2 would have swapped "10 matches" for "10 arbitrary rows" and introduced a fresh defect while fixing this one. The `If(Len >= 2, 50, 10)` row count is kept unchanged inside that branch — INDEX Decisions
 
+- [2026-09-04] **`client_sales` IS OPTIONAL — the user made it not-required in SharePoint, and the repo follows.** `schema/schema.yaml` updated (the golden source now records `required: false` and why). **THE NON-COSMETIC HALF IS THE PATCH, NOT THE VALIDATION LADDER:** `scrClientEdit` wrote `client_sales` UNCONDITIONALLY, so an unset owner would send `gClaimPrefix & ""` as the claim — malformed, and the connector rejects the WHOLE Patch, not the one field. Dropping the field from `lblClMissing` without guarding the write would have turned a blocked save into a FAILED save. Guarded with the optional-person idiom already shipping at `scrProjectEdit` for `project_requestor` / `project_supporter`: `If( Len(g.Mail) > 0, {SPListExpandedUser…}, Blank() )`. **`Blank()` is also what CLEARS a Person column**, so `fldSales`' existing clear button works end to end for the first time — it was previously unreachable in effect, since a cleared owner could never be saved. Nothing else in `src/` reads `client_sales` — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -545,3 +550,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | scrProjects assessed, no source touched: #45 (only-mine defect, 5 ranked candidates) + #46-#49, and #50 (Items is 155 lines/16 branches) + #51-#53. #45 sequenced BEFORE #50 — both rewrite the same eight person predicates. Blast radius: the same predicate is scrHome.pa.yaml:80 behind the "projects I lead" KPIs | sessions/2026-09-04-scrprojects-mine-and-items-epics.md
 - 2026-09-04 | question-only session on the lookup pickers: the 2000 ceiling is NOT the constraint (people are a connector action; product/client folds on indexed Text), but the empty-argument `StartsWith` fault from #51 was found LIVE in six client/product picker branches. Nothing authored | sessions/2026-09-04-1650-picker-empty-query-defect.md
 - 2026-09-04 | picker empty-query fix authored across scrTaskEdit / scrProjectEdit / scrTransactionEdit — six branches split into typed + off-state, validator 22/22, AWAITING PASTE | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | client_sales made optional across 5 sites (schema + scrClientEdit header, caption, validation ladder, guarded Patch). AWAITING PASTE with the picker fix | sessions/2026-09-04-1650-picker-empty-query-defect.md
