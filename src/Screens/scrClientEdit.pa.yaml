@@ -1,6 +1,6 @@
 # Create / edit a client. Reachable from scrReference and from cmpPicker's "+ New".
-# taskmaster_clients has five required columns, one of them a Person.
-# People are never created here — client_sales is filled from Microsoft 365.
+# taskmaster_clients has four required columns. client_sales is OPTIONAL and is the only
+# Person column here; people are never created here, it is filled from Microsoft 365.
 Screens:
   scrClientEdit:
     Properties:
@@ -184,7 +184,7 @@ Screens:
                       Control: CanvasComponent
                       ComponentName: cmpLookupField
                       Properties:
-                        Caption: ="Sales owner  *"
+                        Caption: ="Sales owner"
                         PickLabel: ="＋  Choose a sales owner"
                         HasValue: =Len(gClSales.Mail) > 0
                         Display: =gClSales.DisplayName
@@ -266,7 +266,6 @@ Screens:
               If( Len(Trim(txtClName.Text)) = 0, "a name   ", "" ) &
               If( Len(gClType) = 0,              "a type   ", "" ) &
               If( Len(gClCov) = 0,               "a coverage group   ", "" ) &
-              If( Len(gClSales.Mail) = 0,        "a sales owner   ", "" ) &
               If( Len(gClRegionPath) = 0,        "a region   ", "" ) )
             Font: =gTheme.Font
             Size: =gTheme.Size.Small
@@ -330,7 +329,13 @@ Screens:
               { client_name:        Trim(txtClName.Text),
               client_type:        { Value: gClType },
               client_coverage:    { Value: gClCov },
-              client_sales: { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gClSales.Mail),   DisplayName: gClSales.DisplayName,   Email:       gClSales.Mail,   Department: "", JobTitle: "", Picture: "" },
+              // OPTIONAL. An empty Mail must write Blank(), NOT a record — gClaimPrefix & ""
+              // is a malformed claim and the connector rejects the WHOLE Patch, not the field.
+              // Blank() is also what CLEARS the column when a set owner is removed.
+              client_sales:
+              If( Len(gClSales.Mail) > 0,
+              { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gClSales.Mail),   DisplayName: gClSales.DisplayName,   Email:       gClSales.Mail,   Department: "", JobTitle: "", Picture: "" },
+              Blank() ),
               client_region_id:   gClRegionId,
               client_region_path: gClRegionPath,
               client_notes:       txtClNotes.Text } ) ),

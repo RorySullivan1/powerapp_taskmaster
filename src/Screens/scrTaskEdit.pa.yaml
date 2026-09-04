@@ -1658,11 +1658,17 @@ Screens:
             # the same {Key, Primary, Secondary} and the If chain type-checks. ShowColumns cannot
             # be used here: it can only keep the source's own column names, and there is no `Key`
             # column in a directory row or a list row. Key is TEXT for both kinds.
-            # THE RECORD BRANCHES ARE NOT GATED ON QUERY LENGTH — StartsWith(col, "") is true for
-            # every row, so one branch serves the default page and the search; FirstN makes it 10
-            # with nothing typed and 50 with a query. Sort is INSIDE the Filter, on an indexed
-            # column, so it folds. The directory branches keep the >= 2 gate: there is no "first
-            # 10 people" to show, so their default is the current user.
+            # EACH RECORD KIND IS TWO BRANCHES, AND THE PAIR MUST STAY SPLIT. StartsWith(col, "")
+            # is NOT a match-everything: SharePoint rejects the whole query with "the query is
+            # not valid" (tests/README.md, scrProbe-startswith-empty), so the empty-query default
+            # page cannot go through the Filter at all. Hence the off state is its own branch —
+            # first 10 by name, no Filter. The typed branch is gated on Len > 0, not >= 2, so a
+            # one-character query still narrows, and it keeps If(Len >= 2, 50, 10) for the count.
+            # Sort sits INSIDE the Filter on an indexed column, so both halves fold.
+            # The projection is REPEATED rather than lifted into ForAll( If(a, t1, t2) As x, … ):
+            # that shape is unproven here, and this is the one site that cannot afford a guess.
+            # The directory branches keep the >= 2 gate: there is no "first 10 people" to show,
+            # so their default is the current user.
             Results: |
               =If( (gTkPicker = "Lead" || gTkPicker = "Supporter") && Len(gTkQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gTkQuery, top: 25 }).value As u,
@@ -1673,17 +1679,27 @@ Screens:
               Table( { Key:       User().Email,
               Primary:   User().FullName,
               Secondary: User().Email } ),
-              gTkPicker = "Client",
+              gTkPicker = "Client" && Len(gTkQuery) > 0,
               ForAll( FirstN( Sort( Filter( taskmaster_clients,
               StartsWith(client_name, gTkQuery) ), client_name ),
               If( Len(gTkQuery) >= 2, 50, 10 ) ) As c,
               { Key:       Text(c.ID),
               Primary:   c.client_name,
               Secondary: Coalesce(c.client_type.Value, "") } ),
-              gTkPicker = "Product",
+              gTkPicker = "Client",
+              ForAll( FirstN( Sort( taskmaster_clients, client_name ), 10 ) As c,
+              { Key:       Text(c.ID),
+              Primary:   c.client_name,
+              Secondary: Coalesce(c.client_type.Value, "") } ),
+              gTkPicker = "Product" && Len(gTkQuery) > 0,
               ForAll( FirstN( Sort( Filter( taskmaster_products,
               StartsWith(product_uid, gTkQuery) ), product_uid ),
               If( Len(gTkQuery) >= 2, 50, 10 ) ) As p,
+              { Key:       Text(p.ID),
+              Primary:   p.product_uid,
+              Secondary: Coalesce(p.product_type_path, "") } ),
+              gTkPicker = "Product",
+              ForAll( FirstN( Sort( taskmaster_products, product_uid ), 10 ) As p,
               { Key:       Text(p.ID),
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )

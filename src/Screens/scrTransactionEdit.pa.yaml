@@ -601,6 +601,10 @@ Screens:
                        "Product", "Select product" )
             # Queries run HERE — AccessAppScope false. Bound to gTxQuery, which OnSearch sets,
             # never to the instance's own Query output. See scrTaskEdit's instance.
+            # Each record kind is TWO branches and the pair must stay split: StartsWith(col, "")
+            # is not a match-everything, it is an invalid query SharePoint rejects outright
+            # (tests/README.md, scrProbe-startswith-empty), so the empty-query default page must
+            # avoid the Filter entirely. See scrTaskEdit's instance for the full reasoning.
             Results: |
               =If( gTxPicker = "Sales" && Len(gTxQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gTxQuery, top: 25 }).value As u,
@@ -611,17 +615,27 @@ Screens:
               Table( { Key:       User().Email,
               Primary:   User().FullName,
               Secondary: User().Email } ),
-              gTxPicker = "Client",
+              gTxPicker = "Client" && Len(gTxQuery) > 0,
               ForAll( FirstN( Sort( Filter( taskmaster_clients,
               StartsWith(client_name, gTxQuery) ), client_name ),
               If( Len(gTxQuery) >= 2, 50, 10 ) ) As c,
               { Key:       Text(c.ID),
               Primary:   c.client_name,
               Secondary: Coalesce(c.client_type.Value, "") } ),
-              gTxPicker = "Product",
+              gTxPicker = "Client",
+              ForAll( FirstN( Sort( taskmaster_clients, client_name ), 10 ) As c,
+              { Key:       Text(c.ID),
+              Primary:   c.client_name,
+              Secondary: Coalesce(c.client_type.Value, "") } ),
+              gTxPicker = "Product" && Len(gTxQuery) > 0,
               ForAll( FirstN( Sort( Filter( taskmaster_products,
               StartsWith(product_uid, gTxQuery) ), product_uid ),
               If( Len(gTxQuery) >= 2, 50, 10 ) ) As p,
+              { Key:       Text(p.ID),
+              Primary:   p.product_uid,
+              Secondary: Coalesce(p.product_type_path, "") } ),
+              gTxPicker = "Product",
+              ForAll( FirstN( Sort( taskmaster_products, product_uid ), 10 ) As p,
               { Key:       Text(p.ID),
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )
