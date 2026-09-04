@@ -9,11 +9,19 @@
 - **OPEN BACKLOG — GitHub #50–#53 ONLY. #45–#49 ARE CLOSED**: the "only mine" epic landed
   (`968b7a1` — mine is manager-OR-supporter, empty-state ladder reordered; #46's probe proved
   there was no code defect and the MESSAGE was the bug). What remains is **#50** —
-  `galProjects.Items` is 155 lines and 16 branches (#51 probe / #52 named formulas / #53 collapse
-  the search axis). **#51's TWO PROBES ARE AUTHORED AND AWAIT A PASTE** (`612dfb3`):
-  `scrProbe-startswith-empty` (claim 1) and `scrProbe-namedformula-filter` (claim 2).
-  **#52 and #53 STAY BLOCKED until those readings come back — do not paste a guess.**
+  **#51's probes HAVE RUN and #53 IS CLOSED won't-fix** — `StartsWith(<Text col>, "")` is
+  REJECTED OUTRIGHT ("the query is not valid"), so an off state must be a BRANCH.
+  **#52 IS BUILT AND AWAITS A PASTE**: `galProjects.Items` 155 -> 84 lines, still 16 branches,
+  phase vocab hoisted onto `ActiveProjects` / the new `OpenProjects`. Watch branches 3 and 7 —
+  a bare `Sort(<namedFormula>, project_name)` with no Filter is the one UNPROBED shape shipped.
   Detail: sessions/2026-09-04-scrprojects-mine-and-items-epics.md
+- **PICKER DEFECT, FOUND 2026-09-04, NOT YET FIXED — SIX SITES.** The same empty-argument fault
+  is live in every client/product picker: the "first 10 with nothing typed" default page runs
+  `StartsWith(col, "")` and therefore ERRORS. `scrProjectEdit:1974` (NxClient/NxProduct),
+  `scrTaskEdit:1666` (Client/Product), `scrTransactionEdit:604` (Client/Product). The PERSON
+  branches are gated on `Len(q) >= 2` and are unaffected. Fix is mechanical — branch the off
+  state to `FirstN( Sort( <list>, <col> ), 10 )` with no Filter.
+  Detail: sessions/2026-09-04-1650-picker-empty-query-defect.md
 - **THE PERF BACKLOG #27–#40 IS COMPLETE — all fourteen landed and closed (user, 2026-08-19).**
   **NONE OF IT WAS EVER MEASURED**: every one landed on a paste confirmation, with no Live
   Monitor count, payload figure or wall-time reading taken before or after. The gains are what
@@ -463,6 +471,8 @@ not know them will author something broken:
 
 - [2026-09-04] **#52 BUILT AND #53 CLOSED WON'T-FIX. `galProjects.Items` IS 155 LINES -> 84, STILL 16 BRANCHES.** The phase vocabulary is hoisted out of all sixteen branches onto `ActiveProjects` (5 phases) and the new `OpenProjects` (4 phases, `App.pa.yaml:91`), on ProbeNF row 6 proving a bare `Sort(Filter(namedFormula, …))` needs no redundant phase group to be a valid query. **The branch COUNT is unchanged and cannot be reduced: #53's halving needed `StartsWith(col,"")` as a match-everything off state and ProbeSW proved it does not run at all.** **5b CLOSES THE #17 POST-MORTEM: `StartsWith(manager.Email, Left(me,3))` MATCHES** — same Person subfield as row 5, only the argument differs — **so the empty argument is the only fault and note 20 is not implicated in anything this app does.** Scope note kept in tests/README.md so this is not over-read the other way: note 20 is about DELEGATION, not validity, and 5b matching proves the subfield does not ERROR, not that it folds; its warning was not recorded and nothing in the app depends on it. **ONE UNPROBED SHAPE SHIPPED:** branches 3 and 7 are now a bare `Sort( ActiveProjects, project_name )` / `Sort( OpenProjects, project_name )` with no `Filter` at all — one layer simpler than ProbeNF row 6, which is the argument for it, but not the same shape. If the gallery errors on paste with "show completed" on and no coverage or mine filter, that is the branch — INDEX Decisions
 
+- [2026-09-04] **THE EMPTY-ARGUMENT `StartsWith` FAULT IS NOT CONFINED TO `scrProjects` — IT IS LIVE IN SIX PICKER BRANCHES AND WAS NEVER CONNECTED TO #51 UNTIL NOW.** Every client and product picker uses `StartsWith(col, gQuery)` as ITS DEFAULT PAGE, and every picker sets its query global to `""` on open (`scrTaskEdit:96`, `scrProjectEdit:115`, `scrTransactionEdit:64`) — so the "first 10 with nothing typed" state runs the exact construct ProbeSW proved does not run. `scrProjectEdit:1974` (NxClient/NxProduct), `scrTaskEdit:1666` (Client/Product), `scrTransactionEdit:604` (Client/Product). The PERSON branches are gated on `Len(q) >= 2` and are UNAFFECTED — which is also why `cmpPicker`'s header claim "THE DIALOG OPENS WITH ROWS ALREADY IN IT" is true for person fields ONLY. **Not a ceiling problem and not a delegation problem:** the typed path is fully delegable (indexed Text + `StartsWith` + `Sort` fold, so `FirstN` takes the top of an already-ordered server result and is correct at any list size), and the people path is a CONNECTOR ACTION (`Office365Users.SearchUserV2`, `top: 25`) which the 500/2000 tabular limit does not govern at all. Fix is mechanical and NOT YET AUTHORED: branch the off state to `FirstN( Sort( <list>, <col> ), 10 )` with no `Filter` — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -531,3 +541,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-20 | docs/manuals/ built: user manual + maintainer manual, 7 chapters each, plus docs/README.md and a root-README documentation section. Root README's stale component count (12->10) and App.pa.yaml description corrected. Three findings left open: screen-map.md is historical, cmpAppBar's default Items carries a dead Admin entry, and the manuals have no staleness hook | sessions/2026-08-20-2346-manuals-section.md
 - 2026-09-02 | second "Division by 0" at app start: NOT the timeline (deleted in #24) but scrHome's two KPI-card subtitles, guarded only by `= 0`. Fixed with Max(1, ...) at the point of division; the 2026-08-19 "ruled out, do not re-audit" call on these exact lines is superseded. Full divisor re-enumeration: these were the last two unguarded in the app. Branch audit: main was current, trees identical, PR #41 merged | sessions/2026-09-02-1256-div0-kpi-cards.md
 - 2026-09-04 | scrProjects assessed, no source touched: #45 (only-mine defect, 5 ranked candidates) + #46-#49, and #50 (Items is 155 lines/16 branches) + #51-#53. #45 sequenced BEFORE #50 — both rewrite the same eight person predicates. Blast radius: the same predicate is scrHome.pa.yaml:80 behind the "projects I lead" KPIs | sessions/2026-09-04-scrprojects-mine-and-items-epics.md
+- 2026-09-04 | question-only session on the lookup pickers: the 2000 ceiling is NOT the constraint (people are a connector action; product/client folds on indexed Text), but the empty-argument `StartsWith` fault from #51 was found LIVE in six client/product picker branches. Nothing authored | sessions/2026-09-04-1650-picker-empty-query-defect.md
