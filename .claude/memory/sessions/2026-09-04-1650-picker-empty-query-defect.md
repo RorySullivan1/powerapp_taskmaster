@@ -39,7 +39,16 @@
   default `FirstN( Sort( taskmaster_products, product_uid ), 10 )` with no Filter at all.
 
 ## State at end
-- **FIX AUTHORED, AWAITING PASTE** — all six branches, three screens, validator 22/22.
+- **LANDED. The user pasted all four screens and confirmed "it works" (2026-09-04).**
+  That confirmation covers the three picker screens and scrClientEdit — i.e. exactly the
+  contents of this branch. It does NOT cover the older queue items sitting on `main`
+  (scrHome `dfb5080`, the raw-list audit, the health derivations, #52's scrProjects);
+  those were not handed off this session and remain unverified.
+- **WHAT "IT WORKS" DOES AND DOES NOT PROVE.** It is the binary return signal, taken on a
+  paste that Studio accepted. It proves the dialect is valid and the screens run. It is
+  NOT a report that the two specific proof cases were exercised — opening a picker without
+  typing, and clearing a set sales owner then saving. Neither was asked for by name.
+- **FIX AUTHORED AND PASTED** — all six branches, three screens, validator 22/22.
   Each record kind is now TWO branches: typed (`Len(q) > 0`, Filter + Sort + FirstN,
   keeping `If(Len >= 2, 50, 10)`) and off-state (`FirstN( Sort( <list>, <col> ), 10 )`
   with no Filter). Person branches untouched.

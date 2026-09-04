@@ -15,15 +15,14 @@
   phase vocab hoisted onto `ActiveProjects` / the new `OpenProjects`. Watch branches 3 and 7 —
   a bare `Sort(<namedFormula>, project_name)` with no Filter is the one UNPROBED shape shipped.
   Detail: sessions/2026-09-04-scrprojects-mine-and-items-epics.md
-- **`client_sales` IS NOW OPTIONAL (user changed SharePoint 2026-09-04).** schema + scrClientEdit
-  updated; the Patch guards the Person write with `Blank()`, without which an unset owner FAILS
-  the whole write. AWAITING PASTE alongside the picker fix.
-- **PICKER EMPTY-QUERY DEFECT — FIXED IN SOURCE 2026-09-04, AWAITING PASTE (3 screens).** The
-  same empty-argument fault was live in every client/product picker default page. Each record
-  kind is now TWO branches: typed (`Len(q) > 0`, Filter+Sort+FirstN) and off-state
-  (`FirstN( Sort( <list>, <col> ), 10 )`, no Filter). `scrProjectEdit` (NxClient/NxProduct),
-  `scrTaskEdit` (Client/Product), `scrTransactionEdit` (Client/Product); person branches
-  untouched. **Proof is opening a picker and NOT typing: ten rows, no error banner.**
+- **LANDED 2026-09-04, user confirmed "it works" on all four screens:** the picker empty-query
+  fix (`scrTaskEdit` / `scrProjectEdit` / `scrTransactionEdit` — each record kind split into a
+  typed branch and a no-Filter off state) and `client_sales` made OPTIONAL in `scrClientEdit` +
+  `schema/schema.yaml`, with the Person write guarded by `Blank()`.
+  **SCOPE OF THAT CONFIRMATION: those four screens only** — it does NOT extend to the older
+  `main`-side queue below. **AND IT IS A PASTE CONFIRMATION, NOT A TEST RESULT:** the two proof
+  cases (open a picker without typing; clear a set sales owner and save) were not asked for by
+  name, so do not cite them as exercised.
   Detail: sessions/2026-09-04-1650-picker-empty-query-defect.md
 - **THE PERF BACKLOG #27–#40 IS COMPLETE — all fourteen landed and closed (user, 2026-08-19).**
   **NONE OF IT WAS EVER MEASURED**: every one landed on a paste confirmation, with no Live
