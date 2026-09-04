@@ -55,8 +55,8 @@ Screens:
                   { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
                     Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
                   // NOT User(). The sales owner is usually somebody else — defaulting to whoever is
-                  // entering it writes a wrong name silently, and transaction_sales is required, so the
-                  // empty state is caught by lblTxMissing instead.
+                  // entering it writes a wrong name silently. The column is OPTIONAL, so an empty
+                  // state is a legitimate save, not something lblTxMissing has to catch.
                   { DisplayName: "", Mail: "" } ) );
         Set( gTxCurrency,
               If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
@@ -314,7 +314,7 @@ Screens:
                             Control: CanvasComponent
                             ComponentName: cmpLookupField
                             Properties:
-                              Caption: ="Client  *"
+                              Caption: ="Client"
                               PickLabel: ="＋  Choose a client"
                               HasValue: =gTxClient.Id > 0
                               Display: =gTxClient.Value
@@ -381,7 +381,7 @@ Screens:
                             Control: CanvasComponent
                             ComponentName: cmpLookupField
                             Properties:
-                              Caption: ="Sales owner  *"
+                              Caption: ="Sales owner"
                               PickLabel: ="＋  Choose a sales owner"
                               HasValue: =Len(gTxSales.Mail) > 0
                               Display: =gTxSales.DisplayName
@@ -423,9 +423,7 @@ Screens:
                              // but a blank one would still be rejected by SharePoint — silently, since there is
                              // nothing on screen to point at.
                              If( gTxProject.Id <= 0,             "a parent project (not set — reopen from the project screen)   ", "" ) &
-                             If( gTxClient.Id  <= 0,             "client   ",  "" ) &
                              If( gTxProduct.Id <= 0,             "product   ", "" ) &
-                             If( Len(gTxSales.Mail) = 0,         "sales owner   ", "" ) &
                              If( IsBlank(dtpTxDate.SelectedDate),
                                  "a valid trade date   ", "" ) &
                              // transaction_notional is optional, so an EMPTY box is fine; only text that will
@@ -541,14 +539,23 @@ Screens:
                                                        project_phase.Value ), "" ) = "Archived",
                                transaction_name:        Trim(txtTxName.Text),
                                  transaction_project_id:  { Id: gTxProject.Id, Value: gTxProject.Value },
-                                 transaction_client_name: { Id: gTxClient.Id,  Value: gTxClient.Value },
+                                 // BOTH OPTIONAL. An unset lookup must write Blank(), never {Id: 0};
+                                 // an unset person must write Blank(), never a record built on an empty
+                                 // Mail — `gClaimPrefix & ""` is a malformed claim and the connector
+                                 // rejects the WHOLE Patch. Blank() is also what CLEARS either column.
+                                 transaction_client_name:
+                                     If( gTxClient.Id > 0,
+                                         { Id: gTxClient.Id, Value: gTxClient.Value },
+                                         Blank() ),
                                  transaction_product_id:  { Id: gTxProduct.Id, Value: gTxProduct.Value },
                                  transaction_sales:
-                                     { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                       Claims:      gClaimPrefix & Lower(gTxSales.Mail),
-                                       DisplayName: gTxSales.DisplayName,
-                                       Email:       gTxSales.Mail,
-                                       Department: "", JobTitle: "", Picture: "" },
+                                     If( Len(gTxSales.Mail) > 0,
+                                         { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                           Claims:      gClaimPrefix & Lower(gTxSales.Mail),
+                                           DisplayName: gTxSales.DisplayName,
+                                           Email:       gTxSales.Mail,
+                                           Department: "", JobTitle: "", Picture: "" },
+                                         Blank() ),
                                  transaction_currency:    { Value: gTxCurrency },
                                  transaction_notional:
                                      Value(numTxNotional.Text),

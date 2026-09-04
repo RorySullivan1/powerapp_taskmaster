@@ -291,7 +291,7 @@ lists:
       # waste on 2026-08-11 by trusting this line. Changing the display column in place
       # UNASSOCIATES existing items, which is why it was fixed in the app instead.
       - { name: transaction_project_id, type: Lookup,   required: true,  indexed: true,  desc: "Parent project", lookup: { list: taskmaster_projects, show: project_name } }
-      - { name: transaction_client_name, type: Lookup,  required: true,  indexed: true,  desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
+      - { name: transaction_client_name, type: Lookup,  required: false, indexed: true,  desc: "Associated client. OPTIONAL — made not-required in SharePoint by the user, 2026-09-04. The edit screens write Blank() when unset; a blank lookup still displays as \"—\" on scrProject", lookup: { list: taskmaster_clients, show: client_name } }
       # INDEXED IN SHAREPOINT 2026-08-19 (user). Indexed ahead of need — nothing leads on
       # this column yet — because an index CANNOT BE ADDED past 20,000 items and
       # transactions is the fastest-growing list.
@@ -299,7 +299,7 @@ lists:
       # SALES-SIDE, NOT DESK-SIDE (user-confirmed 2026-08-17). Do NOT feed it into person
       # productivity: whoever sold the trade did not do the desk work. A sales-to-transaction
       # analysis may come later and is a separate view, not another workload attribution path.
-      - { name: transaction_sales,      type: Person, multi: false, required: true,                  desc: "Sales owner. Display and sales-side analysis only — never a desk-workload attribution path" }
+      - { name: transaction_sales,      type: Person, multi: false, required: false,                 desc: "Sales owner. OPTIONAL — made not-required in SharePoint by the user, 2026-09-04. Display and sales-side analysis only — never a desk-workload attribution path" }
       - { name: transaction_notional,   type: Currency, required: false,                 desc: "Trade notional amount (positive)" }
       # ---------------------------------------------------------------------
       # DENORMALISED PARENT STATE — added 2026-08-12. Mirrors project_phase =

@@ -1279,14 +1279,20 @@ Screens:
                                                    { transaction_project_archived: false },
                                                 { transaction_name:        x.x_name,
                                                   transaction_project_id:  { Id: gPrSaved.ID, Value: gPrNameSaved },
-                                                  transaction_client_name: { Id: x.x_clientId,  Value: x.x_clientValue },
+                                                  // Optional — see scrTransactionEdit's Patch.
+                                                  transaction_client_name:
+                                                      If( x.x_clientId > 0,
+                                                          { Id: x.x_clientId, Value: x.x_clientValue },
+                                                          Blank() ),
                                                   transaction_product_id:  { Id: x.x_productId, Value: x.x_productValue },
                                                   transaction_sales:
-                                                      { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
-                                                        Claims:      gClaimPrefix & Lower(x.x_salesMail),
-                                                        DisplayName: x.x_salesName,
-                                                        Email:       x.x_salesMail,
-                                                        Department: "", JobTitle: "", Picture: "" },
+                                                      If( Len(x.x_salesMail) > 0,
+                                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                                            Claims:      gClaimPrefix & Lower(x.x_salesMail),
+                                                            DisplayName: x.x_salesName,
+                                                            Email:       x.x_salesMail,
+                                                            Department: "", JobTitle: "", Picture: "" },
+                                                          Blank() ),
                                                   transaction_currency:    { Value: x.x_ccy },
                                                   transaction_notional:
                                                       x.x_notional,
@@ -1801,7 +1807,7 @@ Screens:
                       Control: CanvasComponent
                       ComponentName: cmpLookupField
                       Properties:
-                        Caption: ="Client  *"
+                        Caption: ="Client"
                         PickLabel: ="＋  Choose a client"
                         HasValue: =gNxClient.Id > 0
                         Display: =gNxClient.Value
@@ -1853,7 +1859,7 @@ Screens:
                       Control: CanvasComponent
                       ComponentName: cmpLookupField
                       Properties:
-                        Caption: ="Sales owner  *  —  anyone in the directory"
+                        Caption: ="Sales owner  —  anyone in the directory"
                         PickLabel: ="＋  Choose a sales owner"
                         HasValue: =Len(gNxSales.Mail) > 0
                         Display: =gNxSales.DisplayName
@@ -1877,8 +1883,9 @@ Screens:
             Size: =gTheme.Size.Body
             Text: =If( gNxEditSid > 0, "Save transaction", "Add transaction" )
             DisplayMode: |
-              =If( Len(Trim(txtNxName.Text)) > 0 && gNxClient.Id > 0 && gNxProduct.Id > 0
-                && !IsBlank(dtpNxDate.SelectedDate) && Len(gNxSales.Mail) > 0,
+              =// Client and sales owner are NOT gated — both columns are optional.
+               If( Len(Trim(txtNxName.Text)) > 0 && gNxProduct.Id > 0
+                && !IsBlank(dtpNxDate.SelectedDate),
                    DisplayMode.Edit, DisplayMode.Disabled )
             X: =(Parent.Width - 780) / 2 + 780 - 24 - 170
             Y: =(Parent.Height - 680) / 2 + 680 - 24 - 40
