@@ -764,9 +764,57 @@ attributed — **regardless of what the rest of the sheet says**.
   everything above.
 - **A1 = 0, or A1 = 2000** → that pair is unreadable, use the B pair.
 
-### Result — PENDING
+### Result — 2026-09-04, run by the user in Studio
 
-Not yet run. **Record the outcome here even if it is null**, per rule 5.
+```
+NC       warns on StartsWith                     negative control PASSED
+2        !! ERROR  "the query is not valid"      StartsWith(project_name, "")
+3        !! ERROR  "the query is not valid"      StartsWith(name, Trim(box)), box empty
+4        !! ERROR  "the query is not valid"      same construct
+5        !! ERROR  "the query is not valid"      StartsWith(manager.Email, "")
+M0..B3   all warn about CountRows                quarantined noise, as designed
+```
+
+**CLAIM 1 STANDS, AND THE MECHANISM IS FINALLY IDENTIFIED — IT IS THE EMPTY ARGUMENT.**
+
+`StartsWith( project_name, "" )` on a plain indexed **Text** column is rejected outright:
+*"the query is not valid"*. The Person subfield is not required to break it, so **MS Learn
+note 20 is not the explanation for #17 that the 2026-09-04 assessment took it for.**
+
+### Read this with `scrProbe-namedformula-filter` — the pair is the isolation
+
+| Argument | Shape | Result |
+|---|---|---|
+| `"ab"` non-empty | bare `Filter` over a named formula, wrapped in `Sort`, **no phase group** | **clean** (ProbeNF row 6) |
+| `""` empty | `Filter` over the same named formula | **"the query is not valid"** (row 2) |
+
+**Two probes, one variable each, and they cross.** The empty argument is the broken half; the
+phase group, the `Sort`, the named formula and the Person subfield are all exonerated as causes.
+That is the mechanism `scrProjects.pa.yaml:160-172` has never had, and it is neither of the two
+things that comment currently blames.
+
+### What this settles
+
+- **#53 closes won't-fix.** The halving depends on `StartsWith(col, "")` as a match-everything
+  off state. It does not match everything — it does not run. **"An off state is a BRANCH" is now
+  grounded**, for a reason the original ban only half-guessed.
+- **#52 proceeds**, on the ProbeNF result, and is now the whole of #50's available win.
+- **#17 is attributed.** The empty argument, not the Person subfield.
+
+**One correction to the old comment beyond the mechanism:** it says the failure is a filter that
+*"silently returns zero rows"*, indistinguishable from an empty list. It is not silent — it
+raises a visible data-retrieval error. Whatever #17's observer saw as "returned NOTHING", the
+construct fails loudly today.
+
+### Still unrecorded from this run
+
+**PC**, **5b** and **5c** were not reported, and the A/B triples produced no readable numbers —
+rows 2/3 error, so A2/A3 and B2/B3 error with them. The verdict came from rows 2 and 3 directly.
+
+**5b is the one still worth reading.** `StartsWith(manager.Email, Left(me,3))` — same Person
+subfield, **non-empty** argument. 5c matches and 5b errors → the subfield is broken as well and
+note 20 keeps its scope. 5b clean → the empty argument is the only fault and note 20 is not
+implicated in this app at all.
 
 ---
 
@@ -851,6 +899,28 @@ this named formula becomes dead weight and should be removed in the same pass.**
   the mechanism it has never had.
 - **8 must be clean** for the rewrite to be buildable at all.
 
-### Result — PENDING
+### Result — 2026-09-04, run by the user in Studio
 
-Not yet run. **Record the outcome here even if it is null**, per rule 5.
+```
+P1, P2   two different projects        prerequisite OK, OpenProjects resolves
+7        -- no rows (no error) --      positive control PASSED (no error)
+6        -- no rows (no error) --      THE DISPUTED SHAPE DOES NOT ERROR
+6ns      -- no rows (no error) --
+6r       a project name                raw list holds a row matching "ab"
+8        -- no rows (no error) --
+8ns      -- no rows (no error) --
+```
+
+**CLAIM 2 IS DEAD.** Row 6 is `Sort( Filter( ActiveProjects, StartsWith(project_name,"ab") ) )`
+with **no phase group** — the exact shape `scrProjects.pa.yaml:167-172` records as rejected — and
+it came back clean. No error. The no-match is expected: `"ab"` is an arbitrary literal, and 6r
+finding one only means the raw list carries an archived project that matches.
+
+**Nothing about a redundant phase predicate repairs a query, and now nothing claims it does.**
+The ~120 lines restating the five-phase vocabulary across sixteen branches are dead weight, and
+#52 proceeds. Row 8 clean means the rewrite is buildable: `Sort( Filter( OpenProjects, … ) )` is
+a valid shape.
+
+**The original observation is not reproduced, so the phase group was never the variable that
+mattered.** See the `scrProbe-startswith-empty` result above, which found the variable that was:
+the empty `StartsWith` argument.
