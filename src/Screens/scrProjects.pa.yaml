@@ -13,6 +13,9 @@
 #
 # Horizontal placement is auto-layout, not arithmetic: the filter row and each gallery
 # row are containers whose children carry NO X, so columns cannot overlap at any width.
+# It is also what lets a row at 100% swap its due-date/percent pair for the green
+# "Ready To Mark Completed" banner: hidden children take no space, so the banner
+# inherits their slot without a single coordinate. See the comments on colDuePct.
 Screens:
   scrProjects:
     Properties:
@@ -398,44 +401,119 @@ Screens:
                         FillPortions: =1
                         LayoutMinWidth: =84
                         Height: =20
-                  - rowDue:
-                      Control: Label@2.5.1
+                  # DUE DATE + PERCENT, AND THE BANNER THAT REPLACES THEM.
+                  # A project at 100% that nobody has moved to the Complete phase is the one
+                  # state this list exists to catch, so it takes the whole right-hand half of
+                  # the row rather than another small grey column.
+                  # THE BANNER IS A SIBLING, NOT AN OVERLAY, AND THAT IS WHY IT NEEDS NO
+                  # GEOMETRY. An auto-layout child carries no X to position anything against,
+                  # and A HIDDEN CHILD TAKES NO SPACE — so hiding this container hands its
+                  # exact slot to the banner declared after it (the same swap cmpLookupField
+                  # makes between its pick button and its chip). Nothing is layered, nothing
+                  # is measured, and the two states cannot drift apart at any width.
+                  # THE TWO `Visible` FORMULAS ARE EXACT NEGATIONS. Edit one and edit the
+                  # other, or a row shows both or neither.
+                  - colDuePct:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        # No target date is "-", not a blank cell: an empty column reads as a rendering
-                        # fault, a dash as "nobody set one".
-                        Text: |
-                          =If( IsBlank(ThisItem.project_date_target), "-",
-                               Text(ThisItem.project_date_target, "dd mmm yyyy") & "   ·   " &
-                               With( { d: DateDiff(Today(), ThisItem.project_date_target, TimeUnit.Days) },
-                                     If( d < 0,  Abs(d) & " days overdue",
-                                         d = 0,  "due today",
-                                         d = 1,  "1 day left",
-                                                 d & " days left" ) ) )
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        # Only overdue on work that is still open — a completed project past its target
-                        # is history, not a problem to flag.
-                        Color: |
-                          =If( !IsBlank(ThisItem.project_date_target)
-                            && ThisItem.project_date_target < Today()
-                            && ThisItem.project_phase.Value <> "Complete",
-                               gTheme.Color.Danger, gTheme.Color.TextMuted )
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =2
-                        LayoutMinWidth: =190
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =16
+                        # `<> "Complete"` is a LOCAL test on a row already fetched, NOT a
+                        # predicate inside the gallery's Filter — the delegation rule against
+                        # a Text `<>` above does not reach here.
+                        Visible: |
+                          =Not( Coalesce(ThisItem.project_perc_completion, 0) >= 100
+                             && Coalesce(ThisItem.project_phase.Value, "") <> "Complete" )
+                        # 3 portions and a 310 floor carry the pair's old 2 + 1 and
+                        # 190 + 16 + 104 across. One container in place of two children also
+                        # removes one of the row's gaps and moves the 16px it held INSIDE this
+                        # container, so every column shifts by up to ~7px at the design width.
+                        # That is the whole cost of the nesting.
+                        FillPortions: =3
+                        LayoutMinWidth: =310
                         Height: =20
-                  - rowPercent:
-                      Control: Label@2.5.1
+                      Children:
+                        - rowDue:
+                            Control: Label@2.5.1
+                            Properties:
+                              # No target date is "-", not a blank cell: an empty column reads as a rendering
+                              # fault, a dash as "nobody set one".
+                              Text: |
+                                =If( IsBlank(ThisItem.project_date_target), "-",
+                                     Text(ThisItem.project_date_target, "dd mmm yyyy") & "   ·   " &
+                                     With( { d: DateDiff(Today(), ThisItem.project_date_target, TimeUnit.Days) },
+                                           If( d < 0,  Abs(d) & " days overdue",
+                                               d = 0,  "due today",
+                                               d = 1,  "1 day left",
+                                                       d & " days left" ) ) )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              # Only overdue on work that is still open — a completed project past its target
+                              # is history, not a problem to flag.
+                              Color: |
+                                =If( !IsBlank(ThisItem.project_date_target)
+                                  && ThisItem.project_date_target < Today()
+                                  && ThisItem.project_phase.Value <> "Complete",
+                                     gTheme.Color.Danger, gTheme.Color.TextMuted )
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =2
+                              LayoutMinWidth: =190
+                              Height: =20
+                        - rowPercent:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =104
+                              Height: =20
+                  # Already at 100% and still not marked Complete. NO `OnSelect`: galProjectsHit
+                  # spans the whole template and is declared last, so a click here opens the
+                  # project exactly like a click anywhere else on the row. Giving this label its
+                  # own OnSelect would not fire — the button is on top of it.
+                  # A CONTAINER PAINTS THE BOX AND A LABEL SITS IN IT, rather than one Label
+                  # carrying a Fill. No label anywhere in this app sets Fill, so a coloured
+                  # Label is an unverified token — and an unverified token fails the WHOLE
+                  # screen paste, not just itself. A filled GroupContainer wrapping a
+                  # transparent Label is the shape already landed as cmpLookupField's chip.
+                  - rowReadyBanner:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        Align: =Align.Right
-                        VerticalAlign: =VerticalAlign.Middle
-                        FillPortions: =1
-                        LayoutMinWidth: =104
-                        Height: =20
+                        Visible: |
+                          =Coalesce(ThisItem.project_perc_completion, 0) >= 100
+                           && Coalesce(ThisItem.project_phase.Value, "") <> "Complete"
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =0
+                        Fill: =gTheme.Color.Success
+                        # Same slot as colDuePct, taller than the 20px text rows it replaces so
+                        # it reads as a block rather than another line of the row.
+                        FillPortions: =3
+                        LayoutMinWidth: =310
+                        Height: =40
+                      Children:
+                        - rowReadyText:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Ready To Mark Completed"
+                              Font: =gTheme.Font
+                              FontWeight: =FontWeight.Semibold
+                              Size: =gTheme.Size.Body
+                              Color: =gTheme.Color.OnPrimary
+                              Align: =Align.Center
+                              VerticalAlign: =VerticalAlign.Middle
+                              # Floor stays well under the container's 310 so the text can never
+                              # push the banner wider than the slot it is filling.
+                              FillPortions: =1
+                              LayoutMinWidth: =120
+                              Height: =40
             # Absolute siblings of the row container, not children: both must span the whole
             # template, and the hit button must be LAST so it is on top.
             - rowLine:
