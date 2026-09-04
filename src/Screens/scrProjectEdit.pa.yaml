@@ -1971,6 +1971,10 @@ Screens:
                        "NxProduct", "Select product" )
             # Queries run HERE — AccessAppScope false. Bound to gPrQuery, which OnSearch
             # sets, never to the instance's own Query output. See scrTaskEdit's instance.
+            # Each record kind is TWO branches and the pair must stay split: StartsWith(col, "")
+            # is not a match-everything, it is an invalid query SharePoint rejects outright
+            # (tests/README.md, scrProbe-startswith-empty), so the empty-query default page must
+            # avoid the Filter entirely. See scrTaskEdit's instance for the full reasoning.
             Results: |
               =If( (gPrPicker = "Manager" || gPrPicker = "Requestor" || gPrPicker = "Supporter"
               || gPrPicker = "NtLead" || gPrPicker = "NxSales") && Len(gPrQuery) >= 2,
@@ -1983,17 +1987,27 @@ Screens:
               Table( { Key:       User().Email,
               Primary:   User().FullName,
               Secondary: User().Email } ),
-              gPrPicker = "NxClient",
+              gPrPicker = "NxClient" && Len(gPrQuery) > 0,
               ForAll( FirstN( Sort( Filter( taskmaster_clients,
               StartsWith(client_name, gPrQuery) ), client_name ),
               If( Len(gPrQuery) >= 2, 50, 10 ) ) As c,
               { Key:       Text(c.ID),
               Primary:   c.client_name,
               Secondary: Coalesce(c.client_type.Value, "") } ),
-              gPrPicker = "NxProduct",
+              gPrPicker = "NxClient",
+              ForAll( FirstN( Sort( taskmaster_clients, client_name ), 10 ) As c,
+              { Key:       Text(c.ID),
+              Primary:   c.client_name,
+              Secondary: Coalesce(c.client_type.Value, "") } ),
+              gPrPicker = "NxProduct" && Len(gPrQuery) > 0,
               ForAll( FirstN( Sort( Filter( taskmaster_products,
               StartsWith(product_uid, gPrQuery) ), product_uid ),
               If( Len(gPrQuery) >= 2, 50, 10 ) ) As p,
+              { Key:       Text(p.ID),
+              Primary:   p.product_uid,
+              Secondary: Coalesce(p.product_type_path, "") } ),
+              gPrPicker = "NxProduct",
+              ForAll( FirstN( Sort( taskmaster_products, product_uid ), 10 ) As p,
               { Key:       Text(p.ID),
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )

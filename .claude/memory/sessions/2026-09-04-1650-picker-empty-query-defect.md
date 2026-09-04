@@ -39,14 +39,26 @@
   default `FirstN( Sort( taskmaster_products, product_uid ), 10 )` with no Filter at all.
 
 ## State at end
-- **NOTHING AUTHORED.** The fix was offered and not yet commissioned — no `src/` file
-  was edited this session. The six sites are still broken as described.
+- **FIX AUTHORED, AWAITING PASTE** — all six branches, three screens, validator 22/22.
+  Each record kind is now TWO branches: typed (`Len(q) > 0`, Filter + Sort + FirstN,
+  keeping `If(Len >= 2, 50, 10)`) and off-state (`FirstN( Sort( <list>, <col> ), 10 )`
+  with no Filter). Person branches untouched.
+- **The typed branch is gated on `Len(q) > 0`, NOT `>= 2`, and that is deliberate:** the
+  only forbidden input is the EMPTY string, so a one-character query must still narrow.
+  Gating at >= 2 would have silently changed one-char behaviour from "10 matches" to
+  "10 arbitrary rows" — a second defect introduced while fixing the first.
+- **The projection is REPEATED, not lifted into `ForAll( If(a, t1, t2) As x, … )`.**
+  The compact form is unproven in this dialect and #52 had already shipped one unprobed
+  shape; two guesses in one paste cycle is not affordable when the only return signal is
+  "it didn't work". Cost is ~12 duplicated lines per screen, accepted knowingly.
 - Memory INDEX previously said #51's probes "await a paste". They do NOT — the results
-  are recorded in `tests/README.md` (run by the user in Studio, 2026-09-04). State
-  updated accordingly.
+  are in `tests/README.md`, #53 is closed won't-fix and #52 is built. State corrected.
 
 ## Open threads
-- Author the empty-query branch fix across the three screens (six branches). Small,
-  mechanical, one paste per screen.
+- **Paste all three screens.** Proof is opening a client or product picker and NOT typing:
+  ten rows by name, no error banner. Then type one character and confirm it narrows.
+- `pkHint`'s ladder still says "Type at least two characters" when a ONE-character query
+  matches nothing — the query did run, it just found nothing. Pre-existing, untouched by
+  this fix, cosmetic.
 - Row 5b's delegation warning was never recorded, so whether `StartsWith` over a Person
   subfield DELEGATES remains open. Nothing shipping depends on it.
