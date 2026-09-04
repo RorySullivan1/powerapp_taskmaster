@@ -341,6 +341,223 @@ reads as the same test, un-delegates the whole fetch, and fails silently.
 
 ---
 
+## `scrProbe-mine-predicate.pa.yaml` — does `project_manager.Email = gUserEmail` match anything?
+
+**Status: NOT YET RUN.** Written 2026-09-04 for issue #46, sub-issue of #45.
+
+### The claim under test
+
+Turning on **Only show my projects** empties the gallery. It is not a rendering fault —
+`ProjectsEmptyLabel` fires its own sentence — so the `Items` predicate is returning zero
+rows. Three candidates produce that identical symptom and cannot be separated from this
+side of the gap:
+
+- **A** — the predicate works, but "mine" means *managed by me* and nothing else
+- **B** — a case mismatch between the lowercased `gUserEmail` and the raw stored `.Email`
+- **C** — `gUserEmail` is blank when `Items` first evaluates
+
+### Why this departs from the sub-case table in #46
+
+**#46 specifies `CountRows(Filter(...))` for five of its six sub-cases. That is rule 4
+violated in exactly the way this directory has already paid for twice.** `CountRows` is
+itself non-delegable, so every such label carries an identical *"CountRows Operation not
+supported"* that says nothing whatever about the `Filter` inside it. `scrProbeRerun` lost
+sub-case D to a shared instrument; `scrProbe-date-null-delegation` was readable only
+because one sub-case happened to carry a second warning **by accident**, and its write-up
+ends by telling the next author to fix it:
+
+> *"A gallery `Items`, or `First(Filter(...)).task_name`, would have carried no aggregate
+> and read cleanly. Fix it that way before reusing this file."*
+
+So the instruments are split into two blocks that never share a label:
+
+| Block | Instrument | Read it for |
+|---|---|---|
+| **DELEGATION** | `First(Filter(…)).project_name` — no aggregate anywhere | **The verdict.** A warning on one of these rows is about the `Filter` |
+| **MAGNITUDE** | the `CountRows` figures #46 asked for, quarantined | Numbers only. Every row warns about `CountRows`; that warning is noise |
+
+`First(…)` answers "greater than zero" without an aggregate: a project name means the
+predicate matched, `-- no match --` means it did not.
+
+### The sub-cases
+
+| Row | Expression | Decides |
+|---|---|---|
+| **PC** | `phase = "Active"` | **Positive control.** `=` on an indexed Choice — must be CLEAN |
+| **NC** | `Lower(manager) = Lower(me)` | **Negative control** — `Lower()` on a column must WARN. Also #46's case 6, the local ground truth |
+| **3** | `manager.Email = gUserEmail` | The shipping predicate, exactly as `galProjects.Items` writes it |
+| **4** | `manager.Email = User().Email` | **B** — does un-lowercased match where lowercased did not |
+| **5** | `supporter.Email = User().Email` | **A** — and the delegation reading #48 needs before putting this column in an `Or` |
+| **7** | raw list, `manager.Email = User().Email` | **E**, isolated — is the nested `Filter` over `ActiveProjects` the problem, or the predicate? |
+| **8** | the gallery branch verbatim: 4 phases + manager | **The decider.** `galProjects.Items:226-231` drops `"Complete"`; `ActiveProjects` keeps it |
+| **9** | `project_phase` of the row 3 returns | Reads `Complete` → row 8 must be a no-match and the diagnosis is settled here |
+
+**NC is what makes silence on rows 3/4/5 a reading rather than a gap.** It proves Studio is
+actively examining a `project_manager` predicate and will report one; the date-null probe
+only got that property by luck.
+
+**Row 7 is not redundant with row 4.** This repo has already been burned by a named formula
+behaving differently from the source beneath it — `ShowColumns` over one reads text columns
+back as an ERROR type — and #45 candidate E blames the nested-`Filter` shape rather than the
+person column. 4 clean and 7 clean clears the shape; 7 clean and 4 warning convicts it.
+
+### Protocol
+
+1. Create a blank screen named exactly `scrProbeMine` and set its `Fill` in the formula bar.
+   `taskmaster_projects` must be in the Data pane; `ActiveProjects` is an App named formula
+   and already exists.
+2. Paste the `Children:` block. Nothing needs pressing — every row is a property formula.
+3. **Read the DELEGATION block first, and check PC and NC before anything else.** If PC warns
+   or NC does not, Studio is not flagging what it claims and no other row means anything.
+4. Then read MAGNITUDE for numbers. **M6 larger than M3 is the finding to watch for** — it
+   means rows exist that the shipping predicate misses.
+5. Optional, and the same corroboration the date-null probe used: set the data row limit to 1
+   and re-read. **Put it back to 2000 afterwards**, or every truncation sentinel in the app
+   goes dead.
+
+### How to read it
+
+- **3 finds a project** → the predicate is fine; the cause is **A**, go to #48.
+- **3 no-match, 4 finds one** → **B**, casing. Go to #49.
+- **3 and 4 no-match, NC finds one** → the fold is dropping rows. **D** or **E**, go to #47.
+- **5 finds one where 3 did not** → **A**, and the tester is exactly the affected profile.
+- **`gUserEmail` empty** → **C**, and nothing else on the sheet can be trusted.
+
+Also record, per row: whether Studio shows a delegation warning, and if Live Monitor is
+available, the row count the server actually returned. #45 candidate D turns on that reading.
+
+### Result — first pass, 2026-09-04, run by the user in Studio
+
+**Rows PC, NC, 3, 4, 5 and 7 all returned a project name. PC returned a DIFFERENT project
+from the rest; NC, 3, 4, 5 and 7 all returned the SAME one. The magnitude block showed
+nothing anomalous.** Delegation warnings were not recorded on this pass.
+
+**What it establishes.**
+
+- **B is dead.** Row 4 (un-lowercased) matched no better than row 3 (lowercased).
+- **C is dead.** Row 3 could not have matched a blank `gUserEmail`.
+- **The fold is not dropping rows.** NC is deliberately non-delegable and evaluated
+  locally; row 3 is the delegable shipping predicate. **They returned the same project**,
+  which is the comparison this probe was built around — a fold that silently dropped rows
+  would have shown NC finding one where 3 did not.
+- **E is cleared for the named formula.** Row 7 (raw list) agrees with row 4
+  (`ActiveProjects`), so composing over the named formula is not the fault.
+- **A does not explain this tester.** Row 5 matched too, so they are both manager and
+  supporter — a manager-only definition of "mine" would still have shown them projects.
+
+**PC returning a different project is expected and is not a fault.** It is a delegation
+control, not an identity one: it returns the lowest-ID *Active* project, which simply is not
+one this tester manages. The reading that matters is the other five agreeing.
+
+**So every candidate ranked in #45 is now either dead or fails to explain the symptom —
+and that is what makes the untested difference the answer.** The probe filtered
+`ActiveProjects`, which admits five phases. The gallery branch behind the toggle admits
+**four**:
+
+```
+ActiveProjects       Not Started, Planning, Active, Stalled, Complete    5
+only-mine branch     Not Started, Planning, Active, Stalled              4     <- scrProjects.pa.yaml:227-230
+```
+
+A user whose projects are `Complete` therefore gets exactly the observed split: the probe
+finds them, the gallery does not. **This is a sixth candidate and it is not in #45.**
+
+**The empty-state message actively misdirected the investigation.** `scrProjects.pa.yaml:540`
+tests `tglOnlyMine.Value` *first*, so "all my projects are complete and completed are hidden"
+renders as *"No projects here are led by you"* — a sentence about the wrong axis, which #45
+then quoted as evidence the person predicate was at fault.
+
+**Rows 8 and 9 were added for a second pass** to settle it: row 8 is the gallery branch
+verbatim, row 9 reports the phase of the project row 3 keeps returning.
+
+### Result — second pass, 2026-09-04, run by the user in Studio
+
+```
+PC   no warning                       positive control PASSED
+NC   warned, naming "lower"           negative control PASSED
+3, 4, 5, 7   no warning               the person predicates FOLD
+M0, M3, M4, M5, M6   all warned       CountRows only. Noise, as designed
+M3 = M4 = M6
+THE TOGGLE DOES NOT FAIL FOR THE TESTER.
+```
+
+**THE PROBE IS SPENT AND THE MACHINERY IS SOUND.** Both controls behaved, so the sheet is
+readable: Studio flags a `project_manager` predicate when there is something to flag (NC) and
+stayed silent on rows 3, 4, 5 and 7 — **evidence of absence, not absence of evidence.**
+
+**`M3 = M4 = M6` is the strongest single line in the run.** M3 is the delegable shipping
+predicate, M4 the un-lowercased variant, M6 the *non-delegable local* ground truth. All three
+agree, so the server-side fold returns exactly what local evaluation returns: **nothing is
+being truncated or dropped.** (Caveat: M6 evaluates over the first 2,000 rows only, so the
+agreement also implies this tester's projects sit inside that page. It is not a statement
+about a user whose projects do not.)
+
+**And the toggle works for the tester.** That retires the sixth candidate *for this user* —
+their projects are in the four-phase set — and it retires the whole idea that the screen is
+broken for everyone.
+
+#### What is left, and it is not a code defect
+
+**Every candidate ranked in #45 is dead**: B and C on the first pass, D on the clean warnings
+plus `M3 = M6`, E on `row 7 = row 4` and on the toggle working. The screen does what it was
+written to do. **The report is from users for whom "what it was written to do" is the wrong
+thing**, and exactly two conditions produce an empty gallery with no fault anywhere:
+
+| | Condition | Behaviour |
+|---|---|---|
+| **A** | the user manages nothing — they support or requested the project | correct by the current definition of "mine" |
+| **6** | every project they manage is `Complete`, and "show completed" is off | correct by the current definition of the branch |
+
+Both are indistinguishable to the user, because **the empty-state message describes neither.**
+`scrProjects.pa.yaml:540` tests `tglOnlyMine.Value` first, so both render as *"No projects
+here are led by you"* — which is false in case 6 and misleading in case A.
+
+**That message is why this cost a five-candidate investigation and two probe passes.** #45
+opened by quoting it as evidence the person predicate was at fault. It never was.
+
+#### Settle A vs 6 without another paste
+
+Take one affected user and ask SharePoint two questions: do they appear in `project_manager`
+on any project, and if so what `project_phase` are those projects in. No probe can answer
+this — the condition is in another user's data, and the probe can only ever run as whoever
+pasted it.
+
+#### What this licenses
+
+Both conditions are covered by the same two changes, so neither needs the answer first:
+
+1. **Widen "mine" to manager-or-supporter** (#48). Decision **C2** already settled that "mine"
+   means lead-or-supporter and `scrProjects` never picked it up; `project_supporter` is
+   indexed, so the `Or` arm stays delegable — and rows 5 and PC together are the evidence that
+   a second person predicate folds. **`project_requestor` is NOT indexed and must stay out.**
+2. **Make the empty state tell the truth** — distinguish "you manage none of these" from
+   "all of yours are complete and completed are hidden". This is the change with the highest
+   value per line in the whole epic, and it is independent of everything else.
+
+**#47 drops in priority.** It exists to verify the live index on `project_manager`; the clean
+warnings and `M3 = M6` are a positive reading at the current list size. The 5,000-item
+threshold is still ahead, so #47 is not void — it is no longer blocking.
+
+### How the second pass was to be read
+
+Superseded by the run above, kept because the reasoning is what made the run legible:
+
+- **3 finds a project, 8 is `-- no match --`** → the phase group is the bug. #45's five
+  candidates all close; the fix is the empty-state wording plus a decision about whether
+  "mine" should show completed work.
+- **8 finds a project too** → the phase group is cleared and the remaining untested
+  difference is `Sort(…, project_name)` wrapped around the branch, which needs its own probe.
+- **9 reads `Complete`** → confirms the above without needing row 8 at all.
+- **9 reads `blank`** → `project_phase` is unpopulated on the backfilled rows, which is a
+  different defect again and would make the allow-list fail closed exactly as `App.pa.yaml:78`
+  warns.
+
+Still unrecorded from the first pass and worth capturing on the second: **the delegation
+warning per row**. That is the block the verdict was meant to rest on, and #45 candidate D
+turns on it.
+
+---
+
 ## `scrProbeRerun.pa.yaml` + `scrProbeRerunB.pa.yaml` — how does a screen re-run a behaviour block in place?
 
 **Status: RUN 2026-08-18 by the user in Studio. BOTH ANSWERS ARE POSITIVE — `Select()` fires

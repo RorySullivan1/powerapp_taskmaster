@@ -6,47 +6,42 @@
 > anything older; do not reconstruct it from here.
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **PERF BACKLOG — GitHub #27–#40. ELEVEN DONE (#27–#33, #36, #37, #39, #40); #34, #35 and #38
-  remain.** Ranked in sessions/2026-08-19-1853-perf-review-issues.md; the take-next assessment is
-  in sessions/2026-08-19-2047-issues-39-33-37-built.md.
-- **#33 AND #37 LANDED (user, 2026-08-19); #39 is done on BOTH sides** — `transaction_product_id`
-  is indexed on the live list, so schema and SharePoint agree.
-- **#40 LANDED AND CLOSED (user, 2026-08-19); THE PASTE QUEUE IS EMPTY.** `App.OnStart` went
-  through the formula bar, `scrReports` and `scrHome` through code view, all clean.
-- **THE PERF BACKLOG #27–#40 IS COMPLETE — ALL FOURTEEN LANDED AND CLOSED (user, 2026-08-19).**
-  **THE PASTE QUEUE IS EMPTY.** There is no open perf work.
-- **NONE OF IT WAS EVER MEASURED.** Every one of the fourteen landed on a paste confirmation;
-  no Live Monitor count, payload figure or wall-time reading was taken before or after any of
-  them. The gains are what the source now does, not observed numbers. **Do not let a later
-  session cite these as measured results.**
-- **PASTE QUEUE IS FOUR SCREENS + THE APP OBJECT.** `App.Formulas` (formula bar) gains
-  LiveTransactions/LiveIssues/LiveTaskProducts; `scrProject` and `scrProjectEdit` reroute their
-  child folds onto the named formulas; `scrTaskEdit` writes taskproduct_project_archived; and
-  `scrHome` still carries the unexercised Division-by-0 fix.
-  **ALL ARCHIVE COLUMNS ARE BACK-FILLED (user, 2026-09-02)**, which unblocked `LiveTaskProducts`;
-  `scrTaskEdit`'s three READ paths now use it, its delete path deliberately still does not.
-- **PASTE QUEUE: `scrHome` (full file, code view) — the Division-by-0 fix, `dfb5080`.** The two
-  KPI-card subtitles now divide by `Max(1, gPrjLed)` / `Max(1, gTaskLed)`. **NOT EXERCISED** —
-  proof is a cold start with at least one non-complete project led and no banner.
-- **THE APP IS NOW PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
+- **OPEN BACKLOG — GitHub #45–#53, all filed 2026-09-04, nothing built.** Two epics on
+  `scrProjects`: **#45** the "only mine" toggle returns an empty gallery (five ranked candidates,
+  sub-issues #46 probe / #47 verify live indexes / #48 widen "mine" / #49 casing), and **#50**
+  `galProjects.Items` is 155 lines and 16 branches (#51 probe / #52 named formulas / #53 collapse
+  the search axis). **#45 lands BEFORE #50** — both rewrite the same eight person predicates.
+  **Both epics start with a PROBE, not a fix; do not paste a guess.**
+  Detail: sessions/2026-09-04-scrprojects-mine-and-items-epics.md
+- **THE PERF BACKLOG #27–#40 IS COMPLETE — all fourteen landed and closed (user, 2026-08-19).**
+  **NONE OF IT WAS EVER MEASURED**: every one landed on a paste confirmation, with no Live
+  Monitor count, payload figure or wall-time reading taken before or after. The gains are what
+  the source now does, not observed numbers. **Do not let a later session cite them as results.**
+- **PASTE QUEUE — NOT EMPTY, and unverified.** `scrHome`'s Division-by-0 fix (`dfb5080`, the two
+  KPI-card subtitles now divide by `Max(1, gPrjLed)` / `Max(1, gTaskLed)`) is **NOT EXERCISED** —
+  proof is a cold start with at least one non-complete project led and no banner. The 2026-09-03
+  raw-list audit (5 sites) and the three health derivations moved onto `OpenIssues` are authored
+  and carry no landing confirmation either. Confirm what is live before authoring on top.
+- **THE APP IS PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
   2026-09-02), plus a working archival flow.** Reported symptom: recent non-archived projects and
-  their children are in the lists but not in the app. Diagnosed to three causes (see Decisions);
-  **not yet resolved, and only the user can tell which one — it needs two SharePoint views:
-  `project_phase` is empty, and `task_project_archived` is empty.**
+  their children are in the lists but not in the app. Three causes identified (see Decisions);
+  **unresolved, and only the user can discriminate — it needs two SharePoint views: `project_phase`
+  is empty, and `task_project_archived` is empty.** The 5,000 list-view threshold is now the
+  live constraint on every unindexed filter — #47 checks the projects list against it.
 - **`taskproduct_project_archived` is LIVE in SharePoint, recorded in `schema/schema.yaml`, and
-  `scrTaskEdit` now WRITES it false on every link it creates (writer gap closed).** Indexed/default
+  `scrTaskEdit` WRITES it false on every link it creates (writer gap closed).** Indexed/default
   state is still UNCONFIRMED (carried in the column's `review:`), and **links that predate the
   column are blank until back-filled** — the writer covers new rows only.
-- **BRANCHES: `main` is authoritative and current.** Only `main` and
-  `claude/powerapp-repo-init-xymvlm` exist; PR #41 merged the branch into `main` and the trees
-  were IDENTICAL, so the branch was restarted from `origin/main` before the fix went on top.
+- **BRANCHES: `main` is authoritative.** Only `main` and `claude/powerapp-repo-init-xymvlm` exist;
+  PR #41 merged the branch into `main` with identical trees, and the branch was restarted from
+  `origin/main` before later work went on top.
 - The `scrProbeDateNull` probe HAS RUN and its result is recorded; it can be deleted from Studio.
-- **LIVE IN STUDIO, the whole perf set so far:** `scrProject` folds tasks/transactions/issues once
-  in `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
+- **LIVE IN STUDIO, the whole perf set:** `scrProject` folds tasks/transactions/issues once in
+  `Concurrent` (`colProjectTx`, `colProjectIss`) and every count, gallery, title and total reads
   the collections; the five edit screens cache 20 reference fetches once per session; the
   `scrTaskEdit` / `scrIssueEdit` save handlers hoist their pre-Patch reads into one `Concurrent`
   (`gTkParentProj` / `gIssParentProj` replace two LookUps each, keyed on the screen's OWN parent
-  id, not `gSelProject.ID`); and `scrTaskEdit` skips the taskproduct reconcile when the staged set
+  id, not `gSelProject.ID`); `scrTaskEdit` skips the taskproduct reconcile when the staged set
   matches `colTkProductsLoaded`; and `scrHome` holds its whole dashboard fold in ONE hidden
   button (`btnHomeRecompute`, two callers), resolves work-list project names from `colPrjNames`
   instead of per visible row, and counts `gIssLed` off one `colIssByPrj` fetch with a `>= 2000`
@@ -59,8 +54,10 @@
 - **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
   `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas`
   holds only the three data-source filters, which **must stay named formulas**.
-- **EVERYTHING IN `src/` HAS LANDED (user, 2026-08-19).** All 11 screens, all 10 components and
-  the App object are in Studio and current with this repo.
+- **`src/` WAS FULLY LANDED AS OF 2026-08-19** — all 11 screens, all 10 components and the App
+  object were in Studio and current with the repo on that date. **That claim is now STALE, not
+  current truth:** the 2026-09-02/03 work (Division-by-0, the raw-list audit, the health
+  derivations) carries no landing confirmation. See the paste-queue line above.
   **`task_output_audience` and `task_output_approval_flag` are LIVE** on `taskmaster_tasks`.
 - **#23 AND #24 ARE LANDED AND CLOSED (user, 2026-08-19).** `scrIssueEdit` carries required
   type/impact with defaults Question/Moderate; `scrHome` carries the Projects-I-lead gallery
@@ -122,6 +119,7 @@
   `maintainer/03-making-a-change.md` is the only new synthesis — check it before a hand-off.
   **`docs/screen-map.md` is HISTORICAL and reads as current** (tmTickets, an Admin screen,
   tmLookups — none of which shipped); labelled as such in `docs/README.md`, not edited.
+
 
 ## Decisions        (append-only; supersede, never delete)
 - [2026-08-19] **NO `Set()` INSIDE A `ForAll` — Studio rejects it.** MS Learn's ForAll page sanctions **Patch** and **Collect** as the actions a ForAll body may take, and rules out the functions that HOLD A VARIABLE — `UpdateContext`, `Clear`, `ClearCollect` — because ForAll may process records **in any order and in parallel**. `Set` is the global-scope twin of `UpdateContext` and falls to the same rule; the docs do not list it only because they list the context-variable form. Hit on `btnIssHealth.OnSelect` / `btnPrjHealth.OnSelect` (user, 2026-08-19), where `Set(gHlScrap*, Patch(...))` wrapped the write purely to swallow Patch's return value. **That wrapper was backwards**: the same page states an UNCAPTURED ForAll result is never built, so capturing it was the only thing creating a per-record data-source copy. `IfError` is fine inside a ForAll and is the documented way to catch a Patch failure. If an error ever needs surfacing from inside one, the two legal options are `Notify()` or a `Collect()` into a log — Collect is explicitly allowed, order undefined — INDEX Decisions
@@ -449,6 +447,13 @@ not know them will author something broken:
 - [2026-09-03] **FULL AUDIT OF RAW-LIST REFERENCES ACROSS ALL 11 SCREENS — 123 sites classified, 5 changed, 15 raw reads KEPT DELIBERATELY.** Script kept at `scratchpad/rawscan.py`: it strips Power Fx and YAML comments, then reports the ENCLOSING VERB for every occurrence of the five child-list tokens, which is what makes the set reviewable — a bare grep cannot tell a `Patch` from a `Filter`. **The rule the audit applies: a MULTI-ROW READ goes through the live named formula; everything else stays on the raw source.** Changed: `scrIssueEdit`'s task and transaction pickers (**the reported bug — an issue's task list was empty because the archived backlog filled the fetch**), the completion rollups on `scrProjectEdit` and `scrTaskEdit` (these are WRITTEN BACK, so a short fetch stores a wrong percentage rather than merely showing one), and `scrReports`' transaction fetch (its inline `transaction_project_archived = false` was LiveTransactions spelled out). **KEPT RAW, and each is correct:** every `Patch`/`Collect`/`Remove`/`Defaults`/`Errors`/`Refresh`/`Choices` (they act on the source, and `Remove` needs a record OF it); every single-record `LookUp(list, ID = x)`; **the delete guard counts and reference-clearing passes** (11 sites — these must see archived referrers too, or a delete leaves a dangling reference); and **the three health derivations**, which carry an explicit in-file decision at `scrTaskEdit:1420` — the named formulas also exclude archived PROJECTS, which would force every task under one to Green. **THAT TRIO IS THE ONE UNRESOLVED CALL: its stated risk is unreachable in the app (an archived project's tasks cannot be navigated to), while the paging risk it accepts is live and demonstrated — a short fetch reads Green for a task that has open issues.** Left as-is pending a decision rather than overturned silently — INDEX Decisions
 
 - [2026-09-03] **THE THREE HEALTH DERIVATIONS NOW READ `OpenIssues`, OVERTURNING THE IN-FILE DECISION AT `scrTaskEdit:1420` (user).** That decision chose the raw issues list to avoid the named formula's exclusion of archived PROJECTS, which it argued would "force every task under one to Green". **The risk it avoided is unreachable — an archived project's tasks cannot be navigated to, because every route runs through `ActiveProjects` — while the risk it accepted is live: the raw fetch pages across archived issues first, so it comes up short and reads GREEN on a task that HAS open issues.** Wrong-green on the one signal that exists to warn people, silently. `issue_status = "Open"` is no longer re-tested at the three call sites; `OpenIssues` is the single definition of open. The replacement comments say "do not fix this back to the raw list" because the old reasoning is superficially persuasive and will otherwise be re-derived. **AFTER THIS, EVERY REMAINING RAW `Filter` IN `src/` IS A DELETE PATH** — guard counts, reference counts, reference clearing, and the taskproduct delete — and all twelve are correct as they stand: a delete must see archived referrers or it leaves a dangling reference — INDEX Decisions
+- [2026-09-04] **MS LEARN NOTE 20 SETTLES THE HALF OF THE #17 POST-MORTEM THE LEDGER RECORDED AS UNSETTLEABLE.** The 2026-08-19 entry on `StartsWith(person.Email, "")` returning nothing says *"which half fails (the empty argument, or `StartsWith` over a Person subfield) cannot be settled from this side of the gap"*. The SharePoint delegation table's note 20: **"SharePoint does not support delegation of `StartsWith` on subfields of Choice or Lookup complex types."** A Person column IS a lookup complex type, so that construct was **never delegable with any argument** — the empty string was incidental. **This does NOT license removing the empty-search branch** (`project_name` is plain Text, where `StartsWith` delegates, and the empty-ARGUMENT half is still untested — GitHub #53 probes it). What it does mean: the "an off state must be a BRANCH" rule was correctly derived for a Person subfield and has been OVER-GENERALISED to Text, currently at a cost of eight duplicated branches — INDEX Decisions
+- [2026-09-04] **THE TWO CLAIMS HOLDING `galProjects.Items` AT 16 BRANCHES WERE NEVER ISOLATED FROM EACH OTHER.** "Every branch needs its own phase predicate" (`scrProjects.pa.yaml:167-172`) rests on ONE observation: a bare `Sort(Filter(ActiveProjects, StartsWith(...)), project_name)` returned "the query is not valid" while the same shape WITH an explicit phase group did not. **At the time that formula ALSO carried the non-delegable Person-subfield `StartsWith` above** — and a non-delegable clause anywhere in a filter is a sufficient explanation for a rejected query. The phase group may simply have been the variable that happened to change. The mechanism was never explained, and it is the load-bearing justification for ~120 lines of duplication. **Do not treat it as settled and do not delete it either** — GitHub #51 separates the two — INDEX Decisions
+- [2026-09-04] **`scrProjects`' "only mine" TESTS `project_manager` ALONE, AND DECISION C2 SAYS IT SHOULD NOT.** C2 (`schema.yaml:872-873`) collapsed the multi-Person columns to single-Person specifically so that *"'mine' is now fully delegable via `lead.Email = me || supporter.Email = me`"*. `scrHome`'s TASK filter took that up; the PROJECT filters on both screens never did. A user who supports but does not manage a project is told "No projects here are led by you" — true, and useless. `project_supporter` is indexed so the `Or` arm stays delegable; **`project_requestor` is NOT indexed and must never join it** (one non-delegable arm inside an `Or` drops delegation for the WHOLE filter — the 2026-08-12 `issue_owner` entry) — GitHub #45/#48
+
+- [2026-09-04] **#46 PROBE RUN AND SPENT: `scrProjects`' "only mine" HAS NO CODE DEFECT. All five candidates in #45 are dead.** Both controls behaved — PC (indexed Choice `=`) clean, NC (`Lower()` on a column) warned naming "lower" — so silence on rows 3/4/5/7 is **evidence of absence**, which is the property `scrProbe-date-null-delegation` only got by accident. **`M3 = M4 = M6` is the strongest line in the run:** the delegable shipping predicate, the un-lowercased variant and the NON-DELEGABLE LOCAL ground truth all return the same count, so the fold drops nothing (caveat: M6 sees only the first 2000 rows, so this also implies the tester's projects sit inside that page). **And the toggle does not fail for the tester** — which retires candidate E and my own sixth candidate (the branch's 4-phase group dropping "Complete") *for this user*, and retires the idea the screen is broken for everyone. **THE REPORT IS FROM USERS FOR WHOM CORRECT BEHAVIOUR IS THE WRONG BEHAVIOUR.** Exactly two conditions empty the gallery with no fault anywhere: the user manages nothing (supports or requested only), or every project they manage is `Complete` while "show completed" is off. **Both are indistinguishable to the user because `scrProjects.pa.yaml:540` tests `tglOnlyMine.Value` FIRST, so both render as "No projects here are led by you" — false in the second case, misleading in the first. THAT MESSAGE IS WHY THIS COST FIVE CANDIDATES AND TWO PROBE PASSES: #45 opened by quoting it as evidence the person predicate was at fault.** Settling which condition applies needs SharePoint, not a probe — the condition lives in another user's data and a probe only ever runs as whoever pasted it. **Both are covered by the same two changes, so neither needs the answer first: widen "mine" to manager-or-supporter (#48, and `project_supporter` is indexed so the Or-arm folds — rows 5 and PC are the evidence; `project_requestor` is NOT indexed and must stay out), and make the empty state distinguish the two cases.** **#47 drops in priority** — it exists to verify the live index on `project_manager`, and the clean warnings plus `M3 = M6` are a positive reading at this list size; the 5,000 threshold is still ahead, so it is not void, just not blocking — tests/README.md
+
+- [2026-09-04] **#48 BUILT: "mine" ON `scrProjects` IS NOW MANAGER-OR-SUPPORTER, AND THE EMPTY-STATE LADDER IS REORDERED. `scrHome` IS DELIBERATELY NOT TOUCHED.** Eight person predicates widened to `( project_manager.Email = gUserEmail || project_supporter.Email = gUserEmail )` — schema decision C2, which `scrProjects` never picked up. Both columns are indexed, which is what keeps the arm delegable; **`project_requestor` is NOT indexed and is excluded, because one unindexed arm drops delegation for the whole filter and truncates silently** (the `issue_owner` lesson, 2026-08-12). The toggle's own label reads "Only show my projects" — *my*, not *led by me* — so the wider definition is what the control already promised. **`scrHome` KEEPS `project_manager` ALONE ON PURPOSE**, against #45's "apply it to scrHome in the same paste": its tiles are labelled "Projects led" and "Projects I lead", which is a NARROWER concept that is correctly named, and the #46 probe proved the predicate itself is sound. Widening it would make the tiles lie. **The empty-state ladder now tests the NARROWEST condition first** — search, then mine-and-not-complete, then mine, then not-complete, then coverage — because two toggles can empty the gallery at once and naming only one sends the reader to the wrong control. That mis-ordering is the entire reason #45 was filed against the person predicate. **RESIDUAL RISK, UNPROBED:** the branch shape is now `(phase Or-group) && (person Or-group)`, and only the person predicate alone was probed (#46 row 5, clean). This screen has previously returned "the query is not valid" from SharePoint for a shape that LOST its phase group — the group is still present here, so that specific failure is not in play, but the doubled Or-group is new. **#50's collapse is NOT folded in: #51 has not run, and the standing rule is that both epics start with a probe** — INDEX Decisions
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
@@ -516,3 +521,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-08-19 | #32/#28/#30 LANDED and closed; scrHome clean on the paste. Select-from-a-component-OnAction is now grounded, not a risk | sessions/2026-08-19-2031-home-32-28-30-built.md
 - 2026-08-20 | docs/manuals/ built: user manual + maintainer manual, 7 chapters each, plus docs/README.md and a root-README documentation section. Root README's stale component count (12->10) and App.pa.yaml description corrected. Three findings left open: screen-map.md is historical, cmpAppBar's default Items carries a dead Admin entry, and the manuals have no staleness hook | sessions/2026-08-20-2346-manuals-section.md
 - 2026-09-02 | second "Division by 0" at app start: NOT the timeline (deleted in #24) but scrHome's two KPI-card subtitles, guarded only by `= 0`. Fixed with Max(1, ...) at the point of division; the 2026-08-19 "ruled out, do not re-audit" call on these exact lines is superseded. Full divisor re-enumeration: these were the last two unguarded in the app. Branch audit: main was current, trees identical, PR #41 merged | sessions/2026-09-02-1256-div0-kpi-cards.md
+- 2026-09-04 | scrProjects assessed, no source touched: #45 (only-mine defect, 5 ranked candidates) + #46-#49, and #50 (Items is 155 lines/16 branches) + #51-#53. #45 sequenced BEFORE #50 — both rewrite the same eight person predicates. Blast radius: the same predicate is scrHome.pa.yaml:80 behind the "projects I lead" KPIs | sessions/2026-09-04-scrprojects-mine-and-items-epics.md
