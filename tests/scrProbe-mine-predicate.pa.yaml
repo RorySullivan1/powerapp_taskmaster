@@ -251,6 +251,51 @@ Screens:
             Y: =368
             Width: =900
             Height: =22
+      - lblPm8:
+          Control: Label@2.5.1
+          Properties:
+            # THE DECIDER, and the row the first cut of this probe was missing. This is the
+            # SHIPPING BRANCH verbatim — galProjects.Items:226-231, taken when "only mine"
+            # is on and "show completed" is off. It enumerates FOUR phases: "Complete" is
+            # absent, while ActiveProjects — and therefore row 3 — keeps it.
+            # 3 finds a project and 8 does not -> the phase group is the bug, the person
+            # predicate is sound, and every candidate ranked in #45 is a red herring.
+            Text: |
+              ="8   GALLERY BRANCH, 4 phases + manager ... " &
+               Coalesce( First( Filter( ActiveProjects,
+                                    ( project_phase.Value = "Not Started"
+                                   || project_phase.Value = "Planning"
+                                   || project_phase.Value = "Active"
+                                   || project_phase.Value = "Stalled" )
+                                 && project_manager.Email = gUserEmail ) ).project_name,
+                         "-- no match --" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =392
+            Width: =900
+            Height: =22
+      - lblPm9:
+          Control: Label@2.5.1
+          Properties:
+            # What phase IS the project row 3 keeps returning? If this reads "Complete",
+            # row 8 must be a no-match and the diagnosis is settled on this sheet alone.
+            Text: |
+              ="9   phase of the project row 3 returns .. [" &
+               Coalesce( First( Filter( ActiveProjects,
+                                        project_manager.Email = gUserEmail
+                                      ) ).project_phase.Value,
+                         "blank" ) & "]"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =416
+            Width: =900
+            Height: =22
       # --------------------------------------------------------------- MAGNITUDE
       - lblPmSecMag:
           Control: Label@2.5.1
@@ -261,7 +306,7 @@ Screens:
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(214, 152, 40, 1)
             X: =16
-            Y: =404
+            Y: =452
             Width: =900
             Height: =22
       - lblPmM0:
@@ -274,7 +319,7 @@ Screens:
             Size: =13
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =430
+            Y: =478
             Width: =900
             Height: =22
       - lblPmM3:
@@ -287,7 +332,7 @@ Screens:
             Size: =13
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =454
+            Y: =502
             Width: =900
             Height: =22
       - lblPmM4:
@@ -300,7 +345,7 @@ Screens:
             Size: =13
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =478
+            Y: =526
             Width: =900
             Height: =22
       - lblPmM5:
@@ -313,7 +358,7 @@ Screens:
             Size: =13
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =502
+            Y: =550
             Width: =900
             Height: =22
       - lblPmM6:
@@ -331,7 +376,7 @@ Screens:
             Size: =13
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =526
+            Y: =574
             Width: =900
             Height: =22
       - lblPmRead:
@@ -346,6 +391,6 @@ Screens:
             Size: =12
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =562
+            Y: =610
             Width: =900
             Height: =56
