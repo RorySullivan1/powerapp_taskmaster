@@ -34,6 +34,12 @@ Screens:
          Set( gDelErr, "" );
          Set( gCmtOpen, false );
          Set( gCmtSaving, false );
+         Set( gCmtViewOpen, false );
+         Set( gCmtEditing, false );
+         // SELF-HEAL, same as scrHome and scrProjects. App.OnStart is NON-BLOCKING, so this
+         // screen can run before it finishes, and a blank gUserEmail would hide Edit and Delete
+         // from the very person who wrote the comment.
+         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
          Select( btnPrjRecompute )
     Children:
       # =====================================================================
@@ -214,6 +220,28 @@ Screens:
                                        { project_perc_completion: gPrjPc } ) ),
                            Set( gPrjPcErr, FirstError.Message ) );
                   Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
+      # THE COMMENTS FETCH ON ITS OWN, because the write paths need it after a save and none
+      # of them wants the whole recompute — that is four round trips plus two write-backs to
+      # repair a phase and a rollup a comment cannot have changed.
+      # THE QUERY IS DUPLICATED IN btnPrjRecompute'S Concurrent, deliberately: that arm must
+      # stay INSIDE the parallel fold so the panel is populated on the first render, and
+      # Select() queues rather than running inline. Change one, change the other.
+      - btnPrjCmtFetch:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =ClearCollect( colProjectCmt,
+                   Sort( Filter( taskmaster_projectcomments,
+                             projectcomment_project_id = gSelProject.ID ),
+                         Created, SortOrder.Descending ) )
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -1742,9 +1770,10 @@ Screens:
                                                Set( gEditMode, "Edit" );
                                                Navigate( scrIssueEdit, ScreenTransition.Cover ) )
                         # ---- COMMENTS -------------------------------------------------
-                        # APPEND-ONLY BY DESIGN: no edit, no delete, no row action. There is no hit
-                        # button over this template and none should be added — a comment opens
-                        # nothing, and a transparent button here would only swallow taps.
+                        # A ROW OPENS THE FULL COMMENT. Editing and deleting live in that dialog and
+                        # nowhere else — there is no delete icon in this template, which is why the
+                        # hit button spans the FULL template width rather than stopping 46px short
+                        # as the other three galleries on this screen do.
                         # AUTHOR AND DATE ARE THE SYSTEM COLUMNS `Created By` and `Created`. This
                         # list stamps no provenance of its own, so nothing here can be attributed
                         # to anyone but the person who wrote it — see schema.yaml.
@@ -1897,13 +1926,23 @@ Screens:
                                                 LayoutMinWidth: =4
                                                 Width: =4
                                                 Height: =46
-                                          # A Note in a 46px cell: long comments CLIP rather than
-                                          # scroll, and that is the accepted trade for a panel meant
-                                          # for short notes. The full text is in SharePoint.
+                                          # TRUNCATED ON PURPOSE, WITH AN ELLIPSIS THAT ONLY APPEARS
+                                          # WHEN IT IS EARNED — the row is a preview and the full text
+                                          # is one tap away in mdCv. Newlines are flattened to spaces
+                                          # first: a Note wraps, so three short lines would otherwise
+                                          # fill the cell and hide a long comment behind almost nothing.
+                                          # 120 characters is about three lines at this width; raise it
+                                          # and the text clips instead of ending in the ellipsis.
                                           - cellCmtText:
                                               Control: Label@2.5.1
                                               Properties:
-                                                Text: =ThisItem.projectcomment_comment
+                                                Text: |
+                                                  =With(
+                                                      { t: Trim( Substitute(
+                                                               Substitute( Coalesce(ThisItem.projectcomment_comment, ""),
+                                                                           Char(13), " " ),
+                                                               Char(10), " " ) ) },
+                                                      If( Len(t) > 120, Left(t, 120) & "…", t ) )
                                                 Font: =gTheme.Font
                                                 Size: =gTheme.Size.Small
                                                 Color: =gTheme.Color.TextPrimary
@@ -1959,6 +1998,45 @@ Screens:
                                           Y: =Parent.TemplateHeight - 1
                                           Width: =Parent.TemplateWidth
                                           Height: =1
+                                    - galCommentsHit:
+                                        Control: Classic/Button@2.2.0
+                                        Properties:
+                                          Text: =""
+                                          Fill: =RGBA(0, 0, 0, 0)
+                                          HoverFill: =gTheme.Color.Hover
+                                          PressedFill: =gTheme.Color.Press
+                                          BorderThickness: =0
+                                          X: =0
+                                          Y: =0
+                                          Width: =Parent.TemplateWidth
+                                          Height: =Parent.TemplateHeight
+                                          # RE-READ THE ROW ON THE WAY IN, as the issue and transaction
+                                          # rows do: this gallery is over a collection, and Edit and
+                                          # Delete must act on what SharePoint holds now, not on a
+                                          # snapshot somebody else may have deleted since the fetch.
+                                          # gCmtCanEdit IS COMPUTED ONCE, HERE. It means "this viewer
+                                          # may change THIS comment" — authorship AND a live project,
+                                          # not authorship alone.
+                                          # THE APP GATE IS AN AFFORDANCE, NOT SECURITY. What actually
+                                          # stops someone editing another person's comment is the
+                                          # list's own Advanced Settings -> Item-level Permissions.
+                                          # See schema.yaml.
+                                          OnSelect: |
+                                            =Select(Parent);
+                                             Set( gCmtEditing, false );
+                                             Set( gCmtErr, "" );
+                                             Set( gCmtView,
+                                                  LookUp(taskmaster_projectcomments, ID = ThisItem.ID) );
+                                             If( IsBlank(gCmtView.ID),
+                                                 Notify( "That comment no longer exists — it may have been deleted. Reopen the project to refresh the list.",
+                                                         NotificationType.Error ),
+                                                 Set( gCmtCanEdit,
+                                                      With( { m: Lower( Coalesce(gUserEmail, "") ) },
+                                                            Len(m) > 0
+                                                         && Lower( Coalesce(gCmtView.'Created By'.Email, "") ) = m
+                                                         && Coalesce(gSelProject.project_phase.Value, "") <> "Archived" ) );
+                                                 Reset( txtCvBody );
+                                                 Set( gCmtViewOpen, true ) )
 
       # =====================================================================
       # DELETE CONFIRMATION — one instance serving all three galleries, keyed by
@@ -1986,6 +2064,7 @@ Screens:
                        "Task",        "Delete this task?",
                        "Transaction", "Delete this transaction?",
                        "Issue",       "Delete this issue?",
+                       "Comment",     "Delete this comment?",
                        "Delete?" )
             # Says what ELSE changes — an arm cannot explain that issues are about to
             # be detached, which is why this one is a dialog.
@@ -2005,6 +2084,8 @@ Screens:
                        " This cannot be undone.",
                        "Issue",
                        "Delete " & gDelName & "? Nothing else references an issue. This cannot be undone.",
+                       "Comment",
+                       "Delete this comment? " & gDelName & " Nothing else references a comment. This cannot be undone.",
                        "" )
             ConfirmLabel: ="Delete"
             CancelLabel: ="Cancel"
@@ -2049,6 +2130,14 @@ Screens:
                            "Issue",
                            IfError( Set( gDelScrapI,
                                          Remove( taskmaster_issues, LookUp(taskmaster_issues, ID = gDelId) ) ),
+                                    Set( gDelErr, FirstError.Message ) ),
+                           // Nothing references a comment and a comment references nothing, so this
+                           // kind needs no detach stage above — gDelRefs is set to 0 by the caller
+                           // and the block guard can never fire on it.
+                           "Comment",
+                           IfError( Set( gDelScrapCm,
+                                         Remove( taskmaster_projectcomments,
+                                                 LookUp(taskmaster_projectcomments, ID = gDelId) ) ),
                                     Set( gDelErr, FirstError.Message ) ) ) );
                If( gDelBlock,
                    Notify( "Too many issues reference this to detach in one pass. Nothing was deleted — ask for the cleanup workflow.",
@@ -2206,15 +2295,9 @@ Screens:
                                 Set( gCmtErr, FirstError.Message ) );
                        If( IsBlank(gCmtScrap.ID),
                            Notify( "Couldn't post that comment: " & gCmtErr, NotificationType.Error ),
-                           // THE COMMENTS FETCH ALONE, not Select(btnPrjRecompute) — the full
-                           // block is four round trips plus two write-backs, and a comment
-                           // changes none of what it computes.
-                           // THIS IS THE SAME QUERY AS THE FOURTH ARM OF btnPrjRecompute'S
-                           // Concurrent. Change one, change the other.
-                           ClearCollect( colProjectCmt,
-                               Sort( Filter( taskmaster_projectcomments,
-                                         projectcomment_project_id = gSelProject.ID ),
-                                     Created, SortOrder.Descending ) );
+                           // The comments fetch alone — not Select(btnPrjRecompute), which would
+                           // repair a phase and a rollup that a comment cannot change.
+                           Select( btnPrjCmtFetch );
                            Set( gCmtOpen, false );
                            Notify( "Comment added.", NotificationType.Success ) ) );
                    Set( gCmtSaving, false ) )
@@ -2234,3 +2317,213 @@ Screens:
             Width: =120
             Height: =40
             OnSelect: =Set( gCmtOpen, false )
+      # =====================================================================
+      # READ ONE COMMENT — and, for the person who wrote it, edit or delete it.
+      # DECLARED LAST, after mdCmt, so it floats over the add dialog as well as the screen.
+      # ONE TEXT CONTROL SERVES BOTH STATES rather than a Visible-negated pair: reading is
+      # DisplayMode.View, which MS Learn defines as "only displays data ... will not render
+      # any interactive elements", and editing flips the same control to Edit. Reset() is
+      # called when the row opens because a text input re-reads Default ONLY on Reset.
+      # WHO MAY EDIT IS DECIDED ONCE, in galCommentsHit, into gCmtCanEdit — never re-derived
+      # here, or the two tests drift and a button appears that the save path rejects.
+      # DELETE HANDS OFF TO cmpPrjConfirmDel with gDelKind "Comment". This dialog CLOSES
+      # first: the confirm component is declared EARLIER in this file, so it would otherwise
+      # open underneath this one and swallow every tap.
+      # =====================================================================
+      - mdCvScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gCmtViewOpen
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: |
+              =Set( gCmtEditing, false );
+               Set( gCmtViewOpen, false )
+      - mdCvBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gCmtViewOpen
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 620) / 2
+            Y: =(Parent.Height - 420) / 2
+            Width: =620
+            Height: =420
+      - mdCvBody:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Visible: =gCmtViewOpen
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            PaddingTop: =24
+            PaddingBottom: =16
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =(Parent.Width - 620) / 2
+            Y: =(Parent.Height - 420) / 2
+            Width: =620
+            Height: =340
+          Children:
+            - mdCvWho:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =Coalesce( gCmtView.'Created By'.DisplayName, "Unknown" )
+                     & "   ·   " & Text( gCmtView.Created, "dd mmm yyyy  hh:mm" )
+                  Font: =gTheme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =gTheme.Size.Body
+                  Color: =gTheme.Color.TextPrimary
+                  Width: =Parent.Width - 48
+                  Height: =24
+            - txtCvBody:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: =gCmtView.projectcomment_comment
+                  Type: =TextInputType.Multiline
+                  TriggerOutput: =TriggerOutput.Delayed
+                  DisplayMode: =If( gCmtEditing, DisplayMode.Edit, DisplayMode.View )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  Width: =Parent.Width - 48
+                  Height: =220
+            # Only while editing, and only when the box has been emptied — Save stays live and
+            # says why, rather than going dead with no explanation.
+            - lblCvNudge:
+                Control: Label@2.5.1
+                Properties:
+                  Visible: =gCmtEditing && Len(Trim(txtCvBody.Text)) = 0
+                  Text: ="A comment cannot be empty. Delete it instead."
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  Width: =Parent.Width - 48
+                  Height: =18
+      # ---- READING: Close, and for the author Edit and Delete -------------------
+      - mdCvClose:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gCmtViewOpen && !gCmtEditing
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Close"
+            X: =(Parent.Width - 620) / 2 + 620 - 24 - 100
+            Y: =(Parent.Height - 420) / 2 + 420 - 24 - 40
+            Width: =100
+            Height: =40
+            OnSelect: =Set( gCmtViewOpen, false )
+      - mdCvEdit:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gCmtViewOpen && !gCmtEditing && gCmtCanEdit
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Edit"
+            X: =(Parent.Width - 620) / 2 + 620 - 24 - 100 - 12 - 100
+            Y: =(Parent.Height - 420) / 2 + 420 - 24 - 40
+            Width: =100
+            Height: =40
+            OnSelect: =Set( gCmtEditing, true )
+      - mdCvDelete:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gCmtViewOpen && !gCmtEditing && gCmtCanEdit
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Danger
+            BorderColor: =gTheme.Color.Danger
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Delete"
+            X: =(Parent.Width - 620) / 2 + 620 - 24 - 100 - 12 - 100 - 12 - 100
+            Y: =(Parent.Height - 420) / 2 + 420 - 24 - 40
+            Width: =100
+            Height: =40
+            # gDelName is the SAME flattened preview the row shows, so the confirmation quotes
+            # back what the person actually sees. gDelRefs is 0: nothing references a comment,
+            # so the detach stage and the 500-row block guard both sit this kind out.
+            OnSelect: |
+              =Set( gCmtViewOpen, false );
+               Set( gDelKind, "Comment" );
+               Set( gDelId, gCmtView.ID );
+               Set( gDelRefs, 0 );
+               Set( gDelName,
+                    With( { t: Trim( Substitute(
+                                 Substitute( Coalesce(gCmtView.projectcomment_comment, ""),
+                                             Char(13), " " ),
+                                 Char(10), " " ) ) },
+                          If( Len(t) > 60, Left(t, 60) & "…", t ) ) )
+      # ---- EDITING: Save and Cancel --------------------------------------------
+      - mdCvSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gCmtViewOpen && gCmtEditing
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: =If( gCmtSaving, "Saving…", "Save" )
+            X: =(Parent.Width - 620) / 2 + 620 - 24 - 120
+            Y: =(Parent.Height - 420) / 2 + 420 - 24 - 40
+            Width: =120
+            Height: =40
+            # ONE COLUMN IS WRITTEN. Author and date are the system columns and are READ-ONLY,
+            # so an edit cannot rewrite who said it — which is the behaviour we want.
+            # TRUST THE RECORD, NOT THE MESSAGE: judged by whether a record with an ID came
+            # back, not by whether an error string landed.
+            OnSelect: |
+              =If( gCmtSaving,
+                   false,
+                   Set( gCmtSaving, true );
+                   If( Len(Trim(txtCvBody.Text)) = 0,
+                       Notify( "A comment cannot be empty. Delete it instead.", NotificationType.Error ),
+                       Set( gCmtErr, "" );
+                       Set( gCmtScrapE, Blank() );
+                       IfError( Set( gCmtScrapE,
+                                     Patch( taskmaster_projectcomments,
+                                            LookUp(taskmaster_projectcomments, ID = gCmtView.ID),
+                                            { projectcomment_comment: Trim(txtCvBody.Text) } ) ),
+                                Set( gCmtErr, FirstError.Message ) );
+                       If( IsBlank(gCmtScrapE.ID),
+                           Notify( "Couldn't save that edit: " & gCmtErr, NotificationType.Error ),
+                           Select( btnPrjCmtFetch );
+                           Set( gCmtEditing, false );
+                           Set( gCmtViewOpen, false );
+                           Notify( "Comment updated.", NotificationType.Success ) ) );
+                   Set( gCmtSaving, false ) )
+      # Back to reading, not out of the dialog — and Reset is what throws the typed text away,
+      # since the input only re-reads Default on Reset.
+      - mdCvCancelEdit:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gCmtViewOpen && gCmtEditing
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Cancel"
+            X: =(Parent.Width - 620) / 2 + 620 - 24 - 120 - 12 - 100
+            Y: =(Parent.Height - 420) / 2 + 420 - 24 - 40
+            Width: =100
+            Height: =40
+            OnSelect: |
+              =Reset( txtCvBody );
+               Set( gCmtEditing, false )

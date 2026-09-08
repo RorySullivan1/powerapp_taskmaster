@@ -422,14 +422,25 @@ lists:
     join_cost: 1
     # AUTHOR AND DATE ARE THE SYSTEM COLUMNS `Created By` and `Created` — this list adds
     # NO app-stamped provenance. Both were confirmed to resolve in Studio 2026-09-08.
-    # The system columns were confirmed INDEXABLE (user, 2026-09-08). Index `Created` before
-    # this list passes 5,000 rows: the gallery sorts newest-first and a Sort only delegates
-    # past that threshold on an indexed column. Nothing breaks at today's size. If a
-    # delegation warning ever appears on that Sort, the fallback is an app-stamped DateTime —
-    # do not reach for it before confirming the warning is real.
+    # `Created` AND `Created By` ARE BOTH INDEXED (user, 2026-09-08), which is what keeps the
+    # gallery's newest-first Sort delegable past the 5,000 list-view threshold. If a delegation
+    # warning ever appears on that Sort, the fallback is an app-stamped DateTime — do not reach
+    # for it before confirming the warning is real.
+    #
+    # ITEM-LEVEL PERMISSIONS ARE WHAT ENFORCE "ONLY THE COMMENTER MAY EDIT OR DELETE".
+    # scrProject hides Edit and Delete unless the signed-in user wrote the comment, but that is
+    # an AFFORDANCE, not security: anyone with Contribute on this list can edit any row through
+    # SharePoint itself, or through any other client. The actual control is
+    #   List settings -> Advanced settings -> Item-level Permissions
+    #   Read access:            Read all items
+    #   Create and Edit access: Create items and edit items that were created by the user
+    # Set it there. Note it does NOT restrict a user with Design or Full Control, by design.
     # The system columns are READ-ONLY: the app cannot backdate a comment or attribute one
-    # to anybody but the signed-in user who wrote it. That is correct for v1, and it is the
-    # constraint to check first if a flow or an import ever needs to create comments.
+    # to anybody but the signed-in user who wrote it. That is correct — an edit rewrites the
+    # text and CANNOT rewrite who said it — and it is the constraint to check first if a flow
+    # or an import ever needs to create comments.
+    # Comments are EDITABLE AND DELETABLE BY THEIR AUTHOR from scrProject (2026-09-08). The
+    # gallery shows a 120-character preview and a row opens the full text.
     columns:
       # NUMBER, NOT LOOKUP, AND THAT IS THE WHOLE DESIGN. The three older child
       # lists carry a Lookup FK, so their fetch filters on `.Id` — which does NOT
