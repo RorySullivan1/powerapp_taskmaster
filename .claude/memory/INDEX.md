@@ -25,7 +25,9 @@
   `DisplayMode.View`.
 - **#66 DONE AND LANDED 2026-09-08 — scrProjects IS A TABLE, AND THERE IS NO COMPONENT.**
   Pasted and confirmed working by the user: headings aligned, all three sorts, both heading
-  filters, both filter columns indexed in SharePoint. **PR OPEN ONTO main.**
+  filters, both filter columns indexed in SharePoint. **PR #70 MERGED TO main 2026-09-08 — it
+  carried BOTH #60 and #66. A MERGED PR CANNOT CARRY FOLLOW-UP WORK: restart
+  `claude/powerapp-repo-init-xymvlm` from `main` before the next change.**
   `galProjects` STAYS ON THE SCREEN, direct-bound, paging past 2,000 as it always did. A new
   `rowTableHead` above it mirrors `rowBody`'s column budget EXACTLY (status 0/28 · name 3/200 ·
   coverage 1/120 · priority 1/84 · due+pct 3/310 → 2/190+1/104, same gap, PaddingRight 32 vs the
