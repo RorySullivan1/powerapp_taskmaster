@@ -147,3 +147,24 @@ priority not filterable or sortable?"**
 - **The Items formula is now GENERATED (96 branches).** The generator was first proved to reproduce
   the landed 48-branch formula character for character, so enabling the priority dimension was a
   controlled extension rather than a rewrite. Regenerate; never hand-edit one branch.
+
+## Internal names confirmed — 96 branches collapse to 32
+
+- **User confirmed:** `project_priority` indexed in SharePoint; `project_date_target` and
+  `project_perc_completion` internal names EQUAL their display names. With `project_name` = `Title`
+  already known, all three sort columns are pinned down.
+- **So the sort column can travel as a string again.** One `SortByColumns` per branch instead of a
+  Switch over three literal-identifier arms: 32 branches, 443 fewer lines.
+- **`gPrjSortCol` flipped meaning between two commits** — an opaque key one commit, a SharePoint
+  internal column name the next. Every comment asserting the old meaning was rewritten rather than
+  left standing. A stale comment that confidently states the opposite of the code is worse than no
+  comment, and this file now has three places that would have said it.
+- **`tools/gen_projects_items.py` added.** The formula is hundreds of near-identical delegable
+  branches; hand-editing one is how the arms drift and how a filter quietly stops folding. The tool
+  owns the shape AND the reasoning, `--check` fails on drift, and it was verified to reproduce the
+  landed 96-branch formula character for character before emitting the 32.
+- **`--mode switch` is a real fallback, not decoration.** Whether `SortByColumns` delegates with the
+  column name in a VARIABLE is undocumented against SharePoint and unproven here. If the
+  descending-name check fails, one flag rewrites the 96-branch literal-identifier version.
+- **`project_coverage`'s SharePoint index is still unconfirmed** — the user indexed priority and
+  said nothing about coverage. Do not assume.
