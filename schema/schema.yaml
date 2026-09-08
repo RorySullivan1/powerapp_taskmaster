@@ -409,6 +409,37 @@ lists:
       - { name: issue_owner,            type: Person, multi: false, required: false,     desc: "Who raised the issue; stamped with User() on insert only. Display only — no picker" }
 
   # ---------------------------------------------------------------------------
+  taskmaster_projectcomments:
+    role: Free-form comments on a project. Append-only; read and written on scrProject only.
+    provisioned: pending     # schema settled here; not yet created in SharePoint
+    # 1. The single Person column. Nothing else joins.
+    join_cost: 1
+    columns:
+      # NUMBER, NOT LOOKUP, AND THAT IS THE WHOLE DESIGN. The three older child
+      # lists carry a Lookup FK, so their fetch filters on `.Id` — which does NOT
+      # delegate, which is why scrProject folds them over the LiveTasks/LiveIssues/
+      # LiveTransactions named formulas instead of the raw lists (a raw-list fetch
+      # came back EMPTY for recent projects: the archived backlog filled the page
+      # before the live rows were reached).
+      # `=` on an indexed Number DOES delegate, so this list is fetched straight
+      # off the raw list and stays correct however far past 5,000 rows it grows.
+      # Do not "make it consistent" by converting this to a Lookup: it would buy a
+      # join and reintroduce the truncation the other three had to work around.
+      - { name: projectcomment_project_id,       type: Number,   required: true,  indexed: true,  desc: "ID of the parent project. Number so `=` delegates and costs no join; see the note above" }
+      - { name: projectcomment_comment,          type: Note,     required: true,                  desc: "The comment. PLAIN multiline, rich text OFF. Never filtered or sorted on — Note is not indexable" }
+      # AUTHOR AND DATE ARE APP-STAMPED, NOT SYSTEM COLUMNS. `Created By` and
+      # `Created` do not resolve in the canvas app (confirmed in Studio 2026-08-12;
+      # `issue_owner` / `issue_date_open` exist for the same reason). Do not reach
+      # for `Modified` either — it rides the same mechanism and there is no way to
+      # test it from this side of the gap.
+      - { name: projectcomment_author,           type: Person, multi: false, required: true, indexed: true, desc: "Who wrote it. Stamped by the app at insert. Indexed for a future by-author query; the v1 gallery compares it locally" }
+      - { name: projectcomment_date,             type: DateTime, required: true,  indexed: true,  desc: "When it was written. Stamped Now() at insert. INDEXED because the gallery sorts on it and Sort must delegate" }
+      # Fourth mirror of the parent-archived flag. Same rationale as
+      # issue_project_archived: a child row carries no parent phase, joins do not
+      # delegate, so the exclusion has to be a local Boolean. Owned by the EXTERNAL
+      # archival flow (#65) — the app only ever writes false at insert.
+      - { name: projectcomment_project_archived, type: Boolean,  required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Maintained by the external archival flow, not the app" }
+  # ---------------------------------------------------------------------------
   taskmaster_taskproduct:
     role: >-
       JUNCTION. One row per (task, product) pair. A task is 1:1 with a client but

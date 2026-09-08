@@ -20,13 +20,16 @@ design. **Internal names freeze at creation** — the YAML's `name:` key *is* th
 | `taskmaster_tasks` | Units of work; the busiest list | 8 |
 | `taskmaster_transactions` | Trades, full transaction level | 4 |
 | `taskmaster_issues` | Freeform issues | 5 |
+| `taskmaster_projectcomments` | Free-form comments on a project; append-only, `scrProject` only | 1 |
 | `taskmaster_clients` | Client dimension | 4 |
 | `taskmaster_products` | Product reference | 1 |
 | ~~`asset_approval`~~ | **RETIRED 2026-08-09** — approvals moved to an external portal; tasks now hold a free-text `task_output_approval_id`. Deprovision in SharePoint. | — |
 | `asset_library` | **Schema never supplied — bindings blocked** | ? |
 
-**Relationships** — all via SharePoint **Lookup** columns, which Power Fx sees as *records*
-(`.Id` / `.Value`), never integers:
+**Relationships** — via SharePoint **Lookup** columns, which Power Fx sees as *records*
+(`.Id` / `.Value`), never integers — **with one deliberate exception**: `taskmaster_projectcomments`
+and the `taskmaster_taskproduct` junction hold the parent's `ID` as a plain **Number**, so `=`
+delegates and costs no join. See the note below the diagram.
 
 ```
 taskmaster_projects ──< taskmaster_tasks         (task_project_id, required)
@@ -41,7 +44,16 @@ asset_library       ──< taskmaster_tasks         (task_output_asset)   ← b
 (asset_approval retired 2026-08-09 — task_output_approval_id is now a free-text id, not a lookup)
 taskmaster_tasks    ──< taskmaster_issues        (issue_task_name)
 taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name)
+
+taskmaster_projects ──< taskmaster_projectcomments (projectcomment_project_id — NUMBER, not Lookup)
 ```
+
+**Why comments break the Lookup pattern.** A Lookup FK is filtered as `<fk>.Id = <id>`, which does
+**not** delegate; that is why `scrProject`'s three folds run over the `LiveTasks` / `LiveIssues` /
+`LiveTransactions` named formulas rather than the raw lists — a raw-list fetch came back **empty**
+for recent projects, the archived backlog filling the page before the live rows were reached.
+`projectcomment_project_id` is an indexed Number, `=` on it delegates, and the comments fold
+therefore reads the raw list directly. That asymmetry is the design, not an oversight.
 
 **Task health vs stage** — two orthogonal Choice columns, decided 2026-08-02:
 
@@ -152,8 +164,10 @@ Filter(taskmaster_tasks,
 ```
 
 **Archived work is excluded AT THE SOURCE (2026-08-12).** Each child list carries a denormalised
-`*_project_archived` Boolean mirroring its parent's `project_phase`, indexed, maintained by
-scrProjectEdit's save. That is what makes "belongs to a live project" a delegable `= false` instead
+`*_project_archived` Boolean mirroring its parent's `project_phase`, indexed. Tasks, transactions
+and issues are maintained by scrProjectEdit's save; the **fourth**,
+`projectcomment_project_archived`, is written `false` by the app at insert and set `true` only by
+the external archival flow (epic #60 / #65) — nothing in this repo can set it. That is what makes "belongs to a live project" a delegable `= false` instead
 of a join — and a join is the only alternative, since a child row does not carry its parent's phase.
 The aim is a threshold one: **keep the rows in scope under 2000 so no query can silently truncate.**
 A local `RemoveIf` cannot serve that, because the rows are fetched before they are dropped.
