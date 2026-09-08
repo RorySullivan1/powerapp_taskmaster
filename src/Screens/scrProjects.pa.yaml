@@ -6,6 +6,8 @@
 # headings stop sitting over their columns. Change one and change the other:
 #     status 0/28 · name 3/200 · coverage 1/120 · priority 1/84 · due+pct 3/310
 # The due+pct slot is a nested container in BOTH, splitting 2/190 + 1/104.
+# The header takes its WIDTH from galProjects.TemplateWidth rather than computing
+# one, so the two containers are the same width whatever the scrollbar costs.
 #
 # VERTICAL BANDS (768 tall). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
 #     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
@@ -166,11 +168,16 @@ Screens:
       # step with it — see the banner. A heading is not a child of the gallery, so
       # nothing in Power Fx can hold the two in step for us.
       #
-      # PaddingRight IS 32 WHERE THE ROW USES 16. The extra 16 is the gallery's
-      # vertical scrollbar, which eats that much off TemplateWidth and would
-      # otherwise push every heading left of its column. The list is past 2,000
-      # projects, so the scrollbar is always there; on a list short enough not to
-      # scroll the headings would sit 16px right of true.
+      # WIDTH IS READ OFF THE GALLERY, NOT COMPUTED. `galProjects.TemplateWidth` is
+      # the exact width rowBody is given, so the heading row and the row template
+      # are the same width by construction and the columns cannot drift apart.
+      # AN EARLIER VERSION GUESSED — same Width as the gallery, PaddingRight 32
+      # against the row's 16, on the assumption that the scrollbar ate 16px off
+      # TemplateWidth. The headings landed misaligned. Whatever the scrollbar
+      # actually costs is now the gallery's business, not this container's.
+      # The forward reference is fine: layout formulas survive a paste and keep
+      # recomputing, including references to a control declared LATER
+      # (tests/README.md, scrProbe-layout-freeze P3).
       #
       # ONLY THREE HEADINGS SORT, AND THAT IS THE DELEGATION RULE, not a design
       # choice: SharePoint folds Sort on Text, Number, Boolean and DateTime and NOT
@@ -188,11 +195,11 @@ Screens:
             LayoutAlignItems: =LayoutAlignItems.Center
             LayoutGap: =16
             PaddingLeft: =16
-            PaddingRight: =32
+            PaddingRight: =16
             Fill: =gTheme.Color.Surface
             X: =gTheme.Space.Gutter
             Y: =220
-            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
+            Width: =galProjects.TemplateWidth
             Height: =48
           Children:
             # Holds the status glyph's slot open. Empty on purpose: the glyph column
