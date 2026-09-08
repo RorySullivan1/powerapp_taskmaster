@@ -23,22 +23,22 @@
   **NOT EXERCISED BY THE LANDING, so NOT proven:** deleting a whole PROJECT that has comments
   (the cascade's fourth arm), and whether a comment longer than the 220px box scrolls in
   `DisplayMode.View`.
-- **OPEN BACKLOG — ONE EPIC, #66. ITS PROBES ARE AUTHORED AND NOT YET RUN.**
-  **#66 "scrProjects table" — `galProjects` becomes `cmpProjectTable` (11th component): sort headers
-  on the DELEGABLE set only (name/target/% — Text/DateTime/Number; never Choice or Person), a new
-  Coverage column, the coverage filter moved INTO that header, `cboPrjCoverage` removed, search +
-  both toggles kept. **#67 [PROBE] BLOCKS the build** — three claims (query-in-a-Table-Input,
-  paging inside a component, dynamic-column SortByColumns) decide the data contract; the epic is
-  written three ways because `galProjects` is direct-bound and PAGES past 2000 while a ForAll
-  projection CAPS there. → **#68 component**, **#69 screen + index project_coverage** (two pastes,
-  component first). Nothing else is queued — **do not invent work beyond #66–#69; ask.**
-  **#67 AUTHORED 2026-09-08 AND AWAITING THE RUN — four files in `tests/`, one shared throwaway
-  component (`cmpProbeTable`, THREE custom properties the user must hand-type) plus `scrProbeCT`
-  / `scrProbeCG` / `scrProbeSBC`. Protocol and how-to-read ladders are in `tests/README.md`.
-  THE RUN NEEDS THE APP-WIDE DATA ROW LIMIT SET TO 10 AND PUT BACK AFTERWARDS** — that is what
-  makes a cap and a small result set distinguishable, and it is why this question has never been
-  settled before. **DO NOT AUTHOR #68 OR #69 UNTIL THE THREE READINGS ARE RECORDED:** which of
-  the epic's three contract outcomes applies is exactly what is unknown.
+- **#66 RESCOPED AND BUILT 2026-09-08 — scrProjects IS A TABLE, AND THERE IS NO COMPONENT.**
+  `galProjects` STAYS ON THE SCREEN, direct-bound, paging past 2,000 as it always did. A new
+  `rowTableHead` above it mirrors `rowBody`'s column budget EXACTLY (status 0/28 · name 3/200 ·
+  coverage 1/120 · priority 1/84 · due+pct 3/310 → 2/190+1/104, same gap, PaddingRight 32 vs the
+  row's 16 for the scrollbar) — **change one side and the headings leave their columns; nothing in
+  Power Fx holds them in step.** Three sort headings ONLY (name/target/% — Text/DateTime/Number);
+  Priority/Coverage/Phase/Lead are Complex and a sort on them would reorder one page silently.
+  `cboPrjCoverage` moved into the Coverage heading under the SAME NAME, so the sixteen branches
+  did not change; each `Sort(…, project_name)` became `SortByColumns(…, gPrjSortCol, gPrjSortOrd)`,
+  equivalence machine-verified. **#67 (probes) AND #68 (cmpProjectTable) ARE CLOSED not-planned —
+  the app stays at TEN components; do not resurrect either.**
+  **AWAITING THE PASTE (`a5a10f2`), plus ONE SHAREPOINT ACTION: index `project_coverage`.**
+  **THE ONE UNPROVEN THING: whether `SortByColumns` folds with a VARIABLE column name.** Undocumented
+  against SharePoint. Proof is a gesture on the real screen — sort by Project DESCENDING and check
+  the top row is genuinely the alphabetically last project. If not, the sort ran locally over one
+  page; the fix is mechanical (three literal columns per branch, ~48 branches).
 - **PASTE QUEUE — ALL 6 EDIT SCREENS + scrReports, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE
   NEEDS SHAREPOINT FIRST.** The required-fields message is reworked on ALL SIX edit screens to
   `Required Fields Remaining: A | B` (so scrClientEdit / scrProductEdit / scrTaskEdit / scrIssueEdit
@@ -195,6 +195,8 @@ not know them will author something broken:
 
 - 2026-09-08 | #67 probe prefixes: an author-chosen StartsWith literal has now matched nothing TWICE ("ab" on #51 row 6, "a" on the first scrProbeCT run — not the first letter of any OPEN project). NEITHER WAS AN INSTRUMENT FAULT and the blank-phase theory raised for the second one was WRONG — the sheet read correctly, the letter was wrong. It still costs a whole run, because a true no-match prints "-- no rows --" exactly as a rejection does. All three probe prefix boxes now seed from Left(First(taskmaster_projects).project_name, 1) and scrProbeCT prints five real names. GENERAL RULE: no project name is visible from the repo side, so never hard-code a data literal into a probe — derive it | sessions/2026-09-08-1724-epic66-probes-authored.md
 
+- 2026-09-08 | #66 RESCOPED MID-EPIC AFTER THE USER PUSHED BACK, and the pushback was right: the probes were testing my scaffolding, not their goal. "The gallery becomes a component" was a MEANS in the brief; the goal was a sortable/filterable table. Keeping galProjects on the screen delivers the table AND deletes the epic's only real risk (a ForAll-fed component caps at the row limit where a direct-bound gallery pages), so #67 and #68 both closed not-planned and scrProjects was built in one pass. FOUR TRIPS ACROSS THE GAP WERE SPENT ON PROBES THAT RETURNED NOTHING — each went on repairing the instrument. GENERAL RULE: probe the thing being shipped, not the scaffolding around it; a probe earns its cost only when a wrong guess is catastrophic or invisible, and the sort question is neither (one gesture on the real screen settles it) | sessions/2026-09-08-1724-epic66-probes-authored.md
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -220,3 +222,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-08 | EPIC #60 CLOSED COMPLETE: archival flow built by the user, so #65 closed too. Project comments ship end to end. Open backlog is now #66 alone. Carried forward, untracked by any issue: item-level permissions on taskmaster_projectcomments | sessions/2026-09-08-1440-projectcomments-authored.md
 - 2026-09-08 | issue #67: all three probes authored for the #66 epic, plus ONE shared throwaway component (cmpProbeTable, three Table Inputs because a component input's TYPE IS ITS DEFAULT LITERAL). DEPARTS FROM #67 ON THE INSTRUMENT: lower the app's data row limit to 10 rather than bound the subset by phase — at 2000 a cap and a small result set are indistinguishable, which is why claims 2 and 3 were never settleable; at 10 a capped gallery reads exactly 10 and a delegated descending sort differs from a local one by two printed names. One setting serves both claims; IT IS APP-WIDE AND MUST BE PUT BACK. Claim 1's verdict is the FORMULA BAR, so the paste sets no inputs at all. #68/#69 stay blocked on the readings | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-08 | #67 probe prefixes: an author-chosen StartsWith literal has now matched nothing TWICE ("ab" on #51 row 6, "a" on the first scrProbeCT run — not the first letter of any OPEN project). NEITHER WAS AN INSTRUMENT FAULT and the blank-phase theory raised for the second one was WRONG — the sheet read correctly, the letter was wrong. It still costs a whole run, because a true no-match prints "-- no rows --" exactly as a rejection does. All three probe prefix boxes now seed from Left(First(taskmaster_projects).project_name, 1) and scrProbeCT prints five real names. GENERAL RULE: no project name is visible from the repo side, so never hard-code a data literal into a probe — derive it | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | #66 RESCOPED MID-EPIC AFTER THE USER PUSHED BACK, and the pushback was right: the probes were testing my scaffolding, not their goal. "The gallery becomes a component" was a MEANS in the brief; the goal was a sortable/filterable table. Keeping galProjects on the screen delivers the table AND deletes the epic's only real risk (a ForAll-fed component caps at the row limit where a direct-bound gallery pages), so #67 and #68 both closed not-planned and scrProjects was built in one pass. FOUR TRIPS ACROSS THE GAP WERE SPENT ON PROBES THAT RETURNED NOTHING — each went on repairing the instrument. GENERAL RULE: probe the thing being shipped, not the scaffolding around it; a probe earns its cost only when a wrong guess is catastrophic or invisible, and the sort question is neither (one gesture on the real screen settles it) | sessions/2026-09-08-1724-epic66-probes-authored.md

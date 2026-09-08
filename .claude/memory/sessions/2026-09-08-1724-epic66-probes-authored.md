@@ -75,3 +75,31 @@
   `Left( First(taskmaster_projects).project_name, 1 )` and `scrProbeCT` prints five real names
   (row N) to widen from. Row EO keeps `OpenProjects` beside the raw list and is labelled NOT
   CLAIM 1 so the phase filter's ordinary behaviour is never read as a result.
+
+## RESCOPED AND BUILT — 2026-09-08
+
+**The user stopped the probe programme, and was right to.** Verbatim: "This is literally the most
+confusing probe ever… This doesn't even look like what i envisioned for the projects table. It
+needs to be a single table with filterable/sortable columns… i am not convinced these probes are
+even moving toward that outcome."
+
+- **The root error: I treated "the gallery becomes a new component" as a requirement when it was a
+  means.** The goal was always the table. Building the epic around the component generated a
+  research programme — three probe screens, a throwaway component, ten hand-typed properties, an
+  app-wide setting to change and restore — and four trips across the gap that returned NO readings,
+  because each was spent repairing the instrument.
+- **Keeping `galProjects` on the screen deletes the risk instead of measuring it.** Claims 1 and 2
+  only existed because the gallery was going to move. It pages past 2,000 today; leaving it alone
+  is strictly safer than proving a component could match it.
+- **Claim 3 did not need a probe either.** Whether a variable column name folds is settled by one
+  gesture on the real screen (sort by name descending, check the top row), and the fallback is
+  mechanical. A probe earns its cost when a wrong guess is catastrophic or invisible.
+- **Built in one pass:** `rowTableHead` mirroring `rowBody`'s budget, three sort headings, coverage
+  filter moved into its heading, `rowCoverage` column, `SortByColumns` across all sixteen branches
+  (equivalence machine-verified by whitespace-normalised comparison), search box pinned, gallery
+  moved to Y=272. `project_coverage` flipped to indexed. 22/22.
+- **Grounded before use:** `Align` and `PaddingLeft` on `Classic/Button@2.2.0` — the repo had never
+  landed either, and MS Learn's control-button page plus properties-text "Text placement" both name
+  Button explicitly.
+- #67 and #68 closed not-planned with the reasoning in their bodies; #66 rewritten; #69 is now the
+  whole epic and carries the proof list.
