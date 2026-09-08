@@ -391,15 +391,17 @@ Screens:
       # that way on the first paste. The other two sort columns were created under their
       # own names and match; all three are recorded as `internal_name:` in schema.yaml.
       #
-      # UNVERIFIED, AND THE ONE THING ON THIS SCREEN THAT IS: whether SortByColumns still
-      # DELEGATES when the column name arrives in a VARIABLE. MS Learn documents the
-      # column driven by a control and the SortOrder held in a variable, and says nothing
-      # about a varying name against SharePoint. If it does not fold, the sort reorders
-      # one fetched page and leaves the rest of the list alone, SILENTLY — the check is
-      # to sort by Project descending and confirm the top row really is the last project
-      # alphabetically. The fallback is one flag:
-      # `gen_projects_items.py --write --mode switch` writes 96 branches that sort on
-      # LITERAL identifiers, three times the size and certainly delegable.
+      # SORTING WITH THE COLUMN NAME IN A VARIABLE WORKS HERE — confirmed in Studio on the
+      # live list (user, 2026-09-08). MS Learn documents the column driven by a control
+      # and the SortOrder held in a variable, and says nothing about a varying name
+      # against SharePoint, so this screen is the only evidence for it that exists.
+      # THE FAILURE MODE, IF A LATER CHANGE BREAKS IT, IS SILENT: a sort that stops
+      # folding reorders one fetched page and leaves the rest of a 2,000+ row list in its
+      # old order, which looks fine on screen. Suspect it whenever the order past the
+      # first page stops making sense, and check by sorting Project descending — the top
+      # row must be the LAST project alphabetically, not the last of the first page.
+      # The fallback is one flag: `gen_projects_items.py --write --mode switch` writes 96
+      # branches sorting on LITERAL identifiers, three times the size, certainly delegable.
       # THE COLUMN NAME MUST BE AN IDENTIFIER, NOT A STRING, and that is what costs the 3x.
       # `SortByColumns(src, gPrjSortCol, ...)` is one line per branch and was tried first; it
       # fails, because a string column name is matched against the SharePoint INTERNAL name and

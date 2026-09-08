@@ -21,10 +21,14 @@ leaves the rest of a 2,000+ row list unsorted or unfiltered, in silence.
 
 TWO SORT SHAPES, and the choice is a real trade rather than a preference:
 
-  dynamic  32 branches. One `SortByColumns(src, gPrjSortCol, gPrjSortOrd)` per
-           branch, so gPrjSortCol IS A COLUMN NAME and must be the SharePoint
-           INTERNAL name. Whether a VARIABLE column name still delegates is not
-           documented and is not provable from this repo — see the note below.
+  dynamic  32 branches, and what scrProjects ships. One
+           `SortByColumns(src, gPrjSortCol, gPrjSortOrd)` per branch, so
+           gPrjSortCol IS A COLUMN NAME and must be the SharePoint INTERNAL
+           name. A VARIABLE column name DOES delegate — confirmed in Studio on
+           the live list (user, 2026-09-08). MS Learn does not document it, so
+           that observation is the only evidence there is; if it ever stops
+           holding, the symptom is a sort that looks right on the first page and
+           leaves the rest of the list in its old order.
 
   switch   96 branches. A Switch over three arms, each sorting on a LITERAL
            identifier, which is the shape the screen already shipped and is

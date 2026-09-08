@@ -23,7 +23,9 @@
   **NOT EXERCISED BY THE LANDING, so NOT proven:** deleting a whole PROJECT that has comments
   (the cascade's fourth arm), and whether a comment longer than the 220px box scrolls in
   `DisplayMode.View`.
-- **#66 RESCOPED AND BUILT 2026-09-08 — scrProjects IS A TABLE, AND THERE IS NO COMPONENT.**
+- **#66 DONE AND LANDED 2026-09-08 — scrProjects IS A TABLE, AND THERE IS NO COMPONENT.**
+  Pasted and confirmed working by the user: headings aligned, all three sorts, both heading
+  filters, both filter columns indexed in SharePoint. **PR OPEN ONTO main.**
   `galProjects` STAYS ON THE SCREEN, direct-bound, paging past 2,000 as it always did. A new
   `rowTableHead` above it mirrors `rowBody`'s column budget EXACTLY (status 0/28 · name 3/200 ·
   coverage 1/120 · priority 1/84 · due+pct 3/310 → 2/190+1/104, same gap, PaddingRight 32 vs the
@@ -50,10 +52,11 @@
   ARE CONFIRMED (user, 2026-09-08): `Title`, `project_date_target`, `project_perc_completion`;
   the last two equal their display names. Every OTHER column's internal name is still unverified
   and has never mattered — only a name passed as a STRING cares.
-  **THE ONE UNVERIFIED THING ON THIS SCREEN: whether SortByColumns DELEGATES with the column name
-  in a VARIABLE.** Undocumented against SharePoint. If it does not fold, the sort reorders one
-  fetched page SILENTLY. Check: sort by Project descending, confirm the top row really is the
-  alphabetically last project. **FALLBACK IS ONE FLAG:** `--mode switch` writes 96 branches
+  **SortByColumns DELEGATES WITH THE COLUMN NAME IN A VARIABLE — user-confirmed in Studio on the
+  live list, 2026-09-08.** MS Learn does not document it, so this screen is the only evidence that
+  exists; it is what the withdrawn #67 claim 3 was for, answered by using the app instead of a
+  probe. **THE FAILURE MODE IF IT EVER STOPS HOLDING IS SILENT** — one page sorted, the rest of the
+  list left alone, and it looks fine. **FALLBACK IS ONE FLAG:** `--mode switch` writes 96 branches
   sorting on LITERAL identifiers — three times the size, certainly delegable.
   **COVERAGE AND PRIORITY FILTER FROM THEIR HEADINGS; NEITHER SORTS.** Equality on a Choice's
   `.Value` folds, a Sort on a Complex column does not. **PRIORITY WILL NOT BECOME SORTABLE BY
@@ -227,6 +230,8 @@ not know them will author something broken:
 
 - 2026-09-08 | internal names CONFIRMED by the user (project_date_target and project_perc_completion equal their display names; project_name is Title), so scrProjects' gallery collapsed 96 -> 32 branches: SortByColumns with the name in a variable, instead of a Switch over three literal-identifier arms. gPrjSortCol flipped meaning — it WAS an opaque key, it IS now a SharePoint internal column name, and every comment saying otherwise was rewritten rather than left to mislead. Added tools/gen_projects_items.py, which owns the formula's shape, was verified to reproduce the landed 96 character-for-character before emitting the 32, and carries --mode switch as a one-flag fallback if the variable column name turns out not to delegate | sessions/2026-09-08-1724-epic66-probes-authored.md
 
+- 2026-09-08 | scrProjects TABLE CONFIRMED WORKING BY THE USER — sorting included, which settles the last open question: SortByColumns DOES delegate with the column name in a variable (undocumented; this screen is the only evidence). That is the withdrawn #67 claim 3, answered by using the app rather than by a probe — the whole argument for rescoping. Epic #66 delivered: sortable headings, coverage AND priority heading filters, coverage column, 32 generated branches, both filter columns indexed | sessions/2026-09-08-1724-epic66-probes-authored.md
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -256,3 +261,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-08 | FIRST PASTE OF THE scrProjects TABLE REJECTED SortByColumns: a column name passed as a STRING is matched against the SharePoint INTERNAL name, and project_name is not one — that column is the built-in Title RENAMED (user). Invisible everywhere else because every other formula names columns as Power Fx IDENTIFIERS, which resolve by DISPLAY name. Fixed by removing the dependency rather than supplying internal names: gPrjSortCol is now a KEY compared with `=`, and the gallery is a Switch over three arms each sorting on a LITERAL identifier (48 branches, each arm machine-verified equivalent to the landed sixteen). Internal names would have added a second naming scheme that schema.yaml cannot check, and only Title is confirmed. schema.yaml now records internal_name: Title and that the rest are UNVERIFIED | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-08 | scrProjects table LANDED and refined on the user's report: header width was GUESSED (gallery width, PaddingRight 32 for a presumed 16px scrollbar) and came out misaligned — now reads galProjects.TemplateWidth so the two containers match by construction. Priority gained a heading FILTER (equality on a Choice .Value folds) but stays unsortable for TWO reasons, not one: Sort does not fold on Complex, AND a text sort of a severity vocabulary is alphabetical nonsense — sortable priority needs an indexed Number rank column, not a delegation fix. Gallery 48 -> 96 branches; the Items formula is GENERATED and the generator was verified to reproduce the landed 48 character-for-character before the new dimension was enabled | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-08 | internal names CONFIRMED by the user (project_date_target and project_perc_completion equal their display names; project_name is Title), so scrProjects' gallery collapsed 96 -> 32 branches: SortByColumns with the name in a variable, instead of a Switch over three literal-identifier arms. gPrjSortCol flipped meaning — it WAS an opaque key, it IS now a SharePoint internal column name, and every comment saying otherwise was rewritten rather than left to mislead. Added tools/gen_projects_items.py, which owns the formula's shape, was verified to reproduce the landed 96 character-for-character before emitting the 32, and carries --mode switch as a one-flag fallback if the variable column name turns out not to delegate | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | scrProjects TABLE CONFIRMED WORKING BY THE USER — sorting included, which settles the last open question: SortByColumns DOES delegate with the column name in a variable (undocumented; this screen is the only evidence). That is the withdrawn #67 claim 3, answered by using the app rather than by a probe — the whole argument for rescoping. Epic #66 delivered: sortable headings, coverage AND priority heading filters, coverage column, 32 generated branches, both filter columns indexed | sessions/2026-09-08-1724-epic66-probes-authored.md

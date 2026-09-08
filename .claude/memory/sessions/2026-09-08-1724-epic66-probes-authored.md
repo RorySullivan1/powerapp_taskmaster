@@ -168,3 +168,20 @@ priority not filterable or sortable?"**
   descending-name check fails, one flag rewrites the 96-branch literal-identifier version.
 - **`project_coverage`'s SharePoint index is still unconfirmed** — the user indexed priority and
   said nothing about coverage. Do not assume.
+
+## Confirmed working — and the probe question answered by using the app
+
+**"Sorting works - looks good."** (user, 2026-09-08)
+
+- **This settles the last open question on the screen, and it is the one the withdrawn probes
+  existed for.** `SortByColumns` DOES delegate with the column name in a variable. MS Learn is
+  silent on it, so `scrProjects` is the only evidence that exists anywhere in this project.
+- **It is also the whole argument for the rescope, demonstrated.** #67 claim 3 would have cost a
+  probe screen, a paste and a reading. Using the shipped screen answered it for free, because the
+  fallback was cheap and mechanical (`--mode switch`) rather than catastrophic.
+- **Recorded as evidence, not as a guarantee.** The failure mode if it ever stops holding is
+  silent — one page sorted, the rest of a 2,000+ row list left in its old order, looking fine. The
+  source and the generator both say so, and both name the check and the one-flag fallback.
+- Epic #66 delivered end to end: sortable headings on the delegable set, Coverage and Priority
+  filtering from their own headings, a Coverage column, 32 generated branches, both filter columns
+  indexed in SharePoint. PR opened onto `main`.
