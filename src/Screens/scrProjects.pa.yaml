@@ -39,10 +39,11 @@ Screens:
          // SELF-HEAL, same as scrHome. App.OnStart is NON-BLOCKING, so this screen can run
          // before it finishes and a blank gUserEmail makes the "only mine" branches match nothing.
          If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
-         // SORT STATE. gPrjSortOrd holds a SortOrder VALUE, not a boolean, so the
-         // sixteen branches can pass it straight to SortByColumns without deriving
-         // anything sixteen times. Both must be set before the gallery first
-         // evaluates: a blank column name is not a column and the query fails.
+         // SORT STATE. gPrjSortCol is a KEY the gallery's Switch compares with `=`, NOT a
+         // column name — see the comment above the gallery's query. gPrjSortOrd holds a SortOrder
+         // VALUE rather than a boolean so every branch can pass it straight to Sort. Both must
+         // be set before the gallery first evaluates, or the Switch falls to its default arm
+         // on load and the heading arrows disagree with the order on screen.
          Set( gPrjSortCol, "project_name" );
          Set( gPrjSortOrd, SortOrder.Ascending )
     Children:
@@ -172,10 +173,13 @@ Screens:
       # scroll the headings would sit 16px right of true.
       #
       # ONLY THREE HEADINGS SORT, AND THAT IS THE DELEGATION RULE, not a design
-      # choice: SharePoint folds Sort/SortByColumns on Text, Number, Boolean and
-      # DateTime and NOT on Complex. Priority, Coverage, Phase and Lead are Choice
-      # or Person columns, so a sort on them would quietly reorder only the rows
-      # already fetched and leave the rest of the list in its old order.
+      # choice: SharePoint folds Sort on Text, Number, Boolean and DateTime and NOT
+      # on Complex. Priority, Coverage, Phase and Lead are Choice or Person columns,
+      # so a sort on them would quietly reorder only the rows already fetched and
+      # leave the rest of the list in its old order.
+      # EACH BUTTON WRITES A KEY, NOT A COLUMN NAME. The gallery's Switch compares
+      # these strings with `=` and sorts on a literal identifier in each arm; nothing
+      # here reaches SharePoint as a column name.
       - rowTableHead:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -347,8 +351,24 @@ Screens:
                         LayoutMinWidth: =104
                         Height: =40
       # ---- Gallery ----------------------------------------------------------
-      # ONE DELEGABLE QUERY, NO LOCAL PASS — and SIXTEEN BRANCHES, which is the honest price
-      # of that. Four binary filters (search × show completed × coverage × only mine), each
+      # FORTY-EIGHT BRANCHES: the sixteen filter branches, written out once per SORT COLUMN.
+      # THE COLUMN NAME MUST BE AN IDENTIFIER, NOT A STRING, and that is what costs the 3x.
+      # `SortByColumns(src, gPrjSortCol, ...)` is one line per branch and was tried first; it
+      # fails, because a string column name is matched against the SharePoint INTERNAL name and
+      # `project_name` is not one — that column is the built-in Title, renamed. Every other
+      # formula in this app names columns as Power Fx IDENTIFIERS, which resolve by DISPLAY
+      # name, so the mismatch appears nowhere else. Passing internal names instead would work
+      # and is rejected: it would put a second, invisible naming scheme into the one formula
+      # that cannot be checked against schema/schema.yaml.
+      # SO gPrjSortCol IS A KEY, NOT A COLUMN NAME. It is only ever compared with `=` in this
+      # Switch, and each arm sorts on a literal identifier — the same delegable shape the
+      # screen already shipped sixteen times. Its values happen to read like column names for
+      # legibility; nothing sends them to SharePoint.
+      # `Sort(If(...))` and a Sort key built from an expression do NOT fold, so the Switch has
+      # to be OUTSIDE and the filters duplicated. Do not factor this back down.
+      #
+      # ONE DELEGABLE QUERY, NO LOCAL PASS — and SIXTEEN BRANCHES per arm, which is the honest
+      # price of that. Four binary filters (search × show completed × coverage × only mine), each
       # branch INDEPENDENTLY delegable with its `Sort` INSIDE it. `Sort(If(...))` would not
       # fold, and a predicate assembled from a variable does not fold either, so every branch
       # WRITES ITS PREDICATES OUT. The duplication is the mechanism; do not factor it away.
@@ -385,103 +405,300 @@ Screens:
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: |
-              =If( Len( Trim(txtProjSearch.Text) ) = 0,
-                   If( tglShowComplete.Value && tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns(
-                           Filter( ActiveProjects,
-                                   ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglShowComplete.Value && tglOnlyMine.Value,
-                       SortByColumns(
-                           Filter( ActiveProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value
-                                && ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglShowComplete.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns( ActiveProjects, gPrjSortCol, gPrjSortOrd ),
-                       tglShowComplete.Value,
-                       SortByColumns(
-                           Filter( ActiveProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns(
-                           Filter( OpenProjects,
-                                   ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglOnlyMine.Value,
-                       SortByColumns(
-                           Filter( OpenProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value
-                                && ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns( OpenProjects, gPrjSortCol, gPrjSortOrd ),
-                       SortByColumns(
-                           Filter( OpenProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value ),
-                           gPrjSortCol, gPrjSortOrd ) ),
-                   If( tglShowComplete.Value && tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns(
-                           Filter( ActiveProjects,
-                                   ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail )
-                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglShowComplete.Value && tglOnlyMine.Value,
-                       SortByColumns(
-                           Filter( ActiveProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value
-                                && ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail )
-                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglShowComplete.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns(
-                           Filter( ActiveProjects,
-                                   StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglShowComplete.Value,
-                       SortByColumns(
-                           Filter( ActiveProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value
-                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns(
-                           Filter( OpenProjects,
-                                   ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail )
-                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       tglOnlyMine.Value,
-                       SortByColumns(
-                           Filter( OpenProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value
-                                && ( project_manager.Email = gUserEmail
-                                 || project_supporter.Email = gUserEmail )
-                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       SortByColumns(
-                           Filter( OpenProjects,
-                                   StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ),
-                       SortByColumns(
-                           Filter( OpenProjects,
-                                   project_coverage.Value = cboPrjCoverage.Selected.Value
-                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                           gPrjSortCol, gPrjSortOrd ) ) )
+              =Switch( gPrjSortCol,
+                   "project_date_target",
+                   If( Len( Trim(txtProjSearch.Text) ) = 0,
+                       If( tglShowComplete.Value && tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglShowComplete.Value && tglOnlyMine.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglShowComplete.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort( ActiveProjects, project_date_target, gPrjSortOrd ),
+                           tglShowComplete.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                               project_date_target, gPrjSortOrd ),
+                           tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglOnlyMine.Value,
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_date_target, gPrjSortOrd ),
+                           Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort( OpenProjects, project_date_target, gPrjSortOrd ),
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                               project_date_target, gPrjSortOrd ) ),
+                       If( tglShowComplete.Value && tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglShowComplete.Value && tglOnlyMine.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglShowComplete.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglShowComplete.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ),
+                           tglOnlyMine.Value,
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ),
+                           Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ),
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_date_target, gPrjSortOrd ) ) ),
+                   "project_perc_completion",
+                   If( Len( Trim(txtProjSearch.Text) ) = 0,
+                       If( tglShowComplete.Value && tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglShowComplete.Value && tglOnlyMine.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglShowComplete.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort( ActiveProjects, project_perc_completion, gPrjSortOrd ),
+                           tglShowComplete.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglOnlyMine.Value,
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort( OpenProjects, project_perc_completion, gPrjSortOrd ),
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                               project_perc_completion, gPrjSortOrd ) ),
+                       If( tglShowComplete.Value && tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglShowComplete.Value && tglOnlyMine.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglShowComplete.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglShowComplete.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           tglOnlyMine.Value,
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ),
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_perc_completion, gPrjSortOrd ) ) ),
+                   If( Len( Trim(txtProjSearch.Text) ) = 0,
+                       If( tglShowComplete.Value && tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_name, gPrjSortOrd ),
+                           tglShowComplete.Value && tglOnlyMine.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_name, gPrjSortOrd ),
+                           tglShowComplete.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort( ActiveProjects, project_name, gPrjSortOrd ),
+                           tglShowComplete.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                               project_name, gPrjSortOrd ),
+                           tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_name, gPrjSortOrd ),
+                           tglOnlyMine.Value,
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail ) ),
+                               project_name, gPrjSortOrd ),
+                           Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort( OpenProjects, project_name, gPrjSortOrd ),
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                               project_name, gPrjSortOrd ) ),
+                       If( tglShowComplete.Value && tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ),
+                           tglShowComplete.Value && tglOnlyMine.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ),
+                           tglShowComplete.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( ActiveProjects,
+                                       StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ),
+                           tglShowComplete.Value,
+                           Sort(
+                               Filter( ActiveProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ),
+                           tglOnlyMine.Value
+                        && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ),
+                           tglOnlyMine.Value,
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && ( project_manager.Email = gUserEmail
+                                     || project_supporter.Email = gUserEmail )
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ),
+                           Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                           Sort(
+                               Filter( OpenProjects,
+                                       StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ),
+                           Sort(
+                               Filter( OpenProjects,
+                                       project_coverage.Value = cboPrjCoverage.Selected.Value
+                                    && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                               project_name, gPrjSortOrd ) ) ) )
             # EXPLICIT single column. Left unset, a wrapping gallery divides TemplateWidth
             # between columns and every proportional child inside the row shrinks with it.
             WrapCount: =1
