@@ -1,0 +1,361 @@
+# =============================================================================
+# scrProbeSBC — CLAIM 3 of issue #67 (epic #66): does SortByColumns FOLD when
+# the COLUMN NAME comes from a variable?
+#
+# #66's sort headers are the reason. If a variable column name delegates, each
+# of galProjects.Items' sixteen branches gains ONE SortByColumns line. If it
+# does not, each branch becomes a Switch over the three literal columns -- 48
+# branches instead of 16 -- because Sort(If(...)) does not fold either. That is
+# the difference between a tidy change and a very large one, and it is not
+# knowable from the docs: MS Learn shows SortByColumns driven by a Drop down and
+# shows SortOrder held in a variable, but says nothing about whether the column
+# NAME may vary and still reach SharePoint.
+#
+# ------------------------------------------------------------ THE FAILURE MODE
+# A non-delegable sort DOES NOT ERROR. It sorts the page that came back, so it
+# returns plausible rows in a plausible order and is wrong only about which rows
+# those are. That is the hardest kind of result to see, and every instrument
+# here exists to make it visible as a difference between two printed names.
+#
+# LOWER THE DATA ROW LIMIT TO 10 (Settings > General) FOR THIS RUN. It is what
+# turns an invisible fault into an obvious one: a DELEGATED descending sort
+# returns the true top 10 of the whole subset, while a LOCAL one returns the
+# first 10 rows the server happened to send and then sorts those. With the limit
+# at its normal 2,000 the two are identical on any subset under 2,000 rows and
+# this probe would confirm nothing.
+#
+# *** PUT THE DATA ROW LIMIT BACK WHEN YOU ARE DONE -- it is app-wide. ***
+# Run this in the same sitting as scrProbeCG so the setting is changed once.
+#
+# ------------------------------------------------------------------- THE ROWS
+# Every row prints FIRST | LAST project_name of the same subset, so the rows are
+# comparable no matter which column is being sorted on -- the ORDER is what is
+# under test, not the values.
+#
+#   L0  literal column, literal SortOrder.Descending    ground truth
+#   L1  literal column, VARIABLE order                  isolates the order
+#   L2  literal project_date_target, variable order
+#   L3  literal project_perc_completion, variable order
+#   V   VARIABLE column, variable order                 THE VERDICT
+#   NC  variable column over a ForAll projection        what LOCAL looks like
+#
+# L1 and V differ in exactly one thing: whether the column name is a literal or
+# a variable. NC is the same formula over a table that is definitely local and
+# definitely capped, so it prints the value a non-folding V would print. With a
+# known-delegated value on one side and a known-local value on the other, V has
+# nowhere ambiguous to land -- and neither control shares an instrument with it.
+#
+# L0 is not redundant. If L1 disagrees with L0 while gSbcOrd holds Descending,
+# the fault is the SortOrder variable and the column name is exonerated, which
+# is a different finding with a different fix.
+#
+# PRESS THE BUTTONS BEFORE READING ANYTHING. gSbcCol and gSbcOrd are blank until
+# then, and rows L1, L2, L3, V and NC are meaningless -- the status line says so.
+#
+# THE PREFIX BOX MUST NOT BE LEFT EMPTY: StartsWith(project_name, "") is
+# rejected outright (scrProbe-startswith-empty, 2026-09-04). It defaults to "a".
+#
+# BREAKS RULE 1 ON PURPOSE: it names a data source, because delegation is the
+# claim. It uses no component and no named formula -- the raw list keeps the
+# subset predictable, and #51 row 6r already proved that shape clean.
+#
+# Paste onto a blank screen named exactly scrProbeSBC. Set its Fill in the
+# formula bar; screens are not controls, so that cannot be pasted.
+# =============================================================================
+Screens:
+  scrProbeSBC:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblSbcTitle:
+          Control: Label@2.5.1
+          Properties:
+            # Block scalar, NOT inline: YAML reads " #" in a plain scalar as a comment
+            # and would eat the rest of the line, closing quote included.
+            Text: |
+              ="Dynamic SortByColumns probe  ·  issue #67 claim 3  ·  does a VARIABLE column name still delegate?"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =12
+            Width: =1300
+            Height: =28
+      - lblSbcHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="1. Data row limit = 10 (Settings > General). Write down what it was and PUT IT BACK afterwards -- it is app-wide." &
+               Char(10) &
+               "2. Press a COLUMN button and an ORDER button. Nothing below L0 means anything until both are set." &
+               Char(10) &
+               "3. Type prefix letters until the rows print two DIFFERENT names. A subset small enough that first and last are the same row cannot show the difference this probe measures." &
+               Char(10) &
+               "4. Read V against L1 (or L2 / L3, matching the column you pressed) and against NC. Repeat for all three columns and both orders."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =46
+            Width: =1300
+            Height: =74
+      - txtSbcPrefix:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Type: =TextInputType.Search
+            Default: ="a"
+            Placeholder: ="name prefix -- NEVER leave this empty"
+            X: =16
+            Y: =128
+            Width: =240
+            Height: =32
+      # ------------------------------------------------------------- THE BUTTONS
+      # A probe screen's OnVisible cannot be pasted -- screens are not controls -- so
+      # the two variables are set by hand here. That is also why the status line below
+      # exists: an unpressed button and a delegation failure would otherwise look the
+      # same on every row.
+      - btnSbcColName:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="col = project_name"
+            OnSelect: =Set( gSbcCol, "project_name" )
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            X: =272
+            Y: =128
+            Width: =180
+            Height: =32
+      - btnSbcColTarget:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="col = date_target"
+            OnSelect: =Set( gSbcCol, "project_date_target" )
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            X: =460
+            Y: =128
+            Width: =180
+            Height: =32
+      - btnSbcColPct:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="col = perc_completion"
+            OnSelect: =Set( gSbcCol, "project_perc_completion" )
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            X: =648
+            Y: =128
+            Width: =180
+            Height: =32
+      - btnSbcOrdDesc:
+          Control: Classic/Button@2.2.0
+          Properties:
+            # DESCENDING is the informative direction. Ascending over a page that begins
+            # at the top of the list can accidentally agree with the delegated answer;
+            # descending puts the rows a local sort has never seen at the front.
+            Text: ="order = Descending"
+            OnSelect: =Set( gSbcOrd, SortOrder.Descending )
+            Fill: =RGBA(146, 104, 22, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            X: =852
+            Y: =128
+            Width: =180
+            Height: =32
+      - btnSbcOrdAsc:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="order = Ascending"
+            OnSelect: =Set( gSbcOrd, SortOrder.Ascending )
+            Fill: =RGBA(146, 104, 22, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            X: =1040
+            Y: =128
+            Width: =180
+            Height: =32
+      - lblSbcStatus:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="prefix = [" & Trim(txtSbcPrefix.Text) & "]     gSbcCol = [" & Coalesce(gSbcCol, "") &
+               "]     gSbcOrd set = " & If( IsBlank(gSbcOrd), "NO -- press an order button", "yes" ) &
+               If( Len( Trim(txtSbcPrefix.Text) ) = 0,
+                   "     PREFIX EMPTY -- every row is erroring", "" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(196, 78, 71, 1)
+            X: =16
+            Y: =172
+            Width: =1300
+            Height: =22
+      # -------------------------------------------------------------- THE ROWS
+      - lblSbcP:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="P   First(taskmaster_projects) ......................... " &
+               IfError( Coalesce( First( taskmaster_projects ).project_name, "-- empty --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =212
+            Width: =1300
+            Height: =22
+      - lblSbcL0:
+          Control: Label@2.5.1
+          Properties:
+            # GROUND TRUTH. Literal column, literal order, and the only row on the sheet
+            # that needs no button pressed. If this one errors, stop.
+            Text: |
+              ="L0  literal col, literal Descending .................... " &
+               IfError( Coalesce( First( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_name", SortOrder.Descending ) ).project_name, "-- no rows --" )
+                        & "   |   " &
+                        Coalesce( Last( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_name", SortOrder.Descending ) ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =244
+            Width: =1300
+            Height: =22
+      - lblSbcL1:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="L1  literal project_name, VARIABLE order ............... " &
+               IfError( Coalesce( First( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_name", gSbcOrd ) ).project_name, "-- no rows --" )
+                        & "   |   " &
+                        Coalesce( Last( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_name", gSbcOrd ) ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =268
+            Width: =1300
+            Height: =22
+      - lblSbcL2:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="L2  literal project_date_target, variable order ........ " &
+               IfError( Coalesce( First( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_date_target", gSbcOrd ) ).project_name, "-- no rows --" )
+                        & "   |   " &
+                        Coalesce( Last( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_date_target", gSbcOrd ) ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =292
+            Width: =1300
+            Height: =22
+      - lblSbcL3:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="L3  literal project_perc_completion, variable order .... " &
+               IfError( Coalesce( First( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_perc_completion", gSbcOrd ) ).project_name, "-- no rows --" )
+                        & "   |   " &
+                        Coalesce( Last( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  "project_perc_completion", gSbcOrd ) ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =316
+            Width: =1300
+            Height: =22
+      - lblSbcV:
+          Control: Label@2.5.1
+          Properties:
+            # THE VERDICT. Identical to L1/L2/L3 except that the column name arrives in a
+            # variable. Read it against whichever literal row matches the button pressed.
+            Text: |
+              ="V   VARIABLE column, variable order .................... " &
+               IfError( Coalesce( First( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  gSbcCol, gSbcOrd ) ).project_name, "-- no rows --" )
+                        & "   |   " &
+                        Coalesce( Last( SortByColumns( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                  gSbcCol, gSbcOrd ) ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =348
+            Width: =1300
+            Height: =22
+      - lblSbcNC:
+          Control: Label@2.5.1
+          Properties:
+            # WHAT LOCAL LOOKS LIKE. The projection materialises at the data row limit, so
+            # this row is sorted over 10 arbitrary rows by construction. V matching THIS
+            # instead of L1 is the negative finding, and it is a value rather than an
+            # absence -- which is the whole reason the row is here.
+            Text: |
+              ="NC  variable column over a ForAll projection  LOCAL .... " &
+               IfError( Coalesce( First( SortByColumns( ForAll( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                    { project_name: project_name,
+                                      project_date_target: project_date_target,
+                                      project_perc_completion: project_perc_completion } ),
+                                  gSbcCol, gSbcOrd ) ).project_name, "-- no rows --" )
+                        & "   |   " &
+                        Coalesce( Last( SortByColumns( ForAll( Filter( taskmaster_projects,
+                                      StartsWith( project_name, Trim(txtSbcPrefix.Text) ) ),
+                                    { project_name: project_name,
+                                      project_date_target: project_date_target,
+                                      project_perc_completion: project_perc_completion } ),
+                                  gSbcCol, gSbcOrd ) ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(196, 78, 71, 1)
+            X: =16
+            Y: =372
+            Width: =1300
+            Height: =22
+      - lblSbcRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="HOW TO READ  ·  L0 errors -> stop, the environment is wrong.   " &
+               "L1 = L0 with Descending pressed -> the SortOrder variable folds, so anything V does is about the COLUMN name.   " &
+               "L1 differs from L0 -> the ORDER variable is the fault; the column name is exonerated and the fix is a different one.   " &
+               "V = L1 (and L2, L3) and V differs from NC -> a VARIABLE COLUMN NAME DELEGATES: #66 takes one SortByColumns line per branch, 16 branches.   " &
+               "V = NC -> it does not: the sort must be a Switch over the three literal columns INSIDE each branch, 48 branches, and the epic pays for it.   " &
+               "V errors -> record the text verbatim; a rejected query is a third answer, not a version of the second.   " &
+               "Every row printing the same name twice -> the subset is too small to discriminate; change the prefix."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =408
+            Width: =1300
+            Height: =92

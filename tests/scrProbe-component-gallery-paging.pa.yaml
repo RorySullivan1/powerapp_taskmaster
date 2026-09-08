@@ -1,0 +1,250 @@
+# =============================================================================
+# scrProbeCG — CLAIM 2 of issue #67 (epic #66): does a gallery INSIDE a
+# component, bound to a Table Input that was handed the query, still PAGE?
+#
+# Claim 1 asks whether the query is accepted. This asks the harder half: an
+# accepted formula may still have been materialised at the data row limit on
+# the way in, in which case cmpProjectTable would show the first N projects and
+# silently lose the rest -- the same failure the 2,000-row backfill exposed, and
+# the reason #66's contract is written three ways. RUN CLAIM 1 FIRST: if the
+# input rejects the query outright there is nothing here to measure.
+#
+# ------------------------------------------------------------------ THE METHOD
+# DEPARTS FROM #67, which asks for a bounded phase subset read against a screen
+# gallery. Two reasons, and the second is why it is worth the departure.
+#
+#  1. No phase's row count is knowable from this side of the gap, so "pick a
+#     subset that lands clear of 0 and of the ceiling" is guesswork the runner
+#     has to do live. A NAME PREFIX in a box is adjustable in a second: type
+#     letters until the control gallery reads somewhere around 20-60 rows.
+#
+#  2. THE LIMIT IS LOWERED INSTEAD OF THE SUBSET BEING RAISED. Settings >
+#     General > Data row limit, set to 10 for this run. "Past the limit" then
+#     costs 11 rows rather than 2,001, the whole sheet is readable by scrolling
+#     three galleries, and -- the part that matters -- IT MAKES CAPPING VISIBLE
+#     AS A NUMBER. Every previous attempt at this question failed because a cap
+#     and a small result set look identical. With the limit at 10, a capped
+#     gallery reads exactly 10 and nothing else does.
+#
+# *** PUT THE DATA ROW LIMIT BACK WHEN YOU ARE DONE. *** It is an APP-WIDE
+# setting, not a screen one: leaving it at 10 silently truncates every
+# non-delegable query in the real app. Write the original value down before
+# changing it. It is 2000 unless someone has moved it.
+#
+# ------------------------------------------------------------- THE THREE ROWS
+#   G1  screen gallery, DIRECT-BOUND to the query      POSITIVE CONTROL
+#   G2  gallery inside the component, bound to the     THE VERDICT
+#       input the instance handed that same query
+#   G3  screen gallery bound to ForAll(query, {...})   NEGATIVE CONTROL
+#
+# G3 is what a capped table looks like: a ForAll projection materialises, so it
+# MUST read exactly 10. G1 is what an uncapped one looks like: a direct-bound
+# gallery pages in 100s regardless of the limit. Between those two known values,
+# G2's number is unambiguous -- which is the whole design, since neither control
+# shares an instrument with the thing being measured.
+#
+# EVERY COUNT IS CountRows OVER gal.AllItems -- a LOCAL table of rows the
+# gallery has actually loaded, never a count over a live list, which prints the
+# ceiling and says nothing (ledger 2026-09-04 on #51). SCROLL EACH GALLERY TO
+# ITS END BEFORE READING ITS NUMBER: they load lazily, so an unscrolled count
+# measures how long you waited.
+#
+# THE PREFIX BOX MUST NOT BE LEFT EMPTY. StartsWith(project_name, "") is
+# rejected outright -- "the query is not valid" -- so an empty box takes all
+# three rows down at once (scrProbe-startswith-empty, 2026-09-04). It defaults
+# to "a"; if a letter matches nothing, type another.
+#
+# BEFORE PASTING
+#   1. taskmaster_projects in the Data pane.
+#   2. cmpProbeTable built, its three custom properties HAND-TYPED, Children
+#      pasted. THE PASTE BELOW SETS cmpCgInst.RowsFlat BY NAME -- if that
+#      property was typed under any other spelling the paste fails as a whole.
+#   3. Claim 1 already run. If claim 1 blessed RowsRich rather than RowsFlat,
+#      move the query onto RowsRich in the formula bar after pasting and read G2
+#      from the right-hand gallery instead.
+#   4. Data row limit set to 10, and the original value written down.
+#   5. Blank screen named exactly scrProbeCG. Set its Fill in the formula bar.
+# =============================================================================
+Screens:
+  scrProbeCG:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblCgTitle:
+          Control: Label@2.5.1
+          Properties:
+            # Block scalar, NOT inline: YAML reads " #" in a plain scalar as a comment
+            # and would eat the rest of the line, closing quote included.
+            Text: |
+              ="Component gallery paging probe  ·  issue #67 claim 2  ·  does the table still page inside a component?"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =12
+            Width: =1300
+            Height: =28
+      - lblCgHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="SET THE DATA ROW LIMIT TO 10 FIRST (Settings > General), write down what it was, and PUT IT BACK AFTERWARDS -- it is app-wide, not screen-wide." &
+               Char(10) &
+               "Type prefix letters until G1 reads roughly 20-60. Then scroll ALL THREE galleries to their end and read the three numbers. G3 must read exactly 10 and G1 must read more; if that is not true, stop -- nothing else on the sheet means anything." &
+               Char(10) &
+               "G2 equal to G1 -> the query crossed intact and kept paging. G2 equal to 10 -> it was materialised at the limit on the way in."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =46
+            Width: =1300
+            Height: =58
+      - txtCgPrefix:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            # Same control and same reader (.Text) as the shipping txtProjSearch, and the
+            # same Trim around it, so the query under test is the one the app runs.
+            Type: =TextInputType.Search
+            Default: ="a"
+            Placeholder: ="name prefix -- NEVER leave this empty"
+            X: =16
+            Y: =110
+            Width: =300
+            Height: =32
+      - lblCgEcho:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="prefix = [" & Trim(txtCgPrefix.Text) & "]        " &
+               If( Len( Trim(txtCgPrefix.Text) ) = 0,
+                   "EMPTY -- every row below is erroring, type a letter",
+                   "" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(196, 78, 71, 1)
+            X: =330
+            Y: =116
+            Width: =700
+            Height: =22
+      # ------------------------------------------------- G1  POSITIVE CONTROL
+      - lblCgG1Head:
+          Control: Label@2.5.1
+          Properties:
+            # The RAW list, not a named formula: the phase vocabulary would bound the set
+            # by an amount nobody here can predict, and #51 row 6r already proved the raw
+            # shape is clean.
+            Text: |
+              ="G1  SCREEN, direct-bound   CONTROL, must exceed 10   loaded: " &
+               IfError( Text( CountRows( galCgCtl.AllItems ) ), "err" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =154
+            Width: =650
+            Height: =22
+      - galCgCtl:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            Items: |
+              =Sort( Filter( taskmaster_projects,
+                         StartsWith( project_name, Trim(txtCgPrefix.Text) ) ),
+                     project_name )
+            WrapCount: =1
+            TemplateSize: =28
+            TemplatePadding: =0
+            TemplateFill: =RGBA(255, 255, 255, 1)
+            BorderThickness: =1
+            BorderColor: =RGBA(49, 130, 93, 1)
+            ShowScrollbar: =true
+            X: =16
+            Y: =180
+            Width: =650
+            Height: =160
+          Children:
+            - cgCtlRow:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =Coalesce( ThisItem.project_name, "-- blank --" )
+                  Font: =Font.'Segoe UI'
+                  Size: =12
+                  Color: =RGBA(32, 38, 45, 1)
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =28
+      # ------------------------------------------------- G3  NEGATIVE CONTROL
+      - lblCgG3Head:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="G3  SCREEN, ForAll projection   CONTROL, must read exactly 10   loaded: " &
+               IfError( Text( CountRows( galCgFor.AllItems ) ), "err" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(196, 78, 71, 1)
+            X: =690
+            Y: =154
+            Width: =650
+            Height: =22
+      - galCgFor:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            # THE SHAPE cmpPicker USES, and the one #66 must not ship for 2,000+ projects.
+            # It is here to be seen failing: a projection materialises, so this gallery
+            # cannot reach past the limit no matter how far it is scrolled.
+            Items: |
+              =ForAll( Sort( Filter( taskmaster_projects,
+                                 StartsWith( project_name, Trim(txtCgPrefix.Text) ) ),
+                             project_name ),
+                       { project_name: project_name } )
+            WrapCount: =1
+            TemplateSize: =28
+            TemplatePadding: =0
+            TemplateFill: =RGBA(255, 255, 255, 1)
+            BorderThickness: =1
+            BorderColor: =RGBA(196, 78, 71, 1)
+            ShowScrollbar: =true
+            X: =690
+            Y: =180
+            Width: =650
+            Height: =160
+          Children:
+            - cgForRow:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =Coalesce( ThisItem.project_name, "-- blank --" )
+                  Font: =Font.'Segoe UI'
+                  Size: =12
+                  Color: =RGBA(32, 38, 45, 1)
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =28
+      # ------------------------------------------------------- G2  THE VERDICT
+      - cmpCgInst:
+          Control: CanvasComponent
+          ComponentName: cmpProbeTable
+          Properties:
+            # THE ONE PROPERTY THIS PROBE EXISTS FOR: the query itself, not a projection
+            # of it, handed across the component boundary. G2 is the LEFT gallery inside
+            # the instance, the one bound to RowsFlat.
+            # ONE property is set, not three. RowsCtl would add a second way for the
+            # paste to fail and buy nothing G3 does not already show, and RowsRich is
+            # left at its default so that the fallback path stays a formula-bar edit
+            # rather than a second chance to lose the whole paste.
+            RowsFlat: |
+              =Sort( Filter( taskmaster_projects,
+                         StartsWith( project_name, Trim(txtCgPrefix.Text) ) ),
+                     project_name )
+            X: =16
+            Y: =356
+            Width: =1324
+            Height: =396

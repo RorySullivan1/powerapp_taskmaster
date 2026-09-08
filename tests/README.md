@@ -935,3 +935,165 @@ a valid shape.
 **The original observation is not reproduced, so the phase group was never the variable that
 mattered.** See the `scrProbe-startswith-empty` result above, which found the variable that was:
 the empty `StartsWith` argument.
+
+---
+
+## Issue #67 — the three claims that fix `cmpProjectTable`'s data contract
+
+Three probes, written 2026-09-08, **none yet run**. They share one throwaway component and
+one Studio setting change, so they are meant to be run in a single sitting.
+
+`#66` rewrites `galProjects` as a component. Its contract is written **three ways** in the epic
+because nobody knows whether a query survives the component boundary — and `galProjects` is
+direct-bound and pages past the data row limit, while a `ForAll` projection materialises at it
+and drops the newest rows in silence. Picking by taste would reproduce, at 2,000+ projects, the
+exact defect the backfill already exposed once. These three probes pick instead.
+
+### The shared instrument: `cmpProbeTable.pa.yaml`
+
+A throwaway component — **not** `cmpProjectTable`, and deleted from Studio once the results are
+recorded. It carries three Table Inputs, one per candidate contract, because **a component
+input's type IS its `Default` literal** and the three candidates have three different shapes:
+
+| Input | `Default` shape | Role |
+|---|---|---|
+| `RowsFlat` | only the flat columns the table displays | candidate (a) |
+| `RowsRich` | same, plus `project_manager` as `{DisplayName, Email}` and the Choices as `{Value}` | candidate (b) |
+| `RowsCtl` | flat again, fed a `ForAll` projection | **positive control** — expected to be accepted |
+
+They are three properties rather than one retyped property so a partial result stays readable.
+Each has a `First()` readout, and `RowsFlat`/`RowsRich` each have a gallery. **All three custom
+properties are hand-typed in Studio** — a paste does not carry them — so build the definition,
+type the properties, check each `Default` against the file, and only then paste the `Children`.
+
+Every width and height inside it is a formula off `Parent`, so one definition fits both probe
+screens at whatever size each instantiates it. Flattening those to constants would push the
+galleries' own bottom edge outside the shorter instance, and the last row — the row claim 2 is
+read from — would land in the clipped strip.
+
+### `scrProbe-component-table-input.pa.yaml` — claim 1: does the query cross the boundary?
+
+**Status: NOT YET RUN.** Written 2026-09-08. Screen name `scrProbeCT`.
+
+**The verdict is in the formula bar, not on the sheet.** The failure mode is an author-time
+schema error, so the readout is binary — the property takes the formula or it goes red — and
+**nothing in the paste sets the inputs**. The instance lands holding its `Default`s and each
+candidate is typed in by hand, so a rejection costs one row instead of the whole screen.
+
+| Row | Typed into | Formula |
+|---|---|---|
+| **1c** | `cmpCtInst.RowsCtl` | `ForAll(Filter(OpenProjects, StartsWith(project_name,"a")), {…})` — **run this first** |
+| **1a** | `cmpCtInst.RowsFlat` | `Filter( OpenProjects, StartsWith(project_name, "a") )` |
+| **1b** | `cmpCtInst.RowsRich` | the same query |
+| **1d** | `cmpCtInst.RowsFlat` | `ShowColumns( Filter(…), project_name, project_date_target, project_perc_completion )` |
+
+**1d is not in #67.** It is the only candidate that could give both an exact schema and a live
+query — `ShowColumns` narrows columns without projecting rows — so an accepted 1d proves nothing
+on its own and earns a row in claim 2 instead.
+
+The screen carries two controls that run **outside** the component (`P`, that `OpenProjects`
+resolves, and `E`, the identical query evaluated on the screen). They are what make a rejection
+attributable: if the query cannot be built on the screen either, the boundary is exonerated.
+
+**How to read.** 1c rejected → stop. 1a or 1b accepted **and** its readout prints a name → the
+query crosses intact and the epic takes its **first** outcome. 1b accepted but `blank manager` →
+rows crossed, complex columns did not, so a lead column inside the component is off the table.
+Both rejected → the **third** outcome: the gallery stays on the screen and the component is the
+header only. Accepted but `-- no rows --` while `E` prints a name → record it as its own answer;
+that is neither a pass nor a clean rejection.
+
+### `scrProbe-component-gallery-paging.pa.yaml` — claim 2: does it still page?
+
+**Status: NOT YET RUN.** Written 2026-09-08. Screen name `scrProbeCG`. **Run claim 1 first.**
+
+An accepted formula may still have been materialised on the way in. Three galleries answer it:
+
+| | Binding | Expected |
+|---|---|---|
+| **G1** | screen gallery, direct-bound to the query | **positive control** — must exceed the limit |
+| **G2** | gallery inside the component, bound to the input handed that query | **the verdict** |
+| **G3** | screen gallery bound to `ForAll(query, {…})` | **negative control** — must read exactly 10 |
+
+**This departs from #67 twice, and the second departure is the point.**
+
+1. #67 asks for a bounded phase subset. No phase's size is knowable from this side of the gap, so
+   "pick one clear of 0 and of the ceiling" is guesswork done live. A **name prefix in a box** is
+   adjustable in a second — type letters until G1 reads roughly 20–60.
+2. **The limit is lowered rather than the subset raised.** Settings → General → Data row limit,
+   set to **10**. "Past the limit" then costs 11 rows instead of 2,001, and — the part that
+   matters — **capping becomes visible as a number**. Every previous attempt at this question
+   failed because a cap and a small result set look identical; with the limit at 10, a capped
+   gallery reads exactly 10 and nothing else does.
+
+**Put the data row limit back afterwards. It is app-wide, not screen-wide** — left at 10 it
+silently truncates every non-delegable query in the real app. Write the original down first;
+it is 2000 unless someone has moved it.
+
+Counts are `CountRows` over `gal.AllItems` — a **local** table of rows actually loaded, never a
+count over a live list, which prints the ceiling and says nothing (ledger 2026-09-04 on #51).
+**Scroll each gallery to its end before reading its number**: they load lazily, so an unscrolled
+count measures how long you waited.
+
+**How to read.** G3 not exactly 10, or G1 not above it → stop, the sheet means nothing (and if G1
+is the one that caps, the epic's premise that `galProjects` pages past the limit is itself wrong,
+which is a larger finding than this probe was built for — record it and stop). G2 = G1 → the
+query crossed intact and kept paging. G2 = 10 → it was materialised at the limit on the way in.
+
+The paste sets **one** instance property, `RowsFlat`, by name. If claim 1 blessed `RowsRich`
+instead, move the query onto it in the formula bar after pasting and read G2 from the right-hand
+gallery. If that property was hand-typed under a different spelling, the paste fails as a whole.
+
+### `scrProbe-sortbycolumns-dynamic.pa.yaml` — claim 3: does a variable column name delegate?
+
+**Status: NOT YET RUN.** Written 2026-09-08. Screen name `scrProbeSBC`. Same lowered data row
+limit as claim 2 — run them in one sitting.
+
+The cost of the answer: one `SortByColumns` line per branch (**16 branches**) if a variable
+column name folds, or a `Switch` over the three literal columns inside each branch (**48
+branches**) if it does not, since `Sort(If(…))` does not fold either. MS Learn shows
+`SortByColumns` driven by a Drop down and shows `SortOrder` held in a variable, and says nothing
+about the column **name** varying.
+
+**A non-delegable sort does not error.** It sorts the page that came back — plausible rows in a
+plausible order, wrong only about *which* rows. Lowering the limit to 10 is what makes that
+visible: a delegated descending sort returns the true top 10 of the subset, a local one returns
+the first 10 the server sent and then sorts those. At the normal 2,000 the two are identical on
+any subset under 2,000 rows and this probe would confirm nothing.
+
+Every row prints **first | last `project_name`** of the same subset, so rows stay comparable
+whichever column is sorted on — the order is under test, not the values.
+
+| Row | Shape | Decides |
+|---|---|---|
+| **L0** | literal column, literal `SortOrder.Descending` | ground truth; needs no button pressed |
+| **L1** | literal `project_name`, **variable** order | isolates the order variable |
+| **L2/L3** | literal `project_date_target` / `project_perc_completion`, variable order | the other two sortable columns |
+| **V** | **variable** column, variable order | **the verdict** |
+| **NC** | variable column over a `ForAll` projection | **what local looks like** |
+
+L1 and V differ in exactly one thing. NC is the same formula over a table that is definitely
+local and definitely capped, so it prints the value a non-folding V would print — a known
+delegated value on one side, a known local value on the other, and no ambiguous place for V to
+land. **L0 is not redundant:** if L1 disagrees with it while `gSbcOrd` holds Descending, the
+fault is the SortOrder variable, the column name is exonerated, and the fix is a different one.
+
+`gSbcCol` and `gSbcOrd` are set by buttons on the screen — a probe screen's `OnVisible` cannot be
+pasted, screens are not controls — and are blank until pressed, which is why the status line
+prints both. **Press a column button and an order button before reading anything below L0.**
+
+**How to read.** L0 errors → stop. V = L1 (and L2, L3) while V differs from NC → **a variable
+column name delegates**, and #66 takes 16 branches. V = NC → it does not, and the epic pays for
+48. V errors → record the text verbatim; a rejected query is a third answer, not a version of the
+second. Every row printing the same name twice → the subset is too small to discriminate, change
+the prefix.
+
+### Carried across all three
+
+- The prefix box **must not be left empty**: `StartsWith(project_name, "")` is rejected outright
+  (`scrProbe-startswith-empty`, 2026-09-04), so an empty box takes every row down at once.
+- Both component probes **break rule 1 on purpose**, twice over — they name a data source and
+  they use a component. In both cases the banned thing is the thing under test.
+- Claim 3 uses the **raw list**, not a named formula: it keeps the subset predictable, and #51
+  row 6r already proved that shape clean.
+- **Done when** all three results are recorded above and `.claude/memory/INDEX.md` carries one
+  Decision naming which of #66's three contract outcomes applies. #68 starts from that entry.

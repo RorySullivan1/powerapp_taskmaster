@@ -1,0 +1,267 @@
+# =============================================================================
+# cmpProbeTable — THROWAWAY probe component for issue #67 (epic #66).
+#
+# THIS IS NOT cmpProjectTable. It is an instrument, deliberately ugly, and it is
+# deleted from Studio once #67 is recorded. Nothing in src/ may reference it.
+#
+# It exists because the epic's data contract is written THREE ways and only a
+# paste can choose between them. Two of #67's three claims are about what a
+# COMPONENT can be handed and what it does with it, so both need a component --
+# and building one costs the user ten hand-typed custom-property fields. ONE
+# definition therefore serves BOTH probe screens: scrProbeCT reads the labels
+# (claim 1, author-time), scrProbeCG scrolls the galleries (claim 2, runtime).
+#
+# BREAKS RULE 1 ON PURPOSE, twice over: it names a data source through what its
+# instances are fed, and it IS a component. In both cases the thing rule 1 bans
+# is the thing under test.
+#
+# THREE Table inputs, one per candidate contract, because a component input's
+# TYPE IS ITS DEFAULT LITERAL and the three candidates have three different
+# shapes. They are separate properties rather than one retyped property so that
+# a partial result is still readable: whatever the formula bar rejects, the
+# other two rows stand.
+#
+#   RowsFlat  flat literal, only the columns the table displays
+#   RowsRich  same, PLUS project_manager shaped { DisplayName, Email } and the
+#             Choices shaped { Value } -- the shape a raw SharePoint record has
+#   RowsCtl   flat again, and fed a ForAll projection. THE POSITIVE CONTROL:
+#             this one is expected to be accepted, and if it is not, the screen
+#             is the problem and nothing else on either sheet can be read.
+#
+# EVERY CUSTOM PROPERTY BELOW IS HAND-TYPED IN STUDIO -- a paste does not carry
+# them. Create the component, add the three Input properties with DataType
+# Table, paste each Default literal into its field, THEN paste the Children
+# block. Getting a Default wrong changes the property's TYPE and quietly makes
+# the claim untestable, so check each one against this file before moving on.
+#
+# Colours are literals and there is no gTheme: AccessAppScope is false, exactly
+# as every real component here.
+#
+# EVERY WIDTH AND HEIGHT BELOW IS A FORMULA OFF Parent, so ONE definition fits
+# both probe screens at whatever size each instantiates it. A fixed height here
+# would push the galleries' own bottom edge outside the instance on the shorter
+# screen, and a gallery scrolled to its end would put the last row -- the row
+# claim 2 is read from -- in the clipped strip. Layout formulas survive a paste
+# (scrProbe-layout-freeze, 2026-08-13); do not flatten these to constants.
+# =============================================================================
+ComponentDefinitions:
+  cmpProbeTable:
+    DefinitionType: CanvasComponent
+    Description: Throwaway instrument for issue 67. Three Table inputs, one per candidate data contract, each with a First() readout and a gallery. Delete after the probe is recorded.
+    AccessAppScope: false
+    CustomProperties:
+      RowsFlat:
+        PropertyKind: Input
+        Description: Candidate (a). Literal names ONLY the flat columns the table displays. The question is whether an instance may hand this the delegable query itself.
+        DataType: Table
+        Default: |
+          =Table( { project_name: "",
+                    project_date_target: Date(2026, 1, 1),
+                    project_perc_completion: 0 } )
+      RowsRich:
+        PropertyKind: Input
+        Description: Candidate (b). Same columns, plus the Person shaped as DisplayName/Email and the Choices shaped as Value -- the shape a raw SharePoint record actually has.
+        DataType: Table
+        Default: |
+          =Table( { project_name: "",
+                    project_date_target: Date(2026, 1, 1),
+                    project_perc_completion: 0,
+                    project_manager: { DisplayName: "", Email: "" },
+                    project_coverage: { Value: "" },
+                    project_priority: { Value: "" } } )
+      RowsCtl:
+        PropertyKind: Input
+        Description: POSITIVE CONTROL. Same literal as RowsFlat, but fed a ForAll projection rather than the query. Expected to be accepted. If this one is rejected the screen is at fault and the sheet is unreadable.
+        DataType: Table
+        Default: |
+          =Table( { project_name: "",
+                    project_date_target: Date(2026, 1, 1),
+                    project_perc_completion: 0 } )
+    Properties:
+      Width: =1180
+      Height: =520
+      Fill: =RGBA(255, 252, 240, 1)
+    Children:
+      - ptEdge:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =RGBA(214, 158, 46, 1)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =4
+      - ptTitle:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="INSIDE THE COMPONENT  ·  cmpProbeTable  ·  everything below this line is component scope"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(146, 104, 22, 1)
+            X: =12
+            Y: =10
+            Width: =Parent.Width - 24
+            Height: =22
+      # --------------------------------------------------------- FIRST() READOUTS
+      # Claim 1 is settled in the FORMULA BAR, not here -- an input that rejects the
+      # query never gets as far as a value. These rows separate the two ways an
+      # ACCEPTED formula can still be wrong: a name means rows crossed the boundary,
+      # "-- no rows --" means the property took the formula and received nothing,
+      # which is a different and worse answer than a clean rejection.
+      - ptFlatRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="RowsFlat  First().project_name .... " &
+               IfError( Coalesce( First( cmpProbeTable.RowsFlat ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =12
+            Y: =40
+            Width: =(Parent.Width - 36) / 2
+            Height: =22
+      - ptRichRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="RowsRich  First().project_name .... " &
+               IfError( Coalesce( First( cmpProbeTable.RowsRich ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =12
+            Y: =64
+            Width: =(Parent.Width - 36) / 2
+            Height: =22
+      - ptCtlRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="RowsCtl   First().project_name .... " &
+               IfError( Coalesce( First( cmpProbeTable.RowsCtl ).project_name, "-- no rows --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(49, 130, 93, 1)
+            X: =12
+            Y: =88
+            Width: =(Parent.Width - 36) / 2
+            Height: =22
+      - ptRichSecond:
+          Control: Label@2.5.1
+          Properties:
+            # If RowsRich is accepted, this says whether the COMPLEX halves survived the
+            # crossing or arrived blank. A flat name proving nothing about the Person is
+            # exactly the trap the epic's contract table would fall into.
+            Text: |
+              ="RowsRich  manager / coverage ...... " &
+               IfError( Coalesce( First( cmpProbeTable.RowsRich ).project_manager.DisplayName, "-- blank manager --" )
+                        & "   |   " &
+                        Coalesce( First( cmpProbeTable.RowsRich ).project_coverage.Value, "-- blank coverage --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(32, 38, 45, 1)
+            X: =(Parent.Width - 36) / 2 + 24
+            Y: =64
+            Width: =(Parent.Width - 36) / 2
+            Height: =22
+      # ------------------------------------------------------------- THE GALLERIES
+      # Claim 2's instrument. CountRows here is over gal.AllItems -- a LOCAL table of
+      # the rows the gallery has actually loaded -- not over a live list, so it is not
+      # the banned CountRows and it does not print a ceiling. It only ever counts what
+      # is in the gallery, which is precisely the quantity under test.
+      # SCROLL EACH GALLERY TO ITS END before reading either number: a direct-bound
+      # gallery loads lazily, so an unscrolled count measures patience, not paging.
+      - ptFlatHead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="gallery bound to RowsFlat   loaded: " &
+               IfError( Text( CountRows( galPtFlat.AllItems ) ), "err" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =12
+            Y: =124
+            Width: =(Parent.Width - 36) / 2
+            Height: =22
+      - galPtFlat:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            Items: =cmpProbeTable.RowsFlat
+            WrapCount: =1
+            TemplateSize: =28
+            TemplatePadding: =0
+            TemplateFill: =RGBA(255, 255, 255, 1)
+            BorderThickness: =1
+            BorderColor: =RGBA(214, 158, 46, 1)
+            ShowScrollbar: =true
+            X: =12
+            Y: =150
+            Width: =(Parent.Width - 36) / 2
+            Height: =Parent.Height - 158
+          Children:
+            - ptFlatRow:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =Coalesce( ThisItem.project_name, "-- blank --" )
+                  Font: =Font.'Segoe UI'
+                  Size: =12
+                  Color: =RGBA(32, 38, 45, 1)
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =28
+      - ptRichHead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="gallery bound to RowsRich   loaded: " &
+               IfError( Text( CountRows( galPtRich.AllItems ) ), "err" )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =(Parent.Width - 36) / 2 + 24
+            Y: =124
+            Width: =(Parent.Width - 36) / 2
+            Height: =22
+      - galPtRich:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            # TWO galleries, one per candidate schema, rather than one gallery switched
+            # by a formula: If() over two tables of DIFFERENT shapes is a type error, and
+            # claim 1 decides which of the two shapes claim 2 is allowed to use.
+            Items: =cmpProbeTable.RowsRich
+            WrapCount: =1
+            TemplateSize: =28
+            TemplatePadding: =0
+            TemplateFill: =RGBA(255, 255, 255, 1)
+            BorderThickness: =1
+            BorderColor: =RGBA(214, 158, 46, 1)
+            ShowScrollbar: =true
+            X: =(Parent.Width - 36) / 2 + 24
+            Y: =150
+            Width: =(Parent.Width - 36) / 2
+            Height: =Parent.Height - 158
+          Children:
+            - ptRichRow:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =Coalesce( ThisItem.project_name, "-- blank --" )
+                  Font: =Font.'Segoe UI'
+                  Size: =12
+                  Color: =RGBA(32, 38, 45, 1)
+                  X: =8
+                  Y: =0
+                  Width: =Parent.TemplateWidth - 16
+                  Height: =28

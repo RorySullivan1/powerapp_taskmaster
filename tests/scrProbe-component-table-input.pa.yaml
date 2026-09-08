@@ -1,0 +1,161 @@
+# =============================================================================
+# scrProbeCT — CLAIM 1 of issue #67 (epic #66): will a component's Table Input
+# accept the DELEGABLE QUERY ITSELF at the instance, or only a materialised
+# projection?
+#
+# This is the question the whole of #66 turns on. galProjects is direct-bound
+# today and pages in 100s past the data row limit; a component fed by ForAll
+# materialises AT that limit and drops the newest rows in silence, which is the
+# exact defect class the 2,000-row backfill already exposed once. If the query
+# can cross the component boundary intact, cmpProjectTable can BE the table. If
+# it cannot, the gallery stays on the screen and the component is only the
+# header -- a different epic, and one worth knowing about before it is built.
+#
+# THE FAILURE MODE IS AN AUTHOR-TIME SCHEMA ERROR, NOT A WRONG VALUE, so the
+# instrument is the FORMULA BAR and the readout is binary: the property takes
+# the formula or it goes red. That is why NOTHING BELOW SETS THE INPUTS. The
+# instance is pasted holding its Defaults, and each candidate is typed into the
+# formula bar by hand, one at a time, so a rejection costs one row and not the
+# whole sheet.
+#
+# THE FOUR CANDIDATES -- type these into the INSTANCE, not the definition:
+#
+#   1a  cmpCtInst.RowsFlat  =
+#         Filter( OpenProjects, StartsWith( project_name, "a" ) )
+#
+#   1b  cmpCtInst.RowsRich  =
+#         Filter( OpenProjects, StartsWith( project_name, "a" ) )
+#
+#   1c  cmpCtInst.RowsCtl   =                          POSITIVE CONTROL
+#         ForAll( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
+#                 { project_name: project_name,
+#                   project_date_target: project_date_target,
+#                   project_perc_completion: project_perc_completion } )
+#
+#   1d  cmpCtInst.RowsFlat  =                          BONUS, NOT IN #67
+#         ShowColumns( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
+#                      project_name, project_date_target,
+#                      project_perc_completion )
+#
+# 1d is here because it is the only candidate that could give BOTH an exact
+# schema and a live query: ShowColumns narrows columns without projecting rows.
+# Whether SharePoint folds it is unknown, so an accepted 1d proves nothing on
+# its own -- it earns a row in claim 2 and is settled there, not here.
+#
+# "a" is an arbitrary prefix and A NO-MATCH IS NOT THE FINDING. It must be
+# NON-EMPTY: StartsWith(project_name, "") is rejected outright -- "the query is
+# not valid" -- on a plain indexed Text column (scrProbe-startswith-empty,
+# 2026-09-04), and using it here would test that instead of this.
+#
+# BREAKS RULE 1 ON PURPOSE: it names a data source and it uses a component,
+# because the boundary between the two IS the claim.
+#
+# BEFORE PASTING
+#   1. taskmaster_projects in the Data pane; OpenProjects in App.Formulas.
+#   2. cmpProbeTable built from tests/cmpProbeTable.pa.yaml -- the three custom
+#      properties HAND-TYPED, then its Children pasted. The instance below is
+#      inert until that exists.
+#   3. Blank screen named exactly scrProbeCT. Set its Fill in the formula bar;
+#      screens are not controls, so that cannot be pasted.
+# =============================================================================
+Screens:
+  scrProbeCT:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblCtTitle:
+          Control: Label@2.5.1
+          Properties:
+            # Block scalar, NOT inline: YAML reads " #" in a plain scalar as a comment
+            # and would eat the rest of the line, closing quote included.
+            Text: |
+              ="Component Table-Input probe  ·  issue #67 claim 1  ·  can the QUERY cross the boundary?"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =12
+            Width: =1300
+            Height: =28
+      - lblCtHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="THE VERDICT IS IN THE FORMULA BAR, not on this sheet. Select the component instance, put each candidate into the named property, and record ACCEPTED or the exact rejection text." &
+               Char(10) &
+               "Order: 1c FIRST (positive control -- if the control is rejected, stop; the screen is at fault and nothing else here can be read), then 1a, then 1b, then 1d." &
+               Char(10) &
+               "The readouts INSIDE the component separate an accepted formula that carried rows from one that carried none. A blank where a name belongs is a worse answer than a clean rejection, not a better one."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =46
+            Width: =1300
+            Height: =58
+      # ------------------------------------------------------- SCREEN-SIDE CONTROLS
+      # Both of these run OUTSIDE the component. They are what makes a rejection
+      # attributable: if the query cannot even be built on the screen, the component
+      # boundary is exonerated and the environment is the finding.
+      - lblCtPre:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="P   First(OpenProjects) ................................ " &
+               IfError( Coalesce( First( OpenProjects ).project_name, "-- empty --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =112
+            Width: =1300
+            Height: =22
+      - lblCtEnv:
+          Control: Label@2.5.1
+          Properties:
+            # The identical query the candidates hand to the component, evaluated on the
+            # screen. It must come back clean, and whatever name it prints is the name the
+            # component's readouts should print too.
+            Text: |
+              ="E   First(Filter(OpenProjects, StartsWith(name,'a')))  ON THE SCREEN ... " &
+               IfError( Coalesce( First( Filter( OpenProjects,
+                                                 StartsWith( project_name, "a" ) ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =136
+            Width: =1300
+            Height: =22
+      # ------------------------------------------------------------- THE INSTANCE
+      # NO INPUT PROPERTIES ARE SET HERE, and that is deliberate: a paste that
+      # carried the candidates would fail as one lump and name none of them.
+      - cmpCtInst:
+          Control: CanvasComponent
+          ComponentName: cmpProbeTable
+          Properties:
+            X: =16
+            Y: =176
+            Width: =1180
+            Height: =520
+      - lblCtRead:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="HOW TO READ  ·  1c rejected -> stop, the sheet is unreadable.   " &
+               "1a or 1b ACCEPTED and its readout prints a name -> the query crosses intact; cmpProjectTable can be the whole table and the epic takes its first outcome.   " &
+               "1b accepted but 'blank manager' -> the complex columns did NOT survive; a lead column inside the component is off the table even though rows crossed.   " &
+               "1a and 1b both rejected -> the epic takes its THIRD outcome: the gallery stays on the screen and the component is the header only.   " &
+               "Accepted but '-- no rows --' while E prints a name -> record it as its own answer; it is neither a pass nor a clean rejection."
+            Font: =Font.'Segoe UI'
+            Size: =12
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =706
+            Width: =1300
+            Height: =52
