@@ -163,7 +163,7 @@ lists:
       # and "Blocked" are gone from the column, so nothing in the app enumerates them.
       # PENDING IN SHAREPOINT: set the column default to "Not Started".
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase — DERIVED by the app, see the note above", values: ["Not Started", Planning, Active, Stalled, Complete, Archived] }
-      - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
+      - { name: project_priority,        type: Choice,          required: true,  indexed: true,  desc: "Priority level. INDEXED because scrProjects filters on it server-side from its column heading, and SharePoint refuses an unindexed filter past the 5,000 list-view threshold. NOT SORTABLE IN THE APP and that is not a delegation gap to close: a sort would order these ALPHABETICALLY (Critical, High, Low, Lowest, Moderate), which is not severity order. Sortable priority needs an indexed NUMBER rank column, written by every edit screen and back-filled.", values: [Lowest, Low, Moderate, High, Critical] }
       - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below" }
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
       - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  desc: "Desired completion date" }
