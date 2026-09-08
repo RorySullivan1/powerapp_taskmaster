@@ -40,12 +40,22 @@
   IDENTIFIERS, which resolve by DISPLAY name; it bites ONLY where a column name travels as a
   STRING. `SortByColumns(src, "project_name", ...)` was rejected for exactly this.
   **THE OTHER COLUMNS' INTERNAL NAMES ARE UNVERIFIED — only Title is confirmed either way.**
-  **SO THE GALLERY IS 48 BRANCHES: a Switch over three arms, each sorting on a LITERAL identifier**
-  (the sixteen filter branches written out once per sort column, each arm machine-verified
-  equivalent to the landed sixteen). `gPrjSortCol` is a KEY compared with `=`, NEVER a column
-  name — nothing reaches SharePoint as a string. `Sort(If(...))` and an expression sort key do not
-  fold, so the Switch must stay OUTSIDE and the filters duplicated. Do not factor it back down.
+  **SO THE GALLERY IS 96 BRANCHES: a Switch over three arms, each sorting on a LITERAL identifier**
+  — 32 filter combinations (search × completed × mine × coverage × priority) per sort column.
+  `gPrjSortCol` is a KEY compared with `=`, NEVER a column name; nothing reaches SharePoint as a
+  string. `Sort(If(...))` and an expression sort key do not fold, so the Switch stays OUTSIDE and
+  the filters are duplicated — **do not factor it back down.** THE FORMULA IS GENERATED and the
+  generator was verified to reproduce the previous 48-branch version character for character
+  before the priority dimension was switched on; regenerate rather than hand-edit a branch.
   This also retired the withdrawn #67 claim 3: no variable column name exists to delegate.
+  **COVERAGE AND PRIORITY FILTER FROM THEIR HEADINGS; NEITHER SORTS.** Equality on a Choice's
+  `.Value` folds, a Sort on a Complex column does not. **PRIORITY WILL NOT BECOME SORTABLE BY
+  FIXING DELEGATION** — a text sort gives Critical/High/Low/Lowest/Moderate, which is not severity
+  order. It needs an indexed NUMBER rank column, written by all six edit screens and back-filled.
+  **`project_priority` IS NOW `indexed: true` IN THE GOLDEN SOURCE — INDEX IT IN SHAREPOINT** with
+  `project_coverage`, or the new filter breaks past the 5,000 list-view threshold.
+  **HEADER WIDTH IS READ, NOT COMPUTED:** `rowTableHead.Width = galProjects.TemplateWidth`. An
+  earlier version guessed the scrollbar cost 16px and the headings landed misaligned.
 - **PASTE QUEUE — ALL 6 EDIT SCREENS + scrReports, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE
   NEEDS SHAREPOINT FIRST.** The required-fields message is reworked on ALL SIX edit screens to
   `Required Fields Remaining: A | B` (so scrClientEdit / scrProductEdit / scrTaskEdit / scrIssueEdit
@@ -206,6 +216,8 @@ not know them will author something broken:
 
 - 2026-09-08 | FIRST PASTE OF THE scrProjects TABLE REJECTED SortByColumns: a column name passed as a STRING is matched against the SharePoint INTERNAL name, and project_name is not one — that column is the built-in Title RENAMED (user). Invisible everywhere else because every other formula names columns as Power Fx IDENTIFIERS, which resolve by DISPLAY name. Fixed by removing the dependency rather than supplying internal names: gPrjSortCol is now a KEY compared with `=`, and the gallery is a Switch over three arms each sorting on a LITERAL identifier (48 branches, each arm machine-verified equivalent to the landed sixteen). Internal names would have added a second naming scheme that schema.yaml cannot check, and only Title is confirmed. schema.yaml now records internal_name: Title and that the rest are UNVERIFIED | sessions/2026-09-08-1724-epic66-probes-authored.md
 
+- 2026-09-08 | scrProjects table LANDED and refined on the user's report: header width was GUESSED (gallery width, PaddingRight 32 for a presumed 16px scrollbar) and came out misaligned — now reads galProjects.TemplateWidth so the two containers match by construction. Priority gained a heading FILTER (equality on a Choice .Value folds) but stays unsortable for TWO reasons, not one: Sort does not fold on Complex, AND a text sort of a severity vocabulary is alphabetical nonsense — sortable priority needs an indexed Number rank column, not a delegation fix. Gallery 48 -> 96 branches; the Items formula is GENERATED and the generator was verified to reproduce the landed 48 character-for-character before the new dimension was enabled | sessions/2026-09-08-1724-epic66-probes-authored.md
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -233,3 +245,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-08 | #67 probe prefixes: an author-chosen StartsWith literal has now matched nothing TWICE ("ab" on #51 row 6, "a" on the first scrProbeCT run — not the first letter of any OPEN project). NEITHER WAS AN INSTRUMENT FAULT and the blank-phase theory raised for the second one was WRONG — the sheet read correctly, the letter was wrong. It still costs a whole run, because a true no-match prints "-- no rows --" exactly as a rejection does. All three probe prefix boxes now seed from Left(First(taskmaster_projects).project_name, 1) and scrProbeCT prints five real names. GENERAL RULE: no project name is visible from the repo side, so never hard-code a data literal into a probe — derive it | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-08 | #66 RESCOPED MID-EPIC AFTER THE USER PUSHED BACK, and the pushback was right: the probes were testing my scaffolding, not their goal. "The gallery becomes a component" was a MEANS in the brief; the goal was a sortable/filterable table. Keeping galProjects on the screen delivers the table AND deletes the epic's only real risk (a ForAll-fed component caps at the row limit where a direct-bound gallery pages), so #67 and #68 both closed not-planned and scrProjects was built in one pass. FOUR TRIPS ACROSS THE GAP WERE SPENT ON PROBES THAT RETURNED NOTHING — each went on repairing the instrument. GENERAL RULE: probe the thing being shipped, not the scaffolding around it; a probe earns its cost only when a wrong guess is catastrophic or invisible, and the sort question is neither (one gesture on the real screen settles it) | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-08 | FIRST PASTE OF THE scrProjects TABLE REJECTED SortByColumns: a column name passed as a STRING is matched against the SharePoint INTERNAL name, and project_name is not one — that column is the built-in Title RENAMED (user). Invisible everywhere else because every other formula names columns as Power Fx IDENTIFIERS, which resolve by DISPLAY name. Fixed by removing the dependency rather than supplying internal names: gPrjSortCol is now a KEY compared with `=`, and the gallery is a Switch over three arms each sorting on a LITERAL identifier (48 branches, each arm machine-verified equivalent to the landed sixteen). Internal names would have added a second naming scheme that schema.yaml cannot check, and only Title is confirmed. schema.yaml now records internal_name: Title and that the rest are UNVERIFIED | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | scrProjects table LANDED and refined on the user's report: header width was GUESSED (gallery width, PaddingRight 32 for a presumed 16px scrollbar) and came out misaligned — now reads galProjects.TemplateWidth so the two containers match by construction. Priority gained a heading FILTER (equality on a Choice .Value folds) but stays unsortable for TWO reasons, not one: Sort does not fold on Complex, AND a text sort of a severity vocabulary is alphabetical nonsense — sortable priority needs an indexed Number rank column, not a delegation fix. Gallery 48 -> 96 branches; the Items formula is GENERATED and the generator was verified to reproduce the landed 48 character-for-character before the new dimension was enabled | sessions/2026-09-08-1724-epic66-probes-authored.md

@@ -124,3 +124,26 @@ even moving toward that outcome."
   whitespace-normalised comparison, so the filter logic is provably untouched by the rewrite.
 - This retired the last live question from the withdrawn #67: there is no variable column name
   left, so whether one would delegate no longer matters to anything being built.
+
+## Table landed — two corrections from the user
+
+**"Table lands and looks good. The header does not match the width of the columns. Also why is
+priority not filterable or sortable?"**
+
+- **Header width was GUESSED and the guess was wrong.** It computed its own width and paid for the
+  gallery scrollbar with `PaddingRight: =32` against the row's 16, on the assumption the scrollbar
+  costs exactly 16px off `TemplateWidth`. Now `Width: =galProjects.TemplateWidth` with padding
+  identical to the row, so the two containers are the same width BY CONSTRUCTION. **General rule:
+  when a second container has to match a gallery row, read TemplateWidth — never re-derive it.**
+  The forward reference to a later-declared control is the case scrProbe-layout-freeze P3 tested.
+- **Priority was not filterable for a reason I had put in an issue instead of on the sheet** — each
+  server-side predicate doubles the query, and it was a v1 non-goal. That is a cost decision, not a
+  limitation, and the user could not see it from the code. Now filtered.
+- **Priority sorting is refused on TWO grounds and only one is delegation.** SharePoint does not
+  fold a Sort on Complex; and even if it did, the order would be ALPHABETICAL — Critical, High,
+  Low, Lowest, Moderate — which is not severity order. **So this is not a delegation gap waiting to
+  be closed.** It needs an indexed Number rank column, written by all six edit screens and
+  back-filled across 2,000+ rows. Recorded in schema.yaml on the column itself.
+- **The Items formula is now GENERATED (96 branches).** The generator was first proved to reproduce
+  the landed 48-branch formula character for character, so enabling the priority dimension was a
+  controlled extension rather than a rewrite. Regenerate; never hand-edit one branch.
