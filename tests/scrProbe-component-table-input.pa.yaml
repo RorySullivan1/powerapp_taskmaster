@@ -41,12 +41,15 @@
 # formula on the wrong property.
 #
 # ------------------------------------------- THE PREFIX COMES FROM THE DATA
-# An author-chosen literal has now come back EMPTY TWICE across the gap -- "ab"
-# on #51 row 6, and "a" on the first run of this screen. An empty result makes
-# every panel print "-- no rows --" and claim 1 unreadable, so the prefix is no
-# longer guessed: the box is seeded with the FIRST CHARACTER OF A REAL ROW and
-# therefore matches at least one row by construction. Row N prints five real
-# names so it can be widened off the data rather than off a hunch.
+# A prefix cannot be chosen from the repo side: no project name is visible from
+# here. Two literals picked that way have matched nothing -- "ab" on #51 row 6,
+# and "a" here, which is simply not the first letter of any open project. The
+# sheet was reading correctly both times; the letter was wrong. But a true
+# no-match prints "-- no rows --" on every panel, which is what a REJECTION also
+# prints, so a wrong letter costs a whole run.
+#
+# So the box is seeded with the FIRST CHARACTER OF A REAL ROW and matches at
+# least one by construction, and row N prints five real names to widen from.
 #
 # NEVER LEAVE THE BOX EMPTY: StartsWith(project_name, "") is rejected outright
 # -- "the query is not valid" -- on a plain indexed Text column
@@ -55,13 +58,11 @@
 #
 # THE PANELS QUERY THE RAW LIST, NOT OpenProjects. Claim 1 is a SCHEMA question
 # -- whether a Table Input accepts a SharePoint query's record type -- and both
-# sources have the identical record type, so the raw list answers it without the
-# confound. It is the confound that forced the change: OpenProjects enumerates
-# the five phases, and rows whose project_phase is BLANK are invisible to it
-# (a known, unresolved condition of this list). Rows E and EO sit side by side
-# to measure exactly that, and EO is labelled NOT CLAIM 1 so its result is not
-# read as one. Composing over a named formula was separately cleared by #51
-# row 6, so nothing about this narrowing weakens the answer.
+# sources carry the identical record type, so the raw list answers it with the
+# largest possible subset and no phase filter narrowing it. Composing over a
+# named formula was separately cleared by #51 row 6, so the narrowing costs the
+# answer nothing. Row EO keeps the named formula in view for free and is
+# labelled NOT CLAIM 1 so its result is never read as one.
 #
 # AccessAppScope: false DOES NOT BLOCK ANY OF THIS, and it looks as though it
 # should. It governs what formulas INSIDE the definition can see. An instance
@@ -111,7 +112,7 @@ Screens:
                Char(10) &
                "Each panel sets ONE property and prints all three. A name on the line its header names is a pass; '-- no rows --' there is NOT, and neither is a red error on the instance." &
                Char(10) &
-               "EO is not part of claim 1. E printing a name while EO prints none means OpenProjects excludes those rows -- a separate finding, and the likely reason a literal prefix kept coming back empty."
+               "EO is not claim 1. E with a name and EO without one just means the letter belongs to an archived or completed project; overtype the box until BOTH print a name."
             Font: =Font.'Segoe UI'
             Size: =12
             Color: =RGBA(110, 120, 130, 1)
@@ -210,10 +211,12 @@ Screens:
       - lblCtEnvOpen:
           Control: Label@2.5.1
           Properties:
-            # THE SAME QUERY OVER OpenProjects, side by side with E. This row is NOT part of
-            # claim 1 -- it is the diagnostic for the empty-prefix mystery. E printing a name
-            # while this prints nothing means the named formula excludes those rows, and the
-            # known blank project_phase rows are the first suspect.
+            # THE SAME QUERY OVER OpenProjects, beside E. NOT part of claim 1: it is here so
+            # the seeded prefix can be read against BOTH sources at a glance. E with a name
+            # and EO without one is ordinary -- the phase filter doing its job on a letter
+            # that only archived or completed projects start with, exactly as #51 row 6
+            # against 6r. Pick a prefix that lands on both if the panels are to mean
+            # anything about the shape #66 actually ships.
             Text: |
               ="EO  the same over OpenProjects  NOT CLAIM 1 ........... " &
                IfError( Coalesce( First( Filter( OpenProjects,

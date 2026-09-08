@@ -999,22 +999,23 @@ and a refusal that survives alone **is** that candidate's answer.
 name therefore appears on exactly the line the panel is testing; anywhere else means the paste
 landed a formula on the wrong property.
 
-**The prefix comes from the data, not from the author — and that is a correction, not a
-refinement.** An author-chosen literal came back empty twice across the gap: `"ab"` on #51 row 6,
-and `"a"` on the first run of this screen. An empty subset makes every panel print `-- no rows --`
-and claim 1 unreadable. The box is now seeded with `Left(First(taskmaster_projects).project_name, 1)`
-— the first character of a real row, so it matches by construction — and row **N** prints five
-real names so it can be widened off the data. **Never leave the box empty:**
+**The prefix comes from the data because it cannot be chosen from the repo side.** No project
+name is visible from here, and two literals picked that way have matched nothing: `"ab"` on #51
+row 6, and `"a"` on the first run of this screen — which is simply not the first letter of any
+open project. **The sheet was reading correctly both times; the letter was wrong.** But a true
+no-match prints `-- no rows --` on every panel, which is exactly what a rejection prints, so a
+wrong letter costs a whole run. The box is now seeded with
+`Left(First(taskmaster_projects).project_name, 1)` — matching by construction — and row **N**
+prints five real names to widen from. **Never leave the box empty:**
 `StartsWith(project_name, "")` is rejected outright and takes all four panels down at once.
 
 **The panels query the raw list, not `OpenProjects`.** Claim 1 is a schema question — whether a
-Table Input accepts a SharePoint query's record type — and both sources have the identical record
-type, so the raw list answers it without the confound. The confound is why: `OpenProjects`
-enumerates the five phases, and rows whose `project_phase` is **blank** are invisible to it, which
-is a known unresolved condition of this list and the first suspect for the empty prefixes. Rows
-**E** and **EO** sit side by side to measure exactly that, and **EO is labelled NOT CLAIM 1** so
-its result is not read as one. Composing over a named formula was separately cleared by #51 row 6,
-so the narrowing costs the answer nothing.
+Table Input accepts a SharePoint query's record type — and both sources carry the identical record
+type, so the raw list answers it with the largest subset and no phase filter narrowing it.
+Composing over a named formula was separately cleared by #51 row 6, so the narrowing costs the
+answer nothing. Row **EO** keeps `OpenProjects` in view for free and is labelled **NOT CLAIM 1**.
+E with a name and EO without one is ordinary — the phase filter doing its job on a letter only
+archived or completed projects start with, exactly as #51 row 6 read against 6r.
 
 **D is not in #67.** It is the only candidate that could give both an exact schema and a live
 query — `ShowColumns` narrows columns without projecting rows — so an accepted D proves nothing

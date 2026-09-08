@@ -58,3 +58,20 @@
 - Everything already open before this session is untouched: the 2026-09-04 paste queue (six edit
   screens + `scrReports`, `transaction_comment` needing provisioning first, the `scrProjects`
   banner on its own branch), and Item-level Permissions on `taskmaster_projectcomments`.
+
+## Run notes — 2026-09-08, claim 1 first attempt
+
+- **The first `scrProbeCT` run produced nothing to read: the seeded literal `"a"` is not the first
+  letter of any open project.** Same shape as #51 row 6's `"ab"`.
+- **I called that "the instrument being blind" and floated blank `project_phase` as the cause.
+  Both were wrong, and the user corrected it.** The sheet read correctly; the letter was wrong.
+  Raw list matching where `OpenProjects` does not is the phase filter doing its job — exactly
+  what #51 row 6 vs 6r already showed — not a defect.
+- **The cost is real even though nothing was broken:** a true no-match prints `-- no rows --` on
+  every panel, which is precisely what a rejection prints, so a wrong letter burns a whole run
+  across the gap.
+- **Fix, and the general rule it establishes:** no project name is visible from the repo side, so
+  a probe must never hard-code a data literal. All three prefix boxes now seed from
+  `Left( First(taskmaster_projects).project_name, 1 )` and `scrProbeCT` prints five real names
+  (row N) to widen from. Row EO keeps `OpenProjects` beside the raw list and is labelled NOT
+  CLAIM 1 so the phase filter's ordinary behaviour is never read as a result.
