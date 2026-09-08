@@ -967,40 +967,57 @@ properties are hand-typed in Studio** — a paste does not carry them — so bui
 type the properties, check each `Default` against the file, and only then paste the `Children`.
 
 Every width and height inside it is a formula off `Parent`, so one definition fits both probe
-screens at whatever size each instantiates it. Flattening those to constants would push the
-galleries' own bottom edge outside the shorter instance, and the last row — the row claim 2 is
-read from — would land in the clipped strip.
+screens at whatever size each instantiates it, and `scrProbeCT` lands four instances side by
+side. Flattening those to constants would push the galleries' own bottom edge outside the shorter
+instance, and the last row — the row claim 2 is read from — would land in the clipped strip. The
+readouts are stacked full-width for the same reason: paired into two columns they clip the
+project name at a half-screen instance width, and the name is the whole of claim 1's result.
 
 ### `scrProbe-component-table-input.pa.yaml` — claim 1: does the query cross the boundary?
 
 **Status: NOT YET RUN.** Written 2026-09-08. Screen name `scrProbeCT`.
 
-**The verdict is in the formula bar, not on the sheet.** The failure mode is an author-time
-schema error, so the readout is binary — the property takes the formula or it goes red — and
-**nothing in the paste sets the inputs**. The instance lands holding its `Default`s and each
-candidate is typed in by hand, so a rejection costs one row instead of the whole screen.
+**Four instances of the same component, one candidate each, all carried by the paste.**
 
-| Row | Typed into | Formula |
+| Panel | Sets | Formula |
 |---|---|---|
-| **1c** | `cmpCtInst.RowsCtl` | `ForAll(Filter(OpenProjects, StartsWith(project_name,"a")), {…})` — **run this first** |
-| **1a** | `cmpCtInst.RowsFlat` | `Filter( OpenProjects, StartsWith(project_name, "a") )` |
-| **1b** | `cmpCtInst.RowsRich` | the same query |
-| **1d** | `cmpCtInst.RowsFlat` | `ShowColumns( Filter(…), project_name, project_date_target, project_perc_completion )` |
+| **C** | `RowsCtl` | `ForAll(Filter(OpenProjects, StartsWith(project_name,"a")), {…})` — **positive control, read first** |
+| **A** | `RowsFlat` | `Filter( OpenProjects, StartsWith(project_name, "a") )` |
+| **B** | `RowsRich` | the same query |
+| **D** | `RowsFlat` | `ShowColumns( Filter(…), project_name, project_date_target, project_perc_completion )` |
 
-**1d is not in #67.** It is the only candidate that could give both an exact schema and a live
-query — `ShowColumns` narrows columns without projecting rows — so an accepted 1d proves nothing
+An earlier draft left the inputs unset and had each candidate typed into the formula bar, so that
+a rejected formula could not take the whole screen with it. **Four instances buy that isolation
+back without the typing** — each holds one property and they differ in nothing else — and
+hand-copying four long formulas across the gap is four chances to introduce a typo that reads
+exactly like a rejection. If the whole paste is refused, paste one panel and its header at a
+time, C first: the blocks are independent list items, so deleting three leaves a valid screen,
+and a refusal that survives alone **is** that candidate's answer.
+
+**Each panel prints all three readouts and sets one.** The two it does not set fall back to their
+`Default` literal, whose only row has an empty `project_name`, so they read `-- no rows --`. A
+name therefore appears on exactly the line the panel is testing; anywhere else means the paste
+landed a formula on the wrong property.
+
+**D is not in #67.** It is the only candidate that could give both an exact schema and a live
+query — `ShowColumns` narrows columns without projecting rows — so an accepted D proves nothing
 on its own and earns a row in claim 2 instead.
+
+**`AccessAppScope: false` does not block any of this, and it looks as though it should.** It
+governs what formulas *inside* the definition can see. An instance property is evaluated in
+**screen** scope, so `OpenProjects` resolves there normally, and a rejection is about schema
+rather than scope.
 
 The screen carries two controls that run **outside** the component (`P`, that `OpenProjects`
 resolves, and `E`, the identical query evaluated on the screen). They are what make a rejection
 attributable: if the query cannot be built on the screen either, the boundary is exonerated.
 
-**How to read.** 1c rejected → stop. 1a or 1b accepted **and** its readout prints a name → the
-query crosses intact and the epic takes its **first** outcome. 1b accepted but `blank manager` →
-rows crossed, complex columns did not, so a lead column inside the component is off the table.
-Both rejected → the **third** outcome: the gallery stays on the screen and the component is the
-header only. Accepted but `-- no rows --` while `E` prints a name → record it as its own answer;
-that is neither a pass nor a clean rejection.
+**How to read.** C rejected or blank → stop. A or B showing a name on its own line → the query
+crosses intact and the epic takes its **first** outcome. B showing a name but `-- blank manager --`
+→ rows crossed, complex columns did not, so a lead column inside the component is off the table.
+A and B both rejected → the **third** outcome: the gallery stays on the screen and the component
+is the header only. Accepted but `-- no rows --` while `E` prints a name → record it as its own
+answer; that is neither a pass nor a clean rejection.
 
 ### `scrProbe-component-gallery-paging.pa.yaml` — claim 2: does it still page?
 

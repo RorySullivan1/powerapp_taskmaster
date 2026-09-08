@@ -11,50 +11,55 @@
 # it cannot, the gallery stays on the screen and the component is only the
 # header -- a different epic, and one worth knowing about before it is built.
 #
-# THE FAILURE MODE IS AN AUTHOR-TIME SCHEMA ERROR, NOT A WRONG VALUE, so the
-# instrument is the FORMULA BAR and the readout is binary: the property takes
-# the formula or it goes red. That is why NOTHING BELOW SETS THE INPUTS. The
-# instance is pasted holding its Defaults, and each candidate is typed into the
-# formula bar by hand, one at a time, so a rejection costs one row and not the
-# whole sheet.
+# ------------------------------------------------- FOUR INSTANCES, NOT ONE
+# EVERY CANDIDATE IS CARRIED BY THE PASTE. An earlier draft left the inputs
+# unset and had them typed into the formula bar one at a time, on the reasoning
+# that a rejected formula would otherwise take the whole screen down. FOUR
+# INSTANCES BUY THAT ISOLATION BACK WITHOUT THE TYPING: each holds ONE property,
+# they differ in nothing else, and hand-copying four long formulas across the
+# gap is four chances to introduce a typo that reads exactly like a rejection.
 #
-# THE FOUR CANDIDATES -- type these into the INSTANCE, not the definition:
+#   A   RowsFlat  =  the query, flat literal schema
+#   B   RowsRich  =  the query, literal shaped like a real SharePoint record
+#   C   RowsCtl   =  a ForAll projection            POSITIVE CONTROL
+#   D   RowsFlat  =  ShowColumns over the query     BONUS, NOT IN #67
 #
-#   1a  cmpCtInst.RowsFlat  =
-#         Filter( OpenProjects, StartsWith( project_name, "a" ) )
+# IF THE WHOLE PASTE IS REFUSED, split it: paste ONE instance block and its
+# header at a time, C first. The four blocks are independent list items and
+# nothing references anything in another, so deleting three of them leaves a
+# valid screen. A refusal that survives on its own IS that candidate's answer.
 #
-#   1b  cmpCtInst.RowsRich  =
-#         Filter( OpenProjects, StartsWith( project_name, "a" ) )
-#
-#   1c  cmpCtInst.RowsCtl   =                          POSITIVE CONTROL
-#         ForAll( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
-#                 { project_name: project_name,
-#                   project_date_target: project_date_target,
-#                   project_perc_completion: project_perc_completion } )
-#
-#   1d  cmpCtInst.RowsFlat  =                          BONUS, NOT IN #67
-#         ShowColumns( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
-#                      project_name, project_date_target,
-#                      project_perc_completion )
-#
-# 1d is here because it is the only candidate that could give BOTH an exact
+# D is here because it is the only candidate that could give BOTH an exact
 # schema and a live query: ShowColumns narrows columns without projecting rows.
-# Whether SharePoint folds it is unknown, so an accepted 1d proves nothing on
-# its own -- it earns a row in claim 2 and is settled there, not here.
+# An accepted D proves nothing on its own -- it earns a row in claim 2 and is
+# settled there, not here.
+#
+# EACH INSTANCE PRINTS ALL THREE READOUTS AND SETS ONE. The two it does not set
+# fall back to their Default literal, whose only row has an empty project_name,
+# so they read "-- no rows --". A name therefore appears on exactly the line
+# the instance is testing, and appearing anywhere else means the paste put a
+# formula on the wrong property.
 #
 # "a" is an arbitrary prefix and A NO-MATCH IS NOT THE FINDING. It must be
 # NON-EMPTY: StartsWith(project_name, "") is rejected outright -- "the query is
 # not valid" -- on a plain indexed Text column (scrProbe-startswith-empty,
 # 2026-09-04), and using it here would test that instead of this.
 #
+# AccessAppScope: false DOES NOT BLOCK ANY OF THIS, and it looks as though it
+# should. It governs what formulas INSIDE the definition can see. An instance
+# property is evaluated in SCREEN scope, so OpenProjects resolves here normally.
+# A rejection below is about schema, never about scope.
+#
 # BREAKS RULE 1 ON PURPOSE: it names a data source and it uses a component,
 # because the boundary between the two IS the claim.
 #
 # BEFORE PASTING
 #   1. taskmaster_projects in the Data pane; OpenProjects in App.Formulas.
-#   2. cmpProbeTable built from tests/cmpProbeTable.pa.yaml -- the three custom
-#      properties HAND-TYPED, then its Children pasted. The instance below is
-#      inert until that exists.
+#   2. cmpProbeTable built -- the three custom properties HAND-TYPED with the
+#      Defaults from tests/cmpProbeTable.pa.yaml, then its Children pasted. THE
+#      PASTE BELOW SETS RowsFlat, RowsRich AND RowsCtl BY NAME: a property typed
+#      under any other spelling fails the paste, and that is not a claim-1
+#      result.
 #   3. Blank screen named exactly scrProbeCT. Set its Fill in the formula bar;
 #      screens are not controls, so that cannot be pasted.
 # =============================================================================
@@ -76,24 +81,24 @@ Screens:
             Color: =RGBA(32, 38, 45, 1)
             X: =16
             Y: =12
-            Width: =1300
+            Width: =1324
             Height: =28
       - lblCtHow:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="THE VERDICT IS IN THE FORMULA BAR, not on this sheet. Select the component instance, put each candidate into the named property, and record ACCEPTED or the exact rejection text." &
+              ="Read P and E FIRST. Then read C -- it is the positive control, and if C cannot show a name, nothing else on this sheet can be read." &
                Char(10) &
-               "Order: 1c FIRST (positive control -- if the control is rejected, stop; the screen is at fault and nothing else here can be read), then 1a, then 1b, then 1d." &
+               "Each panel sets ONE property and prints all three. A name on the line named in the panel header is a pass; '-- no rows --' there is NOT, and neither is a red error on the instance." &
                Char(10) &
-               "The readouts INSIDE the component separate an accepted formula that carried rows from one that carried none. A blank where a name belongs is a worse answer than a clean rejection, not a better one."
+               "If the paste was refused as a whole, paste one panel at a time (C first) and record which candidate survives alone."
             Font: =Font.'Segoe UI'
             Size: =12
             Color: =RGBA(110, 120, 130, 1)
             X: =16
             Y: =46
-            Width: =1300
-            Height: =58
+            Width: =1324
+            Height: =48
       # ------------------------------------------------------- SCREEN-SIDE CONTROLS
       # Both of these run OUTSIDE the component. They are what makes a rejection
       # attributable: if the query cannot even be built on the screen, the component
@@ -109,15 +114,15 @@ Screens:
             Size: =13
             Color: =RGBA(49, 130, 93, 1)
             X: =16
-            Y: =112
-            Width: =1300
+            Y: =100
+            Width: =1324
             Height: =22
       - lblCtEnv:
           Control: Label@2.5.1
           Properties:
-            # The identical query the candidates hand to the component, evaluated on the
+            # The identical query the four panels hand to the component, evaluated on the
             # screen. It must come back clean, and whatever name it prints is the name the
-            # component's readouts should print too.
+            # panels' readouts should print too.
             Text: |
               ="E   First(Filter(OpenProjects, StartsWith(name,'a')))  ON THE SCREEN ... " &
                IfError( Coalesce( First( Filter( OpenProjects,
@@ -129,33 +134,132 @@ Screens:
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(0, 90, 158, 1)
             X: =16
-            Y: =136
-            Width: =1300
+            Y: =124
+            Width: =1324
             Height: =22
-      # ------------------------------------------------------------- THE INSTANCE
-      # NO INPUT PROPERTIES ARE SET HERE, and that is deliberate: a paste that
-      # carried the candidates would fail as one lump and name none of them.
-      - cmpCtInst:
+      # ------------------------------------------------------------------ PANEL A
+      - lblCtHeadA:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="A   RowsFlat  =  Filter(OpenProjects, StartsWith(name,'a'))        read the RowsFlat line"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =16
+            Y: =158
+            Width: =650
+            Height: =20
+      - cmpCtA:
           Control: CanvasComponent
           ComponentName: cmpProbeTable
           Properties:
+            RowsFlat: |
+              =Filter( OpenProjects, StartsWith( project_name, "a" ) )
             X: =16
-            Y: =176
-            Width: =1180
-            Height: =520
+            Y: =180
+            Width: =650
+            Height: =236
+      # ------------------------------------------------------------------ PANEL B
+      - lblCtHeadB:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="B   RowsRich  =  the same query                                    read RowsRich AND the manager line"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(0, 90, 158, 1)
+            X: =690
+            Y: =158
+            Width: =650
+            Height: =20
+      - cmpCtB:
+          Control: CanvasComponent
+          ComponentName: cmpProbeTable
+          Properties:
+            # The Person and the Choices are shaped in this input's Default, so B is the
+            # candidate that could carry a lead column and a coverage column into the
+            # component. A name on the RowsRich line with "-- blank manager --" beneath it
+            # is a THIRD outcome, not a pass: rows crossed and the complex halves did not.
+            RowsRich: |
+              =Filter( OpenProjects, StartsWith( project_name, "a" ) )
+            X: =690
+            Y: =180
+            Width: =650
+            Height: =236
+      # ------------------------------------------------------------------ PANEL C
+      - lblCtHeadC:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="C   RowsCtl   =  ForAll(...) projection        POSITIVE CONTROL   read the RowsCtl line"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =428
+            Width: =650
+            Height: =20
+      - cmpCtC:
+          Control: CanvasComponent
+          ComponentName: cmpProbeTable
+          Properties:
+            # THE SHAPE cmpPicker ALREADY SHIPS. It is expected to be accepted, and it is
+            # here only so that a rejection of A or B can be attributed to the query rather
+            # than to component inputs in general.
+            RowsCtl: |
+              =ForAll( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
+                       { project_name: project_name,
+                         project_date_target: project_date_target,
+                         project_perc_completion: project_perc_completion } )
+            X: =16
+            Y: =450
+            Width: =650
+            Height: =236
+      # ------------------------------------------------------------------ PANEL D
+      - lblCtHeadD:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="D   RowsFlat  =  ShowColumns(query, 3 cols)    NOT IN #67          read the RowsFlat line"
+            Font: =Font.'Segoe UI'
+            Size: =13
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(146, 104, 22, 1)
+            X: =690
+            Y: =428
+            Width: =650
+            Height: =20
+      - cmpCtD:
+          Control: CanvasComponent
+          ComponentName: cmpProbeTable
+          Properties:
+            # The only candidate that could give an exact schema AND a live query, since
+            # ShowColumns narrows columns without projecting rows. Whether SharePoint folds
+            # it is unknown, so an accepted D is a lead, not a result -- claim 2 settles it.
+            RowsFlat: |
+              =ShowColumns( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
+                            project_name, project_date_target, project_perc_completion )
+            X: =690
+            Y: =450
+            Width: =650
+            Height: =236
       - lblCtRead:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="HOW TO READ  ·  1c rejected -> stop, the sheet is unreadable.   " &
-               "1a or 1b ACCEPTED and its readout prints a name -> the query crosses intact; cmpProjectTable can be the whole table and the epic takes its first outcome.   " &
-               "1b accepted but 'blank manager' -> the complex columns did NOT survive; a lead column inside the component is off the table even though rows crossed.   " &
-               "1a and 1b both rejected -> the epic takes its THIRD outcome: the gallery stays on the screen and the component is the header only.   " &
+              ="HOW TO READ  ·  C rejected or blank -> stop, the sheet is unreadable.   " &
+               "A or B showing a name on its own line -> the query crosses intact; cmpProjectTable can be the whole table and the epic takes its FIRST outcome.   " &
+               "B showing a name but '-- blank manager --' -> rows crossed, the complex columns did not; a lead column inside the component is off the table.   " &
+               "A and B both rejected -> the epic takes its THIRD outcome: the gallery stays on the screen and the component is the header only.   " &
                "Accepted but '-- no rows --' while E prints a name -> record it as its own answer; it is neither a pass nor a clean rejection."
             Font: =Font.'Segoe UI'
             Size: =12
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =706
-            Width: =1300
-            Height: =52
+            Y: =696
+            Width: =1324
+            Height: =62
