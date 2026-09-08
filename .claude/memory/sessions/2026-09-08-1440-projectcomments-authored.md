@@ -82,3 +82,11 @@ Still open, neither of them a paste:
 Not exercised by "it works", so not proven:
 - the project-delete cascade's fourth arm (deleting a whole project that has comments);
 - whether a long comment scrolls in `DisplayMode.View`.
+
+## EPIC CLOSED — 2026-09-08
+User built the external archival flow, so #65 closed and #60 closed as completed. All five
+sub-issues done; project comments ship end to end.
+
+Carried forward deliberately, tracked by no issue: **item-level permissions on
+`taskmaster_projectcomments`**. Raised twice; the user closed the epic without it, which is
+their call. The app-side gate stops accidents, not intent.

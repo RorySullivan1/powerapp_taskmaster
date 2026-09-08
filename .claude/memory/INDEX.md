@@ -10,21 +10,20 @@
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid.
-- **OPEN BACKLOG — TWO EPICS. #60 IS LANDED but for #65; NOTHING authored on #66.**
-  **#60 "Project comments" — LANDED AND CONFIRMED WORKING IN STUDIO 2026-09-08 (user).**
-  #61/#62/#63/#64 CLOSED. `taskmaster_projectcomments` is live, connected, and read/written on
+- **PROJECT COMMENTS SHIPPED 2026-09-08 — EPIC #60 CLOSED, ALL FIVE SUB-ISSUES DONE.**
+  `taskmaster_projectcomments` is the FOURTH child list, live and connected, read and written on
   `scrProject`: fourth arm of btnPrjRecompute's Concurrent (raw list, indexed Number FK, sorted
-  server-side); `colIssues` split into secIssues over secComments; manager highlight; add modal
-  `mdCmt`; detail/edit/delete modal `mdCv`; comments in BOTH delete paths.
-  **TWO THINGS ARE STILL OPEN AND NEITHER IS A PASTE.**
-  (1) **#65 [EXTERNAL]** — the archival flow must set `projectcomment_project_archived` alongside
-  the other three flags. Nothing in this repo can do it.
-  (2) **SHAREPOINT: Item-level Permissions on the list** ("create items and edit items that were
-  created by the user"). Until it is set, author-only Edit/Delete is an AFFORDANCE — anyone with
-  Contribute can edit any comment through SharePoint itself.
-  **NOT EXERCISED BY THE CONFIRMATION, so do not record them as proven:** deleting a whole
-  PROJECT that has comments (the cascade's fourth arm), and whether a comment longer than the
-  220px box scrolls in `DisplayMode.View`.
+  server-side); `colIssues` split into secIssues over secComments; manager highlight; `mdCmt` to
+  add; `mdCv` to read, edit or delete your own; comments in BOTH delete paths. The external
+  archival flow sets `projectcomment_project_archived` (user, 2026-09-08).
+  **NEVER A SUB-ISSUE, AND UNSET UNLESS THE USER HAS SINCE DONE IT — do not assume it is done:**
+  Item-level Permissions on that list ("create items and edit items that were created by the
+  user"). Author-only Edit/Delete is an app AFFORDANCE; Contribute lets anyone edit any comment
+  through SharePoint itself. Raised twice and consciously not blocking the close.
+  **NOT EXERCISED BY THE LANDING, so NOT proven:** deleting a whole PROJECT that has comments
+  (the cascade's fourth arm), and whether a comment longer than the 220px box scrolls in
+  `DisplayMode.View`.
+- **OPEN BACKLOG — ONE EPIC, #66, AND NOTHING IS AUTHORED ON IT.**
   **#66 "scrProjects table" — `galProjects` becomes `cmpProjectTable` (11th component): sort headers
   on the DELEGABLE set only (name/target/% — Text/DateTime/Number; never Choice or Person), a new
   Coverage column, the coverage filter moved INTO that header, `cboPrjCoverage` removed, search +
@@ -32,7 +31,7 @@
   paging inside a component, dynamic-column SortByColumns) decide the data contract; the epic is
   written three ways because `galProjects` is direct-bound and PAGES past 2000 while a ForAll
   projection CAPS there. → **#68 component**, **#69 screen + index project_coverage** (two pastes,
-  component first). Nothing else is queued — **do not invent work beyond #60–#69; ask.**
+  component first). Nothing else is queued — **do not invent work beyond #66–#69; ask.**
 - **PASTE QUEUE — ALL 6 EDIT SCREENS + scrReports, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE
   NEEDS SHAREPOINT FIRST.** The required-fields message is reworked on ALL SIX edit screens to
   `Required Fields Remaining: A | B` (so scrClientEdit / scrProductEdit / scrTaskEdit / scrIssueEdit
@@ -207,3 +206,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-08 | #61 provisioned by the user (3 columns, FK + archived flag indexed, connected in Studio) and #62/#63/#64 AUTHORED in one scrProject paste: fourth fold arm, secIssues over secComments, manager highlight, screen-local add modal, comments in the delete cascade. 22/22, pushed. AWAITING THE PASTE | sessions/2026-09-08-projectcomments-authored.md
 - 2026-09-08 | comments gain read/edit/delete: 120-char row preview + mdCv detail dialog, author-only Edit/Delete via gCmtCanEdit, delete through a fourth gDelKind on cmpPrjConfirmDel, btnPrjCmtFetch shared by both write paths. Created/Created By now indexed. #60/#62/#63 bodies rewritten — they still described the dead five-column design. 22/22, AWAITING THE PASTE | sessions/2026-09-08-1440-projectcomments-authored.md
 - 2026-09-08 | scrProject PASTED AND CONFIRMED WORKING (user): project comments live end to end — panel, add, read, edit, delete. #61-#64 closed. Remaining in #60: #65 external archival flow, and item-level permissions on the list. Untested by the confirmation: the project-delete cascade with comments, and View-mode scrolling of a long comment | sessions/2026-09-08-1440-projectcomments-authored.md
+- 2026-09-08 | EPIC #60 CLOSED COMPLETE: archival flow built by the user, so #65 closed too. Project comments ship end to end. Open backlog is now #66 alone. Carried forward, untracked by any issue: item-level permissions on taskmaster_projectcomments | sessions/2026-09-08-1440-projectcomments-authored.md
