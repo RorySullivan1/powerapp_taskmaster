@@ -1931,8 +1931,11 @@ Screens:
                                           # is one tap away in mdCv. Newlines are flattened to spaces
                                           # first: a Note wraps, so three short lines would otherwise
                                           # fill the cell and hide a long comment behind almost nothing.
-                                          # 120 characters is about three lines at this width; raise it
-                                          # and the text clips instead of ending in the ellipsis.
+                                          # THE CAP IS A FUNCTION OF colCmtWho'S WIDTH. That column is 200,
+                                          # which leaves this one about 248px at the design width and ~188
+                                          # at the column's floor — roughly three lines of 33, so 100. Widen
+                                          # colCmtWho again and this number comes down with it, or the text
+                                          # clips instead of ending in the ellipsis.
                                           - cellCmtText:
                                               Control: Label@2.5.1
                                               Properties:
@@ -1942,12 +1945,12 @@ Screens:
                                                                Substitute( Coalesce(ThisItem.projectcomment_comment, ""),
                                                                            Char(13), " " ),
                                                                Char(10), " " ) ) },
-                                                      If( Len(t) > 120, Left(t, 120) & "…", t ) )
+                                                      If( Len(t) > 100, Left(t, 100) & "…", t ) )
                                                 Font: =gTheme.Font
                                                 Size: =gTheme.Size.Small
                                                 Color: =gTheme.Color.TextPrimary
                                                 FillPortions: =3
-                                                LayoutMinWidth: =150
+                                                LayoutMinWidth: =140
                                                 Height: =46
                                           - colCmtWho:
                                               Control: GroupContainer@1.5.0
@@ -1957,8 +1960,8 @@ Screens:
                                                 LayoutAlignItems: =LayoutAlignItems.Start
                                                 LayoutGap: =2
                                                 FillPortions: =0
-                                                LayoutMinWidth: =150
-                                                Width: =150
+                                                LayoutMinWidth: =200
+                                                Width: =200
                                                 Height: =46
                                               Children:
                                                 - cellCmtAuthor:
