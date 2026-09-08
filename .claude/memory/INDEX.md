@@ -59,8 +59,8 @@
   `.Value` folds, a Sort on a Complex column does not. **PRIORITY WILL NOT BECOME SORTABLE BY
   FIXING DELEGATION** — a text sort gives Critical/High/Low/Lowest/Moderate, which is not severity
   order. It needs an indexed NUMBER rank column, written by all six edit screens and back-filled.
-  **`project_priority` IS INDEXED IN SHAREPOINT (user, 2026-09-08). `project_coverage` IS `indexed:
-  true` IN THE GOLDEN SOURCE BUT ITS SHAREPOINT INDEX IS UNCONFIRMED — do not assume it is done.**
+  **BOTH FILTER COLUMNS ARE INDEXED IN SHAREPOINT, CONFIRMED BY THE USER 2026-09-08:**
+  `project_priority` and `project_coverage`. Nothing about this screen is waiting on SharePoint.
   **HEADER WIDTH IS READ, NOT COMPUTED:** `rowTableHead.Width = galProjects.TemplateWidth`. An
   earlier version guessed the scrollbar cost 16px and the headings landed misaligned.
 - **PASTE QUEUE — ALL 6 EDIT SCREENS + scrReports, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE
