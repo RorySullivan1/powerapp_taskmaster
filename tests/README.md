@@ -981,8 +981,8 @@ project name at a half-screen instance width, and the name is the whole of claim
 
 | Panel | Sets | Formula |
 |---|---|---|
-| **C** | `RowsCtl` | `ForAll(Filter(OpenProjects, StartsWith(project_name,"a")), {…})` — **positive control, read first** |
-| **A** | `RowsFlat` | `Filter( OpenProjects, StartsWith(project_name, "a") )` |
+| **C** | `RowsCtl` | `ForAll( Filter(projects, StartsWith(name, prefix)), {…} )` — **positive control, read first** |
+| **A** | `RowsFlat` | `Filter( taskmaster_projects, StartsWith(project_name, Trim(txtCtPrefix.Text)) )` |
 | **B** | `RowsRich` | the same query |
 | **D** | `RowsFlat` | `ShowColumns( Filter(…), project_name, project_date_target, project_perc_completion )` |
 
@@ -998,6 +998,23 @@ and a refusal that survives alone **is** that candidate's answer.
 `Default` literal, whose only row has an empty `project_name`, so they read `-- no rows --`. A
 name therefore appears on exactly the line the panel is testing; anywhere else means the paste
 landed a formula on the wrong property.
+
+**The prefix comes from the data, not from the author — and that is a correction, not a
+refinement.** An author-chosen literal came back empty twice across the gap: `"ab"` on #51 row 6,
+and `"a"` on the first run of this screen. An empty subset makes every panel print `-- no rows --`
+and claim 1 unreadable. The box is now seeded with `Left(First(taskmaster_projects).project_name, 1)`
+— the first character of a real row, so it matches by construction — and row **N** prints five
+real names so it can be widened off the data. **Never leave the box empty:**
+`StartsWith(project_name, "")` is rejected outright and takes all four panels down at once.
+
+**The panels query the raw list, not `OpenProjects`.** Claim 1 is a schema question — whether a
+Table Input accepts a SharePoint query's record type — and both sources have the identical record
+type, so the raw list answers it without the confound. The confound is why: `OpenProjects`
+enumerates the five phases, and rows whose `project_phase` is **blank** are invisible to it, which
+is a known unresolved condition of this list and the first suspect for the empty prefixes. Rows
+**E** and **EO** sit side by side to measure exactly that, and **EO is labelled NOT CLAIM 1** so
+its result is not read as one. Composing over a named formula was separately cleared by #51 row 6,
+so the narrowing costs the answer nothing.
 
 **D is not in #67.** It is the only candidate that could give both an exact schema and a live
 query — `ShowColumns` narrows columns without projecting rows — so an accepted D proves nothing
@@ -1108,6 +1125,9 @@ the prefix.
 
 - The prefix box **must not be left empty**: `StartsWith(project_name, "")` is rejected outright
   (`scrProbe-startswith-empty`, 2026-09-04), so an empty box takes every row down at once.
+- **All three boxes are seeded from a real row** — `Left(First(taskmaster_projects).project_name, 1)`
+  — rather than from a literal. Two author-chosen prefixes have already come back empty across the
+  gap, and on every one of these sheets an empty subset is indistinguishable from a failure.
 - Both component probes **break rule 1 on purpose**, twice over — they name a data source and
   they use a component. In both cases the banned thing is the thing under test.
 - Claim 3 uses the **raw list**, not a named formula: it keeps the subset predictable, and #51

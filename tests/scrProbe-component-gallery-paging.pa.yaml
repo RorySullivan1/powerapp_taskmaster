@@ -51,8 +51,10 @@
 #
 # THE PREFIX BOX MUST NOT BE LEFT EMPTY. StartsWith(project_name, "") is
 # rejected outright -- "the query is not valid" -- so an empty box takes all
-# three rows down at once (scrProbe-startswith-empty, 2026-09-04). It defaults
-# to "a"; if a letter matches nothing, type another.
+# three rows down at once (scrProbe-startswith-empty, 2026-09-04). It is SEEDED FROM A REAL ROW
+# -- the first character of the raw list's first project -- because an
+# author-chosen literal has come back empty twice across the gap and an empty
+# subset makes the whole sheet unreadable. Widen it by overtyping.
 #
 # BEFORE PASTING
 #   1. taskmaster_projects in the Data pane.
@@ -107,7 +109,8 @@ Screens:
             # Same control and same reader (.Text) as the shipping txtProjSearch, and the
             # same Trim around it, so the query under test is the one the app runs.
             Type: =TextInputType.Search
-            Default: ="a"
+            Default: |
+              =Coalesce( Left( First( taskmaster_projects ).project_name, 1 ), "a" )
             Placeholder: ="name prefix -- NEVER leave this empty"
             X: =16
             Y: =110

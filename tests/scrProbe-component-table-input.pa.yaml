@@ -40,10 +40,28 @@
 # the instance is testing, and appearing anywhere else means the paste put a
 # formula on the wrong property.
 #
-# "a" is an arbitrary prefix and A NO-MATCH IS NOT THE FINDING. It must be
-# NON-EMPTY: StartsWith(project_name, "") is rejected outright -- "the query is
-# not valid" -- on a plain indexed Text column (scrProbe-startswith-empty,
-# 2026-09-04), and using it here would test that instead of this.
+# ------------------------------------------- THE PREFIX COMES FROM THE DATA
+# An author-chosen literal has now come back EMPTY TWICE across the gap -- "ab"
+# on #51 row 6, and "a" on the first run of this screen. An empty result makes
+# every panel print "-- no rows --" and claim 1 unreadable, so the prefix is no
+# longer guessed: the box is seeded with the FIRST CHARACTER OF A REAL ROW and
+# therefore matches at least one row by construction. Row N prints five real
+# names so it can be widened off the data rather than off a hunch.
+#
+# NEVER LEAVE THE BOX EMPTY: StartsWith(project_name, "") is rejected outright
+# -- "the query is not valid" -- on a plain indexed Text column
+# (scrProbe-startswith-empty, 2026-09-04), and it would take all four panels
+# down at once.
+#
+# THE PANELS QUERY THE RAW LIST, NOT OpenProjects. Claim 1 is a SCHEMA question
+# -- whether a Table Input accepts a SharePoint query's record type -- and both
+# sources have the identical record type, so the raw list answers it without the
+# confound. It is the confound that forced the change: OpenProjects enumerates
+# the five phases, and rows whose project_phase is BLANK are invisible to it
+# (a known, unresolved condition of this list). Rows E and EO sit side by side
+# to measure exactly that, and EO is labelled NOT CLAIM 1 so its result is not
+# read as one. Composing over a named formula was separately cleared by #51
+# row 6, so nothing about this narrowing weakens the answer.
 #
 # AccessAppScope: false DOES NOT BLOCK ANY OF THIS, and it looks as though it
 # should. It governs what formulas INSIDE the definition can see. An instance
@@ -87,18 +105,20 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="Read P and E FIRST. Then read C -- it is the positive control, and if C cannot show a name, nothing else on this sheet can be read." &
+              ="Read P, R, N and E FIRST, then C -- the positive control. If C cannot show a name, nothing else on this sheet can be read." &
                Char(10) &
-               "Each panel sets ONE property and prints all three. A name on the line named in the panel header is a pass; '-- no rows --' there is NOT, and neither is a red error on the instance." &
+               "THE PREFIX BOX IS SEEDED FROM A REAL ROW, so it matches by construction. Widen or narrow it off the names in row N. NEVER leave it empty: every panel goes red at once." &
                Char(10) &
-               "If the paste was refused as a whole, paste one panel at a time (C first) and record which candidate survives alone."
+               "Each panel sets ONE property and prints all three. A name on the line its header names is a pass; '-- no rows --' there is NOT, and neither is a red error on the instance." &
+               Char(10) &
+               "EO is not part of claim 1. E printing a name while EO prints none means OpenProjects excludes those rows -- a separate finding, and the likely reason a literal prefix kept coming back empty."
             Font: =Font.'Segoe UI'
             Size: =12
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =46
+            Y: =44
             Width: =1324
-            Height: =48
+            Height: =62
       # ------------------------------------------------------- SCREEN-SIDE CONTROLS
       # Both of these run OUTSIDE the component. They are what makes a rejection
       # attributable: if the query cannot even be built on the screen, the component
@@ -114,9 +134,59 @@ Screens:
             Size: =13
             Color: =RGBA(49, 130, 93, 1)
             X: =16
-            Y: =100
+            Y: =96
             Width: =1324
             Height: =22
+      - lblCtRaw:
+          Control: Label@2.5.1
+          Properties:
+            # THE RAW LIST, and the reason it is here: a hand-picked prefix came back empty
+            # twice running. If R prints a name and P does not, OpenProjects is the empty
+            # thing and claim 1 was never what failed.
+            Text: |
+              ="R   First(taskmaster_projects)  RAW LIST ............... " &
+               IfError( Coalesce( First( taskmaster_projects ).project_name, "-- empty --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(49, 130, 93, 1)
+            X: =16
+            Y: =118
+            Width: =1324
+            Height: =22
+      - lblCtNames:
+          Control: Label@2.5.1
+          Properties:
+            # WHAT THE NAMES ACTUALLY LOOK LIKE. Five real ones, so a prefix is chosen from
+            # the data rather than guessed from this side of the gap. FirstN does not
+            # delegate and does not need to: five rows off the first page is the whole job.
+            Text: |
+              ="N   five real names ... " &
+               IfError( Concat( FirstN( taskmaster_projects, 5 ), project_name, "   |   " ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =140
+            Width: =1324
+            Height: =22
+      - txtCtPrefix:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            # THE PREFIX COMES FROM THE DATA, NOT FROM THE AUTHOR. Its Default is the first
+            # character of a real row, so it matches at least one row by construction --
+            # which is exactly what a literal "a" failed to do, twice. Overtype it to widen
+            # or narrow the subset; never leave it EMPTY, because
+            # StartsWith(project_name, "") is rejected outright and takes every panel down.
+            Type: =TextInputType.Search
+            Default: |
+              =Coalesce( Left( First( taskmaster_projects ).project_name, 1 ), "a" )
+            Placeholder: ="prefix -- NEVER leave this empty"
+            X: =16
+            Y: =168
+            Width: =240
+            Height: =32
       - lblCtEnv:
           Control: Label@2.5.1
           Properties:
@@ -124,43 +194,64 @@ Screens:
             # screen. It must come back clean, and whatever name it prints is the name the
             # panels' readouts should print too.
             Text: |
-              ="E   First(Filter(OpenProjects, StartsWith(name,'a')))  ON THE SCREEN ... " &
-               IfError( Coalesce( First( Filter( OpenProjects,
-                                                 StartsWith( project_name, "a" ) ) ).project_name,
+              ="E   ON THE SCREEN, raw list, prefix [" & Trim(txtCtPrefix.Text) & "] ... " &
+               IfError( Coalesce( First( Filter( taskmaster_projects,
+                                        StartsWith( project_name, Trim(txtCtPrefix.Text) ) ) ).project_name,
                                   "-- no rows (no error) --" ),
                         "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
             Font: =Font.'Segoe UI'
             Size: =13
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(0, 90, 158, 1)
-            X: =16
-            Y: =124
-            Width: =1324
+            X: =272
+            Y: =174
+            Width: =1068
+            Height: =22
+      - lblCtEnvOpen:
+          Control: Label@2.5.1
+          Properties:
+            # THE SAME QUERY OVER OpenProjects, side by side with E. This row is NOT part of
+            # claim 1 -- it is the diagnostic for the empty-prefix mystery. E printing a name
+            # while this prints nothing means the named formula excludes those rows, and the
+            # known blank project_phase rows are the first suspect.
+            Text: |
+              ="EO  the same over OpenProjects  NOT CLAIM 1 ........... " &
+               IfError( Coalesce( First( Filter( OpenProjects,
+                                        StartsWith( project_name, Trim(txtCtPrefix.Text) ) ) ).project_name,
+                                  "-- no rows (no error) --" ),
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(146, 104, 22, 1)
+            X: =272
+            Y: =196
+            Width: =1068
             Height: =22
       # ------------------------------------------------------------------ PANEL A
       - lblCtHeadA:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="A   RowsFlat  =  Filter(OpenProjects, StartsWith(name,'a'))        read the RowsFlat line"
+              ="A   RowsFlat  =  Filter(projects, StartsWith(name, prefix))        read the RowsFlat line"
             Font: =Font.'Segoe UI'
             Size: =13
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(0, 90, 158, 1)
             X: =16
-            Y: =158
+            Y: =228
             Width: =650
-            Height: =20
+            Height: =18
       - cmpCtA:
           Control: CanvasComponent
           ComponentName: cmpProbeTable
           Properties:
             RowsFlat: |
-              =Filter( OpenProjects, StartsWith( project_name, "a" ) )
+              =Filter( taskmaster_projects,
+                       StartsWith( project_name, Trim(txtCtPrefix.Text) ) )
             X: =16
-            Y: =180
+            Y: =248
             Width: =650
-            Height: =236
+            Height: =210
       # ------------------------------------------------------------------ PANEL B
       - lblCtHeadB:
           Control: Label@2.5.1
@@ -172,9 +263,9 @@ Screens:
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(0, 90, 158, 1)
             X: =690
-            Y: =158
+            Y: =228
             Width: =650
-            Height: =20
+            Height: =18
       - cmpCtB:
           Control: CanvasComponent
           ComponentName: cmpProbeTable
@@ -184,11 +275,12 @@ Screens:
             # component. A name on the RowsRich line with "-- blank manager --" beneath it
             # is a THIRD outcome, not a pass: rows crossed and the complex halves did not.
             RowsRich: |
-              =Filter( OpenProjects, StartsWith( project_name, "a" ) )
+              =Filter( taskmaster_projects,
+                       StartsWith( project_name, Trim(txtCtPrefix.Text) ) )
             X: =690
-            Y: =180
+            Y: =248
             Width: =650
-            Height: =236
+            Height: =210
       # ------------------------------------------------------------------ PANEL C
       - lblCtHeadC:
           Control: Label@2.5.1
@@ -200,9 +292,9 @@ Screens:
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(49, 130, 93, 1)
             X: =16
-            Y: =428
+            Y: =466
             Width: =650
-            Height: =20
+            Height: =18
       - cmpCtC:
           Control: CanvasComponent
           ComponentName: cmpProbeTable
@@ -211,14 +303,15 @@ Screens:
             # here only so that a rejection of A or B can be attributed to the query rather
             # than to component inputs in general.
             RowsCtl: |
-              =ForAll( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
+              =ForAll( Filter( taskmaster_projects,
+                           StartsWith( project_name, Trim(txtCtPrefix.Text) ) ),
                        { project_name: project_name,
                          project_date_target: project_date_target,
                          project_perc_completion: project_perc_completion } )
             X: =16
-            Y: =450
+            Y: =486
             Width: =650
-            Height: =236
+            Height: =210
       # ------------------------------------------------------------------ PANEL D
       - lblCtHeadD:
           Control: Label@2.5.1
@@ -230,9 +323,9 @@ Screens:
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(146, 104, 22, 1)
             X: =690
-            Y: =428
+            Y: =466
             Width: =650
-            Height: =20
+            Height: =18
       - cmpCtD:
           Control: CanvasComponent
           ComponentName: cmpProbeTable
@@ -241,12 +334,13 @@ Screens:
             # ShowColumns narrows columns without projecting rows. Whether SharePoint folds
             # it is unknown, so an accepted D is a lead, not a result -- claim 2 settles it.
             RowsFlat: |
-              =ShowColumns( Filter( OpenProjects, StartsWith( project_name, "a" ) ),
+              =ShowColumns( Filter( taskmaster_projects,
+                                StartsWith( project_name, Trim(txtCtPrefix.Text) ) ),
                             project_name, project_date_target, project_perc_completion )
             X: =690
-            Y: =450
+            Y: =486
             Width: =650
-            Height: =236
+            Height: =210
       - lblCtRead:
           Control: Label@2.5.1
           Properties:
@@ -260,6 +354,6 @@ Screens:
             Size: =12
             Color: =RGBA(110, 120, 130, 1)
             X: =16
-            Y: =696
+            Y: =700
             Width: =1324
-            Height: =62
+            Height: =60
