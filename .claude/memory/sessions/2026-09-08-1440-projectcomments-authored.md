@@ -68,3 +68,17 @@ character-capped preview with an ellipsis in the row.
 - **STILL TO DO IN SHAREPOINT: Item-level Permissions on `taskmaster_projectcomments`.**
 - Unverified: whether a long comment scrolls in `DisplayMode.View`. Check on the render.
 - No "edited" marker: it would need `Modified`, which is not among the confirmed system columns.
+
+## LANDED — 2026-09-08
+User pasted `scrProject` and confirmed the comment functionality works. #61–#64 closed.
+
+The paste is all-or-nothing, so it grounds every token in the file — see the INDEX Decision of
+this date for the five shapes that are now usable without re-deriving them.
+
+Still open, neither of them a paste:
+- **#65** external archival flow (`projectcomment_project_archived`).
+- **Item-level Permissions** on `taskmaster_projectcomments` in SharePoint.
+
+Not exercised by "it works", so not proven:
+- the project-delete cascade's fourth arm (deleting a whole project that has comments);
+- whether a long comment scrolls in `DisplayMode.View`.
