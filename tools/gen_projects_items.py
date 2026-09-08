@@ -58,7 +58,20 @@ COLUMNS = [("project_date_target",     "project_date_target"),
 
 COV  = "project_coverage.Value = cboPrjCoverage.Selected.Value"
 PRI  = "project_priority.Value = cboPrjPriority.Selected.Value"
-MINE = ["( project_manager.Email = gUserEmail", "|| project_supporter.Email = gUserEmail )"]
+# THREE IDENTITIES PER PERSON COLUMN, NOT ONE. The pickers write a Person column
+# from Office365Users' Mail while this predicate read User().Email — a different
+# Azure AD attribute, commonly the UPN. They coincide for most people and silently
+# do not for anyone whose UPN differs from their mailbox address, and then every
+# arm fails at once and "only show my projects" returns nothing. See App.OnStart.
+# Both columns are indexed, so six arms fold exactly as two did.
+# NONE OF THE THREE GLOBALS MAY BE BLANK: project_supporter is OPTIONAL, so
+# `supporter.Email = ""` would match every project that has no supporter.
+MINE = ["( project_manager.Email = gUserEmail",
+        "|| project_manager.Email = gUserMail",
+        "|| project_manager.Email = gUserUpn",
+        "|| project_supporter.Email = gUserEmail",
+        "|| project_supporter.Email = gUserMail",
+        "|| project_supporter.Email = gUserUpn )"]
 SRCH = "StartsWith( project_name, Trim(txtProjSearch.Text) )"
 ALLC = 'Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"'
 ALLP = 'Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"'
