@@ -413,16 +413,20 @@ lists:
   # ---------------------------------------------------------------------------
   taskmaster_projectcomments:
     role: Free-form comments on a project. Append-only; read and written on scrProject only.
-    provisioned: pending     # schema settled here; not yet created in SharePoint
+    provisioned: live        # 2026-09-08 — created in SharePoint by the user, with
+                             # projectcomment_project_id and projectcomment_project_archived
+                             # indexed, and CONNECTED as a data source in Studio the same day.
+                             # scrProject is this list's only consumer.
     # 1. The single Lookup-free FK is a Number; the only join is the SYSTEM `Created By`,
     # which a view projects.
     join_cost: 1
     # AUTHOR AND DATE ARE THE SYSTEM COLUMNS `Created By` and `Created` — this list adds
     # NO app-stamped provenance. Both were confirmed to resolve in Studio 2026-09-08.
-    # Index `Created` when the list is created: the gallery sorts newest-first, and a Sort
-    # only delegates past 5,000 items on an indexed column. If a delegation warning ever
-    # appears on that Sort, the fallback is an app-stamped DateTime — do not reach for it
-    # before confirming the warning is real.
+    # The system columns were confirmed INDEXABLE (user, 2026-09-08). Index `Created` before
+    # this list passes 5,000 rows: the gallery sorts newest-first and a Sort only delegates
+    # past that threshold on an indexed column. Nothing breaks at today's size. If a
+    # delegation warning ever appears on that Sort, the fallback is an app-stamped DateTime —
+    # do not reach for it before confirming the warning is real.
     # The system columns are READ-ONLY: the app cannot backdate a comment or attribute one
     # to anybody but the signed-in user who wrote it. That is correct for v1, and it is the
     # constraint to check first if a flow or an import ever needs to create comments.
