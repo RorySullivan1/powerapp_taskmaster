@@ -103,3 +103,24 @@ even moving toward that outcome."
   Button explicitly.
 - #67 and #68 closed not-planned with the reasoning in their bodies; #66 rewritten; #69 is now the
   whole epic and carries the proof list.
+
+## First paste — `SortByColumns` rejected, and why it matters beyond this screen
+
+- **`project_name` is not a SharePoint internal name. That column is the built-in `Title`,
+  renamed** (user, on the paste). `schema/schema.yaml` recorded `project_name` as though it were
+  the internal name, and the golden source was wrong about it from the beginning.
+- **It has been invisible for the whole life of the app** because every other formula names
+  columns as Power Fx IDENTIFIERS, which resolve by DISPLAY name. The only construct that cares
+  is a column name travelling as a STRING — which nothing in this app did until `SortByColumns`.
+- **Fixed by removing the dependency, not by supplying internal names.** Internal names would
+  work, but they would put a second naming scheme into the one formula `pre_write_column_guard.py`
+  and `schema.yaml` cannot check — and only `Title` is confirmed; `project_date_target` and
+  `project_perc_completion` are unverified from this side of the gap.
+- `gPrjSortCol` is now a **KEY**, compared with `=` in a Switch; each arm sorts on a **literal
+  identifier**, the same delegable shape the screen already shipped sixteen times. 48 branches.
+  `Sort(If(...))` and an expression sort key do not fold, so the Switch has to be outside the
+  filters — the duplication is the mechanism.
+- **Each of the three arms was machine-verified** equivalent to the landed sixteen branches by
+  whitespace-normalised comparison, so the filter logic is provably untouched by the rewrite.
+- This retired the last live question from the withdrawn #67: there is no variable column name
+  left, so whether one would delegate no longer matters to anything being built.
