@@ -46,3 +46,25 @@ data source in Studio. That unblocked everything below.
 - Long comments clip at ~46px. Accepted for v1; the fix would be a taller `TemplateSize`.
 - The issues gallery visibly shrank. If the split is wrong the lever is the two `FillPortions`.
 - #65 (external archival flow sets the fourth flag) is all that remains in #60.
+
+## Second pass (same day): comments are no longer append-only
+User asked for a detail popup on click, with edit/delete restricted to the commenter, and a
+character-capped preview with an ellipsis in the row.
+
+- `cellCmtText` → 120-char preview, `Char(13)`/`Char(10)` flattened to spaces first, ellipsis
+  only when earned. `galCommentsHit` spans the FULL template (no delete icon in this template).
+- `mdCv` appended after `mdCmt`: one `ModernTextInput` switching `DisplayMode` View↔Edit,
+  Close / Edit / Delete when reading, Save / Cancel when editing.
+- `gCmtCanEdit` computed once in the hit button = author AND project not archived.
+- Delete = fourth `gDelKind` on `cmpPrjConfirmDel`; `mdCv` closes first because the confirm
+  component is declared earlier and would open underneath it.
+- `btnPrjCmtFetch` extracted so the post and edit paths share one refetch.
+- schema.yaml: `Created`/`Created By` indexed; item-level permissions recorded as the real
+  enforcement of author-only editing.
+- GitHub #60/#62/#63 bodies rewritten — they still described the five-column design, which is
+  what made the remote contradict the repo.
+
+## Open
+- **STILL TO DO IN SHAREPOINT: Item-level Permissions on `taskmaster_projectcomments`.**
+- Unverified: whether a long comment scrolls in `DisplayMode.View`. Check on the render.
+- No "edited" marker: it would need `Modified`, which is not among the confirmed system columns.
