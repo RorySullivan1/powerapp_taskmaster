@@ -185,3 +185,29 @@ priority not filterable or sortable?"**
 - Epic #66 delivered end to end: sortable headings on the delegable set, Coverage and Priority
   filtering from their own headings, a Coverage column, 32 generated branches, both filter columns
   indexed in SharePoint. PR opened onto `main`.
+
+## #71 — identity is three values, not one
+
+**User report: someone with multiple addresses sees no projects of his own and a blank dashboard.**
+
+- **Root cause is structural and was provable from the source without a repro.** The pickers write
+  every Person column from `Office365Users.SearchUserV2(...).Mail` (`scrProjectEdit.pa.yaml:1998`,
+  and the Patch at `:1184-1186` puts it in both Claims and Email). Every "mine" predicate read
+  `User().Email`. Different Azure AD attributes.
+- **Why it hid for the life of the app:** the two coincide for most people. It only appears for a
+  user whose UPN differs from their primary SMTP — and then it is TOTAL rather than partial,
+  because every equality in the app fails on the same mismatch at once.
+- **Why it is silent:** an empty filter result is indistinguishable from "you own nothing". There
+  is no error to notice. This is the same class as the delegation failures recorded elsewhere here.
+- **Fix:** three identities OR'd in every predicate — `User().Email`, `MyProfile().Mail`,
+  `MyProfile().UserPrincipalName`. Covers the mismatch in EITHER direction, so it does not depend
+  on diagnosing which way round this particular user is.
+- **The trap inside the fix:** a blank identity global would make `supporter.Email = ""` match every
+  row with no supporter — optional Person columns turn a blank into a wildcard. Each global falls
+  back to gUserEmail, and the generator comment says so where the predicate is built.
+- **`Office365Users.MyProfile()` grounded on MS Learn before use** (no inputs; Mail and
+  UserPrincipalName both outputs). The repo had only ever used `SearchUserV2`.
+- **scrProject's comment gate was affected too and nobody had reported it** — `'Created By'` is
+  stamped by SharePoint, a third attribute again, so the same user could not edit his own comments.
+- **The regression check is half the acceptance:** a user for whom this already worked must see the
+  same projects and the same KPI numbers.
