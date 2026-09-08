@@ -995,9 +995,22 @@ time, C first: the blocks are independent list items, so deleting three leaves a
 and a refusal that survives alone **is** that candidate's answer.
 
 **Each panel prints all three readouts and sets one.** The two it does not set fall back to their
-`Default` literal, whose only row has an empty `project_name`, so they read `-- no rows --`. A
-name therefore appears on exactly the line the panel is testing; anywhere else means the paste
-landed a formula on the wrong property.
+`Default` literal, whose only row has an empty `project_name`, so they read `rows=1 … = [-- no rows --]`
+and their gallery shows one `-- blank --` row. A name therefore appears on exactly the line the
+panel is testing; anywhere else means the paste landed a formula on the wrong property.
+
+**Every value prints in square brackets, with a row count in front.** The first run of this screen
+produced a genuinely *empty* readout line, and nothing on the sheet could say whether the label
+was missing, the input was unset, or the property sat in an author-time error state that `IfError`
+cannot see — three causes, three different fixes. `[]` is now visibly different from a missing
+label, and `rows=` separates an empty table from a table of blank names. That count measures what
+crossed into the input and is **not** a delegation reading; if the input holds a live query it can
+print the data row limit rather than a total. Claim 2 measures paging over `gal.AllItems` instead.
+
+**Every `ForAll` projection is `ThisRecord`-qualified.** `{ project_name: project_name }` reads
+naturally and is ambiguous — the bare name on the right sits in the same scope as the field being
+defined — so the control row is written `{ project_name: ThisRecord.project_name, … }`. A positive
+control that fails because of its own syntax makes the whole sheet unreadable.
 
 **The prefix comes from the data because it cannot be chosen from the repo side.** No project
 name is visible from here, and two literals picked that way have matched nothing: `"ab"` on #51

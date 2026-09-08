@@ -107,18 +107,30 @@ ComponentDefinitions:
             Width: =Parent.Width - 24
             Height: =22
       # --------------------------------------------------------- FIRST() READOUTS
-      # Claim 1 is settled in the FORMULA BAR, not here -- an input that rejects the
-      # query never gets as far as a value. These rows separate the two ways an
-      # ACCEPTED formula can still be wrong: a name means rows crossed the boundary,
-      # "-- no rows --" means the property took the formula and received nothing,
-      # which is a different and worse answer than a clean rejection.
+      # These rows separate the ways an ACCEPTED formula can still be wrong: a name
+      # means rows crossed the boundary, "-- no rows --" means the property took the
+      # formula and received nothing, which is a different and worse answer than a
+      # clean rejection.
+      #
+      # THE VALUE IS PRINTED IN SQUARE BRACKETS AND THE ROW COUNT SITS IN FRONT OF IT,
+      # because a genuinely EMPTY line is otherwise unreadable: the first run of
+      # scrProbeCT produced one, and nothing on the sheet could say whether the label
+      # was missing, the input was unset, or the property was in an author-time error
+      # state that IfError cannot see. "[]" is now visibly different from a missing
+      # label, and rows= distinguishes an empty table from a table of blank names.
+      #
+      # rows= COUNTS WHAT CROSSED INTO THE INPUT AND IS NOT A DELEGATION MEASURE. If
+      # the input is holding a live query it can print the data row limit rather than
+      # a total. Claim 2 is where that number means something, and it is measured
+      # there over gal.AllItems instead.
       - ptFlatRead:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="RowsFlat  First().project_name .... " &
+              ="RowsFlat  rows=" & IfError( Text( CountRows( cmpProbeTable.RowsFlat ) ), "err" ) &
+               "  First().project_name = [" &
                IfError( Coalesce( First( cmpProbeTable.RowsFlat ).project_name, "-- no rows --" ),
-                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) ) & "]"
             Font: =Font.'Segoe UI'
             Size: =13
             Color: =RGBA(32, 38, 45, 1)
@@ -130,9 +142,10 @@ ComponentDefinitions:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="RowsRich  First().project_name .... " &
+              ="RowsRich  rows=" & IfError( Text( CountRows( cmpProbeTable.RowsRich ) ), "err" ) &
+               "  First().project_name = [" &
                IfError( Coalesce( First( cmpProbeTable.RowsRich ).project_name, "-- no rows --" ),
-                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) ) & "]"
             Font: =Font.'Segoe UI'
             Size: =13
             Color: =RGBA(32, 38, 45, 1)
@@ -144,9 +157,10 @@ ComponentDefinitions:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="RowsCtl   First().project_name .... " &
+              ="RowsCtl   rows=" & IfError( Text( CountRows( cmpProbeTable.RowsCtl ) ), "err" ) &
+               "  First().project_name = [" &
                IfError( Coalesce( First( cmpProbeTable.RowsCtl ).project_name, "-- no rows --" ),
-                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) ) & "]"
             Font: =Font.'Segoe UI'
             Size: =13
             FontWeight: =FontWeight.Semibold
@@ -162,11 +176,11 @@ ComponentDefinitions:
             # crossing or arrived blank. A flat name proving nothing about the Person is
             # exactly the trap the epic's contract table would fall into.
             Text: |
-              ="RowsRich  manager / coverage ...... " &
+              ="RowsRich  manager / coverage = [" &
                IfError( Coalesce( First( cmpProbeTable.RowsRich ).project_manager.DisplayName, "-- blank manager --" )
                         & "   |   " &
                         Coalesce( First( cmpProbeTable.RowsRich ).project_coverage.Value, "-- blank coverage --" ),
-                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) )
+                        "!! ERROR: " & Coalesce( FirstError.Message, "(blank message)" ) ) & "]"
             Font: =Font.'Segoe UI'
             Size: =13
             Color: =RGBA(32, 38, 45, 1)

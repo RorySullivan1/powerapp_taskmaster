@@ -305,12 +305,15 @@ Screens:
             # THE SHAPE cmpPicker ALREADY SHIPS. It is expected to be accepted, and it is
             # here only so that a rejection of A or B can be attributed to the query rather
             # than to component inputs in general.
+            # EVERY FIELD IS ThisRecord-QUALIFIED. `{ project_name: project_name }` reads
+            # naturally and is ambiguous: the bare name on the right sits in the same scope
+            # as the field being defined. Qualify it and the row scope is unambiguous.
             RowsCtl: |
               =ForAll( Filter( taskmaster_projects,
                            StartsWith( project_name, Trim(txtCtPrefix.Text) ) ),
-                       { project_name: project_name,
-                         project_date_target: project_date_target,
-                         project_perc_completion: project_perc_completion } )
+                       { project_name: ThisRecord.project_name,
+                         project_date_target: ThisRecord.project_date_target,
+                         project_perc_completion: ThisRecord.project_perc_completion } )
             X: =16
             Y: =486
             Width: =650
