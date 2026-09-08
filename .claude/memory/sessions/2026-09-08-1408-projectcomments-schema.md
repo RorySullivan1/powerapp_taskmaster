@@ -42,7 +42,29 @@
 - Nothing authored on #62/#63/#64 — the guard hook would allow it now, but authoring against
   a list that does not exist risks a paste that fails on the first Patch.
 
+## The 2026-08-12 system-columns finding was FALSE (settled same session)
+- The user pushed back on the five-column design: SharePoint generates author and date
+  already. Checked it rather than defending the ledger. MS Learn documents no such
+  connector limitation, and `the_app_caches_the_column_set` in schema.yaml describes a
+  mechanism that produces exactly the reported symptom.
+- User tested `First(taskmaster_issues).'Created By'.DisplayName` in Studio: **both
+  `Created` and `'Created By'` resolve.** The 2026-08-12 entry generalised one failed
+  reference into a schema rule and it stood for four weeks.
+- `taskmaster_projectcomments` re-cut to THREE columns before provisioning — the last
+  moment that was free. #63's Patch loses the expanded-user Person shape entirely.
+- `issue_owner` / `issue_date_open` STAY: live, populated, written by three screens.
+  Rule going forward is in the maintainer manual — a NEW list prefers the system columns,
+  an existing one keeps what it has.
+- Corrected in `schema.yaml` (x3), `docs/manuals/maintainer/04-schema-changes.md`,
+  `.claude/context/schema.md`, and the ledger (refuted in place, per convention).
+
 ## Open threads
+- **GitHub #60/#61/#62/#63 still describe the five-column design** and are the spec an
+  implementer would follow. Not yet edited — outward-facing, so ask first.
+- **Is `Created` offered in that list's index settings?** Load-bearing: without an index the
+  newest-first Sort stops delegating past 5,000 rows, and it fails silently at scale rather
+  than loudly on day one. Fallback if it cannot be indexed or the Sort warns: an app-stamped
+  DateTime, i.e. the column just deleted.
 - **Row height in `galCmt` is the one unresolved design call.** #62 punts to "fixed template,
   ~3 lines, clipped". A Note column either truncates or needs a flexible-height gallery
   variant, and no such variant is grounded anywhere in this app or in `studio-enums.json`.

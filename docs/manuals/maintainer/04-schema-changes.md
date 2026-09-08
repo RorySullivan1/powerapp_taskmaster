@@ -22,10 +22,13 @@ the columns — `schema.yaml` is the only place those live.
   here. This is enforced, not advisory — see [chapter 5](05-validation-and-enforcement.md).
 - **`provisioned:` tracks reality per list**, and it is the schema's analogue of the paste log.
   Do not flip it on intent.
-- **The system columns are not app-readable.** `Created`, `Modified`, `Created By`,
-  `Modified By` exist on every list, but the canvas SharePoint connector does not reliably
-  surface them (confirmed in Studio 2026-08-12). Provenance the app has to *show* must be an
-  app-written column.
+- **The system columns ARE app-readable** (confirmed in Studio 2026-09-08). `Created`,
+  `Modified`, `Created By`, `Modified By` exist on every list and resolve from Power Fx —
+  quote the two-word names. Prefer them over an app-stamped provenance column on a NEW list.
+  Two caveats: they are **read-only**, so nothing can be backdated or re-attributed; and they
+  are **not indexed by default**, so a sort or filter on `Created` needs an index like any
+  other column. Older lists carry app-stamped equivalents (`issue_owner`, `issue_date_open`)
+  and keep them — swapping would strand the provenance already in those rows.
 
 ## After a schema change
 

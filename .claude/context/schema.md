@@ -20,7 +20,7 @@ design. **Internal names freeze at creation** — the YAML's `name:` key *is* th
 | `taskmaster_tasks` | Units of work; the busiest list | 8 |
 | `taskmaster_transactions` | Trades, full transaction level | 4 |
 | `taskmaster_issues` | Freeform issues | 5 |
-| `taskmaster_projectcomments` | Free-form comments on a project; append-only, `scrProject` only | 1 |
+| `taskmaster_projectcomments` | Free-form comments on a project; append-only, `scrProject` only. **Three columns** — author and date are the system `Created By` / `Created` | 1 |
 | `taskmaster_clients` | Client dimension | 4 |
 | `taskmaster_products` | Product reference | 1 |
 | ~~`asset_approval`~~ | **RETIRED 2026-08-09** — approvals moved to an external portal; tasks now hold a free-text `task_output_approval_id`. Deprovision in SharePoint. | — |
@@ -166,8 +166,8 @@ Filter(taskmaster_tasks,
 **Archived work is excluded AT THE SOURCE (2026-08-12).** Each child list carries a denormalised
 `*_project_archived` Boolean mirroring its parent's `project_phase`, indexed. Tasks, transactions
 and issues are maintained by scrProjectEdit's save; the **fourth**,
-`projectcomment_project_archived`, is written `false` by the app at insert and set `true` only by
-the external archival flow (epic #60 / #65) — nothing in this repo can set it. That is what makes "belongs to a live project" a delegable `= false` instead
+`projectcomment_project_archived`, is set `true` only by the external archival flow
+(epic #60 / #65) — nothing in this repo can set it. That is what makes "belongs to a live project" a delegable `= false` instead
 of a join — and a join is the only alternative, since a child row does not carry its parent's phase.
 The aim is a threshold one: **keep the rows in scope under 2000 so no query can silently truncate.**
 A local `RemoveIf` cannot serve that, because the rows are fetched before they are dropped.

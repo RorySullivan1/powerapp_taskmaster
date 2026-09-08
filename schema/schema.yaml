@@ -57,16 +57,17 @@ types:
 # children locally — is GONE: it pulled the rows first and then dropped them, so the
 # limit still bit, and past it archived work silently reappeared.
 
-# Present on every list, managed by SharePoint. NEVER patch these from the app.
+# Present on every list, managed by SharePoint. NEVER patch these from the app —
+# they are READ-ONLY, so a row's author and creation time are whoever and whenever
+# the app actually wrote it, and cannot be corrected, backdated or attributed.
 #
-# DO NOT REFERENCE THESE FROM POWER FX. Confirmed in Studio 2026-08-12: the canvas
-# SharePoint connector does NOT surface `Created By` on taskmaster_issues, so
-# `rec.'Created By'` does not resolve — the column the app can see is not the same
-# set as the column the list has. They are listed here because they EXIST on the
-# list (a SharePoint view can project them), not because the app
-# can read them. Provenance the APP has to show must be an app-written column.
-# NOT INDEXED BY DEFAULT either, so a >5,000-item list cannot sort or filter on
-# `Created` without an index like any other column.
+# THEY ARE READABLE FROM POWER FX. `rec.'Created By'.DisplayName` and `rec.Created`
+# both resolve (confirmed in Studio 2026-09-08). Quote the two-word names — a space
+# in a column name requires single quotes. If one ever fails to resolve, suspect the
+# app's CACHED COLUMN SET first (see `the_app_caches_the_column_set` below) rather
+# than concluding the connector cannot see it.
+# NOT INDEXED BY DEFAULT, so a >5,000-item list cannot sort or filter on `Created`
+# without adding an index like any other column.
 system_columns: [Created, Modified, Created By, Modified By]
 
 # =============================================================================
@@ -399,10 +400,11 @@ lists:
       # so an edit leaves them alone. There is no picker and no form field for either:
       # not-user-manipulable is achieved by not offering the control, not by relying on
       # SharePoint's read-only-ness.
-      # ON THIS LIST, `issue_owner` IS THE CREATED-BY. Do not reach for the system
-      # column instead: the canvas connector does not surface `Created By` here, so
-      # the reference does not resolve in Studio (confirmed 2026-08-12). Same for
-      # `issue_date_open` and `Created`. See `system_columns` at the top of this file.
+      # ON THIS LIST, `issue_owner` IS THE CREATED-BY, and it stays that way: it is
+      # provisioned, populated, and written by three screens. The system `Created By`
+      # would serve (it resolves — see `system_columns`), but swapping to it would
+      # strand the existing rows' provenance, so these two columns are kept
+      # deliberately. A NEW list should prefer the system columns.
       - { name: issue_date_open,        type: DateTime, required: false,                 desc: "When the issue was raised; stamped with Now() on insert only" }
       - { name: issue_date_target,      type: DateTime, required: false, indexed: true,  desc: "Expected resolution date" }
       - { name: issue_date_close,       type: DateTime, required: false,                 desc: "Resolution date" }
@@ -412,8 +414,18 @@ lists:
   taskmaster_projectcomments:
     role: Free-form comments on a project. Append-only; read and written on scrProject only.
     provisioned: pending     # schema settled here; not yet created in SharePoint
-    # 1. The single Person column. Nothing else joins.
+    # 1. The single Lookup-free FK is a Number; the only join is the SYSTEM `Created By`,
+    # which a view projects.
     join_cost: 1
+    # AUTHOR AND DATE ARE THE SYSTEM COLUMNS `Created By` and `Created` — this list adds
+    # NO app-stamped provenance. Both were confirmed to resolve in Studio 2026-09-08.
+    # Index `Created` when the list is created: the gallery sorts newest-first, and a Sort
+    # only delegates past 5,000 items on an indexed column. If a delegation warning ever
+    # appears on that Sort, the fallback is an app-stamped DateTime — do not reach for it
+    # before confirming the warning is real.
+    # The system columns are READ-ONLY: the app cannot backdate a comment or attribute one
+    # to anybody but the signed-in user who wrote it. That is correct for v1, and it is the
+    # constraint to check first if a flow or an import ever needs to create comments.
     columns:
       # NUMBER, NOT LOOKUP, AND THAT IS THE WHOLE DESIGN. The three older child
       # lists carry a Lookup FK, so their fetch filters on `.Id` — which does NOT
@@ -427,18 +439,12 @@ lists:
       # join and reintroduce the truncation the other three had to work around.
       - { name: projectcomment_project_id,       type: Number,   required: true,  indexed: true,  desc: "ID of the parent project. Number so `=` delegates and costs no join; see the note above" }
       - { name: projectcomment_comment,          type: Note,     required: true,                  desc: "The comment. PLAIN multiline, rich text OFF. Never filtered or sorted on — Note is not indexable" }
-      # AUTHOR AND DATE ARE APP-STAMPED, NOT SYSTEM COLUMNS. `Created By` and
-      # `Created` do not resolve in the canvas app (confirmed in Studio 2026-08-12;
-      # `issue_owner` / `issue_date_open` exist for the same reason). Do not reach
-      # for `Modified` either — it rides the same mechanism and there is no way to
-      # test it from this side of the gap.
-      - { name: projectcomment_author,           type: Person, multi: false, required: true, indexed: true, desc: "Who wrote it. Stamped by the app at insert. Indexed for a future by-author query; the v1 gallery compares it locally" }
-      - { name: projectcomment_date,             type: DateTime, required: true,  indexed: true,  desc: "When it was written. Stamped Now() at insert. INDEXED because the gallery sorts on it and Sort must delegate" }
       # Fourth mirror of the parent-archived flag. Same rationale as
       # issue_project_archived: a child row carries no parent phase, joins do not
       # delegate, so the exclusion has to be a local Boolean. Owned by the EXTERNAL
       # archival flow (#65) — the app only ever writes false at insert.
       - { name: projectcomment_project_archived, type: Boolean,  required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Maintained by the external archival flow, not the app" }
+
   # ---------------------------------------------------------------------------
   taskmaster_taskproduct:
     role: >-
