@@ -935,3 +935,36 @@ a valid shape.
 **The original observation is not reproduced, so the phase group was never the variable that
 mattered.** See the `scrProbe-startswith-empty` result above, which found the variable that was:
 the empty `StartsWith` argument.
+
+
+---
+
+## Issue #67 — WITHDRAWN 2026-09-08, not run
+
+Three probes were written for epic #66 and **deleted the same day without being run**. They asked
+whether a component's Table Input accepts a delegable query, whether a gallery inside a component
+still pages, and whether `SortByColumns` folds with a variable column name.
+
+**The first two questions only existed because the table was going to move inside a component.**
+`galProjects` is direct-bound on the screen and already pages past 2,000 rows; leaving it there
+deletes the risk rather than measuring it. The epic was rescoped to build the sort/filter header
+on the screen, so claims 1 and 2 became questions about an architecture that is not being built.
+
+**The third question survives as an observation on the real screen, not a probe.** Whether a
+variable column name folds is visible in one gesture — sort by name descending and check the top
+row is genuinely the last project alphabetically — and the fallback if it does not fold is
+mechanical: write the three sort columns out literally instead of passing a variable. A probe is
+worth its cost when a wrong guess is catastrophic or invisible. This one is neither.
+
+**What the attempt cost, since it is the reusable part:** four trips across the gap, none of which
+returned a reading, because each was spent repairing the instrument — an author-chosen prefix that
+matched nothing (twice), a readout that could render blank with three different causes and no way
+to tell them apart, and an ambiguous `ForAll` projection in the positive control itself. Two
+lessons worth carrying:
+
+1. **Never hard-code a data literal into a probe.** No project name is visible from the repo side.
+   A prefix that matches nothing prints exactly what a rejection prints, so a wrong guess costs a
+   whole run and cannot be distinguished from a result.
+2. **Probe the thing being shipped, not the scaffolding around it.** Three screens and a throwaway
+   component had to be built and understood before a single question could be answered, and the
+   design they were testing was never the thing the user asked for.

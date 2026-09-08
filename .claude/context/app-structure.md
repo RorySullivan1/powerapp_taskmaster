@@ -75,8 +75,11 @@ data-driven. (All mechanics → `power-apps-components`.)
 
 ## Data-flow notes that shape the UI
 
-- **Three peers under a project.** Tasks/Tickets/Issues never nest into one another in the UI;
-  they surface alongside. Only Tasks roll up into completion.
+- **Three peers under a project, plus comments.** Tasks/Tickets/Issues never nest into one
+  another in the UI; they surface alongside. Only Tasks roll up into completion.
+  `taskmaster_projectcomments` is a **fourth child** folded on the project screen (epic #60) but
+  it is **not a peer for any derivation**: a comment must never move a project's phase off
+  Not Started, and it never counts toward completion.
 - **Client-side joins.** No Lookup columns — the app resolves FKs (`ProjectId`, `TicketId`,
   `ClientId`, `InstrumentId`) against `ID` in memory. Resolve once at screen load, not per
   gallery row (avoid the N+1 — see `power-fx-review`).

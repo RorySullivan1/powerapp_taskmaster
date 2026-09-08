@@ -1,13 +1,23 @@
-# Projects browser: coverage filter + search + two toggles ("only mine", "show
-# completed") over a six-column gallery. ONE filter row.
+# Projects browser: a TABLE. Search + two toggles ("only mine", "show completed")
+# above a sortable column header, over a five-column gallery.
+#
+# THE HEADER ROW AND THE GALLERY ROW ARE ONE COLUMN BUDGET IN TWO PLACES. Same
+# order, same FillPortions, same LayoutMinWidth, same 16px gap and padding, or the
+# headings stop sitting over their columns. Change one and change the other:
+#     status 0/28 · name 3/200 · coverage 1/120 · priority 1/140 · due+pct 3/310
+# The due+pct slot is a nested container in BOTH, splitting 2/190 + 1/104.
+# The header takes its WIDTH from galProjects.TemplateWidth rather than computing
+# one, so the two containers are the same width whatever the scrollbar costs.
 #
 # VERTICAL BANDS (768 tall). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
 #     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
 #    88 .. 148   hdrProjects   = HeaderH + Gutter, height 60
 #   164 .. 204   rowFilters    = off hdrProjects,  height 40
-#   220 .. 744   galProjects   = absolute 220, fills to the bottom gutter
-# The bands above galProjects are RELATIVE. The gallery is an ABSOLUTE 220 and its
-# Height subtracts the same number, so those two must be edited together.
+#   220 .. 268   rowTableHead  = absolute 220, height 48
+#   272 .. 744   galProjects   = absolute 272, fills to the bottom gutter
+# The bands above rowTableHead are RELATIVE. The header and the gallery are
+# ABSOLUTE, and the gallery Height subtracts its own Y, so those must be edited
+# together.
 # Layout formulas survive a paste and keep recomputing (tests/README.md); what breaks
 # the link is DRAGGING a control in Studio. Change geometry here, never with the mouse.
 #
@@ -28,9 +38,21 @@ Screens:
          Collect( colPrjCoverage,
                   ForAll( Choices([@taskmaster_projects].project_coverage) As c,
                           { Value: c.Value } ) );
+         ClearCollect( colPrjPriority, { Value: "All priorities" } );
+         Collect( colPrjPriority,
+                  ForAll( Choices([@taskmaster_projects].project_priority) As p,
+                          { Value: p.Value } ) );
          // SELF-HEAL, same as scrHome. App.OnStart is NON-BLOCKING, so this screen can run
          // before it finishes and a blank gUserEmail makes the "only mine" branches match nothing.
-         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) )
+         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+         // SORT STATE. gPrjSortCol is a SHAREPOINT INTERNAL COLUMN NAME, which is why this
+         // one says "Title" where the rest of the app says project_name — see the comment
+         // above the gallery's query. gPrjSortOrd holds a SortOrder
+         // VALUE rather than a boolean so every branch can pass it straight to Sort. Both must
+         // be set before the gallery first evaluates, or the Switch falls to its default arm
+         // on load and the heading arrows disagree with the order on screen.
+         Set( gPrjSortCol, "Title" );
+         Set( gPrjSortOrd, SortOrder.Ascending )
     Children:
       - hdrProjects:
           Control: CanvasComponent
@@ -53,8 +75,13 @@ Screens:
                Navigate( scrProjectEdit, ScreenTransition.Cover )
       # ---- Filter row -------------------------------------------------------
       # ONE auto-layout row; the controls carry no X and the search box takes the slack.
-      # WIDTH BUDGET: 240 + 220 + 60 + 170 + 60 + 150 with five 16px gaps = 980 against
-      # 1318 usable (1366 - two gutters), so the search box gets 338 and nothing wraps.
+      # THE COVERAGE FILTER IS NOT HERE — it lives in its own column heading, so the
+      # control that filters a column sits over that column. It is still named
+      # cboPrjCoverage and the gallery's sixteen branches still read it.
+      # WIDTH BUDGET: 360 + 60 + 170 + 60 + 150 with five 16px gaps = 880 against 1318
+      # usable (1366 - two gutters). THE SEARCH BOX IS PINNED AND A SPACER TAKES THE
+      # SLACK: with the coverage combo box gone it was the only flexible child left and
+      # stretched to 814px, which reads as a mistake rather than a search field.
       - rowFilters:
           Control: GroupContainer@1.5.0
           Variant: AutoLayout
@@ -70,20 +97,6 @@ Screens:
             # FillPortions 0 + LayoutMinWidth on everything except the search box: a child of an
             # auto-layout container is FLEXIBLE by default and its declared Width is only advisory
             # until that is turned off.
-            - cboPrjCoverage:
-                Control: ModernCombobox@1.1.1
-                Properties:
-                  Items: =colPrjCoverage
-                  ItemDisplayText: =ThisItem.Value
-                  DefaultSelectedItems: |
-                    =Table( { Value: "All coverage" } )
-                  SelectMultiple: =false
-                  IsSearchable: =false
-                  InputTextPlaceholder: ="Coverage"
-                  FillPortions: =0
-                  LayoutMinWidth: =240
-                  Width: =240
-                  Height: =40
             - txtProjSearch:
                 Control: ModernTextInput@1.1.1
                 Properties:
@@ -92,8 +105,9 @@ Screens:
                   TriggerOutput: =TriggerOutput.Delayed
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Body
-                  FillPortions: =1
-                  LayoutMinWidth: =220
+                  FillPortions: =0
+                  LayoutMinWidth: =360
+                  Width: =360
                   Height: =40
             # THE "MINE" FILTER, a toggle + label pair rather than a check box: the check-box
             # token is not grounded for this dialect and an unverified control fails the WHOLE
@@ -146,9 +160,265 @@ Screens:
                   LayoutMinWidth: =150
                   Width: =150
                   Height: =40
+            # Takes the leftover width so nothing else has to. The ONLY flexible child
+            # in this row — remove it and whatever is left flexible stretches instead.
+            - filterSpacer:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =""
+                  FillPortions: =1
+                  Height: =40
+      # ---- Table header -----------------------------------------------------
+      # THE COLUMN BUDGET IS DUPLICATED FROM rowBody ON PURPOSE and must be kept in
+      # step with it — see the banner. A heading is not a child of the gallery, so
+      # nothing in Power Fx can hold the two in step for us.
+      #
+      # WIDTH IS READ OFF THE GALLERY, NOT COMPUTED. `galProjects.TemplateWidth` is
+      # the exact width rowBody is given, so the heading row and the row template
+      # are the same width by construction and the columns cannot drift apart.
+      # AN EARLIER VERSION GUESSED — same Width as the gallery, PaddingRight 32
+      # against the row's 16, on the assumption that the scrollbar ate 16px off
+      # TemplateWidth. The headings landed misaligned. Whatever the scrollbar
+      # actually costs is now the gallery's business, not this container's.
+      # The forward reference is fine: layout formulas survive a paste and keep
+      # recomputing, including references to a control declared LATER
+      # (tests/README.md, scrProbe-layout-freeze P3).
+      #
+      # SORTING AND FILTERING ARE NOT THE SAME PERMISSION, and this row is where the
+      # difference shows. SharePoint folds SORT on Text, Number, Boolean and DateTime
+      # and NOT on Complex, so Priority, Coverage, Phase and Lead cannot be sort
+      # headings — a sort on them would quietly reorder the rows already fetched and
+      # leave the rest of the list in its old order. But EQUALITY on a Choice's
+      # `.Value` DOES fold, which is why Coverage and Priority both filter from their
+      # own headings. Neither is a Lead or Phase filter: each server-side predicate
+      # DOUBLES the query below, and those two were not asked for.
+      # EACH BUTTON WRITES A SHAREPOINT INTERNAL COLUMN NAME into gPrjSortCol, which
+      # the gallery hands straight to SortByColumns. `Title` is project_name: the
+      # built-in column, renamed. Change one of these and change schema.yaml with it.
+      - rowTableHead:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            LayoutDirection: =LayoutDirection.Horizontal
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =16
+            PaddingLeft: =16
+            PaddingRight: =16
+            Fill: =gTheme.Color.Surface
+            X: =gTheme.Space.Gutter
+            Y: =220
+            Width: =galProjects.TemplateWidth
+            Height: =48
+          Children:
+            # Holds the status glyph's slot open. Empty on purpose: the glyph column
+            # has no heading and no sort, and a spacer is what keeps the four real
+            # headings aligned with their columns.
+            - hdStatus:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =""
+                  FillPortions: =0
+                  LayoutMinWidth: =28
+                  Width: =28
+                  Height: =40
+            - hdName:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  # THE SORT TOGGLE, and the order of the two Sets is load-bearing: the
+                  # direction is decided against the column we are moving AWAY from, so
+                  # gPrjSortOrd must be written before gPrjSortCol. Clicking the column
+                  # already sorted ascending flips it; clicking any other column starts
+                  # that column ascending.
+                  Text: |
+                    ="Project" &
+                     If( gPrjSortCol = "Title",
+                         If( gPrjSortOrd = SortOrder.Descending, "  ▼", "  ▲" ), "" )
+                  OnSelect: |
+                    =Set( gPrjSortOrd,
+                          If( gPrjSortCol = "Title"
+                           && gPrjSortOrd = SortOrder.Ascending,
+                              SortOrder.Descending, SortOrder.Ascending ) );
+                     Set( gPrjSortCol, "Title" )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  FontWeight: =FontWeight.Semibold
+                  Color: |
+                    =If( gPrjSortCol = "Title",
+                         gTheme.Color.Primary, gTheme.Color.TextMuted )
+                  Fill: =RGBA(0, 0, 0, 0)
+                  HoverFill: =gTheme.Color.Hover
+                  PressedFill: =gTheme.Color.Press
+                  BorderThickness: =0
+                  # Align + PaddingLeft on a classic Button are documented (MS Learn,
+                  # control-button "Additional properties" and properties-text "Text
+                  # placement", which names Button). Without them the heading centres
+                  # itself over a left-aligned column.
+                  Align: =Align.Left
+                  PaddingLeft: =0
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =3
+                  LayoutMinWidth: =200
+                  Height: =40
+            # THE COVERAGE FILTER, moved out of the filter row into its own heading.
+            # Same control name the gallery's sixteen branches read, so the query is
+            # untouched by the move. Its "All coverage" sentinel is Collected FIRST in
+            # OnVisible and the branches Coalesce to it, because before OnVisible runs
+            # Selected.Value is BLANK — which is not "All coverage", and an
+            # un-Coalesced test would filter on a blank value and empty the gallery.
+            - cboPrjCoverage:
+                Control: ModernCombobox@1.1.1
+                Properties:
+                  Items: =colPrjCoverage
+                  ItemDisplayText: =ThisItem.Value
+                  DefaultSelectedItems: |
+                    =Table( { Value: "All coverage" } )
+                  SelectMultiple: =false
+                  IsSearchable: =false
+                  InputTextPlaceholder: ="Coverage"
+                  FillPortions: =1
+                  LayoutMinWidth: =120
+                  Height: =40
+            # FILTERS, DOES NOT SORT — and the two halves fail for different reasons.
+            # Equality on a Choice's .Value DELEGATES, which is why this filter is here
+            # at all and why it costs branches rather than correctness. A SORT on the
+            # same column would not fold; and even if it did it would order the rows
+            # ALPHABETICALLY — Critical, High, Low, Lowest, Moderate — which is not
+            # priority order. Sorting a severity vocabulary by its text is meaningless,
+            # so a sortable Priority heading needs an indexed NUMBER rank column, not a
+            # relaxed delegation rule.
+            - cboPrjPriority:
+                Control: ModernCombobox@1.1.1
+                Properties:
+                  Items: =colPrjPriority
+                  ItemDisplayText: =ThisItem.Value
+                  DefaultSelectedItems: |
+                    =Table( { Value: "All priorities" } )
+                  SelectMultiple: =false
+                  IsSearchable: =false
+                  InputTextPlaceholder: ="Priority"
+                  FillPortions: =1
+                  LayoutMinWidth: =140
+                  Height: =40
+            # Mirrors colDuePct: one slot of 3/310 split 2/190 + 1/104 with the same
+            # 16px gap, so both headings land over their own halves of the row.
+            - hdDuePct:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =16
+                  FillPortions: =3
+                  LayoutMinWidth: =310
+                  Height: =40
+                Children:
+                  - hdTarget:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: |
+                          ="Target" &
+                           If( gPrjSortCol = "project_date_target",
+                               If( gPrjSortOrd = SortOrder.Descending, "  ▼", "  ▲" ), "" )
+                        OnSelect: |
+                          =Set( gPrjSortOrd,
+                                If( gPrjSortCol = "project_date_target"
+                                 && gPrjSortOrd = SortOrder.Ascending,
+                                    SortOrder.Descending, SortOrder.Ascending ) );
+                           Set( gPrjSortCol, "project_date_target" )
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        FontWeight: =FontWeight.Semibold
+                        Color: |
+                          =If( gPrjSortCol = "project_date_target",
+                               gTheme.Color.Primary, gTheme.Color.TextMuted )
+                        Fill: =RGBA(0, 0, 0, 0)
+                        HoverFill: =gTheme.Color.Hover
+                        PressedFill: =gTheme.Color.Press
+                        BorderThickness: =0
+                        Align: =Align.Left
+                        PaddingLeft: =0
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =2
+                        LayoutMinWidth: =190
+                        Height: =40
+                  - hdPct:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        # Right-aligned, because rowPercent is. The arrow trails the
+                        # word on every heading, so it sits INSIDE the right edge here.
+                        Text: |
+                          ="% complete" &
+                           If( gPrjSortCol = "project_perc_completion",
+                               If( gPrjSortOrd = SortOrder.Descending, "  ▼", "  ▲" ), "" )
+                        OnSelect: |
+                          =Set( gPrjSortOrd,
+                                If( gPrjSortCol = "project_perc_completion"
+                                 && gPrjSortOrd = SortOrder.Ascending,
+                                    SortOrder.Descending, SortOrder.Ascending ) );
+                           Set( gPrjSortCol, "project_perc_completion" )
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        FontWeight: =FontWeight.Semibold
+                        Color: |
+                          =If( gPrjSortCol = "project_perc_completion",
+                               gTheme.Color.Primary, gTheme.Color.TextMuted )
+                        Fill: =RGBA(0, 0, 0, 0)
+                        HoverFill: =gTheme.Color.Hover
+                        PressedFill: =gTheme.Color.Press
+                        BorderThickness: =0
+                        Align: =Align.Right
+                        PaddingRight: =0
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =104
+                        Height: =40
       # ---- Gallery ----------------------------------------------------------
-      # ONE DELEGABLE QUERY, NO LOCAL PASS — and SIXTEEN BRANCHES, which is the honest price
-      # of that. Four binary filters (search × show completed × coverage × only mine), each
+      # THIS FORMULA IS MACHINE-GENERATED — `python3 tools/gen_projects_items.py --write`.
+      # Do not hand-edit a branch: that tool is where the shape and the reasoning live,
+      # and `--check` fails if this block has drifted from it.
+      #
+      # THIRTY-TWO BRANCHES: five binary dimensions (search × completed × mine ×
+      # coverage × priority) of which four multiply, because an "off" state has to be a
+      # BRANCH — `StartsWith(col, "")` is rejected outright, a Text `<>` does not
+      # delegate, and a Choice column has no delegable tautology.
+      #
+      # gPrjSortCol IS A COLUMN NAME HERE, AND IT MUST BE THE SHAREPOINT INTERNAL NAME.
+      # A column name passed as a STRING is matched against the internal name, while a
+      # Power Fx IDENTIFIER resolves by DISPLAY name — which is why every other formula
+      # in this app is indifferent to the difference and this one is not.
+      # THE NAME FOR project_name IS `Title`: it is the built-in Title column, renamed.
+      # `SortByColumns(src, "project_name", ...)` does NOT resolve, and it failed exactly
+      # that way on the first paste. The other two sort columns were created under their
+      # own names and match; all three are recorded as `internal_name:` in schema.yaml.
+      #
+      # SORTING WITH THE COLUMN NAME IN A VARIABLE WORKS HERE — confirmed in Studio on the
+      # live list (user, 2026-09-08). MS Learn documents the column driven by a control
+      # and the SortOrder held in a variable, and says nothing about a varying name
+      # against SharePoint, so this screen is the only evidence for it that exists.
+      # THE FAILURE MODE, IF A LATER CHANGE BREAKS IT, IS SILENT: a sort that stops
+      # folding reorders one fetched page and leaves the rest of a 2,000+ row list in its
+      # old order, which looks fine on screen. Suspect it whenever the order past the
+      # first page stops making sense, and check by sorting Project descending — the top
+      # row must be the LAST project alphabetically, not the last of the first page.
+      # The fallback is one flag: `gen_projects_items.py --write --mode switch` writes 96
+      # branches sorting on LITERAL identifiers, three times the size, certainly delegable.
+      # THE COLUMN NAME MUST BE AN IDENTIFIER, NOT A STRING, and that is what costs the 3x.
+      # `SortByColumns(src, gPrjSortCol, ...)` is one line per branch and was tried first; it
+      # fails, because a string column name is matched against the SharePoint INTERNAL name and
+      # `project_name` is not one — that column is the built-in Title, renamed. Every other
+      # formula in this app names columns as Power Fx IDENTIFIERS, which resolve by DISPLAY
+      # name, so the mismatch appears nowhere else. Passing internal names instead would work
+      # and is rejected: it would put a second, invisible naming scheme into the one formula
+      # that cannot be checked against schema/schema.yaml.
+      # SO gPrjSortCol IS A KEY, NOT A COLUMN NAME. It is only ever compared with `=` in this
+      # Switch, and each arm sorts on a literal identifier — the same delegable shape the
+      # screen already shipped sixteen times. Its values happen to read like column names for
+      # legibility; nothing sends them to SharePoint.
+      # `Sort(If(...))` and a Sort key built from an expression do NOT fold, so the Switch has
+      # to be OUTSIDE and the filters duplicated. Do not factor this back down.
+      #
+      # ONE DELEGABLE QUERY, NO LOCAL PASS — and THIRTY-TWO BRANCHES, which is the honest
+      # price of that. Four binary filters (search × show completed × coverage × only mine), each
       # branch INDEPENDENTLY delegable with its `Sort` INSIDE it. `Sort(If(...))` would not
       # fold, and a predicate assembled from a variable does not fold either, so every branch
       # WRITES ITS PREDICATES OUT. The duplication is the mechanism; do not factor it away.
@@ -186,102 +456,251 @@ Screens:
           Properties:
             Items: |
               =If( Len( Trim(txtProjSearch.Text) ) = 0,
-                   If( tglShowComplete.Value && tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 ( project_manager.Email = gUserEmail
+                  If( tglShowComplete.Value && tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
-                             project_name ),
-                       tglShowComplete.Value && tglOnlyMine.Value,
-                       Sort( Filter( ActiveProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && ( project_manager.Email = gUserEmail
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value && tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
-                             project_name ),
-                       tglShowComplete.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( ActiveProjects, project_name ),
-                       tglShowComplete.Value,
-                       Sort( Filter( ActiveProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value ),
-                             project_name ),
-                       tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( Filter( OpenProjects,
-                                 ( project_manager.Email = gUserEmail
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value && tglOnlyMine.Value
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
-                             project_name ),
-                       tglOnlyMine.Value,
-                       Sort( Filter( OpenProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && ( project_manager.Email = gUserEmail
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value && tglOnlyMine.Value,
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail ) ),
-                             project_name ),
-                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( OpenProjects, project_name ),
-                       Sort( Filter( OpenProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value ),
-                             project_name ) ),
-                   If( tglShowComplete.Value && tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 ( project_manager.Email = gUserEmail
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns( ActiveProjects, gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value,
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value,
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns( OpenProjects, gPrjSortCol, gPrjSortOrd ),
+                      Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value ),
+                          gPrjSortCol, gPrjSortOrd ) ),
+                  If( tglShowComplete.Value && tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ),
-                       tglShowComplete.Value && tglOnlyMine.Value,
-                       Sort( Filter( ActiveProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && ( project_manager.Email = gUserEmail
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value && tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ),
-                       tglShowComplete.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( Filter( ActiveProjects,
-                                 StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ),
-                       tglShowComplete.Value,
-                       Sort( Filter( ActiveProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ),
-                       tglOnlyMine.Value
-                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( Filter( OpenProjects,
-                                 ( project_manager.Email = gUserEmail
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value && tglOnlyMine.Value
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ),
-                       tglOnlyMine.Value,
-                       Sort( Filter( OpenProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && ( project_manager.Email = gUserEmail
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value && tglOnlyMine.Value,
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
                                 || project_supporter.Email = gUserEmail )
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ),
-                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
-                       Sort( Filter( OpenProjects,
-                                 StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ),
-                       Sort( Filter( OpenProjects,
-                                 project_coverage.Value = cboPrjCoverage.Selected.Value
-                              && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
-                             project_name ) ) )
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglShowComplete.Value,
+                      SortByColumns(
+                          Filter( ActiveProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value
+                   && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      tglOnlyMine.Value,
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value
+                               && ( project_manager.Email = gUserEmail
+                                || project_supporter.Email = gUserEmail )
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                   && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_priority.Value = cboPrjPriority.Selected.Value
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ),
+                      SortByColumns(
+                          Filter( OpenProjects,
+                                  project_coverage.Value = cboPrjCoverage.Selected.Value
+                               && project_priority.Value = cboPrjPriority.Selected.Value
+                               && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
+                          gPrjSortCol, gPrjSortOrd ) ) )
             # EXPLICIT single column. Left unset, a wrapping gallery divides TemplateWidth
             # between columns and every proportional child inside the row shrinks with it.
             WrapCount: =1
             TemplateSize: =72
             TemplatePadding: =0
             X: =gTheme.Space.Gutter
-            Y: =220
+            Y: =272
             Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            Height: =Parent.Height - 220 - gTheme.Space.Gutter
+            Height: =Parent.Height - 272 - gTheme.Space.Gutter
             TemplateFill: =If(ThisItem.ID = gSelProject.ID, gTheme.Color.Accent, gTheme.Color.Surface)
           Children:
             # ONE auto-layout row per record. The columns carry NO X, so they cannot collide at
             # any TemplateWidth. Every column is FillPortions + LayoutMinWidth: a child of an
             # auto-layout container is FLEXIBLE by default and a fixed Width alone does nothing.
+            # THIS BUDGET IS MIRRORED IN rowTableHead. Every FillPortions and LayoutMinWidth
+            # below has a twin up there, and the headings sit over the wrong columns the
+            # moment one side changes alone.
             - rowBody:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -382,6 +801,22 @@ Screens:
                               LayoutMinHeight: =20
                               Width: =Parent.Width
                               Height: =20
+                  # COVERAGE. Filtered from its own heading, never sorted from it:
+                  # project_coverage is a Choice and SharePoint does not fold a sort on a
+                  # Complex column. Existing rows may hold BLANK — the column was made
+                  # required after they were written and nothing back-fills — so the dash
+                  # is a real state here, not a placeholder.
+                  - rowCoverage:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: =Coalesce(ThisItem.project_coverage.Value, "—")
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =120
+                        Height: =20
                   - rowPriority:
                       Control: Label@2.5.1
                       Properties:
@@ -399,7 +834,7 @@ Screens:
                                                gTheme.Color.TextMuted )
                         VerticalAlign: =VerticalAlign.Middle
                         FillPortions: =1
-                        LayoutMinWidth: =84
+                        LayoutMinWidth: =140
                         Height: =20
                   # DUE DATE + PERCENT, AND THE BANNER THAT REPLACES THEM.
                   # A project at 100% that nobody has moved to the Complete phase is the one
@@ -549,6 +984,9 @@ Screens:
             # the reader to the wrong control. `tglOnlyMine` was tested first here and the
             # combined case never reached its own arm, so "all of mine are complete" read as
             # "none are led by you" — a sentence about a filter that was not the cause.
+            # THE TWO HEADING FILTERS EXTEND THE LADDER, they do not share its last rung:
+            # both set names both, one set names that one, neither set falls through to a
+            # sentence that blames no control at all.
             Text: |
               =If( Len(Trim(txtProjSearch.Text)) > 0,
                    "No project name starts with """ & Trim(txtProjSearch.Text) & """.",
@@ -559,7 +997,14 @@ Screens:
                    "You do not manage or support any projects here.",
                    !tglShowComplete.Value,
                    "Nothing open here. Turn on Show completed to include finished projects.",
-                   "No projects match this coverage." )
+                   Coalesce(cboPrjCoverage.Selected.Value, "All coverage") <> "All coverage"
+                && Coalesce(cboPrjPriority.Selected.Value, "All priorities") <> "All priorities",
+                   "No projects match this coverage and priority.",
+                   Coalesce(cboPrjPriority.Selected.Value, "All priorities") <> "All priorities",
+                   "No projects have this priority.",
+                   Coalesce(cboPrjCoverage.Selected.Value, "All coverage") <> "All coverage",
+                   "No projects match this coverage.",
+                   "No projects to show." )
             Font: =gTheme.Font
             Size: =gTheme.Size.Body
             Color: =gTheme.Color.TextMuted

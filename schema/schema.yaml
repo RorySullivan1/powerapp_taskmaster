@@ -57,16 +57,17 @@ types:
 # children locally — is GONE: it pulled the rows first and then dropped them, so the
 # limit still bit, and past it archived work silently reappeared.
 
-# Present on every list, managed by SharePoint. NEVER patch these from the app.
+# Present on every list, managed by SharePoint. NEVER patch these from the app —
+# they are READ-ONLY, so a row's author and creation time are whoever and whenever
+# the app actually wrote it, and cannot be corrected, backdated or attributed.
 #
-# DO NOT REFERENCE THESE FROM POWER FX. Confirmed in Studio 2026-08-12: the canvas
-# SharePoint connector does NOT surface `Created By` on taskmaster_issues, so
-# `rec.'Created By'` does not resolve — the column the app can see is not the same
-# set as the column the list has. They are listed here because they EXIST on the
-# list (a SharePoint view can project them), not because the app
-# can read them. Provenance the APP has to show must be an app-written column.
-# NOT INDEXED BY DEFAULT either, so a >5,000-item list cannot sort or filter on
-# `Created` without an index like any other column.
+# THEY ARE READABLE FROM POWER FX. `rec.'Created By'.DisplayName` and `rec.Created`
+# both resolve (confirmed in Studio 2026-09-08). Quote the two-word names — a space
+# in a column name requires single quotes. If one ever fails to resolve, suspect the
+# app's CACHED COLUMN SET first (see `the_app_caches_the_column_set` below) rather
+# than concluding the connector cannot see it.
+# NOT INDEXED BY DEFAULT, so a >5,000-item list cannot sort or filter on `Created`
+# without adding an index like any other column.
 system_columns: [Created, Modified, Created By, Modified By]
 
 # =============================================================================
@@ -132,9 +133,9 @@ lists:
     provisioned: live        # 2026-08-04
     join_cost: 3          # was 6 — the 3 Managed Metadata columns became zero-join Number/Text
     columns:
-      - { name: project_name,            type: Text,            required: true,  indexed: true,  desc: "User-facing project title (unique by convention only)" }
+      - { name: project_name,            type: Text,            required: true,  indexed: true,  internal_name: Title,  desc: "User-facing project title (unique by convention only). INTERNAL NAME IS `Title` — this is SharePoint's built-in Title column RENAMED, not a column created as project_name (user, 2026-09-08, on the first paste of the sortable table). Harmless everywhere the app names columns as Power Fx IDENTIFIERS, which resolve by DISPLAY name — which is everywhere except a column name passed as a STRING. `SortByColumns(src, \"project_name\", ...)` does NOT resolve; scrProjects sorts on literal identifiers under a Switch instead, so no formula depends on an internal name. The two other sort columns, project_date_target and project_perc_completion, are CONFIRMED equal to their display names (user, 2026-09-08). Every OTHER column in this list is still unverified — it has never mattered, because only a column name passed as a string cares." }
       - { name: project_manager,         type: Person, multi: false, required: true,  indexed: true,  desc: "Accountable owner" }
-      - { name: project_coverage,        type: Choice,          required: true,  default: INTERNAL, desc: "Business/product coverage area. Required since #25, default INTERNAL — the app offers no blank option and writes it unguarded. EXISTING ROWS MAY STILL HOLD BLANK: SharePoint enforces required only on write, and nothing back-fills.", values: [INTERNAL, PLACEHOLDER_B], review: "VALUES STILL NOT FULLY SUPPLIED. `INTERNAL` is CONFIRMED a member and CONFIRMED UPPERCASE (user, 2026-09-02 — it was recorded as `Internal` until then); the rest of the list is unknown here. CASING IS PART OF THE VALUE: a SharePoint Choice write is case-sensitive, while Power Fx `in` is not, so scrProjectEdit-s membership test passes on any casing and then writes its literal verbatim. Keep the literal there identical to this one. The app binds Choices() for the OPTIONS and never a literal, so the remaining values need no app change; only the DEFAULT is a literal." }
+      - { name: project_coverage,        type: Choice,          required: true,  indexed: true,  default: INTERNAL, desc: "Business/product coverage area. INDEXED IN SHAREPOINT, CONFIRMED BY THE USER 2026-09-08 — scrProjects filters on it server-side from its column heading, and SharePoint refuses an unindexed filter past the 5,000 list-view threshold. Required since #25, default INTERNAL — the app offers no blank option and writes it unguarded. EXISTING ROWS MAY STILL HOLD BLANK: SharePoint enforces required only on write, and nothing back-fills.", values: [INTERNAL, PLACEHOLDER_B], review: "VALUES STILL NOT FULLY SUPPLIED. `INTERNAL` is CONFIRMED a member and CONFIRMED UPPERCASE (user, 2026-09-02 — it was recorded as `Internal` until then); the rest of the list is unknown here. CASING IS PART OF THE VALUE: a SharePoint Choice write is case-sensitive, while Power Fx `in` is not, so scrProjectEdit-s membership test passes on any casing and then writes its literal verbatim. Keep the literal there identical to this one. The app binds Choices() for the OPTIONS and never a literal, so the remaining values need no app change; only the DEFAULT is a literal." }
       - { name: project_description,     type: Note,            required: false,                 desc: "Detailed description (display only)" }
       - { name: project_region_id,       type: Number,          required: false, indexed: true,  desc: "ID of the mapping_region row when the picked path names one exactly; 0 when it names a BRANCH the vocabulary has no row for. The path column is the authoritative value — see C11", maps_to: mapping_region }
       - { name: project_region_path,     type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"EMEA | UK | London\". Denormalised so display needs no lookup and drill-down is StartsWith(), which delegates on Text" }
@@ -162,10 +163,10 @@ lists:
       # and "Blocked" are gone from the column, so nothing in the app enumerates them.
       # PENDING IN SHAREPOINT: set the column default to "Not Started".
       - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase — DERIVED by the app, see the note above", values: ["Not Started", Planning, Active, Stalled, Complete, Archived] }
-      - { name: project_priority,        type: Choice,          required: true,                  desc: "Priority level", values: [Lowest, Low, Moderate, High, Critical] }
-      - { name: project_perc_completion, type: Number,          required: false,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below" }
+      - { name: project_priority,        type: Choice,          required: true,  indexed: true,  desc: "Priority level. INDEXED IN SHAREPOINT, CONFIRMED BY THE USER 2026-09-08. Indexed because scrProjects filters on it server-side from its column heading, and SharePoint refuses an unindexed filter past the 5,000 list-view threshold. NOT SORTABLE IN THE APP and that is not a delegation gap to close: a sort would order these ALPHABETICALLY (Critical, High, Low, Lowest, Moderate), which is not severity order. Sortable priority needs an indexed NUMBER rank column, written by every edit screen and back-filled.", values: [Lowest, Low, Moderate, High, Critical] }
+      - { name: project_perc_completion, type: Number,          required: false, internal_name: project_perc_completion,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below. Internal name CONFIRMED equal to the display name (user, 2026-09-08); scrProjects passes it to SortByColumns as a STRING, which resolves against the internal name only." }
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
-      - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  desc: "Desired completion date" }
+      - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  internal_name: project_date_target,  desc: "Desired completion date. Internal name CONFIRMED equal to the display name (user, 2026-09-08); scrProjects passes it to SortByColumns as a STRING, which resolves against the internal name only." }
       - { name: project_date_complete,   type: DateTime,        required: false,                 desc: "Actual completion date" }
       - { name: project_supporter,       type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside project_manager)" }
 
@@ -399,14 +400,65 @@ lists:
       # so an edit leaves them alone. There is no picker and no form field for either:
       # not-user-manipulable is achieved by not offering the control, not by relying on
       # SharePoint's read-only-ness.
-      # ON THIS LIST, `issue_owner` IS THE CREATED-BY. Do not reach for the system
-      # column instead: the canvas connector does not surface `Created By` here, so
-      # the reference does not resolve in Studio (confirmed 2026-08-12). Same for
-      # `issue_date_open` and `Created`. See `system_columns` at the top of this file.
+      # ON THIS LIST, `issue_owner` IS THE CREATED-BY, and it stays that way: it is
+      # provisioned, populated, and written by three screens. The system `Created By`
+      # would serve (it resolves — see `system_columns`), but swapping to it would
+      # strand the existing rows' provenance, so these two columns are kept
+      # deliberately. A NEW list should prefer the system columns.
       - { name: issue_date_open,        type: DateTime, required: false,                 desc: "When the issue was raised; stamped with Now() on insert only" }
       - { name: issue_date_target,      type: DateTime, required: false, indexed: true,  desc: "Expected resolution date" }
       - { name: issue_date_close,       type: DateTime, required: false,                 desc: "Resolution date" }
       - { name: issue_owner,            type: Person, multi: false, required: false,     desc: "Who raised the issue; stamped with User() on insert only. Display only — no picker" }
+
+  # ---------------------------------------------------------------------------
+  taskmaster_projectcomments:
+    role: Free-form comments on a project. Append-only; read and written on scrProject only.
+    provisioned: live        # 2026-09-08 — created in SharePoint by the user, with
+                             # projectcomment_project_id and projectcomment_project_archived
+                             # indexed, and CONNECTED as a data source in Studio the same day.
+                             # scrProject is this list's only consumer.
+    # 1. The single Lookup-free FK is a Number; the only join is the SYSTEM `Created By`,
+    # which a view projects.
+    join_cost: 1
+    # AUTHOR AND DATE ARE THE SYSTEM COLUMNS `Created By` and `Created` — this list adds
+    # NO app-stamped provenance. Both were confirmed to resolve in Studio 2026-09-08.
+    # `Created` AND `Created By` ARE BOTH INDEXED (user, 2026-09-08), which is what keeps the
+    # gallery's newest-first Sort delegable past the 5,000 list-view threshold. If a delegation
+    # warning ever appears on that Sort, the fallback is an app-stamped DateTime — do not reach
+    # for it before confirming the warning is real.
+    #
+    # ITEM-LEVEL PERMISSIONS ARE WHAT ENFORCE "ONLY THE COMMENTER MAY EDIT OR DELETE".
+    # scrProject hides Edit and Delete unless the signed-in user wrote the comment, but that is
+    # an AFFORDANCE, not security: anyone with Contribute on this list can edit any row through
+    # SharePoint itself, or through any other client. The actual control is
+    #   List settings -> Advanced settings -> Item-level Permissions
+    #   Read access:            Read all items
+    #   Create and Edit access: Create items and edit items that were created by the user
+    # Set it there. Note it does NOT restrict a user with Design or Full Control, by design.
+    # The system columns are READ-ONLY: the app cannot backdate a comment or attribute one
+    # to anybody but the signed-in user who wrote it. That is correct — an edit rewrites the
+    # text and CANNOT rewrite who said it — and it is the constraint to check first if a flow
+    # or an import ever needs to create comments.
+    # Comments are EDITABLE AND DELETABLE BY THEIR AUTHOR from scrProject (2026-09-08). The
+    # gallery shows a 120-character preview and a row opens the full text.
+    columns:
+      # NUMBER, NOT LOOKUP, AND THAT IS THE WHOLE DESIGN. The three older child
+      # lists carry a Lookup FK, so their fetch filters on `.Id` — which does NOT
+      # delegate, which is why scrProject folds them over the LiveTasks/LiveIssues/
+      # LiveTransactions named formulas instead of the raw lists (a raw-list fetch
+      # came back EMPTY for recent projects: the archived backlog filled the page
+      # before the live rows were reached).
+      # `=` on an indexed Number DOES delegate, so this list is fetched straight
+      # off the raw list and stays correct however far past 5,000 rows it grows.
+      # Do not "make it consistent" by converting this to a Lookup: it would buy a
+      # join and reintroduce the truncation the other three had to work around.
+      - { name: projectcomment_project_id,       type: Number,   required: true,  indexed: true,  desc: "ID of the parent project. Number so `=` delegates and costs no join; see the note above" }
+      - { name: projectcomment_comment,          type: Note,     required: true,                  desc: "The comment. PLAIN multiline, rich text OFF. Never filtered or sorted on — Note is not indexable" }
+      # Fourth mirror of the parent-archived flag. Same rationale as
+      # issue_project_archived: a child row carries no parent phase, joins do not
+      # delegate, so the exclusion has to be a local Boolean. Owned by the EXTERNAL
+      # archival flow (#65) — the app only ever writes false at insert.
+      - { name: projectcomment_project_archived, type: Boolean,  required: false, indexed: true, default: false, desc: "TRUE when the PARENT project is archived. Maintained by the external archival flow, not the app" }
 
   # ---------------------------------------------------------------------------
   taskmaster_taskproduct:
