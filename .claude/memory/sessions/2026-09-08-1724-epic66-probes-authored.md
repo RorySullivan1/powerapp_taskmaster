@@ -211,3 +211,11 @@ priority not filterable or sortable?"**
   stamped by SharePoint, a third attribute again, so the same user could not edit his own comments.
 - **The regression check is half the acceptance:** a user for whom this already worked must see the
   same projects and the same KPI numbers.
+
+## #71 pasted — 2026-09-09
+
+All four pastes landed cleanly: `App.OnStart` via the formula bar, then `scrProjects`, `scrHome`
+and `scrProject`. The three identity globals and the widened Person predicates are live.
+
+**Landed is not fixed.** Nothing yet says the affected user can see his projects, and nothing says
+a previously-working user still sees the same ones. #71 stays open on both.
