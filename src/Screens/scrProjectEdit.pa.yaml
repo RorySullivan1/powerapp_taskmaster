@@ -31,6 +31,11 @@ Screens:
                   { DisplayName: Coalesce(gEditProject.project_supporter.DisplayName, ""),
                     Mail:        Coalesce(gEditProject.project_supporter.Email, "") },
                   { DisplayName: "", Mail: "" } ) );
+        Set( gPrRequestor2,
+              If( gEditMode = "Edit",
+                  { DisplayName: Coalesce(gEditProject.project_requestor_2.DisplayName, ""),
+                    Mail:        Coalesce(gEditProject.project_requestor_2.Email, "") },
+                  { DisplayName: "", Mail: "" } ) );
         // Priority opens on its column default. The phase is DERIVED on scrProject and this
         // screen offers no control for it.
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
@@ -453,6 +458,12 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =58
                 Children:
+                  # FOUR PICKERS, and the width divisor is a GAP COUNT, not a column count:
+                  # rowPrPeople is horizontal auto-layout with LayoutGap 16, so four columns
+                  # leave THREE gaps. All four carry the same `(Parent.Width - 48) / 4` and
+                  # they must be changed together — a fifth picker makes it `- 64) / 5`.
+                  # ORDER IS THE ASK: manager, supporter, primary requestor, secondary
+                  # requestor. Requestor and Supporter swapped places to get it.
                   - colPrMgr:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -460,7 +471,7 @@ Screens:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =6
-                        Width: =(Parent.Width - 32) / 3
+                        Width: =(Parent.Width - 48) / 4
                         Height: =58
                       Children:
                         - fldManager:
@@ -479,32 +490,6 @@ Screens:
                                  Set( gPrQuery, "" )
                               OnClear: |
                                 =Set( gPrManager, { DisplayName: "", Mail: "" } )
-                  - colPrReq:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Center
-                        LayoutGap: =6
-                        Width: =(Parent.Width - 32) / 3
-                        Height: =58
-                      Children:
-                        - fldRequestor:
-                            Control: CanvasComponent
-                            ComponentName: cmpLookupField
-                            Properties:
-                              Caption: ="Requestor"
-                              PickLabel: ="＋  Choose a requestor"
-                              HasValue: =Len(gPrRequestor.Mail) > 0
-                              Display: =gPrRequestor.DisplayName
-                              Width: =Parent.Width
-                              Height: =62
-                              OnPick: |
-                                =Set( gPrPicker, "Requestor" );
-                                 Reset( cmpPrPick );
-                                 Set( gPrQuery, "" )
-                              OnClear: |
-                                =Set( gPrRequestor, { DisplayName: "", Mail: "" } )
                   - colPrSup:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -512,7 +497,7 @@ Screens:
                         LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =6
-                        Width: =(Parent.Width - 32) / 3
+                        Width: =(Parent.Width - 48) / 4
                         Height: =58
                       Children:
                         - fldSupporter:
@@ -531,6 +516,58 @@ Screens:
                                  Set( gPrQuery, "" )
                               OnClear: |
                                 =Set( gPrSupporter, { DisplayName: "", Mail: "" } )
+                  - colPrReq:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =6
+                        Width: =(Parent.Width - 48) / 4
+                        Height: =58
+                      Children:
+                        - fldRequestor:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
+                            Properties:
+                              Caption: ="Primary requestor"
+                              PickLabel: ="＋  Choose a primary requestor"
+                              HasValue: =Len(gPrRequestor.Mail) > 0
+                              Display: =gPrRequestor.DisplayName
+                              Width: =Parent.Width
+                              Height: =62
+                              OnPick: |
+                                =Set( gPrPicker, "Requestor" );
+                                 Reset( cmpPrPick );
+                                 Set( gPrQuery, "" )
+                              OnClear: |
+                                =Set( gPrRequestor, { DisplayName: "", Mail: "" } )
+                  - colPrReq2:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =6
+                        Width: =(Parent.Width - 48) / 4
+                        Height: =58
+                      Children:
+                        - fldRequestor2:
+                            Control: CanvasComponent
+                            ComponentName: cmpLookupField
+                            Properties:
+                              Caption: ="Secondary requestor"
+                              PickLabel: ="＋  Choose a secondary requestor"
+                              HasValue: =Len(gPrRequestor2.Mail) > 0
+                              Display: =gPrRequestor2.DisplayName
+                              Width: =Parent.Width
+                              Height: =62
+                              OnPick: |
+                                =Set( gPrPicker, "Requestor2" );
+                                 Reset( cmpPrPick );
+                                 Set( gPrQuery, "" )
+                              OnClear: |
+                                =Set( gPrRequestor2, { DisplayName: "", Mail: "" } )
             - divPrClass:
                 Control: Rectangle@2.3.0
                 Properties:
@@ -1206,6 +1243,14 @@ Screens:
                                             Claims:      gClaimPrefix & Lower(gPrRequestor.Mail),
                                             DisplayName: gPrRequestor.DisplayName,
                                             Email:       gPrRequestor.Mail,
+                                            Department: "", JobTitle: "", Picture: "" },
+                                          Blank() ),
+                                  project_requestor_2:
+                                      If( Len(gPrRequestor2.Mail) > 0,
+                                          { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                            Claims:      gClaimPrefix & Lower(gPrRequestor2.Mail),
+                                            DisplayName: gPrRequestor2.DisplayName,
+                                            Email:       gPrRequestor2.Mail,
                                             Department: "", JobTitle: "", Picture: "" },
                                           Blank() ),
                                   project_supporter:
@@ -1978,9 +2023,10 @@ Screens:
             Height: =Parent.Height
             Title: |
               =Switch( gPrPicker,
-                       "Manager",   "Select project manager",
-                       "Requestor", "Select requestor",
-                       "Supporter", "Select supporter",
+                       "Manager",    "Select project manager",
+                       "Requestor",  "Select primary requestor",
+                       "Requestor2", "Select secondary requestor",
+                       "Supporter",  "Select supporter",
                        "NtLead",    "Select task lead",
                        "NxSales",   "Select sales owner",
                        "NxClient",  "Select client",
@@ -1993,13 +2039,13 @@ Screens:
             # avoid the Filter entirely. See scrTaskEdit's instance for the full reasoning.
             Results: |
               =If( (gPrPicker = "Manager" || gPrPicker = "Requestor" || gPrPicker = "Supporter"
-              || gPrPicker = "NtLead" || gPrPicker = "NxSales") && Len(gPrQuery) >= 2,
+              || gPrPicker = "Requestor2" || gPrPicker = "NtLead" || gPrPicker = "NxSales") && Len(gPrQuery) >= 2,
               ForAll( Office365Users.SearchUserV2({ searchTerm: gPrQuery, top: 25 }).value As u,
               { Key:       u.Mail,
               Primary:   u.DisplayName,
               Secondary: u.Mail } ),
               gPrPicker = "Manager" || gPrPicker = "Requestor" || gPrPicker = "Supporter"
-              || gPrPicker = "NtLead" || gPrPicker = "NxSales",
+              || gPrPicker = "Requestor2" || gPrPicker = "NtLead" || gPrPicker = "NxSales",
               Table( { Key:       User().Email,
               Primary:   User().FullName,
               Secondary: User().Email } ),
@@ -2033,6 +2079,7 @@ Screens:
               =Switch( gPrPicker,
               "Manager",   Set( gPrManager,   { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),
               "Requestor", Set( gPrRequestor, { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),
+              "Requestor2", Set( gPrRequestor2, { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),
               "Supporter", Set( gPrSupporter, { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),
               "NtLead",    Set( gNtLead,      { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),
               "NxSales",   Set( gNxSales,     { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),

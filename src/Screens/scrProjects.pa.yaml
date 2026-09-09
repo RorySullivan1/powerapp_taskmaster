@@ -45,6 +45,14 @@ Screens:
          // SELF-HEAL, same as scrHome. App.OnStart is NON-BLOCKING, so this screen can run
          // before it finishes and a blank gUserEmail makes the "only mine" branches match nothing.
          If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+         // THE OTHER TWO IDENTITIES, same self-heal reasoning — see App.OnStart for why there
+         // are three. The connector call fires ONLY on a cold start that beat OnStart, and the
+         // two Sets below are idempotent: Coalesce keeps whatever is already there.
+         If( IsBlank(gUserMail) || IsBlank(gUserUpn),
+             IfError( Set( gUserProfile, Office365Users.MyProfile() ),
+                      Set( gUserProfile, Blank() ) ) );
+         Set( gUserMail, Coalesce( gUserMail, Lower(gUserProfile.Mail), gUserEmail ) );
+         Set( gUserUpn,  Coalesce( gUserUpn,  Lower(gUserProfile.UserPrincipalName), gUserEmail ) );
          // SORT STATE. gPrjSortCol is a SHAREPOINT INTERNAL COLUMN NAME, which is why this
          // one says "Title" where the rest of the app says project_name — see the comment
          // above the gallery's query. gPrjSortOrd holds a SortOrder
@@ -462,7 +470,11 @@ Screens:
                       SortByColumns(
                           Filter( ActiveProjects,
                                   ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value && tglOnlyMine.Value
                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
@@ -470,7 +482,11 @@ Screens:
                           Filter( ActiveProjects,
                                   project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value && tglOnlyMine.Value
                    && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
@@ -478,7 +494,11 @@ Screens:
                           Filter( ActiveProjects,
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value && tglOnlyMine.Value,
                       SortByColumns(
@@ -486,7 +506,11 @@ Screens:
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value
                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
@@ -516,7 +540,11 @@ Screens:
                       SortByColumns(
                           Filter( OpenProjects,
                                   ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglOnlyMine.Value
                    && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage",
@@ -524,7 +552,11 @@ Screens:
                           Filter( OpenProjects,
                                   project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglOnlyMine.Value
                    && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
@@ -532,7 +564,11 @@ Screens:
                           Filter( OpenProjects,
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglOnlyMine.Value,
                       SortByColumns(
@@ -540,7 +576,11 @@ Screens:
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail ) ),
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
                    && Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities",
@@ -566,7 +606,11 @@ Screens:
                       SortByColumns(
                           Filter( ActiveProjects,
                                   ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value && tglOnlyMine.Value
@@ -575,7 +619,11 @@ Screens:
                           Filter( ActiveProjects,
                                   project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value && tglOnlyMine.Value
@@ -584,7 +632,11 @@ Screens:
                           Filter( ActiveProjects,
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value && tglOnlyMine.Value,
@@ -593,7 +645,11 @@ Screens:
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglShowComplete.Value
@@ -630,7 +686,11 @@ Screens:
                       SortByColumns(
                           Filter( OpenProjects,
                                   ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglOnlyMine.Value
@@ -639,7 +699,11 @@ Screens:
                           Filter( OpenProjects,
                                   project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglOnlyMine.Value
@@ -648,7 +712,11 @@ Screens:
                           Filter( OpenProjects,
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       tglOnlyMine.Value,
@@ -657,7 +725,11 @@ Screens:
                                   project_coverage.Value = cboPrjCoverage.Selected.Value
                                && project_priority.Value = cboPrjPriority.Selected.Value
                                && ( project_manager.Email = gUserEmail
-                                || project_supporter.Email = gUserEmail )
+                                || project_manager.Email = gUserMail
+                                || project_manager.Email = gUserUpn
+                                || project_supporter.Email = gUserEmail
+                                || project_supporter.Email = gUserMail
+                                || project_supporter.Email = gUserUpn )
                                && StartsWith( project_name, Trim(txtProjSearch.Text) ) ),
                           gPrjSortCol, gPrjSortOrd ),
                       Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"

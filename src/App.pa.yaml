@@ -66,8 +66,27 @@ App:
        // not first-party: first suspect if a Person write fails.
        Set( gClaimPrefix, "i:0#.f|membership|" );
 
-       // Inlines into the server-side predicates on scrHome / scrReports.
-       Set( gUserEmail, Lower(User().Email) )
+       // THREE IDENTITIES, NOT ONE, AND THAT IS A DEFECT FIX RATHER THAN CAUTION.
+       // The pickers WRITE a Person column from Office365Users.SearchUserV2(...).Mail —
+       // the mailbox address — while every "mine" predicate READ User().Email, which is
+       // a different Azure AD attribute and is commonly the UPN. They coincide for most
+       // people and silently do not for anyone whose UPN differs from their primary
+       // SMTP: every equality fails at once, so that user sees no projects of their own
+       // and an empty dashboard, with no error anywhere (user report, 2026-09-08).
+       // So the predicates OR over all three known forms. When they are equal the extra
+       // arms are redundant and harmless; when they are not, one of them matches.
+       // NONE OF THESE MAY EVER BE BLANK. project_supporter and task_supporter are
+       // OPTIONAL columns, so `supporter.Email = ""` would match every row that has no
+       // supporter and hand the user somebody else's work. Each falls back to
+       // gUserEmail, which is never blank.
+       // Office365Users.MyProfile() is documented with no inputs and both Mail and
+       // UserPrincipalName as outputs (MS Learn, connection-office365-users). It is
+       // wrapped because a connector call at start-up must not be able to stop OnStart.
+       Set( gUserEmail, Lower(User().Email) );
+       IfError( Set( gUserProfile, Office365Users.MyProfile() ),
+                Set( gUserProfile, Blank() ) );
+       Set( gUserMail, Coalesce( Lower(gUserProfile.Mail), gUserEmail ) );
+       Set( gUserUpn,  Coalesce( Lower(gUserProfile.UserPrincipalName), gUserEmail ) )
 
     # Data-source filters. These must stay NAMED FORMULAS: `Set(x, Filter(...))` captures
     # a table value, and filtering a variable does not delegate — every cross-project query

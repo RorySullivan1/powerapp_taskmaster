@@ -42,6 +42,14 @@ Screens:
         // NOTHING, and those KPIs are imperative Sets that never re-fire — the dashboard
         // latches at zero until a manual refresh. Declarative properties self-heal; these cannot.
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+        // THE OTHER TWO IDENTITIES, same self-heal reasoning — see App.OnStart for why there
+        // are three. The connector call fires ONLY on a cold start that beat OnStart, and the
+        // two Sets below are idempotent: Coalesce keeps whatever is already there.
+        If( IsBlank(gUserMail) || IsBlank(gUserUpn),
+            IfError( Set( gUserProfile, Office365Users.MyProfile() ),
+                     Set( gUserProfile, Blank() ) ) );
+        Set( gUserMail, Coalesce( gUserMail, Lower(gUserProfile.Mail), gUserEmail ) );
+        Set( gUserUpn,  Coalesce( gUserUpn,  Lower(gUserProfile.UserPrincipalName), gUserEmail ) );
         // SAME REASON. Blank compares as ZERO, so an unseeded gDataRowLimit makes the fold's
         // truncation test true and forces gIssLed down the expensive per-project arm on every
         // cold start. Must match App.OnStart.
@@ -77,14 +85,28 @@ Screens:
             OnSelect: |
               =Concurrent(
                   ClearCollect( colMyProjects,
-                      Filter( ActiveProjects, project_manager.Email = gUserEmail ) ),
+                      // THREE IDENTITIES — see App.OnStart. The app writes a Person column
+                      // from Office365Users' Mail and this read used User().Email, so anyone
+                      // whose UPN differs from their mailbox address matched NOTHING here and
+                      // saw an empty dashboard. All three columns below are indexed, so the
+                      // extra Or-arms cost nothing in delegation.
+                      Filter( ActiveProjects,
+                          project_manager.Email = gUserEmail
+                       || project_manager.Email = gUserMail
+                       || project_manager.Email = gUserUpn ) ),
                   ClearCollect( colMyTasks,
-                      Filter( LiveTasks, task_lead.Email = gUserEmail ) ),
+                      Filter( LiveTasks,
+                          task_lead.Email = gUserEmail
+                       || task_lead.Email = gUserMail
+                       || task_lead.Email = gUserUpn ) ),
                   ClearCollect( colMyIssues,
                       // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email = gUserEmail`:
                       // issue_owner is not indexed, so an Or-arm on it drops delegation for the WHOLE
                       // filter and silently truncates at 500 rows.
-                      Filter( OpenIssues, issue_assignee.Email = gUserEmail ) ),
+                      Filter( OpenIssues,
+                          issue_assignee.Email = gUserEmail
+                       || issue_assignee.Email = gUserMail
+                       || issue_assignee.Email = gUserUpn ) ),
                   // THE NAME MAP the two work-list galleries resolve their parent project against.
                   // task_project_id and issue_project_id are Lookup columns and the canvas connector
                   // displays the NUMERIC ID, so the name has to be resolved app-side either way; the

@@ -40,6 +40,14 @@ Screens:
          // screen can run before it finishes, and a blank gUserEmail would hide Edit and Delete
          // from the very person who wrote the comment.
          If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
+         // THE OTHER TWO IDENTITIES, same self-heal reasoning — see App.OnStart for why there
+         // are three. The connector call fires ONLY on a cold start that beat OnStart, and the
+         // two Sets below are idempotent: Coalesce keeps whatever is already there.
+         If( IsBlank(gUserMail) || IsBlank(gUserUpn),
+             IfError( Set( gUserProfile, Office365Users.MyProfile() ),
+                      Set( gUserProfile, Blank() ) ) );
+         Set( gUserMail, Coalesce( gUserMail, Lower(gUserProfile.Mail), gUserEmail ) );
+         Set( gUserUpn,  Coalesce( gUserUpn,  Lower(gUserProfile.UserPrincipalName), gUserEmail ) );
          Select( btnPrjRecompute )
     Children:
       # =====================================================================
@@ -2033,10 +2041,17 @@ Screens:
                                              If( IsBlank(gCmtView.ID),
                                                  Notify( "That comment no longer exists — it may have been deleted. Reopen the project to refresh the list.",
                                                          NotificationType.Error ),
+                                                 // THREE IDENTITIES — see App.OnStart. 'Created By' is stamped by
+                                                 // SharePoint, so its Email is yet another attribute that need not
+                                                 // equal User().Email; matching only that one locked a user out of
+                                                 // editing their OWN comments. This is a LOCAL test on one fetched
+                                                 // record, so the extra arms cost nothing at all.
                                                  Set( gCmtCanEdit,
-                                                      With( { m: Lower( Coalesce(gUserEmail, "") ) },
-                                                            Len(m) > 0
-                                                         && Lower( Coalesce(gCmtView.'Created By'.Email, "") ) = m
+                                                      With( { a: Lower( Coalesce(gCmtView.'Created By'.Email, "") ) },
+                                                            Len(a) > 0
+                                                         && ( a = Lower( Coalesce(gUserEmail, "") )
+                                                           || a = Lower( Coalesce(gUserMail,  "") )
+                                                           || a = Lower( Coalesce(gUserUpn,   "") ) )
                                                          && Coalesce(gSelProject.project_phase.Value, "") <> "Archived" ) );
                                                  Reset( txtCvBody );
                                                  Set( gCmtViewOpen, true ) )
