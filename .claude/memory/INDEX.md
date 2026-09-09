@@ -10,37 +10,19 @@
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid.
-- **IDENTITY IS THREE VALUES, NOT ONE — #71, PASTED 2026-09-09 (all four landed cleanly).**
-  **LANDED IS NOT FIXED, AND #71 STAYS OPEN UNTIL IT IS:** the affected user has NOT yet reported
-  whether he sees his projects, and no regression check has been reported either.
-  **THE APP WRITES A PERSON COLUMN FROM `Office365Users...Mail` AND USED TO READ `User().Email`.**
-  Those are different Azure AD attributes; they coincide for most people, so the defect was LATENT
-  for the life of the app. For a user whose UPN differs from their mailbox address EVERY equality
-  fails at once — no "my projects", blank dashboard, no error (user report). `gUserEmail` is now
-  joined by `gUserMail` (MyProfile().Mail) and `gUserUpn` (MyProfile().UserPrincipalName), and
-  every Person predicate ORs over all three, covering the mismatch in EITHER direction.
-  **NONE OF THE THREE MAY EVER BE BLANK:** `project_supporter` and `task_supporter` are OPTIONAL,
-  so `supporter.Email = ""` matches every row without a supporter and hands the user someone
-  else's work. Each falls back to gUserEmail.
-  All four pastes landed 2026-09-09. scrReports is deliberately untouched — it self-heals
-  gUserEmail but reads it in no predicate.
-  **REGRESSION CHECK MATTERS AS MUCH AS THE FIX:** a user for whom this already worked must see
-  the SAME projects and the SAME KPI numbers.
-  **IF IT DOES NOT FIX HIM** the stored address is a THIRD value (an alias, or a duplicate/guest
-  directory entry) — read the raw Manager value in the SharePoint list before authoring more.
-- **PROJECT COMMENTS SHIPPED 2026-09-08 — EPIC #60 CLOSED, ALL FIVE SUB-ISSUES DONE.**
-  `taskmaster_projectcomments` is the FOURTH child list, live and connected, read and written on
-  `scrProject`: fourth arm of btnPrjRecompute's Concurrent (raw list, indexed Number FK, sorted
-  server-side); `colIssues` split into secIssues over secComments; manager highlight; `mdCmt` to
-  add; `mdCv` to read, edit or delete your own; comments in BOTH delete paths. The external
-  archival flow sets `projectcomment_project_archived` (user, 2026-09-08).
-  **NEVER A SUB-ISSUE, AND UNSET UNLESS THE USER HAS SINCE DONE IT — do not assume it is done:**
-  Item-level Permissions on that list ("create items and edit items that were created by the
-  user"). Author-only Edit/Delete is an app AFFORDANCE; Contribute lets anyone edit any comment
-  through SharePoint itself. Raised twice and consciously not blocking the close.
-  **NOT EXERCISED BY THE LANDING, so NOT proven:** deleting a whole PROJECT that has comments
-  (the cascade's fourth arm), and whether a comment longer than the 220px box scrolls in
-  `DisplayMode.View`.
+- **IDENTITY IS THREE VALUES, NOT ONE — #71 SHIPPED AND CONFIRMED 2026-09-09, BOTH DIRECTIONS.**
+  The affected user sees his projects again AND a previously-working user is unchanged — the
+  regression half matters as much, because a blank identity global would have turned an optional
+  Person column into a wildcard. **ROOT CAUSE, WHICH IS STRUCTURAL AND STILL TRUE OF ANY NEW
+  PREDICATE: the app WRITES Person columns from `Office365Users...Mail` and `User().Email` is a
+  DIFFERENT Azure AD attribute.** They coincide for most people, so this was latent for the life of
+  the app and failed TOTALLY and SILENTLY for the one they differ for. `gUserEmail`, `gUserMail`
+  (MyProfile().Mail) and `gUserUpn` (MyProfile().UserPrincipalName) are all seeded in OnStart and
+  self-healed on scrHome/scrProjects/scrProject; **EVERY PERSON PREDICATE MUST OR OVER ALL THREE.**
+  **NONE MAY EVER BE BLANK** — `supporter.Email = ""` matches every row without a supporter. Each
+  falls back to gUserEmail. scrReports reads none of them, deliberately.
+  **NOT SEPARATELY REPORTED:** whether the comment author gate on scrProject now lets that user
+  edit his own comments. Same mechanism, so it should — but it was not read back.
 - **#66 DONE AND LANDED 2026-09-08 — scrProjects IS A TABLE, AND THERE IS NO COMPONENT.**
   Pasted and confirmed working by the user: headings aligned, all three sorts, both heading
   filters, both filter columns indexed in SharePoint. **PR #70 MERGED TO main 2026-09-08 — it
@@ -256,6 +238,8 @@ not know them will author something broken:
 
 - 2026-09-09 | #71's four pastes LANDED cleanly (App.OnStart, scrProjects, scrHome, scrProject). The three-identity globals and the widened Person predicates are live. NOT YET VERIFIED and #71 stays open: the affected user has not reported whether he now sees his projects, nor has anyone run the regression check that a previously-working user sees the SAME projects and KPI numbers | sessions/2026-09-08-1724-epic66-probes-authored.md
 
+- 2026-09-09 | #71 CONFIRMED FIXED IN BOTH DIRECTIONS and closed: the affected user sees his projects, and a previously-working user is unchanged. The regression half was half the acceptance — a blank identity global would have made `supporter.Email = ""` a wildcard over every project without a supporter. STANDING RULE FOR ANY NEW PERSON PREDICATE: OR over gUserEmail / gUserMail / gUserUpn, never just one | sessions/2026-09-08-1724-epic66-probes-authored.md
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -288,3 +272,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-08 | scrProjects TABLE CONFIRMED WORKING BY THE USER — sorting included, which settles the last open question: SortByColumns DOES delegate with the column name in a variable (undocumented; this screen is the only evidence). That is the withdrawn #67 claim 3, answered by using the app rather than by a probe — the whole argument for rescoping. Epic #66 delivered: sortable headings, coverage AND priority heading filters, coverage column, 32 generated branches, both filter columns indexed | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-08 | #71 filed and fixed: a user with multiple addresses matched NO Person filter. Root cause is structural, not data — the app WRITES Person columns from Office365Users' Mail and READ User().Email, a different Azure AD attribute. Latent for the life of the app because the two coincide for most people; total and SILENT for anyone they differ for, since an empty result is indistinguishable from owning nothing. Now three identities (User().Email, MyProfile().Mail, MyProfile().UserPrincipalName) OR'd in every predicate — covers either direction. GENERAL RULE THIS ESTABLISHES: match identity on the SAME attribute you wrote, or on all of them; never assume User().Email is what landed in the column | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-09 | #71's four pastes LANDED cleanly (App.OnStart, scrProjects, scrHome, scrProject). The three-identity globals and the widened Person predicates are live. NOT YET VERIFIED and #71 stays open: the affected user has not reported whether he now sees his projects, nor has anyone run the regression check that a previously-working user sees the SAME projects and KPI numbers | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-09 | #71 CONFIRMED FIXED IN BOTH DIRECTIONS and closed: the affected user sees his projects, and a previously-working user is unchanged. The regression half was half the acceptance — a blank identity global would have made `supporter.Email = ""` a wildcard over every project without a supporter. STANDING RULE FOR ANY NEW PERSON PREDICATE: OR over gUserEmail / gUserMail / gUserUpn, never just one | sessions/2026-09-08-1724-epic66-probes-authored.md

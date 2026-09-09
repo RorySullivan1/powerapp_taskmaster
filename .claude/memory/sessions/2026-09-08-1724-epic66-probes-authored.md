@@ -219,3 +219,16 @@ and `scrProject`. The three identity globals and the widened Person predicates a
 
 **Landed is not fixed.** Nothing yet says the affected user can see his projects, and nothing says
 a previously-working user still sees the same ones. #71 stays open on both.
+
+## #71 confirmed fixed — 2026-09-09
+
+**"It has landed and worked for both."** The affected user sees his projects; a previously-working
+user is unchanged. Both halves reported, which is what the acceptance asked for — the regression
+half was never a formality, since a blank identity global would have turned `supporter.Email = ""`
+into a wildcard matching every project without a supporter.
+
+Not separately read back: the comment author gate on `scrProject`. Same mechanism, so it should
+follow, but nobody reported it.
+
+**The standing rule this leaves behind:** any NEW predicate on a Person column ORs over all three
+of `gUserEmail` / `gUserMail` / `gUserUpn`. Matching one attribute is the defect, not the baseline.
