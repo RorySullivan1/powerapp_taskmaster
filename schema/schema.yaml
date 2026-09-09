@@ -142,7 +142,13 @@ lists:
       - { name: project_pathway,         type: Text,            required: false,                 desc: "SharedDrive folder location (relative or full path)" }
       - { name: project_type_id,         type: Number,          required: false, indexed: true,  desc: "ID of the mapping_activitytype row when the picked path names one exactly; 0 when it names a branch", maps_to: mapping_activitytype }
       - { name: project_type_path,       type: Text,            required: true,  indexed: true,  desc: "Composed path of that row, e.g. \"Campaign | Email | Newsletter\". Same id+path pair as project_region" }
-      - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user" }
+      - { name: project_requestor,       type: Person, multi: false, required: false,                 desc: "Requesting user — the PRIMARY requestor. Labelled \"Primary requestor\" on scrProjectEdit since project_requestor_2 joined it; the internal name is unchanged and deliberately not renamed." }
+      # SINGULAR, matching its three siblings, and the name was settled BEFORE provisioning
+      # (user, 2026-09-09) because internal names freeze at creation. NOT INDEXED, matching
+      # project_requestor — which means it must NEVER join the only-mine Or-arm on
+      # scrProjects: one unindexed arm drops delegation for the whole filter and truncates
+      # in silence. "Mine" is manager or supporter (decision C2).
+      - { name: project_requestor_2,     type: Person, multi: false, required: false,                 desc: "Second requesting user. Optional, like project_requestor. multi:false IS LOAD-BEARING — project_requestor itself was provisioned multi-Person and corrected the same day; a multi column returns a TABLE, so the read errors and the write fails." }
       # DERIVED BY THE APP, NOT PICKED BY A USER (2026-08-13). scrProjectEdit no longer
       # offers a phase control; scrProject recomputes it on open and writes it back when
       # it differs:
