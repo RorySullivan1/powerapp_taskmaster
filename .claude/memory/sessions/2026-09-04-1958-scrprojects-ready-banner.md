@@ -66,3 +66,23 @@
 ## Open threads
 - Whether the banner should fire on 100% regardless of phase. Offered to the user as
   a one-clause edit in two places; not answered.
+
+## LANDED — confirmed 2026-09-04, recovered into main 2026-09-14
+
+Pasted into Studio and confirmed working by the user. Nothing outstanding on the change itself.
+
+**What the paste grounds beyond the feature, which is the durable part:**
+- a `GroupContainer` **nests** inside a gallery template's row container. The 2026-08-19 ledger
+  entry called that ungrounded and worked around it by spending two columns with one captioned
+  blank; that workaround is no longer needed.
+- a hidden child takes no space **horizontally and inside a template**, where the only prior
+  evidence was `cmpLookupField`'s vertical stack in a component.
+
+**Still untested: the suppression case.** That a project at 100% *and* already phased `Complete`
+shows no banner has never been seen — it needs "Show completed" on and such a project to exist.
+The logic is a single `<>` clause, but nobody has laid eyes on it.
+
+**How this nearly went missing.** The commit carrying the above lived alone on
+`claude/memory-ready-banner-landed` and was never merged. For ten days `main` stated the nesting
+ban as live while its refutation sat on a branch nobody would open. Recovered by hand on
+2026-09-14. **A memory commit on a side branch is knowledge that does not exist.**
