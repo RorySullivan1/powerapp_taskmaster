@@ -10,6 +10,20 @@
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid.
+- **#74 REOPEN A COMPLETED PROJECT — AUTHORED 2026-09-14, ONE PASTE (scrProject), NO SHAREPOINT.**
+  `btnPrjReopen` is an EXACTLY-NEGATED sibling of `btnPrjComplete` in the same slot; `= "Complete"`
+  also excludes Archived, so an archived project offers neither. **IT REOPENS TO `gPrjDerived`,
+  NEVER TO A LITERAL "Active"** — btnPrjRecompute re-derives the phase on every visit and writes it
+  back whenever it differs, so a literal survives only until the next visit and then silently
+  becomes Planning or Stalled. The Notify names the phase it landed on.
+  **DO NOT DELETE THE DERIVATION GUARD** (`scrProject`, the `<> "Complete" && <> "Archived"` test)
+  as obsolete now a human can reopen: without it, opening a completed project un-completes itself.
+  **Complete is terminal to the MACHINE and reversible by a PERSON; Archived is terminal to both.**
+  **CLEARING `project_date_complete` IS RETROACTIVE IN REPORTING** — scrReports counts completions
+  per bucket by filtering that column, so a reopened project leaves bars it used to appear in.
+  **OPEN QUESTION FOR THE USER, NOT ANSWERABLE HERE:** whether the external archival flow selects
+  on the phase or on that timestamp's age, and whether it re-checks the phase before writing — a
+  project reopened mid-run could still be archived.
 - **#73 SECOND REQUESTOR — AUTHORED 2026-09-09, BLOCKED ON SHAREPOINT, THEN ONE PASTE.**
   **PROVISION `project_requestor_2` BEFORE PASTING scrProjectEdit** — Person, **SINGLE** (multi
   returns a TABLE: the read errors and the write fails; project_requestor was provisioned multi
@@ -254,6 +268,8 @@ not know them will author something broken:
 
 - 2026-09-09 | #73 second requestor authored: project_requestor_2 in the golden source (Person, SINGLE, optional, unindexed) plus a fourth picker on scrProjectEdit. Column name settled SINGULAR before provisioning — the user proposed project_requestors_2 and internal names freeze at creation, so the inconsistency would have been permanent. Blocked on SharePoint provisioning, then one paste. PR #72 now carries this alongside the #71 identity fix | (no session file — single feature)
 
+- 2026-09-14 | #74 authored: a completed project can be reopened from scrProject. THE EVALUATION FOUND THE USER'S PROPOSED "mark as active" WOULD NOT HAVE HELD — the screen re-derives the phase on every visit and writes it back, so a literal "Active" expires on the next visit; it reopens to gPrjDerived instead. Also corrected the premise that the button lives on scrProjectEdit (it is btnPrjComplete on scrProject). Records updated: Complete is no longer terminal to a human, and clearing project_date_complete retroactively changes scrReports' completion bars | (no session file — single feature)
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -288,3 +304,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-09 | #71's four pastes LANDED cleanly (App.OnStart, scrProjects, scrHome, scrProject). The three-identity globals and the widened Person predicates are live. NOT YET VERIFIED and #71 stays open: the affected user has not reported whether he now sees his projects, nor has anyone run the regression check that a previously-working user sees the SAME projects and KPI numbers | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-09 | #71 CONFIRMED FIXED IN BOTH DIRECTIONS and closed: the affected user sees his projects, and a previously-working user is unchanged. The regression half was half the acceptance — a blank identity global would have made `supporter.Email = ""` a wildcard over every project without a supporter. STANDING RULE FOR ANY NEW PERSON PREDICATE: OR over gUserEmail / gUserMail / gUserUpn, never just one | sessions/2026-09-08-1724-epic66-probes-authored.md
 - 2026-09-09 | #73 second requestor authored: project_requestor_2 in the golden source (Person, SINGLE, optional, unindexed) plus a fourth picker on scrProjectEdit. Column name settled SINGULAR before provisioning — the user proposed project_requestors_2 and internal names freeze at creation, so the inconsistency would have been permanent. Blocked on SharePoint provisioning, then one paste. PR #72 now carries this alongside the #71 identity fix | (no session file — single feature)
+- 2026-09-14 | #74 authored: a completed project can be reopened from scrProject. THE EVALUATION FOUND THE USER'S PROPOSED "mark as active" WOULD NOT HAVE HELD — the screen re-derives the phase on every visit and writes it back, so a literal "Active" expires on the next visit; it reopens to gPrjDerived instead. Also corrected the premise that the button lives on scrProjectEdit (it is btnPrjComplete on scrProject). Records updated: Complete is no longer terminal to a human, and clearing project_date_complete retroactively changes scrReports' completion bars | (no session file — single feature)

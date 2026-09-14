@@ -156,9 +156,14 @@ lists:
       #     any started task, or any transaction        -> Active
       #     any child at all, but no started task       -> Planning
       #     no tasks, transactions or issues            -> Not Started
-      # "Complete" is reachable ONLY through the Mark complete button on scrProject, and
-      # both Complete and Archived are TERMINAL — the derivation never moves a project
-      # out of either.
+      # "Complete" is set ONLY by btnPrjComplete on scrProject and cleared ONLY by
+      # btnPrjReopen beside it. The derivation never moves a project out of Complete or
+      # Archived — that guard is load-bearing, since without it opening a completed
+      # project would un-complete itself.
+      # SO Complete IS TERMINAL TO THE MACHINE AND REVERSIBLE BY A PERSON. Reopening
+      # clears project_date_complete and sets the phase the project's CHILDREN imply,
+      # not a literal "Active": a literal would survive only until the next visit.
+      # ARCHIVED IS TERMINAL TO BOTH. Nothing in the app sets or undoes it.
       #
       # "Archived" is now set by an EXTERNAL FLOW, not the app. That flow OWNS the three
       # `*_project_archived` child flags as well: the app's cascade was removed with the
@@ -168,12 +173,12 @@ lists:
       # THESE SIX ARE THE WHOLE VOCABULARY (user-confirmed 2026-08-13). "Under Review"
       # and "Blocked" are gone from the column, so nothing in the app enumerates them.
       # PENDING IN SHAREPOINT: set the column default to "Not Started".
-      - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase — DERIVED by the app, see the note above", values: ["Not Started", Planning, Active, Stalled, Complete, Archived] }
+      - { name: project_phase,           type: Choice,          required: true,  indexed: true,  default: Not Started, desc: "Lifecycle phase — DERIVED by the app, see the note above. Complete is set and cleared by hand on scrProject; Archived is the external flow's alone.", values: ["Not Started", Planning, Active, Stalled, Complete, Archived] }
       - { name: project_priority,        type: Choice,          required: true,  indexed: true,  desc: "Priority level. INDEXED IN SHAREPOINT, CONFIRMED BY THE USER 2026-09-08. Indexed because scrProjects filters on it server-side from its column heading, and SharePoint refuses an unindexed filter past the 5,000 list-view threshold. NOT SORTABLE IN THE APP and that is not a delegation gap to close: a sort would order these ALPHABETICALLY (Critical, High, Low, Lowest, Moderate), which is not severity order. Sortable priority needs an indexed NUMBER rank column, written by every edit screen and back-filled.", values: [Lowest, Low, Moderate, High, Critical] }
       - { name: project_perc_completion, type: Number,          required: false, internal_name: project_perc_completion,                 desc: "Completion %, 0-100 — WEIGHTED rollup of child task stages; see `rollups:` below. Internal name CONFIRMED equal to the display name (user, 2026-09-08); scrProjects passes it to SortByColumns as a STRING, which resolves against the internal name only." }
       - { name: project_date_start,      type: DateTime,        required: false,                 desc: "Actual start date (default = Created)" }
       - { name: project_date_target,     type: DateTime,        required: false, indexed: true,  internal_name: project_date_target,  desc: "Desired completion date. Internal name CONFIRMED equal to the display name (user, 2026-09-08); scrProjects passes it to SortByColumns as a STRING, which resolves against the internal name only." }
-      - { name: project_date_complete,   type: DateTime,        required: false,                 desc: "Actual completion date" }
+      - { name: project_date_complete,   type: DateTime,        required: false,                 desc: "Actual completion date. Written by btnPrjComplete on scrProject and CLEARED by btnPrjReopen beside it. Clearing it is retroactive in reporting: scrReports counts completions per bucket by filtering on this column, so a reopened project leaves the completed bars for windows it previously appeared in. That is deliberate — it was not in fact complete — but it means a chart can change after the fact." }
       - { name: project_supporter,       type: Person, multi: false, required: false, indexed: true,  desc: "Supporting contributor (one extra person beside project_manager)" }
 
   # ---------------------------------------------------------------------------
