@@ -188,9 +188,13 @@ Screens:
                            nStarted > 0 || nX > 0,   "Active",
                            nT + nX + nI > 0,         "Planning",
                                                      "Not Started" ) ) );
-              // COMPLETE AND ARCHIVED ARE TERMINAL. Complete is reachable only through the Mark
-              // complete button, Archived only through the external cleanup flow — the derivation
-              // must never drag a project back out of either.
+              // THE DERIVATION NEVER MOVES A PROJECT OUT OF Complete OR Archived, and this guard
+              // is what stops it — DO NOT DELETE IT as obsolete now that a human can reopen one.
+              // Without it, opening a completed project would instantly un-complete itself here,
+              // before anybody pressed anything.
+              // Complete is terminal to the MACHINE and reversible by a PERSON: btnPrjComplete
+              // sets it, btnPrjReopen clears it. Archived is terminal to both — it belongs to the
+              // external cleanup flow, and nothing in the app writes or undoes it.
               If( Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
                && Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
                && gPrjDerived <> Coalesce(gSelProject.project_phase.Value, ""),
@@ -836,8 +840,6 @@ Screens:
                                                              NotificationType.Success );
                                                      Navigate( scrProjects, ScreenTransition.UnCover ) );
                                                  Set( gPrDelArm, false ) )
-                                    # THE ONLY WAY A PROJECT REACHES "Complete". Every other phase is derived on
-                                    # this screen's OnVisible; this button is the one place a human decides.
                                     - lblDelArmed:
                                         Control: Label@2.5.1
                                         Properties:
@@ -851,6 +853,15 @@ Screens:
                                           LayoutMinHeight: =16
                                           Width: =Parent.Width
                                           Height: =16
+                        # THE TWO PHASE BUTTONS, AND THEIR `Visible` FORMULAS ARE EXACT
+                        # NEGATIONS — edit one and edit the other, or a completed project
+                        # shows both or neither. They share one slot with no geometry
+                        # because a hidden auto-layout child takes NO space, the same swap
+                        # scrProjects makes between colDuePct and rowReadyBanner.
+                        #
+                        # THIS PAIR IS THE ONLY PLACE A HUMAN SETS project_phase. Every
+                        # other phase is derived in btnPrjRecompute above; Archived is the
+                        # external flow's and appears nowhere in this app.
                         - btnPrjComplete:
                             Control: Classic/Button@2.2.0
                             Properties:
@@ -890,6 +901,57 @@ Screens:
                                              NotificationType.Error ),
                                      Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) );
                                      Notify( "Project marked complete.", NotificationType.Success ) )
+                        - btnPrjReopen:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              # `= "Complete"` also excludes Archived without a second test, which
+                              # is the point: an archived project offers neither button.
+                              Visible: |
+                                =Coalesce(gSelProject.project_phase.Value, "") = "Complete"
+                              # NO DisplayMode GATE. Mark complete is blocked until nothing is
+                              # outstanding; reopening has no precondition at all — open work is
+                              # the ordinary reason to do it.
+                              # NOT LABELLED "Mark active": this lands on the phase the project's
+                              # CHILDREN imply, which is Active only when some work has started.
+                              Text: ="↺  Reopen project"
+                              Fill: =gTheme.Color.Primary
+                              Color: =gTheme.Color.OnPrimary
+                              BorderColor: =gTheme.Color.Primary
+                              BorderThickness: =0
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Body
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              # REOPENS TO gPrjDerived, NOT TO A LITERAL "Active", and that is the
+                              # whole design. btnPrjRecompute derives the phase on every visit and
+                              # writes it back whenever it differs, so a literal would survive
+                              # exactly until the next visit and then become Planning or Stalled
+                              # with nothing to explain it. Coalesce only covers the sub-second
+                              # window before the queued recompute has run.
+                              # The Notify NAMES the phase, so a project that reopens to Planning
+                              # says so rather than looking like a bug.
+                              OnSelect: |
+                                =Set( gPrjCompErr, "" );
+                                 IfError(
+                                     Set( gPrjCompSaved,
+                                          Patch( taskmaster_projects,
+                                                 LookUp(taskmaster_projects, ID = gSelProject.ID),
+                                                 { project_phase:         { Value: Coalesce(gPrjDerived, "Active") },
+                                                   project_date_complete: Blank() } ) ),
+                                     Set( gPrjCompErr, FirstError.Message ) );
+                                 // Trust the RECORD, never the message — a write can fail and still
+                                 // leave FirstError.Message empty.
+                                 If( IsBlank(gPrjCompSaved.ID) && Len(gPrjCompErr) = 0,
+                                     Set( gPrjCompErr, "SharePoint returned no record and no error message." ) );
+                                 If( Len(gPrjCompErr) > 0,
+                                     Notify( "Couldn't reopen it: " & gPrjCompErr,
+                                             NotificationType.Error ),
+                                     Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) );
+                                     Notify( "Project reopened as " & Coalesce(gPrjDerived, "Active")
+                                             & ". The completion date has been cleared.",
+                                             NotificationType.Success ) )
                         - lblPrjCompleteWhy:
                             Control: Label@2.5.1
                             Properties:
