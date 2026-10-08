@@ -14,8 +14,8 @@
   scrProject's paste ALSO carries `txtPrjDesc` (read-only description under the info card).
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
   (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
-- **EPIC #77 QUICK TRANSACTION — FILED 2026-10-08, NOTHING BUILT.** Subs #78-#83. **#78 (decision: what the parent
-  project is) BLOCKS the rest and needs the USER** — recommended A: pick a real project, remembered per session.
+- **EPIC #77 QUICK TRANSACTION — FILED 2026-10-08, NOTHING BUILT.** #78 DECIDED (option A) and closed; #83 won't-fix.
+  **#79 (project picker + archived-mirror fix) is NEXT and unblocked**, then #80, #81, #82.
   Design: reuse scrTransactionEdit with a `gTxQuick` flag (one save path), not a modal on scrHome.
 - **#74 REOPEN A COMPLETED PROJECT — AUTHORED 2026-09-14, ONE PASTE (scrProject), NO SHAREPOINT.**
   `btnPrjReopen` is an EXACTLY-NEGATED sibling of `btnPrjComplete` in the same slot; `= "Complete"`
@@ -281,6 +281,8 @@ not know them will author something broken:
 
 - [2026-10-08] **scrProject SHOWS `project_description` in `txtPrjDesc`, a `ModernTextInput@1.1.1` in `DisplayMode.View`, full width between cardInfo and rowWork.** A text input, not a Label, because a Label clips and this scrolls. **`Color` on ModernTextInput HAD NOT LANDED (0 of 25 instances)** — authored on MS Learn's word: it is in the same FontColor->Color rename set as `Size`, which has landed 25 times on @1.1.1. **If the scrProject paste fails, `Color` on txtPrjDesc is the first suspect** — drop it and the box still works, unmuted. Height 64 is the BUDGET, not a style choice: on the 768 screen rowWork keeps its 320 floor only while the box is <= 74. Reset in OnVisible because a text input re-reads Default only on Reset — INDEX Decisions
 
+- [2026-10-08] **#78: A QUICK TRANSACTION ATTACHES TO A REAL PROJECT, PICKED ON THE FORM AND REMEMBERED FOR THE SESSION (user).** Pickable set is `OpenProjects` (no Complete, no Archived); no create-project from the picker. **`transaction_project_id` STAYS REQUIRED — no schema change.** Rejected: a per-desk "holding" project (a sentinel the app treats as real — permanently Active, counted in every report) and making the FK optional (the archived mirror loses meaning for a parentless row, scrReports needs a "No project" bucket, and such a trade has no screen to live on). **#83 WON'T FIX (user): no suggested transaction names** — names stay typed by hand; do not re-propose without a naming convention from the desk — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -319,3 +321,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | Complete => 100%: the phase overrides the task rollup in all three writers, Mark complete writes 100, Reopen writes the task rollup back. Pastes: scrProject, scrTaskEdit, scrProjectEdit, scrProjects. No SharePoint change. 22/22, AWAITING PASTE | (no session file — single feature)
 - 2026-10-08 | scrProject: read-only project description box (txtPrjDesc) under the info card. Rides the same scrProject paste as Complete => 100%. 22/22, AWAITING PASTE | (no session file — single feature)
 - 2026-10-08 | Epic #77 filed: Quick transaction for transaction-only users. Found scrTransactionEdit has NO project field (a from-scrHome form could never save) and btnTxSave's archived mirror reads gSelProject, not gTxProject (latent; fixed in #79). SetFocus ruled out (form is containers). Subs #78 decision, #79 picker, #80 scrHome button, #81 sticky + save-and-another, #82 session list, #83 suggested name (optional) | (no session file)
+- 2026-10-08 | #77: user took option A on #78 (real project, picked + remembered, OpenProjects, no schema change) and declined #83 (suggested names). Both closed; epic updated. #79 is next | (no session file)
