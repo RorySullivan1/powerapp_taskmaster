@@ -36,6 +36,7 @@ Screens:
          Set( gCmtSaving, false );
          Set( gCmtViewOpen, false );
          Set( gCmtEditing, false );
+         Reset( txtPrjDesc );
          // SELF-HEAL, same as scrHome and scrProjects. App.OnStart is NON-BLOCKING, so this
          // screen can run before it finishes, and a blank gUserEmail would hide Edit and Delete
          // from the very person who wrote the comment.
@@ -994,6 +995,26 @@ Screens:
                               LayoutMinHeight: =18
                               Width: =Parent.Width
                               Height: =18
+            # READ-ONLY DESCRIPTION. A View-mode text input rather than a Label because a
+            # Label clips long text and this box scrolls. 64 is the most the 768-tall screen
+            # spares: rowWork keeps its 320 floor only while this stays at or under 74.
+            # A text input re-reads Default only on Reset, so OnVisible resets it.
+            - txtPrjDesc:
+                Control: ModernTextInput@1.1.1
+                Properties:
+                  Default: |
+                    =If( IsBlank( Trim(gSelProject.project_description) ), "No description.",
+                         gSelProject.project_description )
+                  Type: =TextInputType.Multiline
+                  DisplayMode: =DisplayMode.View
+                  AccessibleLabel: ="Project description"
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  FillPortions: =0
+                  LayoutMinHeight: =64
+                  Width: =Parent.Width - 48
+                  Height: =64
             - rowWork:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
