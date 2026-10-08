@@ -671,7 +671,6 @@ Screens:
                                   Properties:
                                     Default: =ThisItem.q_name
                                     Placeholder: ="e.g. QIS-2026-0417 EMEA autocall"
-                                    TriggerOutput: =TriggerOutput.FocusOut
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.Small
                                     FillPortions: =3
@@ -689,6 +688,7 @@ Screens:
                                     StartOfWeek: =StartOfWeek.Monday
                                     IsEditable: =true
                                     FillPortions: =0
+                                    LayoutMinWidth: =170
                                     Width: =170
                                     Height: =36
                                     OnChange: |
@@ -706,6 +706,7 @@ Screens:
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.Small
                                     FillPortions: =2
+                                    LayoutMinWidth: =130
                                     Height: =36
                                     OnChange: |
                                       =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
@@ -986,7 +987,25 @@ Screens:
                   Width: =300
                   Height: =48
                   OnSelect: |
-                    =If( gSaving,
+                    =// SAVE WHAT IS ON SCREEN. Each row input writes itself to colQtRows on OnChange,
+                    // but a value typed just before pressing Save may not have committed yet, and a
+                    // reused gallery row can show a date or currency its record no longer holds
+                    // (the combobox and date picker re-read their defaults only on Reset). So the
+                    // visible values are copied back first. AllItems is complete here: the gallery
+                    // is bound to a local collection, not a paged data source.
+                    If( !gSaving,
+                        ClearCollect( colQtSync,
+                            ForAll( galQtRows.AllItems As g,
+                                { s_rid:  g.q_rid,
+                                  s_name: g.txtQtRowName.Text,
+                                  s_date: g.dtpQtRowDate.SelectedDate,
+                                  s_not:  g.numQtRowNotional.Text,
+                                  s_ccy:  g.cboQtRowCcy.Selected.Value } ) );
+                        ForAll( colQtSync As s,
+                            Patch( colQtRows, LookUp( colQtRows, q_rid = s.s_rid ),
+                                   { q_name: s.s_name, q_date: s.s_date,
+                                     q_notional: s.s_not, q_ccy: s.s_ccy } ) ) );
+                    If( gSaving,
                     // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing — the button
                     // stays live during a Patch, and a double-tap ran the handler twice.
                     false,
@@ -1081,10 +1100,8 @@ Screens:
                         RemoveIf( colQtRows,
                                   q_rid in ShowColumns( Filter( colQtResult, Len(Message) = 0 ), Rid ) );
                         // --- 3. outcome ----------------------------------------------------
+                        // BOTH ARMS END IN Notify, so the If's arms agree on type.
                         If( gQtFailN = 0,
-                            Notify( "Logged " & gQtOkN & If( gQtOkN = 1, " transaction", " transactions" )
-                                      & " to " & gQtPname,
-                                    NotificationType.Success );
                             Clear( colQtRows );
                             Collect( colQtRows,
                                 { q_rid:          Coalesce( gQtCarry.q_rid, 0 ) + 1,
@@ -1095,7 +1112,10 @@ Screens:
                                   q_clientId:     Coalesce( gQtCarry.q_clientId, 0 ),
                                   q_clientValue:  Coalesce( gQtCarry.q_clientValue, "" ),
                                   q_productId:    Coalesce( gQtCarry.q_productId, 0 ),
-                                  q_productValue: Coalesce( gQtCarry.q_productValue, "" ) } ),
+                                  q_productValue: Coalesce( gQtCarry.q_productValue, "" ) } );
+                            Notify( "Logged " & gQtOkN & If( gQtOkN = 1, " transaction", " transactions" )
+                                      & " to " & gQtPname,
+                                    NotificationType.Success ),
                             Notify( If( gQtWasNew, "Project """ & gQtPname & """ was created. ", "" )
                                       & gQtFailN & " of " & CountRows(colQtResult)
                                       & " transactions could not be saved — they are still listed, press Save to retry.   """
@@ -1178,13 +1198,18 @@ Screens:
             # Pick-only in every state: "＋ New" would navigate away mid-batch.
             AllowCreate: =false
             OnConfirm: |
-              =Switch( gQtPicker,
+              =// THE Set ARMS AND THE Patch ARMS ARE KEPT APART: one Switch mixing a Boolean
+              // (Set) with a record (Patch) is the type clash scrTaskEdit and scrProductEdit
+              // already split for the same reason.
+              Switch( gQtPicker,
               "Project", Set( gQtProject, { Id: Value(cmpQtPick.Picked.Key), Value: cmpQtPick.Picked.Primary } ),
-              "Manager", Set( gQtManager, { DisplayName: cmpQtPick.Picked.Primary, Mail: cmpQtPick.Picked.Secondary } ),
-              "Client",  Patch( colQtRows, LookUp( colQtRows, q_rid = gQtPickRow ),
-                                { q_clientId: Value(cmpQtPick.Picked.Key), q_clientValue: cmpQtPick.Picked.Primary } ),
-              "Product", Patch( colQtRows, LookUp( colQtRows, q_rid = gQtPickRow ),
-                                { q_productId: Value(cmpQtPick.Picked.Key), q_productValue: cmpQtPick.Picked.Primary } ) );
+              "Manager", Set( gQtManager, { DisplayName: cmpQtPick.Picked.Primary, Mail: cmpQtPick.Picked.Secondary } ) );
+              If( gQtPicker = "Client",
+                  Patch( colQtRows, LookUp( colQtRows, q_rid = gQtPickRow ),
+                         { q_clientId: Value(cmpQtPick.Picked.Key), q_clientValue: cmpQtPick.Picked.Primary } ) );
+              If( gQtPicker = "Product",
+                  Patch( colQtRows, LookUp( colQtRows, q_rid = gQtPickRow ),
+                         { q_productId: Value(cmpQtPick.Picked.Key), q_productValue: cmpQtPick.Picked.Primary } ) );
               Set( gQtPicker, "" )
             OnCreateNew: =Set( gQtPicker, "" )
             OnCancel: =Set( gQtPicker, "" )
