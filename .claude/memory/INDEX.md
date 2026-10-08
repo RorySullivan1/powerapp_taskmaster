@@ -19,8 +19,8 @@
   Design: reuse scrTransactionEdit with a `gTxQuick` flag (one save path), not a modal on scrHome.
 - **EPIC #84 scrReports SCOPE + FORMAT PIE — FILED 2026-10-08, NOTHING BUILT.** #85 (Scope filters EVERY chart:
   fetch into *Raw, new hidden `btnRptFold` re-materialises the scoped colRptOpen/Done/Tx/TxCur/Prj/Iss) is NEXT and
-  unblocked; then #86 (task_output_format pie, audience-pie clone, new row). #87 is a USER DECISION (require format
-  when Output is on; recommended A). Today `gRptScope` is read ONLY by galRptPeople.Items — and not even its measures.
+  unblocked; then #86 (task_output_format pie, audience-pie clone, new row). #87 DECIDED B (format stays OPTIONAL;
+  closed) — paste is scrReports ONLY. Today `gRptScope` is read ONLY by galRptPeople.Items — and not even its measures.
 - **#74 REOPEN A COMPLETED PROJECT — AUTHORED 2026-09-14, ONE PASTE (scrProject), NO SHAREPOINT.**
   `btnPrjReopen` is an EXACTLY-NEGATED sibling of `btnPrjComplete` in the same slot; `= "Complete"`
   also excludes Archived, so an archived project offers neither. **IT REOPENS TO `gPrjDerived`,
@@ -289,6 +289,8 @@ not know them will author something broken:
 
 - [2026-10-08] **#84: THE SCOPE DROPDOWN ON scrReports SCOPES THE WHOLE SCREEN, AND `task_output_format` RETURNS TO REPORTING (user).** Reverses two design calls in docs/reports-screen-design.md: (1) §3 said scope = "no refetch, NO REFOLD, re-filter colRptPerson" — users read it as a screen filter, so scope now REFOLDS (still no refetch); (2) format was dropped for audience because scrTaskEdit never requires it — user wants the medium pie anyway; the Unspecified slice is the accepted cost, #87 decides whether to enforce it. Key = parent project's project_manager (colRptPrjMap.Mgr). "All" must be a PASS-THROUGH, not a filter against the full PId set, or orphaned-lookup rows drop. colRptMgrOpts, colRptPrjMap and gRptTrunc stay UNSCOPED. colRptIss must be hand-projected before reading issue_project_id (ShowColumns over a named formula). Issues #85/#86/#87.
 
+- [2026-10-08] **#87: `task_output_format` STAYS OPTIONAL — scrTaskEdit does NOT require it when Output is on (user, against the recommended A).** Output keeps requiring AUDIENCE only. Consequence for #86: the format pie's **Unspecified slice is PERMANENT, not transitional** — it will not shrink as the backlog turns over — so its subtitle stating the Unspecified count is the main reading aid, not a caveat, and Unspecified keeps a muted colour fixed by value. No scrTaskEdit paste for #84; no "required when Output is on" note in schema.yaml. **Do not re-propose the guard as a fix for a grey pie** — that trade was made knowingly — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -329,3 +331,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | Epic #77 filed: Quick transaction for transaction-only users. Found scrTransactionEdit has NO project field (a from-scrHome form could never save) and btnTxSave's archived mirror reads gSelProject, not gTxProject (latent; fixed in #79). SetFocus ruled out (form is containers). Subs #78 decision, #79 picker, #80 scrHome button, #81 sticky + save-and-another, #82 session list, #83 suggested name (optional) | (no session file)
 - 2026-10-08 | #77: user took option A on #78 (real project, picked + remembered, OpenProjects, no schema change) and declined #83 (suggested names). Both closed; epic updated. #79 is next | (no session file)
 - 2026-10-08 | Epic #84 filed: scrReports Scope dropdown only filtered the People list (and not its measures); fix = fetch/fold split (#85); add task_output_format pie (#86); decision on requiring format (#87). Nothing built | (no session file)
+- 2026-10-08 | #87 decided B by the user (format stays optional) and closed; #86 and epic #84 updated (Unspecified slice permanent; paste is scrReports only). #85 is next | (no session file)
