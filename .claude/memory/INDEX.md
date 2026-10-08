@@ -15,7 +15,7 @@
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
   (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
 - **EPIC #77 QUICK TRANSACTION — FILED 2026-10-08, NOTHING BUILT.** #78 DECIDED (option A) and closed; #83 won't-fix.
-  **#79 + #80 + #81 AUTHORED 2026-10-08 — TWO PASTES (scrTransactionEdit, scrHome), AWAITING STUDIO.** Then #82.
+  **#79-#82 ALL AUTHORED 2026-10-08, PR #88 — TWO PASTES (scrTransactionEdit, scrHome), pre-paste review PASTE, AWAITING STUDIO.**
   **scrTransactionEdit STILL NEEDS `transaction_comment` PROVISIONED FIRST** (pending since 2026-09-04) or every save fails.
   Design: reuse scrTransactionEdit with a `gTxQuick` flag (one save path), not a modal on scrHome.
 - **EPIC #84 scrReports SCOPE + FORMAT PIE — FILED 2026-10-08, NOTHING BUILT.** #85 (Scope filters EVERY chart:
@@ -298,6 +298,8 @@ not know them will author something broken:
 
 - [2026-10-08] **#81: QUICK MODE CARRIES project, client, product, currency and date in `gTxSticky*` (written by any successful QUICK save, either button); the SALES OWNER IS NEVER CARRIED.** "Save & log another" (`btnTxSaveNext`) is NOT a second save path: it raises `gTxSaveNext` and `Select(btnTxSave)`, guarded on `!gSaving` because Select queues. On success it resets name/notional/comment + clears gTxSales and STAYS; a failed save resets nothing. **UNGROUNDED, first suspect if the paste fails: `dtpTxDate.DefaultDate` mixes a DateTime arm (transaction_date) with a Date arm (Today()/SelectedDate) in one If** — nothing else in src/ does; Power Fx source says it widens to DateTime (~90%). **If btnTxSave lands as btnTxSave_1, Select(btnTxSave) silently does nothing** — rename. **SetFocus is NOT used** (form is containers) — INDEX Decisions
 
+- [2026-10-08] **#82: "Logged this session" = LOCAL `colTxSession`, built from the FORM on each successful NEW quick save (no query; lasts until the app closes); a row tap re-reads from the list and loads it into the SAME form.** The form's load moved VERBATIM from OnVisible into hidden `btnTxSeed` (5 call sites: OnVisible, row tap, and the return to quick entry after a correction is saved / cancelled / deleted). **A correction never touches the gTxSticky* defaults.** Row tap, Cancel-on-correction and Delete are all **ignored while gSaving** — the save re-reads gEditMode AFTER its Patch, so changing it mid-write misfiles the trade in the session list. **LESSON, applies everywhere: CONTROLS AND COLLECTIONS SHARE ONE NAME SPACE.** The list's container was first named `colTxSession` — the collection's own name — so Collect/UpdateIf/RemoveIf would have resolved to the container. The validator does NOT catch this (pre-paste review did); container is now `colTxSessionList`. Scan: 776 controls vs 109 collections, no other clash — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -342,3 +344,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | #79 authored: project picker on scrTransactionEdit + archived-mirror read fixed. Branch brought onto main by a MERGE (rebase + force-push was denied). Validator 22/22, pre-paste review PASTE. AWAITING PASTE | (no session file)
 - 2026-10-08 | #80 authored: scrHome `+ Quick transaction` (btnQuickTx) beside New project; quick mode consumed on arrival into gTxIsQuick; title reads "Quick transaction". 22/22, globals audit clean. AWAITING PASTE | (no session file)
 - 2026-10-08 | #81 authored: sticky quick-mode defaults + Save & log another on scrTransactionEdit. 22/22, globals + balance clean, pre-paste review PASTE. AWAITING PASTE (after transaction_comment is provisioned) | (no session file)
+- 2026-10-08 | #82 authored (session list + btnTxSeed refactor); review caught a control/collection NAME CLASH (fixed) and three in-flight races (guarded). PR #88 opened for #79-#82. Pre-paste review PASTE | (no session file)

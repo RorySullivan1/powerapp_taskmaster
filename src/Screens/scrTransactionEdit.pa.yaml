@@ -740,11 +740,14 @@ Screens:
                   LayoutMinWidth: =140
                   Width: =140
                   Height: =48
+                  # Ignored while this transaction is saving: a delete confirmed mid-write resets
+                  # gEditMode under the save and misfiles the trade in the session list.
                   OnSelect: |
-                    =Set( gDelKind, "Transaction" );
-                     Set( gDelId, gEditTransaction.ID );
-                     Set( gDelName, gEditTransaction.transaction_name );
-                     Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = gEditTransaction.ID) ) )
+                    =If( !gSaving,
+                         Set( gDelKind, "Transaction" );
+                         Set( gDelId, gEditTransaction.ID );
+                         Set( gDelName, gEditTransaction.transaction_name );
+                         Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = gEditTransaction.ID) ) ) )
             - lblTxFooterSpacer:
                 Control: Label@2.5.1
                 Properties:
