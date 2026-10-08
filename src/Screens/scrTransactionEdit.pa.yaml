@@ -1,6 +1,7 @@
 # =============================================================================
 # scrTransactionEdit — create / edit a transaction.
-# Entered with gEditMode + gEditTransaction; gSelProject pre-attaches a new one.
+# Entered with gEditMode + gEditTransaction; gSelProject pre-fills a new one's project,
+# and fldProject picks or changes it.
 # Follows the shared edit-screen pattern documented in scrIssueEdit's header.
 #
 # CURRENCY — READ THIS BEFORE ADDING ANY TOTAL TO THIS SCREEN. This form writes the
@@ -133,6 +134,34 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height - gTheme.Space.HeaderH - 88
           Children:
+            # ROW 0 — the parent project, on its own row because it is the record everything
+            # else hangs off. gTxProject is the value; the picker lists OpenProjects only.
+            - colTxProject:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =8
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - fldProject:
+                      Control: CanvasComponent
+                      ComponentName: cmpLookupField
+                      Properties:
+                        Caption: ="Project  *"
+                        PickLabel: ="＋  Choose a project"
+                        HasValue: =gTxProject.Id > 0
+                        Display: =gTxProject.Value
+                        Width: =Parent.Width
+                        Height: =62
+                        OnPick: |
+                          =Set( gTxPicker, "Project" );
+                           Reset( cmpTxPick );
+                           Set( gTxQuery, "" )
+                        OnClear: |
+                          =Set( gTxProject, { Id: 0, Value: "" } )
             # ROW 1 — the label spans BOTH columns: it is what a user scans for, and its
             # placeholder is long enough that a half-width box truncated it.
             - gridTx1:
@@ -458,10 +487,8 @@ Screens:
                           =With(
                              { m: Concat( Filter( Table(
                                     { L: "Label",          M: Len(Trim(txtTxName.Text)) = 0 },
-                                    // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
-                                    // so a user cannot act on this one — reopen the transaction from the project
-                                    // screen. A blank would otherwise be rejected by SharePoint silently.
-                                    { L: "Parent Project", M: gTxProject.Id <= 0 },
+                                    // A blank project would otherwise be rejected by SharePoint silently.
+                                    { L: "Project",        M: gTxProject.Id <= 0 },
                                     { L: "Trade Date",     M: IsBlank(dtpTxDate.SelectedDate) },
                                     // THE ONE VALIDITY TEST IN THIS LIST, not a missing-field test: the notional is
                                     // OPTIONAL, so an empty box is fine and only an entry that will not parse fires
@@ -569,11 +596,11 @@ Screens:
                         Patch( taskmaster_transactions,
                                If( gEditMode = "Edit", gEditTransaction, Defaults(taskmaster_transactions) ),
                                // Mirrors the PARENT's phase so cross-project queries can exclude archived work with
-                               // a delegable `= false`. Written on EVERY save. Read LIVE from the list, not from
-                               // gSelProject — that global is a gallery snapshot, so a project archived since would
-                               // stamp `false` and the row would stay in scope forever.
+                               // a delegable `= false`. Written on EVERY save. Read LIVE from the list for the
+                               // PICKED project (gTxProject), never gSelProject: that is only the screen the form
+                               // was opened from, and is blank or different once the project is chosen here.
                                { transaction_project_archived:
-                                     Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
+                                     Coalesce( LookUp( taskmaster_projects, ID = gTxProject.Id,
                                                        project_phase.Value ), "" ) = "Archived",
                                transaction_name:        Trim(txtTxName.Text),
                                  transaction_project_id:  { Id: gTxProject.Id, Value: gTxProject.Value },
@@ -647,7 +674,8 @@ Screens:
               =Switch( gTxPicker,
                        "Sales",   "Select sales owner",
                        "Client",  "Select client",
-                       "Product", "Select product" )
+                       "Product", "Select product",
+                       "Project", "Select project" )
             # Queries run HERE — AccessAppScope false. Bound to gTxQuery, which OnSearch sets,
             # never to the instance's own Query output. See scrTaskEdit's instance.
             # Each record kind is TWO branches and the pair must stay split: StartsWith(col, "")
@@ -687,14 +715,27 @@ Screens:
               ForAll( FirstN( Sort( taskmaster_products, product_uid ), 10 ) As p,
               { Key:       Text(p.ID),
               Primary:   p.product_uid,
-              Secondary: Coalesce(p.product_type_path, "") } ) )
+              Secondary: Coalesce(p.product_type_path, "") } ),
+              gTxPicker = "Project" && Len(gTxQuery) > 0,
+              ForAll( FirstN( Sort( Filter( OpenProjects,
+              StartsWith(project_name, gTxQuery) ), project_name ),
+              If( Len(gTxQuery) >= 2, 50, 10 ) ) As p,
+              { Key:       Text(p.ID),
+              Primary:   p.project_name,
+              Secondary: Coalesce(p.project_phase.Value, "") } ),
+              gTxPicker = "Project",
+              ForAll( FirstN( Sort( OpenProjects, project_name ), 10 ) As p,
+              { Key:       Text(p.ID),
+              Primary:   p.project_name,
+              Secondary: Coalesce(p.project_phase.Value, "") } ) )
             OnSearch: =Set( gTxQuery, cmpTxPick.Query )
             AllowCreate: =gTxPicker = "Client" || gTxPicker = "Product"
             OnConfirm: |
               =Switch( gTxPicker,
               "Sales",   Set( gTxSales,   { DisplayName: cmpTxPick.Picked.Primary, Mail: cmpTxPick.Picked.Secondary } ),
               "Client",  Set( gTxClient,  { Id: Value(cmpTxPick.Picked.Key), Value: cmpTxPick.Picked.Primary } ),
-              "Product", Set( gTxProduct, { Id: Value(cmpTxPick.Picked.Key), Value: cmpTxPick.Picked.Primary } ) );
+              "Product", Set( gTxProduct, { Id: Value(cmpTxPick.Picked.Key), Value: cmpTxPick.Picked.Primary } ),
+              "Project", Set( gTxProject, { Id: Value(cmpTxPick.Picked.Key), Value: cmpTxPick.Picked.Primary } ) );
               Set( gTxPicker, "" )
             OnCreateNew: |
               =Set( gTxResume, true );
