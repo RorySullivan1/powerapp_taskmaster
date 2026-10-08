@@ -1394,7 +1394,10 @@ Screens:
                                            NotificationType.Warning),
                                     // Don't spend a write on a number that has not moved. gEditProject was
                                     // re-read from the server four lines up, so it carries the stored value.
-                                    With( { newPc: If( CountRows(scored) = 0, 0,
+                                    // A Complete project stays at 100 — the phase overrides the
+                                    // rollup, as on scrProject.
+                                    With( { newPc: If( Coalesce(gEditProject.project_phase.Value, "") = "Complete", 100,
+                                                       CountRows(scored) = 0, 0,
                                                        RoundDown(Average(scored, wgt), 0) ) },
                                         // Coalesce to -1, NOT a bare compare. A just-inserted row has NULL and
                                         // newPc is 0 for a project with no tasks, so `0 <> Blank()` may be FALSE,

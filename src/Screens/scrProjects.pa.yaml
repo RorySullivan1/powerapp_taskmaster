@@ -971,7 +971,12 @@ Screens:
                         - rowPercent:
                             Control: Label@2.5.1
                             Properties:
-                              Text: =Coalesce(ThisItem.project_perc_completion, 0) & "% complete"
+                              # Complete reads 100 even if the stored figure is behind: a project
+                              # completed without ever being re-opened on scrProject still holds
+                              # its old rollup until it is.
+                              Text: |
+                                =If( Coalesce(ThisItem.project_phase.Value, "") = "Complete", 100,
+                                     Coalesce(ThisItem.project_perc_completion, 0) ) & "% complete"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted

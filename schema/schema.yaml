@@ -632,6 +632,12 @@ rollups:
     source_list: taskmaster_tasks
     parent_key: task_project_id
     formula: "mean(stage_weight[task_stage]) over counted tasks   # weights are already 0-100, so do NOT multiply by 100 again"
+    # project_phase = "Complete" OVERRIDES THE FORMULA: the value is 100 whatever the tasks say
+    # (a project with no tasks would otherwise complete at 0). btnPrjComplete writes 100;
+    # btnPrjReopen writes the task rollup back, so a reopened project returns to the formula.
+    # Every writer (scrProject, scrTaskEdit, scrProjectEdit) applies the override, and
+    # scrProjects applies it on display for a row whose stored value predates it.
+    complete_override: 100
     # WEIGHTS ARE PROPOSED — confirm or edit. Percent-of-effort per stage.
     stage_weights:
       "Not Started":  0

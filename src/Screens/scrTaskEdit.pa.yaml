@@ -1599,7 +1599,9 @@ Screens:
                     CountRows(gTkRollupScored) >= 500,
                     Notify("Task saved. This project has too many tasks to compute completion accurately, so it was left unchanged.",
                     NotificationType.Warning),
-                    With( { newPc: If( CountRows(gTkRollupScored) = 0, 0, RoundDown(Average(gTkRollupScored, wgt), 0) ) },
+                    // A Complete project stays at 100 — the phase overrides the rollup, as on scrProject.
+                    With( { newPc: If( Coalesce(gTkParentProj.project_phase.Value, "") = "Complete", 100,
+                    CountRows(gTkRollupScored) = 0, 0, RoundDown(Average(gTkRollupScored, wgt), 0) ) },
                     // Don't spend a write on a number that has not moved.
                     // Coalesce to -1: a just-inserted row holds NULL and newPc is 0, so a bare compare
                     // would skip the write and leave NULL — and Average() drops blanks from the
