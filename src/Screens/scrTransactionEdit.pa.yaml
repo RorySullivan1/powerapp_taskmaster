@@ -47,8 +47,8 @@ Screens:
       # =====================================================================
       # THE SEED BLOCK — hidden, 1x1, declared FIRST so it can never cover a control. Loads
       # the form from gEditMode / gEditTransaction / quick mode. A CONTROL because it has
-      # four callers: OnVisible, a tap on a "Logged this session" row, and the return to
-      # quick entry after an edit is saved, cancelled or deleted. Select QUEUES, so no
+      # five call sites: OnVisible, a tap on a "Logged this session" row, and the return to
+      # quick entry after a correction is saved, cancelled or deleted. Select QUEUES, so no
       # caller may read a seeded value in the same formula that Selects this.
       # =====================================================================
       - btnTxSeed:
@@ -518,7 +518,9 @@ Screens:
             # re-reads the trade from the list and loads it into this same form via btnTxSeed.
             # Capped at five rows of height so a long session cannot push the footer out of reach.
             # Per-currency only — no cross-currency total (see this file's header).
-            - colTxSession:
+            # THE CONTAINER IS colTxSessionList, NEVER colTxSession: controls and collections share
+            # one name space, and a control named like the collection captures Collect/UpdateIf.
+            - colTxSessionList:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
                 Properties:
@@ -642,14 +644,22 @@ Screens:
                               Y: =0
                               Width: =Parent.TemplateWidth
                               Height: =Parent.TemplateHeight
+                              # BLOCKED WHILE A SAVE IS IN FLIGHT: the save re-reads gEditMode after its
+                              # Patch, so switching it mid-write files the new trade under this row.
+                              # And it will not throw away a trade that is half typed.
                               OnSelect: |
-                                =Select(Parent);
-                                Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.Id) );
-                                If( IsBlank(gEditTransaction.ID),
-                                    Notify( "That transaction no longer exists — it may have been deleted.",
-                                            NotificationType.Error ),
-                                    Set( gEditMode, "Edit" );
-                                    Select( btnTxSeed ) )
+                                =If( gSaving, false,
+                                     gEditMode = "New"
+                                     && ( Len(Trim(txtTxName.Text)) > 0 || Len(Trim(numTxNotional.Text)) > 0 ),
+                                     Notify( "Save or clear the trade you're typing before correcting another.",
+                                             NotificationType.Warning ),
+                                     Select(Parent);
+                                     Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.Id) );
+                                     If( IsBlank(gEditTransaction.ID),
+                                         Notify( "That transaction no longer exists — it may have been deleted.",
+                                                 NotificationType.Error ),
+                                         Set( gEditMode, "Edit" );
+                                         Select( btnTxSeed ) ) )
             # GATED ON THE MESSAGE, not just its two children. Both were already Visible-gated,
             # so this row sat as 62px of blank space on every valid form. Reading a hidden
             # control's .Text is fine and is already how btnTxSave gates the save — same
@@ -909,9 +919,11 @@ Screens:
                   LayoutMinWidth: =140
                   Width: =140
                   Height: =48
-                  # Cancelling a correction from the session list returns to quick entry.
+                  # Cancelling a correction from the session list returns to quick entry. Ignored
+                  # while that correction is saving, for the same reason as the session row.
                   OnSelect: |
-                    =If( gTxIsQuick && gEditMode = "Edit",
+                    =If( gTxIsQuick && gEditMode = "Edit" && gSaving, false,
+                         gTxIsQuick && gEditMode = "Edit",
                          Set( gEditMode, "New" );
                          Set( gEditTransaction, Blank() );
                          Select( btnTxSeed ),
