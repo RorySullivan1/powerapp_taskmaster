@@ -14,10 +14,11 @@
   scrProject's paste ALSO carries `txtPrjDesc` (read-only description under the info card).
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
   (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
-- **EPIC #77 QUICK TRANSACTION — FILED 2026-10-08, NOTHING BUILT.** #78 DECIDED (option A) and closed; #83 won't-fix.
-  **#79-#82 ALL AUTHORED 2026-10-08, PR #88 — TWO PASTES (scrTransactionEdit, scrHome), pre-paste review PASTE, AWAITING STUDIO.**
-  **scrTransactionEdit STILL NEEDS `transaction_comment` PROVISIONED FIRST** (pending since 2026-09-04) or every save fails.
-  Design: reuse scrTransactionEdit with a `gTxQuick` flag (one save path), not a modal on scrHome.
+- **EPIC #77 QUICK TRANSACTION — DIRECTION CHANGED 2026-10-08 (user): quick entry is its OWN screen `scrQuickTx` (#89).**
+  scrTransactionEdit is RESTORED byte-for-byte to pre-PR-#88 (quick mode #79-#82 reverted). **The #88 quick-mode version
+  WAS pasted into Studio (user, 2026-10-08), so the restore NEEDS A PASTE: delete the screen, then paste.** scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
+  **PASTE ORDER: scrQuickTx FIRST (new screen), THEN scrHome** (btnQuickTx navigates to it). scrQuickTx never writes
+  transaction_comment, so it does not wait on that column; scrTransactionEdit still does (pending since 2026-09-04).
 - **EPIC #84 scrReports SCOPE + FORMAT PIE — FILED 2026-10-08, NOTHING BUILT.** #85 (Scope filters EVERY chart:
   fetch into *Raw, new hidden `btnRptFold` re-materialises the scoped colRptOpen/Done/Tx/TxCur/Prj/Iss) is NEXT and
   unblocked; then #86 (task_output_format pie, audience-pie clone, new row). #87 DECIDED B (format stays OPTIONAL;
@@ -300,6 +301,8 @@ not know them will author something broken:
 
 - [2026-10-08] **#82: "Logged this session" = LOCAL `colTxSession`, built from the FORM on each successful NEW quick save (no query; lasts until the app closes); a row tap re-reads from the list and loads it into the SAME form.** The form's load moved VERBATIM from OnVisible into hidden `btnTxSeed` (5 call sites: OnVisible, row tap, and the return to quick entry after a correction is saved / cancelled / deleted). **A correction never touches the gTxSticky* defaults.** Row tap, Cancel-on-correction and Delete are all **ignored while gSaving** — the save re-reads gEditMode AFTER its Patch, so changing it mid-write misfiles the trade in the session list. **LESSON, applies everywhere: CONTROLS AND COLLECTIONS SHARE ONE NAME SPACE.** The list's container was first named `colTxSession` — the collection's own name — so Collect/UpdateIf/RemoveIf would have resolved to the container. The validator does NOT catch this (pre-paste review did); container is now `colTxSessionList`. Scan: 776 controls vs 109 collections, no other clash — INDEX Decisions
 
+- [2026-10-08] **#89 (user): QUICK ENTRY IS A DEDICATED SCREEN, `scrQuickTx` — NOT a mode of scrTransactionEdit, which stays ORIGINAL.** Supersedes the #80-#82 quick-mode design (merged in #88, then reverted before any paste). Project is NEW (required fields only, mirroring scrProjectEdit's insert) OR EXISTING (OpenProjects picker, #78); trades are INLINE ROWS saved in one go; `+ Add row` copies the previous row's date/currency/client/product. Row inputs write back to colQtRows on OnChange, AND btnQtSave first syncs galQtRows.AllItems into colQtRows (a value typed just before Save, or a reused row showing a value its record no longer holds). After a new project is created the screen switches to it, so a retry never duplicates it. **UNGROUNDED, first suspects on paste: OnChange on ModernDatePicker@1.0.1 and Classic/TextInput@2.3.2 (no landed instance); inputs inside a gallery (none landed before); the btnQtSave `galQtRows.AllItems` sync reading child-control values (`g.txtQtRowName.Text` etc. — no precedent; FALLBACK: delete that first `If( !gSaving, … );` block and the save falls back to OnChange only).** Review also caught two MIXED-TYPE arms (a Switch mixing Set with Patch; an If ending in a table vs Notify) — split, the same rule scrTaskEdit/scrProductEdit follow — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -345,3 +348,5 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | #80 authored: scrHome `+ Quick transaction` (btnQuickTx) beside New project; quick mode consumed on arrival into gTxIsQuick; title reads "Quick transaction". 22/22, globals audit clean. AWAITING PASTE | (no session file)
 - 2026-10-08 | #81 authored: sticky quick-mode defaults + Save & log another on scrTransactionEdit. 22/22, globals + balance clean, pre-paste review PASTE. AWAITING PASTE (after transaction_comment is provisioned) | (no session file)
 - 2026-10-08 | #82 authored (session list + btnTxSeed refactor); review caught a control/collection NAME CLASH (fixed) and three in-flight races (guarded). PR #88 opened for #79-#82. Pre-paste review PASTE | (no session file)
+- 2026-10-08 | PR #88 merged; user redirected: scrTransactionEdit restored to pre-#88, btnQuickTx restyled like New project, new screen scrQuickTx built (#89) — 23/23, review fixes applied (2 mixed-type arms, AllItems sync), re-review PASTE. AWAITING PASTE: scrQuickTx then scrHome | (no session file)
+- 2026-10-08 | User had pasted #88's quick-mode scrTransactionEdit into Studio — the restored original must be RE-PASTED (delete-then-paste). PR opened for #89 + the restore | (no session file)
