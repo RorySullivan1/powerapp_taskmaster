@@ -209,12 +209,20 @@ Screens:
               // fresh as the last task save whose STAGE MOVED, and is blank outright on an
               // untouched project. Written back on a change, so opening a project repairs the
               // stored copy the other screens read.
-              Set( gPrjPc,
+              // gPrjPcRollup IS THE TASK-WEIGHTED FIGURE and is kept separately because
+              // btnPrjReopen writes it back: a reopened project returns to what its tasks say.
+              Set( gPrjPcRollup,
                    If( CountRows(colProjectTasks) = 0, 0,
                        RoundDown( Average( AddColumns( colProjectTasks, wgt,
                                       Coalesce( LookUp(gStageWeights,
                                                        Stage = task_stage.Value, Weight), 0 ) ),
                                   wgt ), 0 ) ) );
+              // A PROJECT MARKED Complete IS 100%, whatever its tasks say — the phase overrides
+              // the rollup. Without this a project with no tasks (transactions only) completes
+              // at 0%. scrTaskEdit and scrProjectEdit apply the same override when they write.
+              Set( gPrjPc,
+                   If( Coalesce(gSelProject.project_phase.Value, "") = "Complete", 100,
+                       gPrjPcRollup ) );
               // HOW MANY TASKS CARRY A STAGE gStageWeights DOES NOT KNOW. Every weight lookup
               // Coalesces a miss to 0, so a stale weights table and a project of genuinely
               // unstarted work produce the SAME 0%. gStageWeights lives in App.OnStart, a
@@ -223,8 +231,10 @@ Screens:
                    CountRows( Filter( colProjectTasks,
                                       IsBlank( LookUp(gStageWeights, Stage = task_stage.Value, Weight) ) ) ) );
               // The 500 cap matches scrTaskEdit's rollup so the two writers cannot disagree:
-              // a wrong number written back is worse than a stale one left alone.
-              If( CountRows(colProjectTasks) < 500
+              // a wrong number written back is worse than a stale one left alone. A Complete
+              // project's 100 does not depend on the task count, so the cap does not gate it.
+              If( ( CountRows(colProjectTasks) < 500
+                    || Coalesce(gSelProject.project_phase.Value, "") = "Complete" )
                && gPrjPc <> Coalesce(gSelProject.project_perc_completion, -1),
                   IfError( Set( gPrjPcScrap,
                                 Patch( taskmaster_projects,
@@ -889,8 +899,9 @@ Screens:
                                      Set( gPrjCompSaved,
                                           Patch( taskmaster_projects,
                                                  LookUp(taskmaster_projects, ID = gSelProject.ID),
-                                                 { project_phase:         { Value: "Complete" },
-                                                   project_date_complete: Now() } ) ),
+                                                 { project_phase:           { Value: "Complete" },
+                                                   project_date_complete:   Now(),
+                                                   project_perc_completion: 100 } ) ),
                                      Set( gPrjCompErr, FirstError.Message ) );
                                  // Trust the RECORD, never the message — a write can fail and still leave
                                  // FirstError.Message empty.
@@ -900,6 +911,7 @@ Screens:
                                      Notify( "Couldn't mark it complete: " & gPrjCompErr,
                                              NotificationType.Error ),
                                      Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) );
+                                     Set( gPrjPc, 100 );
                                      Notify( "Project marked complete.", NotificationType.Success ) )
                         - btnPrjReopen:
                             Control: Classic/Button@2.2.0
@@ -932,14 +944,19 @@ Screens:
                               # window before the queued recompute has run.
                               # The Notify NAMES the phase, so a project that reopens to Planning
                               # says so rather than looking like a bug.
+                              # THE PERCENTAGE GOES BACK TO THE TASK ROLLUP for the same reason:
+                              # Complete pinned it at 100, and once the phase is gone the tasks
+                              # decide again. Written here, not left to the next recompute, so
+                              # scrProjects reads the right figure straight away.
                               OnSelect: |
                                 =Set( gPrjCompErr, "" );
                                  IfError(
                                      Set( gPrjCompSaved,
                                           Patch( taskmaster_projects,
                                                  LookUp(taskmaster_projects, ID = gSelProject.ID),
-                                                 { project_phase:         { Value: Coalesce(gPrjDerived, "Active") },
-                                                   project_date_complete: Blank() } ) ),
+                                                 { project_phase:           { Value: Coalesce(gPrjDerived, "Active") },
+                                                   project_date_complete:   Blank(),
+                                                   project_perc_completion: Coalesce(gPrjPcRollup, 0) } ) ),
                                      Set( gPrjCompErr, FirstError.Message ) );
                                  // Trust the RECORD, never the message — a write can fail and still
                                  // leave FirstError.Message empty.
@@ -949,7 +966,9 @@ Screens:
                                      Notify( "Couldn't reopen it: " & gPrjCompErr,
                                              NotificationType.Error ),
                                      Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) );
+                                     Set( gPrjPc, Coalesce(gPrjPcRollup, 0) );
                                      Notify( "Project reopened as " & Coalesce(gPrjDerived, "Active")
+                                             & " at " & Coalesce(gPrjPcRollup, 0) & "%"
                                              & ". The completion date has been cleared.",
                                              NotificationType.Success ) )
                         - lblPrjCompleteWhy:
