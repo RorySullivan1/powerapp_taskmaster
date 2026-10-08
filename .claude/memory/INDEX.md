@@ -10,6 +10,9 @@
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid.
+- **COMPLETE => 100% — AUTHORED 2026-10-08, FOUR PASTES (scrProject, scrTaskEdit, scrProjectEdit, scrProjects), NO SHAREPOINT.**
+  The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
+  (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
 - **#74 REOPEN A COMPLETED PROJECT — AUTHORED 2026-09-14, ONE PASTE (scrProject), NO SHAREPOINT.**
   `btnPrjReopen` is an EXACTLY-NEGATED sibling of `btnPrjComplete` in the same slot; `= "Complete"`
   also excludes Archived, so an archived project offers neither. **IT REOPENS TO `gPrjDerived`,
