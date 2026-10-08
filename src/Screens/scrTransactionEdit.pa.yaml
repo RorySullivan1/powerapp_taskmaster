@@ -36,61 +36,82 @@ Screens:
         // QUICK MODE IS CONSUMED HERE. gTxQuick is a one-shot request raised by scrHome; it
         // is copied into gTxIsQuick and cleared, so every other entry point opens the normal
         // form without having to reset it. Inside the resume guard so returning from
-        // ＋ New client/product keeps the mode it left with.
+        // ＋ New client/product keeps the mode it left with. The form itself is loaded by
+        // btnTxSeed, which a resume must skip for the same reason.
         If( gTxResume,
          Set( gTxResume, false ),
          Set( gTxIsQuick, Coalesce(gTxQuick, false) );
          Set( gTxQuick, false );
-         Set( gTxProject,
-              If( gEditMode = "Edit",
-                  { Id: gEditTransaction.transaction_project_id.Id,
-                    // NOT redundant. The lookup column's live display field is the target's ID, so
-                    // `.Value` is a NUMBER — see schema.yaml. Do not "optimise" this away.
-                    Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
-                  // QUICK MODE CARRIES THE LAST TRADE'S PROJECT, CLIENT, PRODUCT, CURRENCY AND DATE
-                  // (the gTxSticky* globals, written by a successful quick save). The sales owner
-                  // is never carried: a remembered person lands silently on trades that aren't theirs.
-                  gTxIsQuick && Coalesce(gTxStickyProject.Id, 0) > 0,
-                  gTxStickyProject,
-                  gSelProject.ID > 0,
-                  { Id: gSelProject.ID, Value: gSelProject.project_name },
-                  { Id: 0, Value: "" } ) );
-        Set( gTxClient,
-              If( gEditMode = "Edit",
-                  { Id: gEditTransaction.transaction_client_name.Id, Value: gEditTransaction.transaction_client_name.Value },
-                  gTxIsQuick && Coalesce(gTxStickyClient.Id, 0) > 0,
-                  gTxStickyClient,
-                  { Id: 0, Value: "" } ) );
-        Set( gTxProduct,
-              If( gEditMode = "Edit",
-                  { Id: gEditTransaction.transaction_product_id.Id, Value: gEditTransaction.transaction_product_id.Value },
-                  gTxIsQuick && Coalesce(gTxStickyProduct.Id, 0) > 0,
-                  gTxStickyProduct,
-                  { Id: 0, Value: "" } ) );
-        Set( gTxSales,
-              If( gEditMode = "Edit",
-                  { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
-                    Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
-                  // NOT User(). The sales owner is usually somebody else — defaulting to whoever is
-                  // entering it writes a wrong name silently. The column is OPTIONAL, so an empty
-                  // state is a legitimate save, not something lblTxMissing has to catch.
-                  { DisplayName: "", Mail: "" } ) );
-        Set( gTxCurrency,
-              If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"),
-                  gTxIsQuick,         Coalesce(gTxStickyCcy, "USD"),
-                                      "USD" ) );
-        Reset( txtTxName ); Reset( txtTxComment );
-        Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
-        // transaction_date is REQUIRED, so an unseeded picker did not merely lose the date —
-        // it blocked the save outright on every edit. A text input re-reads Default ONLY on
-        // Reset, or the previous transaction's notional is written onto the next one.
-        Reset( numTxNotional );
-        Reset( dtpTxDate );
-        // cmpSelection re-reads its DefaultId ONLY on Reset.
-        // INSIDE the resume guard on purpose: returning from ＋ New must not re-seed from the
-        // stored record and discard a currency the user picked before stepping out.
-        Reset( selTxCurrency ) )
+         Select( btnTxSeed ) )
     Children:
+      # =====================================================================
+      # THE SEED BLOCK — hidden, 1x1, declared FIRST so it can never cover a control. Loads
+      # the form from gEditMode / gEditTransaction / quick mode. A CONTROL because it has
+      # four callers: OnVisible, a tap on a "Logged this session" row, and the return to
+      # quick entry after an edit is saved, cancelled or deleted. Select QUEUES, so no
+      # caller may read a seeded value in the same formula that Selects this.
+      # =====================================================================
+      - btnTxSeed:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =Set( gTxProject,
+                     If( gEditMode = "Edit",
+                         { Id: gEditTransaction.transaction_project_id.Id,
+                           // NOT redundant. The lookup column's live display field is the target's ID, so
+                           // `.Value` is a NUMBER — see schema.yaml. Do not "optimise" this away.
+                           Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
+                         // QUICK MODE CARRIES THE LAST TRADE'S PROJECT, CLIENT, PRODUCT, CURRENCY AND DATE
+                         // (the gTxSticky* globals, written by a successful quick save). The sales owner
+                         // is never carried: a remembered person lands silently on trades that aren't theirs.
+                         gTxIsQuick && Coalesce(gTxStickyProject.Id, 0) > 0,
+                         gTxStickyProject,
+                         gSelProject.ID > 0,
+                         { Id: gSelProject.ID, Value: gSelProject.project_name },
+                         { Id: 0, Value: "" } ) );
+               Set( gTxClient,
+                     If( gEditMode = "Edit",
+                         { Id: gEditTransaction.transaction_client_name.Id, Value: gEditTransaction.transaction_client_name.Value },
+                         gTxIsQuick && Coalesce(gTxStickyClient.Id, 0) > 0,
+                         gTxStickyClient,
+                         { Id: 0, Value: "" } ) );
+               Set( gTxProduct,
+                     If( gEditMode = "Edit",
+                         { Id: gEditTransaction.transaction_product_id.Id, Value: gEditTransaction.transaction_product_id.Value },
+                         gTxIsQuick && Coalesce(gTxStickyProduct.Id, 0) > 0,
+                         gTxStickyProduct,
+                         { Id: 0, Value: "" } ) );
+               Set( gTxSales,
+                     If( gEditMode = "Edit",
+                         { DisplayName: Coalesce(gEditTransaction.transaction_sales.DisplayName, ""),
+                           Mail:        Coalesce(gEditTransaction.transaction_sales.Email, "") },
+                         // NOT User(). The sales owner is usually somebody else — defaulting to whoever is
+                         // entering it writes a wrong name silently. The column is OPTIONAL, so an empty
+                         // state is a legitimate save, not something lblTxMissing has to catch.
+                         { DisplayName: "", Mail: "" } ) );
+               Set( gTxCurrency,
+                     If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"),
+                         gTxIsQuick,         Coalesce(gTxStickyCcy, "USD"),
+                                             "USD" ) );
+               Reset( txtTxName ); Reset( txtTxComment );
+               Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
+               // transaction_date is REQUIRED, so an unseeded picker did not merely lose the date —
+               // it blocked the save outright on every edit. A text input re-reads Default ONLY on
+               // Reset, or the previous transaction's notional is written onto the next one.
+               Reset( numTxNotional );
+               Reset( dtpTxDate );
+               // cmpSelection re-reads its DefaultId ONLY on Reset.
+               // NEVER RUN ON A RESUME: returning from ＋ New must not re-seed from the stored
+               // record and discard a currency the user picked before stepping out.
+               Reset( selTxCurrency )
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -491,6 +512,144 @@ Screens:
                         LayoutMinHeight: =84
                         Width: =Parent.Width
                         Height: =84
+            # LOGGED THIS SESSION — quick mode only. A LOCAL collection, colTxSession, filled by
+            # btnTxSave from the form on each successful quick save: no query, nothing to
+            # delegate, and never anybody else's trades. It lasts until the app closes. A tap
+            # re-reads the trade from the list and loads it into this same form via btnTxSeed.
+            # Capped at five rows of height so a long session cannot push the footer out of reach.
+            # Per-currency only — no cross-currency total (see this file's header).
+            - colTxSession:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  Visible: =gTxIsQuick && !IsEmpty(colTxSession)
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =8
+                  Width: =Parent.Width - 48
+                  Height: =18 + 8 + Min( CountRows(colTxSession), 5 ) * 44
+                Children:
+                  - lblTxSessionCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Logged this session   ·   " & CountRows(colTxSession)
+                           & "   ·   tap one to correct it"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        Width: =Parent.Width
+                        Height: =18
+                  - galTxSession:
+                      Control: Gallery@2.15.0
+                      Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                      Properties:
+                        Items: =Sort( colTxSession, Id, SortOrder.Descending )
+                        WrapCount: =1
+                        TemplateSize: =44
+                        TemplatePadding: =0
+                        TemplateFill: =RGBA(0, 0, 0, 0)
+                        BorderThickness: =0
+                        ShowScrollbar: =true
+                        FillPortions: =0
+                        LayoutMinHeight: =44
+                        Width: =Parent.Width
+                        Height: =Min( CountRows(colTxSession), 5 ) * 44
+                      Children:
+                        - rowTxSessBody:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =10
+                              PaddingLeft: =8
+                              PaddingRight: =8
+                              X: =0
+                              Y: =0
+                              Width: =Parent.TemplateWidth
+                              Height: =Parent.TemplateHeight - 1
+                            Children:
+                              - cellTxSessName:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =ThisItem.Name
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Body
+                                    Color: =gTheme.Color.TextPrimary
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =3
+                                    LayoutMinWidth: =140
+                                    Height: =40
+                              - cellTxSessProject:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =ThisItem.Project
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =2
+                                    LayoutMinWidth: =110
+                                    Height: =40
+                              - cellTxSessAmt:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: |
+                                      =If( IsBlank(ThisItem.Notional), "-",
+                                           ThisItem.Ccy & " " & Text(ThisItem.Notional, "[$-en-US]#,##0") )
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =2
+                                    LayoutMinWidth: =120
+                                    Height: =40
+                              - cellTxSessDate:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: |
+                                      =If( IsBlank(ThisItem.Date), "-",
+                                           Text(ThisItem.Date, "dd mmm yyyy") )
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    Align: =Align.Right
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =2
+                                    LayoutMinWidth: =104
+                                    Height: =40
+                        - rowTxSessLine:
+                            Control: Rectangle@2.3.0
+                            Properties:
+                              Fill: =gTheme.Color.Border
+                              X: =0
+                              Y: =Parent.TemplateHeight - 1
+                              Width: =Parent.TemplateWidth
+                              Height: =1
+                        # Full template, declared LAST so it is on top. Re-reads the trade from the
+                        # list: the session row is a snapshot, the form must edit what is stored.
+                        - galTxSessionHit:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Text: =""
+                              Fill: =RGBA(0, 0, 0, 0)
+                              HoverFill: =gTheme.Color.Hover
+                              PressedFill: =gTheme.Color.Press
+                              BorderThickness: =0
+                              X: =0
+                              Y: =0
+                              Width: =Parent.TemplateWidth
+                              Height: =Parent.TemplateHeight
+                              OnSelect: |
+                                =Select(Parent);
+                                Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.Id) );
+                                If( IsBlank(gEditTransaction.ID),
+                                    Notify( "That transaction no longer exists — it may have been deleted.",
+                                            NotificationType.Error ),
+                                    Set( gEditMode, "Edit" );
+                                    Select( btnTxSeed ) )
             # GATED ON THE MESSAGE, not just its two children. Both were already Visible-gated,
             # so this row sat as 62px of blank space on every valid form. Reading a hidden
             # control's .Text is fine and is already how btnTxSave gates the save — same
@@ -689,13 +848,22 @@ Screens:
                         Set( gTxErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                     If( Len(gTxErr) > 0,
                         Notify("Couldn't save the transaction: " & gTxErr, NotificationType.Error) );
-                    // A successful QUICK save remembers what carries over, whichever button saved it.
-                    If( Len(gTxErr) = 0 && gTxIsQuick,
+                    // A successful NEW QUICK save remembers what carries over, whichever button saved
+                    // it, and joins colTxSession — built from the form, not from gTxSaved, whose
+                    // columns may come back trimmed. Correcting an older trade changes neither.
+                    If( Len(gTxErr) = 0 && gTxIsQuick && gEditMode = "New",
                         Set( gTxStickyProject, gTxProject );
                         Set( gTxStickyClient,  gTxClient );
                         Set( gTxStickyProduct, gTxProduct );
                         Set( gTxStickyCcy,     gTxCurrency );
-                        Set( gTxStickyDate,    dtpTxDate.SelectedDate ) );
+                        Set( gTxStickyDate,    dtpTxDate.SelectedDate );
+                        Collect( colTxSession,
+                                 { Id:       gTxSaved.ID,
+                                   Name:     Trim(txtTxName.Text),
+                                   Project:  gTxProject.Value,
+                                   Ccy:      gTxCurrency,
+                                   Notional: Value(numTxNotional.Text),
+                                   Date:     dtpTxDate.SelectedDate } ) );
                     // "Save & log another" STAYS: only the per-trade fields are cleared, and only
                     // after the record came back — a failed save keeps everything that was typed.
                     // Project, client, product, currency and date stay on the form as they are.
@@ -708,6 +876,19 @@ Screens:
                                 NotificationType.Success );
                         Reset( txtTxName ); Reset( numTxNotional ); Reset( txtTxComment );
                         Set( gTxSales, { DisplayName: "", Mail: "" } ),
+                        // A CORRECTION FROM THE SESSION LIST updates its row and returns to quick
+                        // entry instead of leaving the screen.
+                        Len(gTxErr) = 0 && gTxIsQuick && gEditMode = "Edit",
+                        UpdateIf( colTxSession, Id = gEditTransaction.ID,
+                                  { Name:     Trim(txtTxName.Text),
+                                    Project:  gTxProject.Value,
+                                    Ccy:      gTxCurrency,
+                                    Notional: Value(numTxNotional.Text),
+                                    Date:     dtpTxDate.SelectedDate } );
+                        Notify( "Transaction saved", NotificationType.Success );
+                        Set( gEditMode, "New" );
+                        Set( gEditTransaction, Blank() );
+                        Select( btnTxSeed ),
                         Len(gTxErr) = 0,
                         Notify( If(gEditMode = "Edit", "Transaction saved", "Transaction created"),
                                 NotificationType.Success );
@@ -728,7 +909,13 @@ Screens:
                   LayoutMinWidth: =140
                   Width: =140
                   Height: =48
-                  OnSelect: =Back()
+                  # Cancelling a correction from the session list returns to quick entry.
+                  OnSelect: |
+                    =If( gTxIsQuick && gEditMode = "Edit",
+                         Set( gEditMode, "New" );
+                         Set( gEditTransaction, Blank() );
+                         Select( btnTxSeed ),
+                         Back() )
       # =====================================================================
       # PICKER — ONE cmpPicker instance for the sales owner AND the three lookups. Declared LAST
       # so the dialog paints above the footer. See scrTaskEdit's instance for the contract.
@@ -870,7 +1057,14 @@ Screens:
                              & " Some issue links may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( "Transaction deleted.", NotificationType.Success );
-                   // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute.
-                   Back() );
+                   // In quick mode the trade leaves the session list and the form returns to
+                   // quick entry. Otherwise Back() lands on scrProject, whose OnVisible calls
+                   // btnPrjRecompute.
+                   If( gTxIsQuick,
+                       RemoveIf( colTxSession, Id = gDelId );
+                       Set( gEditMode, "New" );
+                       Set( gEditTransaction, Blank() );
+                       Select( btnTxSeed ),
+                       Back() ) );
                Set( gDelKind, "" )
             OnCancel: =Set( gDelKind, "" )
