@@ -15,7 +15,7 @@
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
   (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
 - **EPIC #77 QUICK TRANSACTION — FILED 2026-10-08, NOTHING BUILT.** #78 DECIDED (option A) and closed; #83 won't-fix.
-  **#79 AUTHORED 2026-10-08 — ONE PASTE (scrTransactionEdit), pre-paste review PASTE, AWAITING STUDIO.** Then #80, #81, #82.
+  **#79 + #80 AUTHORED 2026-10-08 — TWO PASTES (scrTransactionEdit, scrHome), AWAITING STUDIO.** Then #81, #82.
   Design: reuse scrTransactionEdit with a `gTxQuick` flag (one save path), not a modal on scrHome.
 - **EPIC #84 scrReports SCOPE + FORMAT PIE — FILED 2026-10-08, NOTHING BUILT.** #85 (Scope filters EVERY chart:
   fetch into *Raw, new hidden `btnRptFold` re-materialises the scoped colRptOpen/Done/Tx/TxCur/Prj/Iss) is NEXT and
@@ -293,6 +293,8 @@ not know them will author something broken:
 
 - [2026-10-08] **#79: scrTransactionEdit HAS A PROJECT FIELD — `fldProject` on its OWN full-width row 0, not beside the label** (the label row spans both columns on purpose: half width truncated its placeholder). `cmpTxPick` gains a "Project" mode over **`OpenProjects`**, two branches like Client/Product: `StartsWith(project_name, q)` for a typed query, a bare `Sort(OpenProjects, project_name)` for an empty one. **The archived mirror in btnTxSave now reads `gTxProject.Id`, NEVER `gSelProject.ID`** — gSelProject is only the screen the form came from, blank from scrHome and stale once the project is changed; it was latent only because the project could not change. **A transaction on a Complete project keeps showing it, but once moved off it cannot be picked back** (OpenProjects excludes Complete) — by #78's decision, not a bug — INDEX Decisions
 
+- [2026-10-08] **#80: QUICK MODE IS A ONE-SHOT REQUEST, CONSUMED BY THE FORM — `gTxQuick` (raised by scrHome's `btnQuickTx`) is copied into `gTxIsQuick` and cleared in scrTransactionEdit's OnVisible, INSIDE the gTxResume guard.** So no other entry point (scrProject x2, scrProjectEdit) needs to reset it, and the paste list stays scrHome + scrTransactionEdit. **#81 must READ `gTxIsQuick`, never `gTxQuick`** — the request is already false by the time anything renders. Button is FILLED Primary (btnTxSave's landed property set, no HoverFill), 200 wide; header min 702 vs ~1318 available — INDEX Decisions
+
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
@@ -335,3 +337,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | Epic #84 filed: scrReports Scope dropdown only filtered the People list (and not its measures); fix = fetch/fold split (#85); add task_output_format pie (#86); decision on requiring format (#87). Nothing built | (no session file)
 - 2026-10-08 | #87 decided B by the user (format stays optional) and closed; #86 and epic #84 updated (Unspecified slice permanent; paste is scrReports only). #85 is next | (no session file)
 - 2026-10-08 | #79 authored: project picker on scrTransactionEdit + archived-mirror read fixed. Branch brought onto main by a MERGE (rebase + force-push was denied). Validator 22/22, pre-paste review PASTE. AWAITING PASTE | (no session file)
+- 2026-10-08 | #80 authored: scrHome `+ Quick transaction` (btnQuickTx) beside New project; quick mode consumed on arrival into gTxIsQuick; title reads "Quick transaction". 22/22, globals audit clean. AWAITING PASTE | (no session file)

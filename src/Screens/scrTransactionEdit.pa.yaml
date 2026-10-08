@@ -32,8 +32,14 @@ Screens:
                       With( { ch: Choices([@taskmaster_transactions].transaction_currency) },
                             ForAll( Sequence( CountRows(ch) ) As n,
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) );
+        // QUICK MODE IS CONSUMED HERE. gTxQuick is a one-shot request raised by scrHome; it
+        // is copied into gTxIsQuick and cleared, so every other entry point opens the normal
+        // form without having to reset it. Inside the resume guard so returning from
+        // ＋ New client/product keeps the mode it left with.
         If( gTxResume,
          Set( gTxResume, false ),
+         Set( gTxIsQuick, Coalesce(gTxQuick, false) );
+         Set( gTxQuick, false );
          Set( gTxProject,
               If( gEditMode = "Edit",
                   { Id: gEditTransaction.transaction_project_id.Id,
@@ -85,7 +91,9 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Text: |
-              =If(gEditMode = "Edit", "Edit transaction", "New transaction") &
+              =If( gEditMode = "Edit", "Edit transaction",
+                   gTxIsQuick,         "Quick transaction",
+                                       "New transaction" ) &
                If( gTxProject.Id > 0, "   ·   " & gTxProject.Value, "" )
             Color: =gTheme.Color.OnPrimary
             Font: =gTheme.Font

@@ -281,6 +281,31 @@ Screens:
                            Set( gEditProject, Blank() );
                            Set( gSelProject, Blank() );
                            Navigate( scrProjectEdit, ScreenTransition.Cover )
+                  # FILLED, unlike New project: for people who only log trades it is the main
+                  # action on the screen. gTxQuick is a one-shot request — scrTransactionEdit
+                  # consumes it on arrival, so no other entry point has to clear it.
+                  # gSelProject is cleared for the same reason as New project: the form
+                  # pre-fills its project from it.
+                  - btnQuickTx:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: ="+  Quick transaction"
+                        Fill: =gTheme.Color.Primary
+                        Color: =gTheme.Color.OnPrimary
+                        BorderColor: =gTheme.Color.Primary
+                        BorderThickness: =0
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FillPortions: =0
+                        LayoutMinWidth: =200
+                        Width: =200
+                        Height: =36
+                        OnSelect: |
+                          =Set( gEditMode, "New" );
+                           Set( gEditTransaction, Blank() );
+                           Set( gSelProject, Blank() );
+                           Set( gTxQuick, true );
+                           Navigate( scrTransactionEdit, ScreenTransition.Cover )
             # PLAIN CONTAINERS, NOT cmpStatusCard. The component carries a full-bleed
             # transparent button with a hover wash, so it reads as tappable; these are inert.
             - rowCards:
