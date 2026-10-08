@@ -14,6 +14,9 @@
   scrProject's paste ALSO carries `txtPrjDesc` (read-only description under the info card).
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
   (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
+- **EPIC #77 QUICK TRANSACTION — FILED 2026-10-08, NOTHING BUILT.** Subs #78-#83. **#78 (decision: what the parent
+  project is) BLOCKS the rest and needs the USER** — recommended A: pick a real project, remembered per session.
+  Design: reuse scrTransactionEdit with a `gTxQuick` flag (one save path), not a modal on scrHome.
 - **#74 REOPEN A COMPLETED PROJECT — AUTHORED 2026-09-14, ONE PASTE (scrProject), NO SHAREPOINT.**
   `btnPrjReopen` is an EXACTLY-NEGATED sibling of `btnPrjComplete` in the same slot; `= "Complete"`
   also excludes Archived, so an archived project offers neither. **IT REOPENS TO `gPrjDerived`,
@@ -315,3 +318,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-09-14 | #74 authored: a completed project can be reopened from scrProject. THE EVALUATION FOUND THE USER'S PROPOSED "mark as active" WOULD NOT HAVE HELD — the screen re-derives the phase on every visit and writes it back, so a literal "Active" expires on the next visit; it reopens to gPrjDerived instead. Also corrected the premise that the button lives on scrProjectEdit (it is btnPrjComplete on scrProject). Records updated: Complete is no longer terminal to a human, and clearing project_date_complete retroactively changes scrReports' completion bars | (no session file — single feature)
 - 2026-10-08 | Complete => 100%: the phase overrides the task rollup in all three writers, Mark complete writes 100, Reopen writes the task rollup back. Pastes: scrProject, scrTaskEdit, scrProjectEdit, scrProjects. No SharePoint change. 22/22, AWAITING PASTE | (no session file — single feature)
 - 2026-10-08 | scrProject: read-only project description box (txtPrjDesc) under the info card. Rides the same scrProject paste as Complete => 100%. 22/22, AWAITING PASTE | (no session file — single feature)
+- 2026-10-08 | Epic #77 filed: Quick transaction for transaction-only users. Found scrTransactionEdit has NO project field (a from-scrHome form could never save) and btnTxSave's archived mirror reads gSelProject, not gTxProject (latent; fixed in #79). SetFocus ruled out (form is containers). Subs #78 decision, #79 picker, #80 scrHome button, #81 sticky + save-and-another, #82 session list, #83 suggested name (optional) | (no session file)
