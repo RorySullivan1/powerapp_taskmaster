@@ -15,8 +15,8 @@
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
   (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
 - **EPIC #77 QUICK TRANSACTION — DIRECTION CHANGED 2026-10-08 (user): quick entry is its OWN screen `scrQuickTx` (#89).**
-  scrTransactionEdit is RESTORED byte-for-byte to pre-PR-#88 (quick mode #79-#82 reverted; #88 never reached Studio, so
-  restoring needs NO paste). scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
+  scrTransactionEdit is RESTORED byte-for-byte to pre-PR-#88 (quick mode #79-#82 reverted). **The #88 quick-mode version
+  WAS pasted into Studio (user, 2026-10-08), so the restore NEEDS A PASTE: delete the screen, then paste.** scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
   **PASTE ORDER: scrQuickTx FIRST (new screen), THEN scrHome** (btnQuickTx navigates to it). scrQuickTx never writes
   transaction_comment, so it does not wait on that column; scrTransactionEdit still does (pending since 2026-09-04).
 - **EPIC #84 scrReports SCOPE + FORMAT PIE — FILED 2026-10-08, NOTHING BUILT.** #85 (Scope filters EVERY chart:
@@ -349,3 +349,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | #81 authored: sticky quick-mode defaults + Save & log another on scrTransactionEdit. 22/22, globals + balance clean, pre-paste review PASTE. AWAITING PASTE (after transaction_comment is provisioned) | (no session file)
 - 2026-10-08 | #82 authored (session list + btnTxSeed refactor); review caught a control/collection NAME CLASH (fixed) and three in-flight races (guarded). PR #88 opened for #79-#82. Pre-paste review PASTE | (no session file)
 - 2026-10-08 | PR #88 merged; user redirected: scrTransactionEdit restored to pre-#88, btnQuickTx restyled like New project, new screen scrQuickTx built (#89) — 23/23, review fixes applied (2 mixed-type arms, AllItems sync), re-review PASTE. AWAITING PASTE: scrQuickTx then scrHome | (no session file)
+- 2026-10-08 | User had pasted #88's quick-mode scrTransactionEdit into Studio — the restored original must be RE-PASTED (delete-then-paste). PR opened for #89 + the restore | (no session file)
