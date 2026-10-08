@@ -19,6 +19,7 @@ Screens:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnTxSave
+        Set( gTxSaveNext, false );   // see btnTxSaveNext
         // CURRENCY OPTIONS COME FROM THE COLUMN, not a literal list. Outside the resume guard
         // on purpose: the options do not depend on the record.
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
@@ -46,16 +47,25 @@ Screens:
                     // NOT redundant. The lookup column's live display field is the target's ID, so
                     // `.Value` is a NUMBER — see schema.yaml. Do not "optimise" this away.
                     Value: LookUp(taskmaster_projects, ID = gEditTransaction.transaction_project_id.Id, project_name) },
+                  // QUICK MODE CARRIES THE LAST TRADE'S PROJECT, CLIENT, PRODUCT, CURRENCY AND DATE
+                  // (the gTxSticky* globals, written by a successful quick save). The sales owner
+                  // is never carried: a remembered person lands silently on trades that aren't theirs.
+                  gTxIsQuick && Coalesce(gTxStickyProject.Id, 0) > 0,
+                  gTxStickyProject,
                   gSelProject.ID > 0,
                   { Id: gSelProject.ID, Value: gSelProject.project_name },
                   { Id: 0, Value: "" } ) );
         Set( gTxClient,
               If( gEditMode = "Edit",
                   { Id: gEditTransaction.transaction_client_name.Id, Value: gEditTransaction.transaction_client_name.Value },
+                  gTxIsQuick && Coalesce(gTxStickyClient.Id, 0) > 0,
+                  gTxStickyClient,
                   { Id: 0, Value: "" } ) );
         Set( gTxProduct,
               If( gEditMode = "Edit",
                   { Id: gEditTransaction.transaction_product_id.Id, Value: gEditTransaction.transaction_product_id.Value },
+                  gTxIsQuick && Coalesce(gTxStickyProduct.Id, 0) > 0,
+                  gTxStickyProduct,
                   { Id: 0, Value: "" } ) );
         Set( gTxSales,
               If( gEditMode = "Edit",
@@ -66,7 +76,9 @@ Screens:
                   // state is a legitimate save, not something lblTxMissing has to catch.
                   { DisplayName: "", Mail: "" } ) );
         Set( gTxCurrency,
-              If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"), "USD" ) );
+              If( gEditMode = "Edit", Coalesce(gEditTransaction.transaction_currency.Value, "USD"),
+                  gTxIsQuick,         Coalesce(gTxStickyCcy, "USD"),
+                                      "USD" ) );
         Reset( txtTxName ); Reset( txtTxComment );
         Set( gTxPicker, "" ); Set( gTxQuery, "" ); Reset( cmpTxPick );
         // transaction_date is REQUIRED, so an unseeded picker did not merely lose the date —
@@ -329,7 +341,13 @@ Screens:
                   - dtpTxDate:
                       Control: ModernDatePicker@1.0.1
                       Properties:
-                        DefaultDate: =If(gEditMode = "Edit", gEditTransaction.transaction_date, Blank())
+                        # Quick mode opens on the last quick trade's date, or today: a backlog of
+                        # yesterday's trades stays on yesterday. The Edit arm is a DateTime and the
+                        # quick arm a Date — Power Fx widens a Date, so the If is one type.
+                        DefaultDate: |
+                          =If( gEditMode = "Edit", gEditTransaction.transaction_date,
+                               gTxIsQuick,         Coalesce(gTxStickyDate, Today()),
+                                                   Blank() )
                         Placeholder: ="Trade date"
                         Format: =DatePickerFormat.LongAbbreviated
                         StartOfWeek: =StartOfWeek.Monday
@@ -565,18 +583,44 @@ Screens:
                   FillPortions: =1
                   LayoutMinWidth: =60
                   Height: =48
-            - btnTxSave:
+            # QUICK MODE ADDS "Save & log another" (btnTxSaveNext) AHEAD OF THIS BUTTON and makes
+            # it the filled one, so this one becomes the outlined "Save & close". Both run THIS
+            # OnSelect — btnTxSaveNext raises gTxSaveNext and Selects it — so there is one save path.
+            - btnTxSaveNext:
                 Control: Classic/Button@2.2.0
                 Properties:
+                  Visible: =gTxIsQuick && gEditMode = "New"
                   Fill: =gTheme.Color.Primary
                   Color: =gTheme.Color.OnPrimary
                   BorderColor: =gTheme.Color.Primary
                   BorderThickness: =0
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Body
+                  Text: =If( gSaving, "Saving…", "Save & log another" )
+                  FillPortions: =0
+                  LayoutMinWidth: =220
+                  Width: =220
+                  Height: =48
+                  # GATED ON gSaving HERE TOO. Select queues, so a second tap during the write would
+                  # otherwise run btnTxSave again AFTER the first save had cleared its own guard.
+                  OnSelect: |
+                    =If( !gSaving,
+                         Set( gTxSaveNext, true );
+                         Select( btnTxSave ) )
+            - btnTxSave:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Fill: =If( gTxIsQuick && gEditMode = "New", gTheme.Color.Surface, gTheme.Color.Primary )
+                  Color: =If( gTxIsQuick && gEditMode = "New", gTheme.Color.Primary, gTheme.Color.OnPrimary )
+                  BorderColor: =gTheme.Color.Primary
+                  BorderThickness: =If( gTxIsQuick && gEditMode = "New", 1, 0 )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
                   Text: |
                     =If( gSaving, "Saving…",
-                         If(gEditMode = "Edit", "Save transaction", "Create transaction") )
+                         gEditMode = "Edit", "Save transaction",
+                         gTxIsQuick,         "Save & close",
+                                             "Create transaction" )
                   FillPortions: =0
                   LayoutMinWidth: =220
                   Width: =220
@@ -645,11 +689,31 @@ Screens:
                         Set( gTxErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                     If( Len(gTxErr) > 0,
                         Notify("Couldn't save the transaction: " & gTxErr, NotificationType.Error) );
-                    If( Len(gTxErr) = 0,
+                    // A successful QUICK save remembers what carries over, whichever button saved it.
+                    If( Len(gTxErr) = 0 && gTxIsQuick,
+                        Set( gTxStickyProject, gTxProject );
+                        Set( gTxStickyClient,  gTxClient );
+                        Set( gTxStickyProduct, gTxProduct );
+                        Set( gTxStickyCcy,     gTxCurrency );
+                        Set( gTxStickyDate,    dtpTxDate.SelectedDate ) );
+                    // "Save & log another" STAYS: only the per-trade fields are cleared, and only
+                    // after the record came back — a failed save keeps everything that was typed.
+                    // Project, client, product, currency and date stay on the form as they are.
+                    If( Len(gTxErr) = 0 && gTxSaveNext,
+                        Notify( "Logged " & Trim(txtTxName.Text)
+                                & If( IsBlank(Value(numTxNotional.Text)), "",
+                                      "   ·   " & gTxCurrency & " "
+                                      & Text(Value(numTxNotional.Text), "[$-en-US]#,##0") )
+                                & ". Ready for the next one.",
+                                NotificationType.Success );
+                        Reset( txtTxName ); Reset( numTxNotional ); Reset( txtTxComment );
+                        Set( gTxSales, { DisplayName: "", Mail: "" } ),
+                        Len(gTxErr) = 0,
                         Notify( If(gEditMode = "Edit", "Transaction saved", "Transaction created"),
                                 NotificationType.Success );
                         Back() ) );
-                    Set( gSaving, false ) )
+                    Set( gSaving, false );
+                    Set( gTxSaveNext, false ) )
             - btnTxCancel:
                 Control: Classic/Button@2.2.0
                 Properties:
