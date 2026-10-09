@@ -3,16 +3,19 @@
 # Layout and chart choices: docs/reports-screen-design.md. Reasoning: .claude/memory/.
 #
 # FOUR RULES THIS SCREEN BREAKS IF THEY ARE IGNORED:
-#  1. Fold once in btnRptLoad.OnSelect, render from the folds. NO CountRows,
-#     LookUp or Filter over a fact collection in a gallery Items or row property.
+#  1. Fetch in btnRptLoad, fold once in btnRptFold, render from the folds. NO
+#     CountRows, LookUp or Filter over a fact collection in any property.
 #  2. Every value Power Fx feeds an SVG attribute is a WHOLE NUMBER. A fraction
 #     goes through Text(), which drags the locale decimal separator into the
 #     attribute and renders it EMPTY. Fractions written as string literals are safe.
 #  3. Every denominator in a PROPERTY formula is wrapped Max(1, ...) at the point
 #     of use. The editor evaluates property formulas with every global blank, and
-#     blank divides as zero. Behaviour formulas inside btnRptLoad are exempt.
-#  4. Select() QUEUES btnRptLoad — nothing may read a fold in the formula that
-#     Selects it.
+#     blank divides as zero. Behaviour formulas inside btnRptLoad/btnRptFold are exempt.
+#  4. Select() QUEUES btnRptLoad and btnRptFold — nothing may read a fold in the
+#     formula that Selects either. btnRptLoad Selects btnRptFold as its LAST step.
+#
+# SCOPE APPLIES TO THE WHOLE SCREEN. btnRptFold narrows the six fetched sets to the
+# picked manager's projects before any fold reads them; "All" is a pass-through.
 #
 # Header and control bar are absolute (0..136); bodyRoot below them is a vertical
 # auto-layout that scrolls, so no band does manual Y arithmetic.
@@ -39,7 +42,7 @@ Screens:
         Set( gRptKey, gRptPeriod );
         If( gRptKey <> gRptLoadedKey, Select( btnRptLoad ) )
     Children:
-      # THE LOAD. One copy, reached with Select() from three places. Hidden is fine —
+      # THE FETCH. One copy, reached with Select() from three places. Hidden is fine —
       # Select fires regardless of Visible, but does NOTHING if DisplayMode is Disabled.
       - btnRptLoad:
           Control: Classic/Button@2.2.0
@@ -71,10 +74,10 @@ Screens:
               // ShowColumns MUST NOT BE USED OVER ANYTHING ROOTED IN A NAMED FORMULA, and a
               // Filter wrapped around one does NOT fix it: text columns read back as an ERROR
               // type. Burned twice — task_name off LiveTasks, project_name off ActiveProjects.
-              // colRptTx below keeps ShowColumns because it filters a DATA SOURCE directly,
+              // colRptTxRaw below keeps ShowColumns because it filters a DATA SOURCE directly,
               // which is the only safe form. Stages are enumerated because Text <> won't delegate.
               Concurrent(
-                  ClearCollect( colRptOpen,
+                  ClearCollect( colRptOpenRaw,
                       ForAll(
                           Filter( LiveTasks,
                                   task_stage.Value = "Not Started" || task_stage.Value = "Planning"
@@ -88,7 +91,8 @@ Screens:
                             task_lead:            s.task_lead,
                             task_supporter:       s.task_supporter,
                             task_project_id:      s.task_project_id,
-                            task_output_audience: s.task_output_audience } ) ),
+                            task_output_audience: s.task_output_audience,
+                                          task_output_format:   s.task_output_format } ) ),
                   // BOUNDED ON THE PERIOD, AND THE NULL ARM IS WHAT MAKES THAT SAFE.
                   // task_date_completion is OPTIONAL and `>= gRptFrom` is FALSE for a blank date,
                   // so a bare date bound would drop every dateless Completed task and leave Done
@@ -117,7 +121,7 @@ Screens:
                             task_supporter:       d.task_supporter,
                             task_project_id:      d.task_project_id } ) ),
                   // F3 is the LOAD-BEARING bound — transactions grow fastest.
-                  ClearCollect( colRptTx,
+                  ClearCollect( colRptTxRaw,
                       ShowColumns(
                           Filter( LiveTransactions,
                                   transaction_date >= gRptFrom2x ),
@@ -125,7 +129,7 @@ Screens:
                           transaction_product_id, transaction_currency, transaction_notional ) ),
                   // Explicit projection for the same reason as F1: project_name off ActiveProjects,
                   // a named formula. Choice and Person columns are copied WHOLE so .Value resolves.
-                  ClearCollect( colRptPrj,
+                  ClearCollect( colRptPrjRaw,
                       ForAll( ActiveProjects As p,
                           { ID:                      p.ID,
                             project_name:            p.project_name,
@@ -139,45 +143,32 @@ Screens:
                             project_requestor:       p.project_requestor,
                             project_manager:         p.project_manager,
                             project_supporter:       p.project_supporter } ) ),
-                  // ShowColumns over a named formula, safe ONLY because nothing reads a field off
-                  // this — it feeds one CountRows. Project it by hand before reading a column.
-                  ClearCollect( colRptIss, ShowColumns( OpenIssues, ID, issue_project_id ) )
+                  // A HAND PROJECTION, NOT ShowColumns: the scope fold reads issue_project_id, and a
+                  // field read off ShowColumns over a named formula comes back as an error type.
+                  ClearCollect( colRptIssRaw,
+                      ForAll( OpenIssues As i,
+                          { ID:               i.ID,
+                            issue_project_id: i.issue_project_id } ) )
               );
-              // A completed task with NO completion date is in, in every window. The count is
-              // stated beside the people table rather than dropped.
-              //
-              // The window is re-applied here even though the fetch is now bounded, and this is
-              // NOT redundant: a SharePoint DateTime is compared server-side in the LIST's
-              // timezone, so the fetch's boundary can sit up to a day off this one. THIS is the
-              // boundary every figure on the screen uses. It can only narrow the fetch, never
-              // widen it — accepted on a rolling 7/30/90-day window.
-              // IsBlank() is correct HERE: colRptDoneAll is a collection, so there is no query
-              // behind this and nothing to delegate.
-              ClearCollect( colRptDone,
-                  Filter( colRptDoneAll,
-                          IsBlank(task_date_completion) || task_date_completion >= gRptFrom ) );
-              Set( gRptDoneNoDate,
-                   CountRows( Filter(colRptDoneAll, IsBlank(task_date_completion)) ) );
               // Fetched whole because a transaction reaches a product by ID, not by path.
               ClearCollect( colRptProducts,
                   ShowColumns( taskmaster_products, ID, product_uid, product_type_path ) );
               // Aggregates never delegate, so this is the only place the app can notice it ran out.
               // gDataRowLimit, never a literal: the ceiling is a Studio setting no paste carries,
               // and six copies of it is six places to miss when the app is rebuilt.
+              // RAW COUNTS, NEVER SCOPED: the ceiling applies to what the connector returned.
               Set( gRptTrunc,
                    Trim(
-                     If( CountRows(colRptOpen) >= gDataRowLimit, "open tasks  ", "" ) &
+                     If( CountRows(colRptOpenRaw) >= gDataRowLimit, "open tasks  ", "" ) &
                      If( CountRows(colRptDoneAll) >= gDataRowLimit, "completed tasks  ", "" ) &
-                     If( CountRows(colRptTx)   >= gDataRowLimit, "transactions  ", "" ) &
-                     If( CountRows(colRptPrj)  >= gDataRowLimit, "projects  ", "" ) &
-                     If( CountRows(colRptIss)      >= gDataRowLimit, "issues  ", "" ) &
+                     If( CountRows(colRptTxRaw) >= gDataRowLimit, "transactions  ", "" ) &
+                     If( CountRows(colRptPrjRaw) >= gDataRowLimit, "projects  ", "" ) &
+                     If( CountRows(colRptIssRaw) >= gDataRowLimit, "issues  ", "" ) &
                      If( CountRows(colRptProducts) >= gDataRowLimit, "products  ", "" ) ) );
-              // Transactions inside the CURRENT window; colRptTx holds two windows.
-              ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
               // Level 1 of an "A | B | C" path with Find/Left, NOT Split — the separator is part
               // of the stored data and blanks need their own bucket.
               ClearCollect( colRptPrjMap,
-                  ForAll( colRptPrj As p,
+                  ForAll( colRptPrjRaw As p,
                       { PId:  p.ID,
                         PNm:  p.project_name,
                         Fam:  With( { s: Trim(Coalesce(p.project_type_path, "")) },
@@ -197,8 +188,8 @@ Screens:
                         // Email is the key, the name is only ever shown.
                         MgrNm: Coalesce(p.project_manager.DisplayName, ""),
                         Sup:  Lower(Coalesce(p.project_supporter.Email, "")) } ) );
-              // "All" plus one row per manager on a project in the window. Em is the key and is
-              // BLANK for "All", which is what the filter tests.
+              // "All" plus one row per manager. UNSCOPED, or picking a manager would collapse the
+              // list to that one manager. Em is the key and is BLANK for "All".
               ClearCollect( colRptMgrOpts, { Value: "All", Em: "" } );
               Collect( colRptMgrOpts,
                   Sort( ForAll( Distinct( Filter(colRptPrjMap, Len(Mgr) > 0), Mgr ) As m,
@@ -206,6 +197,64 @@ Screens:
                                          If( Len(Coalesce(n, "")) > 0, n, m.Value ) ),
                               Em:    m.Value } ),
                         Value ) );
+              // A manager whose projects have all left the live set would otherwise hold a scope the
+              // dropdown cannot show, and zero every figure on the screen.
+              If( Len(Coalesce(gRptScope, "")) > 0
+                  && CountRows( Filter(colRptMgrOpts, Em = gRptScope) ) = 0,
+                  Set( gRptScope, "" ) );
+              // The FETCH time. A scope change refolds without refetching, so it does not move this.
+              Set( gRptAsAt, Text(Now(), "[$-en-US]hh:mm") );
+              Select( btnRptFold )
+      # THE FOLD. Everything derived from the fetch, over the SCOPED rows. Reached from the
+      # end of btnRptLoad and from the Scope picker, which refolds without refetching.
+      # Same shape as btnRptLoad: hidden, never Disabled.
+      - btnRptFold:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =false
+            Text: =""
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =Set( gRptBusy, true );
+              // THE SCOPE. Keyed on the PARENT PROJECT's manager, the same key colRptPrjMap.Mgr holds.
+              // "All" is a PASS-THROUGH (!gRptScoped), never a filter against every PId: a row whose
+              // project lookup is blank or orphaned is not in the map and must still count under All.
+              Set( gRptScoped, Len(Coalesce(gRptScope, "")) > 0 );
+              Set( gRptScopeNm,
+                   If( gRptScoped,
+                       Coalesce( LookUp(colRptMgrOpts, Em = gRptScope, Value), gRptScope ), "" ) );
+              ClearCollect( colRptScopePId,
+                  ForAll( Filter( colRptPrjMap, Mgr = Coalesce(gRptScope, "") ) As m, { PId: m.PId } ) );
+              // Every fold below reads these six names and nothing else, so scoping them scopes the screen.
+              ClearCollect( colRptOpen,
+                  Filter( colRptOpenRaw, !gRptScoped || task_project_id.Id in colRptScopePId.PId ) );
+              // A completed task with NO completion date is in, in every window. The count is
+              // stated beside the people table rather than dropped.
+              //
+              // The window is re-applied here even though the fetch is now bounded, and this is
+              // NOT redundant: a SharePoint DateTime is compared server-side in the LIST's
+              // timezone, so the fetch's boundary can sit up to a day off this one. THIS is the
+              // boundary every figure on the screen uses. It can only narrow the fetch, never
+              // widen it — accepted on a rolling 7/30/90-day window.
+              // IsBlank() is correct HERE: colRptDoneAll is a collection, so there is no query
+              // behind this and nothing to delegate.
+              ClearCollect( colRptDone,
+                  Filter( colRptDoneAll,
+                          ( IsBlank(task_date_completion) || task_date_completion >= gRptFrom )
+                       && ( !gRptScoped || task_project_id.Id in colRptScopePId.PId ) ) );
+              Set( gRptDoneNoDate,
+                   CountRows( Filter(colRptDone, IsBlank(task_date_completion)) ) );
+              ClearCollect( colRptTx,
+                  Filter( colRptTxRaw, !gRptScoped || transaction_project_id.Id in colRptScopePId.PId ) );
+              // Transactions inside the CURRENT window; colRptTx holds two windows.
+              ClearCollect( colRptTxCur, Filter( colRptTx, transaction_date >= gRptFrom ) );
+              ClearCollect( colRptPrj,
+                  Filter( colRptPrjRaw, !gRptScoped || ID in colRptScopePId.PId ) );
+              ClearCollect( colRptIss,
+                  Filter( colRptIssRaw, !gRptScoped || issue_project_id.Id in colRptScopePId.PId ) );
               // TWO ATTRIBUTION PATHS, BOTH FROM TASKS: task_lead owns, task_supporter supports.
               // Counted separately and NEVER summed into one workload number — that double-counts
               // the desk. Days and OnT carry -1 for "not applicable" so the medians and rates can
@@ -334,7 +383,8 @@ Screens:
                           { Fam: Coalesce( pm.Fam, "Unclassified" ),
                             Rgn: Coalesce( pm.Rgn, "Unassigned" ),
                             Req: Coalesce( pm.Req, "Unassigned" ),
-                            Aud: Coalesce( t.task_output_audience.Value, "Unspecified" ) } ) ) );
+                            Aud: Coalesce( t.task_output_audience.Value, "Unspecified" ),
+                            Fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) } ) ) );
               ClearCollect( colRptFamAll,
                   ForAll( Distinct(colRptOpenTag, Fam) As f,
                       { K: f.Value, N: CountRows( Filter(colRptOpenTag, Fam = f.Value) ) } ) );
@@ -387,6 +437,46 @@ Screens:
                                          Switch( Mod(r.Idx - 1, 6),
                                                  0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
                                                  3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) ) } ) ) );
+              // OUTPUT FORMAT, the audience fold's shape on task_output_format. Format is OPTIONAL
+              // on save, so Unspecified is a STANDING bucket, not one the backlog will drain — the
+              // subtitle states it, and the counts it needs are folded here, not in the property.
+              ClearCollect( colRptFmtVocab,
+                  ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+                          { K: c.Value } ) );
+              Set( gRptFmtUnsp, CountRows( Filter(colRptOpenTag, Fmt = "Unspecified") ) );
+              Set( gRptFmtOther, CountRows( Filter( colRptOpenTag,
+                                     Fmt <> "Unspecified" && !(Fmt in colRptFmtVocab.K) ) ) );
+              Set( gRptFmtSet, CountRows(colRptOpenTag) - gRptFmtUnsp );
+              Clear( colRptFmtBar );
+              Collect( colRptFmtBar,
+                  ForAll( Sequence( CountRows(colRptFmtVocab) ) As s,
+                      With( { k: Index(colRptFmtVocab, s.Value).K },
+                          { Idx: s.Value, K: k,
+                            N: CountRows( Filter(colRptOpenTag, Fmt = k) ) } ) ) );
+              Collect( colRptFmtBar,
+                  { Idx: CountRows(colRptFmtVocab) + 1, K: "Unspecified", N: gRptFmtUnsp },
+                  { Idx: CountRows(colRptFmtVocab) + 2, K: "Other",       N: gRptFmtOther } );
+              Set( gRptFmtTot, Max( 1, Coalesce(Sum(colRptFmtBar, N), 0) ) );
+              ClearCollect( colRptFmtPie,
+                  ForAll( Filter(colRptFmtBar, N > 0) As r,
+                      With( { cb: Coalesce( Sum( Filter(colRptFmtBar, Idx < r.Idx), N ), 0 ) },
+                          { Idx: r.Idx, K: r.K, N: r.N,
+                            // LEGEND ROW, not Idx — a dropped zero-count row would gap the legend.
+                            Li:  CountRows( Filter(colRptFmtBar, N > 0 && Idx <= r.Idx) ),
+                            Off: RoundDown( cb / gRptFmtTot * 100, 0 ),
+                            Pct: RoundDown( (cb + r.N) / gRptFmtTot * 100, 0 )
+                                 - RoundDown( cb / gRptFmtTot * 100, 0 ),
+                            // FIXED BY VALUE, so Deck is the same colour on every load and scope.
+                            // The positional arm only colours a value schema.yaml does not list.
+                            Hx:  If( r.K = "Other", "#C53A3A",
+                                     If( r.K = "Unspecified", "#B9C0C8",
+                                         Switch( r.K,
+                                                 "Flyer", "#005A9E", "Email", "#2E8B9A",
+                                                 "PDF", "#D69828", "Webpage", "#7A6FB0",
+                                                 "Deck", "#C05F3C", "Video", "#4A9E63",
+                                                 Switch( Mod(r.Idx - 1, 6),
+                                                         0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
+                                                         3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) ) ) } ) ) );
               // Top 6 + Other: the requestor list is open-ended and forty rows is not a chart.
               ClearCollect( colRptReqAll,
                   ForAll( Distinct(colRptOpenTag, Req) As r,
@@ -669,14 +759,6 @@ Screens:
                         Base: Coalesce( Sum( Filter(colRptTxSegRaw, Bi = g.Bi && Ci < g.Ci), N ), 0 ),
                         Hx: Switch( g.K, "EUR", "#005A9E", "USD", "#2E8B9A", "GBP", "#D69828",
                                          "JPY", "#7A6FB0", "CHF", "#C05F3C", "#4A9E63" ) } ) );
-              // Flat email list so the gallery filters with `in` over ~40 rows rather than scanning
-              // the unpivot on every repaint. Recomputed here AND in the picker's OnChange — a
-              // period change rebuilds colRptPersonSrc under a scope already set. Keep them identical.
-              ClearCollect( colRptScopeEm,
-                  Distinct( Filter( colRptPersonSrc,
-                                    PId in Filter(colRptPrjMap, Mgr = Coalesce(gRptScope, "")).PId ),
-                            Em ) );
-              Set( gRptAsAt,   Text(Now(), "[$-en-US]hh:mm") );
               Set( gRptLoadedKey, gRptKey );
               Set( gRptBusy, false )
       # BAND 0 — control bar. Fixed, outside the scroll body.
@@ -763,8 +845,8 @@ Screens:
                         LayoutMinHeight: =16
                         Width: =Parent.Width
                         Height: =16
-                  # Scope NEVER refetches — it re-filters a ~40-row collection. A combobox, not a
-                  # cmpSelection strip: one row per manager, so the list grows with the desk.
+                  # Scope NEVER refetches — it refolds the screen from the fetched rows. A combobox,
+                  # not a cmpSelection strip: one row per manager, so the list grows with the desk.
                   - cboRptScope:
                       Control: ModernCombobox@1.1.1
                       Properties:
@@ -780,14 +862,11 @@ Screens:
                         LayoutMinWidth: =Parent.Width
                         Width: =Parent.Width
                         Height: =36
-                        # Same fold as the end of btnRptLoad.OnSelect. Keep the two identical.
+                        # Guarded so a reload that re-seeds the same selection does not fold twice.
                         OnChange: |
-                          =Set( gRptScope, Coalesce(cboRptScope.Selected.Em, "") );
-                           ClearCollect( colRptScopeEm,
-                               Distinct( Filter( colRptPersonSrc,
-                                                 PId in Filter( colRptPrjMap,
-                                                                Mgr = Coalesce(cboRptScope.Selected.Em, "") ).PId ),
-                                         Em ) )
+                          =If( Coalesce(cboRptScope.Selected.Em, "") <> Coalesce(gRptScope, ""),
+                               Set( gRptScope, Coalesce(cboRptScope.Selected.Em, "") );
+                               Select( btnRptFold ) )
             - lblRptAsAt:
                 Control: Label@2.5.1
                 Properties:
@@ -933,7 +1012,8 @@ Screens:
                         - lblRptOpenSub:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="across the desk"
+                              Text: |
+                                =If( gRptScoped, "on " & gRptScopeNm & "'s projects", "across the desk" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -1352,19 +1432,16 @@ Screens:
                       Control: Gallery@2.15.0
                       Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                       Properties:
-                        # SCOPE RE-FILTERS A ~40-ROW FOLD; it never refetches.
+                        # colRptPerson IS ALREADY SCOPED by btnRptFold — rows and measures alike.
                         # TWO BRANCHES, because Name is text and every other key is a number — one Switch
                         # returning both would be a type conflict. SortByColumns would collapse this to
                         # one line, but whether it still accepts a string post-3.24042 is not grounded
                         # here, and a wrong guess fails the whole paste.
                         Items: |
-                          =With( { sc: If( Len(Coalesce(gRptScope, "")) = 0,
-                                           colRptPerson,
-                                           Filter(colRptPerson, Em in colRptScopeEm.Value) ),
-                                   dr: If(gRptSortDesc, SortOrder.Descending, SortOrder.Ascending) },
+                          =With( { dr: If(gRptSortDesc, SortOrder.Descending, SortOrder.Ascending) },
                                If( gRptSort = "Nm",
-                                   Sort( sc, Nm, dr ),
-                                   Sort( sc,
+                                   Sort( colRptPerson, Nm, dr ),
+                                   Sort( colRptPerson,
                                          Switch( gRptSort,
                                                  "Owns", Owns, "Sups", Sups, "Ovd",  Ovd,
                                                  "Dn",   Dn,   "Med",  Med,  "OnTp", OnTp,
@@ -1564,8 +1641,9 @@ Screens:
                                                                DateDiff(Today(), r.Dtl, TimeUnit.Days) ) ) } ),
                                              Sk, SortOrder.Ascending ) ) )
             # BAND 3 — where the work sits
-            # FOUR COLUMNS AT LayoutMinWidth 260 need ~1100px before they overflow. Raising a
-            # panel's minimum without dropping one from the row is what breaks this band.
+            # THREE COLUMNS AT LayoutMinWidth 260 + two 16 gaps = 812px before they overflow. The
+            # row does not wrap: a fourth panel here needs ~1100px, which is why the output pies
+            # have their own row below.
             - rowRptWork:
                 Control: GroupContainer@1.5.0
                 Variant: AutoLayout
@@ -1649,105 +1727,6 @@ Screens:
                                       & If( n = 0,
                                             "<text x='300' y='34' text-anchor='middle' font-size='17'"
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>No open tasks</text>", "" )
-                                      & "</svg>" ) )
-                  - pnlRptAud:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Vertical
-                        LayoutAlignItems: =LayoutAlignItems.Start
-                        LayoutGap: =6
-                        PaddingTop: =12
-                        PaddingBottom: =12
-                        PaddingLeft: =16
-                        PaddingRight: =16
-                        Fill: =gTheme.Color.Surface
-                        BorderColor: =gTheme.Color.Border
-                        BorderThickness: =1
-                        FillPortions: =1
-                        LayoutMinWidth: =260
-                        Height: =300
-                      Children:
-                        - lblRptAudT:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: ="Open tasks by output audience"
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.H3
-                              FontWeight: =FontWeight.Semibold
-                              Color: =gTheme.Color.Primary
-                              VerticalAlign: =VerticalAlign.Middle
-                              FillPortions: =0
-                              LayoutMinHeight: =24
-                              Width: =Parent.Width - 32
-                              Height: =24
-                        # THE SUBTITLE CARRIES BOTH GAPS, because a slice cannot. A large Unspecified
-                        # wedge means the column is YOUNGER than the backlog, not that the report is
-                        # broken, and those two look identical on a pie. Other outranks it: rarer, and
-                        # a data question.
-                        - lblRptAudS:
-                            Control: Label@2.5.1
-                            Properties:
-                              Text: |
-                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
-                                     "Other is non-zero — a value the column no longer offers.",
-                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
-                                     LookUp(colRptAudBar, K = "Unspecified", N) & " of "
-                                       & CountRows(colRptOpenTag) & " unspecified.",
-                                     "Open tasks that produce output." )
-                              Font: =gTheme.Font
-                              Size: =gTheme.Size.Small
-                              Color: |
-                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
-                                     gTheme.Color.Danger,
-                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
-                                     gTheme.Color.Warning,
-                                     gTheme.Color.TextMuted )
-                              FillPortions: =0
-                              LayoutMinHeight: =32
-                              Width: =Parent.Width - 32
-                              Height: =32
-                        - imgRptAud:
-                            Control: Image@2.2.3
-                            Properties:
-                              ImagePosition: =ImagePosition.Fit
-                              FillPortions: =1
-                              LayoutMinHeight: =120
-                              Width: =Parent.Width - 32
-                              Height: =Parent.Height - 80
-                              # A PIE IS N STACKED CIRCLES, not arc paths: circumference 100 at r 15.9155, so
-                              # a slice IS its percentage and no Cos/Sin appears anywhere. stroke-width 31.831
-                              # is 2r, which fills the stroke to the centre and makes the ring a disc.
-                              # dashoffset 125 - Off, not 25 - Off: the pattern repeats every 100 units so the
-                              # two are the same rotation, and this one can never go negative.
-                              Image: |
-                                =With( { n: CountRows(colRptAudPie) },
-                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
-                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
-                                      & "<g transform='translate(75 75) scale(2)'>"
-                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
-                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
-                                      & Concat( colRptAudPie,
-                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
-                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
-                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
-                                          & (125 - Off) & "'/>" )
-                                      & "</g>"
-                                      & Concat( colRptAudPie,
-                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
-                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
-                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
-                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
-                                          & " fill='#20262D'>"
-                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
-                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
-                                          & "' text-anchor='end' font-size='13'"
-                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                          & N & "</text>" )
-                                      & If( n = 0,
-                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
-                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                          & "No open tasks</text>", "" )
                                       & "</svg>" ) )
                   - pnlRptReq:
                       Control: GroupContainer@1.5.0
@@ -1876,7 +1855,7 @@ Screens:
                               LayoutMinHeight: =120
                               Width: =Parent.Width - 32
                               Height: =Parent.Height - 80
-                              # Same pie construction as the audience chart above.
+                              # Same pie construction as the audience chart.
                               Image: |
                                 =With( { n: CountRows(colRptRgnPie) },
                                     "data:image/svg+xml;charset=utf-8," & EncodeUrl(
@@ -1891,6 +1870,210 @@ Screens:
                                           & (125 - Off) & "'/>" )
                                       & "</g>"
                                       & Concat( colRptRgnPie,
+                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
+                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
+                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
+                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
+                                          & " fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
+                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
+                                          & "' text-anchor='end' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "No open tasks</text>", "" )
+                                      & "</svg>" ) )
+            # BAND 3b — what the work produces: the two task-output pies side by side.
+            # TWO COLUMNS AT LayoutMinWidth 260 + one 16 gap = 536px, well under band 5's ~1150,
+            # so this row never sets the scroll width.
+            - rowRptOutput:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =gTheme.Space.Gap
+                  FillPortions: =0
+                  LayoutMinHeight: =300
+                  Width: =Parent.Width - 48
+                  Height: =300
+                Children:
+                  - pnlRptAud:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =260
+                        Height: =300
+                      Children:
+                        - lblRptAudT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks by output audience"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        # THE SUBTITLE CARRIES BOTH GAPS, because a slice cannot. A large Unspecified
+                        # wedge means the column is YOUNGER than the backlog, not that the report is
+                        # broken, and those two look identical on a pie. Other outranks it: rarer, and
+                        # a data question.
+                        - lblRptAudS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
+                                     "Other is non-zero — a value the column no longer offers.",
+                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
+                                     LookUp(colRptAudBar, K = "Unspecified", N) & " of "
+                                       & CountRows(colRptOpenTag) & " unspecified.",
+                                     "Open tasks that produce output." )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: |
+                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
+                                     gTheme.Color.Danger,
+                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
+                                     gTheme.Color.Warning,
+                                     gTheme.Color.TextMuted )
+                              FillPortions: =0
+                              LayoutMinHeight: =32
+                              Width: =Parent.Width - 32
+                              Height: =32
+                        - imgRptAud:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 80
+                              # A PIE IS N STACKED CIRCLES, not arc paths: circumference 100 at r 15.9155, so
+                              # a slice IS its percentage and no Cos/Sin appears anywhere. stroke-width 31.831
+                              # is 2r, which fills the stroke to the centre and makes the ring a disc.
+                              # dashoffset 125 - Off, not 25 - Off: the pattern repeats every 100 units so the
+                              # two are the same rotation, and this one can never go negative.
+                              Image: |
+                                =With( { n: CountRows(colRptAudPie) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
+                                      & "<g transform='translate(75 75) scale(2)'>"
+                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
+                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
+                                      & Concat( colRptAudPie,
+                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
+                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
+                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
+                                          & (125 - Off) & "'/>" )
+                                      & "</g>"
+                                      & Concat( colRptAudPie,
+                                            "<rect x='160' y='" & ((Li - 1) * 22 + 10)
+                                          & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
+                                          & "<text x='176' y='" & ((Li - 1) * 22 + 19)
+                                          & "' font-size='13' font-family='Segoe UI, sans-serif'"
+                                          & " fill='#20262D'>"
+                                          & EncodeHTML( If(Len(K) > 16, Left(K, 15) & "..", K) ) & "</text>"
+                                          & "<text x='318' y='" & ((Li - 1) * 22 + 19)
+                                          & "' text-anchor='end' font-size='13'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & N & "</text>" )
+                                      & If( n = 0,
+                                            "<text x='230' y='79' text-anchor='middle' font-size='14'"
+                                          & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
+                                          & "No open tasks</text>", "" )
+                                      & "</svg>" ) )
+                  - pnlRptFmt:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =6
+                        PaddingTop: =12
+                        PaddingBottom: =12
+                        PaddingLeft: =16
+                        PaddingRight: =16
+                        Fill: =gTheme.Color.Surface
+                        BorderColor: =gTheme.Color.Border
+                        BorderThickness: =1
+                        FillPortions: =1
+                        LayoutMinWidth: =260
+                        Height: =300
+                      Children:
+                        - lblRptFmtT:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Open tasks by output format"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.H3
+                              FontWeight: =FontWeight.Semibold
+                              Color: =gTheme.Color.Primary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =24
+                              Width: =Parent.Width - 32
+                              Height: =24
+                        # THE SUBTITLE IS THE MAIN READING AID, NOT A CAVEAT. Format is optional on save,
+                        # so the coloured slices describe only the tasks that set one; this says how
+                        # many that is. Unspecified is muted, not a warning: it is the expected state.
+                        # A non-zero Other still outranks it, as on the audience pie.
+                        - lblRptFmtS:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( gRptFmtOther > 0,
+                                     "Other is non-zero — a value the column no longer offers.",
+                                     gRptFmtUnsp > 0,
+                                     "Format set on " & gRptFmtSet & " of " & (gRptFmtSet + gRptFmtUnsp)
+                                       & " open tasks   ·   " & gRptFmtUnsp & " unspecified.",
+                                     "What each open task produces." )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =If( gRptFmtOther > 0, gTheme.Color.Danger, gTheme.Color.TextMuted )
+                              FillPortions: =0
+                              LayoutMinHeight: =32
+                              Width: =Parent.Width - 32
+                              Height: =32
+                        - imgRptFmt:
+                            Control: Image@2.2.3
+                            Properties:
+                              ImagePosition: =ImagePosition.Fit
+                              FillPortions: =1
+                              LayoutMinHeight: =120
+                              Width: =Parent.Width - 32
+                              Height: =Parent.Height - 80
+                              # Same pie construction as the audience chart beside it.
+                              Image: |
+                                =With( { n: CountRows(colRptFmtPie) },
+                                    "data:image/svg+xml;charset=utf-8," & EncodeUrl(
+                                        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 150'>"
+                                      & "<g transform='translate(75 75) scale(2)'>"
+                                      & "<circle cx='0' cy='0' r='15.9155' fill='none'"
+                                      & " stroke='#EEF1F5' stroke-width='31.831'/>"
+                                      & Concat( colRptFmtPie,
+                                            "<circle cx='0' cy='0' r='15.9155' fill='none' stroke='"
+                                          & Hx & "' stroke-width='31.831' stroke-dasharray='"
+                                          & Pct & " " & (100 - Pct) & "' stroke-dashoffset='"
+                                          & (125 - Off) & "'/>" )
+                                      & "</g>"
+                                      & Concat( colRptFmtPie,
                                             "<rect x='160' y='" & ((Li - 1) * 22 + 10)
                                           & "' width='10' height='10' rx='2' fill='" & Hx & "'/>"
                                           & "<text x='176' y='" & ((Li - 1) * 22 + 19)
@@ -2247,6 +2430,8 @@ Screens:
                             Properties:
                               Text: |
                                 ="Top 6 by transactions on projects they manage. A count, not a notional."
+                                 // A scope is one manager, so this collapses to one bar by design.
+                                 & If( gRptScoped, "   ·   Scoped to " & gRptScopeNm & ".", "" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -2562,6 +2747,7 @@ Screens:
                 Properties:
                   Text: |
                     ="Window: " & Text(gRptFrom, "[$-en-US]d mmm yyyy") & " to today   ·   "
+                     & If( gRptScoped, "scoped to " & gRptScopeNm & "'s projects   ·   ", "" )
                      & "archived work excluded   ·   "
                      & If( Len(Coalesce(gRptTrunc, "")) > 0,
                            "TRUNCATED on " & gRptTrunc, "no fetch hit the row limit" )
@@ -2684,6 +2870,7 @@ Screens:
                 Properties:
                   Text: |
                     ="Open work, plus anything finished in the period. Listed once."
+                     & If( gRptScoped, " Only " & gRptScopeNm & "'s projects.", "" )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
