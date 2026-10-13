@@ -14,7 +14,7 @@
   scrProject's paste ALSO carries `txtPrjDesc` (read-only description under the info card).
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
   (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
-- **EPIC #77 QUICK TRANSACTION — DIRECTION CHANGED 2026-10-08 (user): quick entry is its OWN screen `scrQuickTx` (#89).**
+- **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
   scrTransactionEdit is RESTORED byte-for-byte to pre-PR-#88 (quick mode #79-#82 reverted). **The #88 quick-mode version
   WAS pasted into Studio (user, 2026-10-08), so the restore NEEDS A PASTE: delete the screen, then paste.** scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
   **PASTE ORDER: scrQuickTx FIRST (new screen), THEN scrHome** (btnQuickTx navigates to it). scrQuickTx never writes
@@ -354,3 +354,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | User had pasted #88's quick-mode scrTransactionEdit into Studio — the restored original must be RE-PASTED (delete-then-paste). PR opened for #89 + the restore | (no session file)
 - 2026-10-09 | Epic #84 authored: #85 fetch/fold split (Scope now drives every KPI, chart and People measure) and #86 output-format pie in a new rowRptOutput band. Validator 23/23, column guard + globals audit clean. Branch restarted from main (PR #90 merged). Paste scrReports only | (no session file)
 - 2026-10-13 | Epic #84 pre-paste review: PASTE, no blockers. Hygiene fixes applied in the same paste: lblRptAudS/imgRptLd read gRptOpenN/gRptTxN (not CountRows over fact collections), lblRptIssSub names the scope, colRptTxRaw comment corrected (LiveTransactions IS a named formula; ShowColumns is safe only because no Text column is projected). PR opened closing #84/#85/#86 | (no session file)
+- 2026-10-13 | Epic #77 closed (user): #79/#81/#82 re-marked not planned (superseded by #89), closing summary on #77. Pastes still pending: scrQuickTx → scrHome → delete+repaste scrTransactionEdit | (no session file)
