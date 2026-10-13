@@ -9,7 +9,7 @@
 > refuted in place rather than deleted. Read the marker before the entry.**
 
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
-- **THE APP IS BUILT.** 11 screens, 10 components, the App object; 22/22 valid.
+- **THE APP IS BUILT.** 12 screens (scrQuickTx is the 12th), 10 components, the App object; 23/23 valid.
 - **COMPLETE => 100% — AUTHORED 2026-10-08, FOUR PASTES (scrProject, scrTaskEdit, scrProjectEdit, scrProjects), NO SHAREPOINT.**
   scrProject's paste ALSO carries `txtPrjDesc` (read-only description under the info card).
   The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
@@ -19,7 +19,7 @@
   WAS pasted into Studio (user, 2026-10-08), so the restore NEEDS A PASTE: delete the screen, then paste.** scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
   **PASTE ORDER: scrQuickTx FIRST (new screen), THEN scrHome** (btnQuickTx navigates to it). scrQuickTx never writes
   transaction_comment, so it does not wait on that column; scrTransactionEdit still does (pending since 2026-09-04).
-- **EPIC #84 scrReports SCOPE + FORMAT PIE — AUTHORED 2026-10-09 (#85 + #86), ONE PASTE: scrReports (delete, then paste).**
+- **EPIC #84 scrReports SCOPE + FORMAT PIE — AUTHORED 2026-10-09 (#85 + #86), PRE-PASTE REVIEW PASTE 2026-10-13, PR OPEN; ONE PASTE: scrReports (delete, then paste; check neither worker pasted as `_1`).**
   btnRptLoad FETCHES into *Raw then `Select(btnRptFold)`; btnRptFold scopes the six sets and runs every fold. Scope
   refolds only (no refetch; "as at" = fetch time). Format pie in new `rowRptOutput` beside the audience pie. No SharePoint.
   **First suspect if the fold never runs after a load: the TWO-LEVEL queued Select (OnVisible→Load→Fold) has no precedent
@@ -353,3 +353,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-08 | PR #88 merged; user redirected: scrTransactionEdit restored to pre-#88, btnQuickTx restyled like New project, new screen scrQuickTx built (#89) — 23/23, review fixes applied (2 mixed-type arms, AllItems sync), re-review PASTE. AWAITING PASTE: scrQuickTx then scrHome | (no session file)
 - 2026-10-08 | User had pasted #88's quick-mode scrTransactionEdit into Studio — the restored original must be RE-PASTED (delete-then-paste). PR opened for #89 + the restore | (no session file)
 - 2026-10-09 | Epic #84 authored: #85 fetch/fold split (Scope now drives every KPI, chart and People measure) and #86 output-format pie in a new rowRptOutput band. Validator 23/23, column guard + globals audit clean. Branch restarted from main (PR #90 merged). Paste scrReports only | (no session file)
+- 2026-10-13 | Epic #84 pre-paste review: PASTE, no blockers. Hygiene fixes applied in the same paste: lblRptAudS/imgRptLd read gRptOpenN/gRptTxN (not CountRows over fact collections), lblRptIssSub names the scope, colRptTxRaw comment corrected (LiveTransactions IS a named formula; ShowColumns is safe only because no Text column is projected). PR opened closing #84/#85/#86 | (no session file)

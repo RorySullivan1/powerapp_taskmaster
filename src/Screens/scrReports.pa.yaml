@@ -74,8 +74,9 @@ Screens:
               // ShowColumns MUST NOT BE USED OVER ANYTHING ROOTED IN A NAMED FORMULA, and a
               // Filter wrapped around one does NOT fix it: text columns read back as an ERROR
               // type. Burned twice — task_name off LiveTasks, project_name off ActiveProjects.
-              // colRptTxRaw below keeps ShowColumns because it filters a DATA SOURCE directly,
-              // which is the only safe form. Stages are enumerated because Text <> won't delegate.
+              // colRptTxRaw below keeps ShowColumns over LiveTransactions only because it
+              // projects NO Text column; add one and it must become a hand ForAll.
+              // Stages are enumerated because Text <> won't delegate.
               Concurrent(
                   ClearCollect( colRptOpenRaw,
                       ForAll(
@@ -1184,7 +1185,8 @@ Screens:
                         - lblRptIssSub:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="on live projects"
+                              Text: |
+                                =If( gRptScoped, "on " & gRptScopeNm & "'s live projects", "on live projects" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -1943,7 +1945,7 @@ Screens:
                                      "Other is non-zero — a value the column no longer offers.",
                                      LookUp(colRptAudBar, K = "Unspecified", N) > 0,
                                      LookUp(colRptAudBar, K = "Unspecified", N) & " of "
-                                       & CountRows(colRptOpenTag) & " unspecified.",
+                                       & gRptOpenN & " unspecified.",
                                      "Open tasks that produce output." )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
@@ -2466,7 +2468,7 @@ Screens:
                                         & "<text x='598' y='" & ((Idx - 1) * 44 + 27)
                                         & "' text-anchor='end' font-size='16'"
                                         & " font-family='Segoe UI, sans-serif' fill='#6E7882'>" & N & "</text>" )
-                                    & If( n = 0 || CountRows(colRptTxEnriched) = 0,
+                                    & If( Coalesce(gRptTxN, 0) = 0,
                                           "<text x='300' y='30' text-anchor='middle' font-size='16'"
                                         & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                         & "No transactions in this window</text>", "" )
