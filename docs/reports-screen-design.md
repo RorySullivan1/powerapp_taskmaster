@@ -25,9 +25,10 @@ Three were settled with the user on 2026-08-17 and belong in the Decisions ledge
 3. **Effort is proxied, and labelled as such.** The model has no hours or effort column. "Where time
    goes" is measured as **task volume** — by activity family, output audience, requestor and region
    — with elapsed duration surviving only as the per-person **median days** and **on-time %**. The
-   standalone median-cycle-time-by-family chart is gone, and **`task_output_format` is no longer
-   reported anywhere**: the output breakdown groups by audience, which is the enforced column. The screen says "volume and elapsed time"
-   on its face and never calls either "effort".
+   standalone median-cycle-time-by-family chart is gone. Output is reported twice: by **audience**,
+   which `scrTaskEdit` enforces, and by **format** (`task_output_format`, #86), which stays optional
+   (#87), so its Unspecified slice is permanent and its subtitle says how many tasks set one. The
+   screen says "volume and elapsed time" on its face and never calls either "effort".
 
 ---
 
@@ -85,7 +86,18 @@ The output-format chart is the exception and still binds `Choices([@taskmaster_t
 inline, because a format nobody currently uses should still show as a zero — the same lesson
 `scrHome`'s donut records.
 
-### 2. Fold once, at the finest grain
+### 2. Fetch, scope, then fold once at the finest grain
+
+**Two hidden buttons, not one.** `btnRptLoad` fetches into raw collections (`colRptOpenRaw`,
+`colRptDoneAll`, `colRptTxRaw`, `colRptPrjRaw`, `colRptIssRaw`) and builds what must stay
+unscoped: `colRptProducts`, the truncation banner `gRptTrunc` (it counts what the connector
+returned), `colRptPrjMap` and the Scope options `colRptMgrOpts`. Its last step is
+`Select( btnRptFold )`. `btnRptFold` narrows the raw sets to the picked manager's projects
+(`colRptScopePId`) under the names every fold already reads — `colRptOpen`, `colRptDone`,
+`colRptTx`, `colRptTxCur`, `colRptPrj`, `colRptIss` — and then builds every fold below. **"All" is
+a pass-through, not a filter against every project id**, so a row with a blank or orphaned
+project lookup still counts under All.
+
 
 Everything renders from small pre-aggregated collections. **No `CountRows`, `LookUp` or `Filter`
 over a fact collection may appear in any gallery `Items` or row property** — that is the N+1, and a
@@ -93,8 +105,9 @@ over a fact collection may appear in any gallery `Items` or row property** — t
 
 | Fold | Rows | Built from |
 |---|---|---|
+| `colRptScopePId` | one manager's projects | `colRptPrjMap` where `Mgr = gRptScope`; read only when a scope is set |
 | `colRptPrjMap` | ~hundreds | project ID → activity family L1, region L1, requestor, manager, supporter |
-| `colRptOpenTag` | = F1 | each open task tagged with family, region, requestor and audience off **one** hoisted project lookup — and the ONLY place that join happens |
+| `colRptOpenTag` | = F1 | each open task tagged with family, region, requestor, audience and format off **one** hoisted project lookup — and the ONLY place that join happens |
 | `colRptPersonSrc` | ~2× tasks | tasks unpivoted on `task_lead` / `task_supporter`, each row carrying its measures **and the task itself** — name, health, start, due — plus a `Dup` flag. **No project lookup**: the family and format it used to carry fed overlay mini-charts that no longer exist |
 | `colRptPerson` | ~20–50 | one row per person, every measure precomputed |
 | `colRptPTask` | one person's tasks | built on row tap, feeds the overlay, refetches nothing |
@@ -132,10 +145,14 @@ it sidesteps every timezone and month-length edge.
 
 ### 3. Refetch only when the period changes
 
+**Scope applies to the whole screen** — every KPI, chart and People measure, keyed on the parent
+project's `project_manager`. An earlier design re-filtered only the People list; users read the
+dropdown as a screen filter, so scope now refolds (#85).
+
 | Interaction | Refetch | Refold | Cost |
 |---|:-:|:-:|---|
 | Period change | yes (F1–F5) | yes | the only network cost on the screen |
-| Scope change (Me / My projects / Desk) | no | no | re-filter `colRptPerson` (~40 rows) |
+| Scope change (All / one manager) | no | **yes** | `btnRptFold` only — no connector call, "as at" does not move |
 | Coverage filter | no | no | re-filter `colRptGrid` / `colRptTxEnriched` |
 | Tap a person | no | no | overlay reads existing folds |
 | Screen revisit | no | no | guarded on `gRptKey <> gRptLoadedKey` |
@@ -177,10 +194,11 @@ Body is a vertical `GroupContainer` / AutoLayout with `LayoutOverflowY: Scroll`,
 
 ### Band 0 — Control bar (fixed, outside the scroll body)
 
-Period strip · Scope strip · coverage combo · refresh + "as at HH:MM" · truncation banner.
+Period strip · Scope combobox · refresh + "as at HH:MM" · truncation banner.
 
-Both strips are `cmpSelection` — confirmed working since 2026-08-13, fed from `Choices()` where the
-vocabulary is data. Period: Quarter · 90 days · YTD · 12 months. Scope: Me · My projects · Desk.
+Period is a `cmpSelection` strip (1W · 1M · 1QTR) and refetches. Scope is a `ModernCombobox` —
+All plus one row per project manager, keyed on email — and refolds the whole screen without
+refetching.
 
 ### Band 1 — Desk pulse
 
@@ -215,8 +233,10 @@ lead and supporter. Zero refetch — that is the payoff for folding at person gr
 
 ### Band 3 — Where the work sits
 
-Four panels in one row, each `FillPortions: =1` at `LayoutMinWidth: =260` — about 1100px before the
-row overflows:
+Two rows. Activity family, requestor and region share the first (three panels at
+`LayoutMinWidth: =260`, 812px before it overflows); the two output pies — audience and format —
+share a second row beneath it (536px). The rows do not wrap, so a fifth panel in one row would
+have needed ~1370px:
 
 - **By activity family** — horizontal bars, top 6 + Other, share of open tasks. Joined through the
   parent project.
@@ -227,6 +247,11 @@ row overflows:
   Unspecified mostly means "predates the column" — the subtitle states its size, because on a pie
   that case and a broken report look identical. A non-zero Other outranks it in the subtitle: rarer,
   and a genuine data question.
+- **By output format** — a **pie** on `task_output_format`, beside the audience pie, built the same
+  way (vocabulary from `Choices()`, Unspecified and Other buckets). Format is **optional on save
+  (#87)**, so Unspecified is permanent, not transitional: the subtitle reads "Format set on X of Y
+  open tasks · Z unspecified" and Unspecified is muted grey, not a warning colour. Slice colours
+  are fixed **by value** (Deck is always the same colour).
 - **By requestor** — bars, top 6 + Other, `project_requestor` through the parent project. The
   column is optional, so `Unassigned` is a real bucket and its size is stated even when it falls
   outside the top six.
