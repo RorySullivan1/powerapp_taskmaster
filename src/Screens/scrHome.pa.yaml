@@ -703,12 +703,13 @@ Screens:
                                         Control: Label@2.5.1
                                         Properties:
                                           # Tagged when the row is here because I SUPPORT it, not manage it.
+                                          # The tag LEADS so a long name that wraps cannot clip it away.
                                           # The identities are already lower case; the column's may not be.
                                           Text: |
-                                            =ThisItem.project_name
-                                             & With( { m: Lower(ThisItem.project_manager.Email) },
-                                                     If( m = gUserEmail || m = gUserMail || m = gUserUpn,
-                                                         "", "   ·   Support" ) )
+                                            =With( { m: Lower(ThisItem.project_manager.Email) },
+                                                   If( m = gUserEmail || m = gUserMail || m = gUserUpn,
+                                                       "", "Support   ·   " ) )
+                                             & ThisItem.project_name
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.Body
                                           Color: =gTheme.Color.TextPrimary
@@ -930,11 +931,12 @@ Screens:
                                         Control: Label@2.5.1
                                         Properties:
                                           # Tagged when the row is here because I SUPPORT it, not lead it.
+                                          # The tag LEADS so a long name that wraps cannot clip it away.
                                           Text: |
-                                            =ThisItem.task_name
-                                             & With( { l: Lower(ThisItem.task_lead.Email) },
-                                                     If( l = gUserEmail || l = gUserMail || l = gUserUpn,
-                                                         "", "   ·   Support" ) )
+                                            =With( { l: Lower(ThisItem.task_lead.Email) },
+                                                   If( l = gUserEmail || l = gUserMail || l = gUserUpn,
+                                                       "", "Support   ·   " ) )
+                                             & ThisItem.task_name
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.Body
                                           Color: =gTheme.Color.TextPrimary
@@ -1326,7 +1328,7 @@ Screens:
                                               & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                               & If(d > 0, "+", "") & d & "</text>", "" ) )
                                       & "<text x='525' y='330' text-anchor='middle' font-size='24'"
-                                      & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>days</text>"
+                                      & " font-family='Segoe UI, sans-serif' fill='#B9C0C8'>Days</text>"
                                       & "</svg>" ) )
                   # HEALTH, NOT STAGE. task_status holds only the ISSUE-DERIVED half; overdue changes
                   # with no write, so it is folded in by the reader — see rollups.task_health. Reading
@@ -1562,7 +1564,7 @@ Screens:
                               Width: =Parent.Width - 24
                               Height: =Parent.Height - 48
                               # Same construction as imgPieTasks — read the notes there.
-                              # `issue_impact` is OPTIONAL in the golden source, so "Not Set" is a REAL
+                              # `issue_impact` is required, but legacy rows can be blank, so "Not Set" is a REAL
                               # category, not a fallback: without it the slices would not account for
                               # every issue and the ring would understate the total it prints.
                               Image: |
