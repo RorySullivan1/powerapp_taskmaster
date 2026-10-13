@@ -99,6 +99,27 @@ Screens:
                           task_lead.Email = gUserEmail
                        || task_lead.Email = gUserMail
                        || task_lead.Email = gUserUpn ) ),
+                  // THE WORK LISTS ARE WIDER THAN THE CARDS: owned OR supported. The cards and charts
+                  // keep reading colMyProjects / colMyTasks (owned only) — a supported item is shown,
+                  // never counted. Every arm is an INDEXED Person column (project_supporter and
+                  // task_supporter included), so the Or-group still delegates; one unindexed arm
+                  // would drop delegation for the whole filter and truncate silently.
+                  ClearCollect( colWorkProjects,
+                      Filter( ActiveProjects,
+                          project_manager.Email = gUserEmail
+                       || project_manager.Email = gUserMail
+                       || project_manager.Email = gUserUpn
+                       || project_supporter.Email = gUserEmail
+                       || project_supporter.Email = gUserMail
+                       || project_supporter.Email = gUserUpn ) ),
+                  ClearCollect( colWorkTasks,
+                      Filter( LiveTasks,
+                          task_lead.Email = gUserEmail
+                       || task_lead.Email = gUserMail
+                       || task_lead.Email = gUserUpn
+                       || task_supporter.Email = gUserEmail
+                       || task_supporter.Email = gUserMail
+                       || task_supporter.Email = gUserUpn ) ),
                   ClearCollect( colMyIssues,
                       // ASSIGNED TO ME, full stop. Do not add `|| issue_owner.Email = gUserEmail`:
                       // issue_owner is not indexed, so an Or-arm on it drops delegation for the WHOLE
@@ -237,8 +258,8 @@ Screens:
                             Properties:
                               Width: =Parent.Width
                               Height: =60
-                              Title: ="My work"
-                              Subtitle: ="Everything you lead or own, across every open project"
+                              Title: ="My Work"
+                              Subtitle: ="Everything You Own Or Support"
                               ShowAction: =true
                               ActionLabel: ="Refresh Stats"
                               # THE SAME FOLD THE SCREEN OPENS WITH — btnHomeRecompute, not a copy of
@@ -260,7 +281,7 @@ Screens:
                   - btnNewProject:
                       Control: Classic/Button@2.2.0
                       Properties:
-                        Text: ="+  New project"
+                        Text: ="+  New Project"
                         Fill: =gTheme.Color.Surface
                         Color: =gTheme.Color.Primary
                         HoverFill: =gTheme.Color.Hover
@@ -286,7 +307,7 @@ Screens:
                   - btnQuickTx:
                       Control: Classic/Button@2.2.0
                       Properties:
-                        Text: ="+  Quick transaction"
+                        Text: ="+  Quick Transaction"
                         Fill: =gTheme.Color.Surface
                         Color: =gTheme.Color.Primary
                         HoverFill: =gTheme.Color.Hover
@@ -335,7 +356,7 @@ Screens:
                         - lblPrjLedCap:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Projects led"
+                              Text: ="My Projects"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               FontWeight: =FontWeight.Semibold
@@ -366,8 +387,8 @@ Screens:
                               # so it renders before OnVisible queues the fold, and an unset global is BLANK,
                               # not 0 — blank divides as zero and raises Division by 0. Guard at the divide.
                               Text: |
-                                =If( gPrjLed = 0, "none open",
-                                     RoundDown(gPrjLedOverdue / Max(1, gPrjLed) * 100, 0) & "% overdue" )
+                                =If( gPrjLed = 0, "None Open",
+                                     RoundDown(gPrjLedOverdue / Max(1, gPrjLed) * 100, 0) & "% Overdue" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: |
@@ -398,7 +419,7 @@ Screens:
                         - lblTaskLedCap:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Tasks led"
+                              Text: ="My Tasks"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               FontWeight: =FontWeight.Semibold
@@ -426,8 +447,8 @@ Screens:
                             Properties:
                               # Max(1, ...) for the reason given on lblPrjLedSub.
                               Text: |
-                                =If( gTaskLed = 0, "none open",
-                                     RoundDown(gTaskLedOverdue / Max(1, gTaskLed) * 100, 0) & "% overdue" )
+                                =If( gTaskLed = 0, "None Open",
+                                     RoundDown(gTaskLedOverdue / Max(1, gTaskLed) * 100, 0) & "% Overdue" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: |
@@ -458,7 +479,7 @@ Screens:
                         - lblIssLedCap:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open Issues on my Projects"
+                              Text: ="Issues On My Projects"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               FontWeight: =FontWeight.Semibold
@@ -502,7 +523,7 @@ Screens:
                         - lblIssMineCap:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Issues Owned and Still Open"
+                              Text: ="My Open Issues"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               FontWeight: =FontWeight.Semibold
@@ -561,7 +582,7 @@ Screens:
                         - lblMyProjectsTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Projects I lead   (" & gPrjLed & ")"
+                              Text: ="Projects   (" & CountRows( galMyProjects.AllItems ) & ")"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -575,7 +596,7 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Visible: =IsEmpty(galMyProjects.AllItems)
-                              Text: ="Nothing open — no live project has you as its manager."
+                              Text: ="No Open Projects"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -592,7 +613,7 @@ Screens:
                               # stable sort. priority * 100000 dominates, the day count breaks ties, and +50000
                               # keeps an overdue (negative) count positive so no target date sorts last.
                               Items: |
-                                =Sort( Filter(colMyProjects, project_phase.Value <> "Complete"),
+                                =Sort( Filter(colWorkProjects, project_phase.Value <> "Complete"),
                                        Switch( project_priority.Value,
                                                "Critical", 1, "High", 2, "Moderate", 3,
                                                "Low", 4, "Lowest", 5, 6 ) * 100000
@@ -681,7 +702,13 @@ Screens:
                                     - cellMyProjectName:
                                         Control: Label@2.5.1
                                         Properties:
-                                          Text: =ThisItem.project_name
+                                          # Tagged when the row is here because I SUPPORT it, not manage it.
+                                          # The identities are already lower case; the column's may not be.
+                                          Text: |
+                                            =ThisItem.project_name
+                                             & With( { m: Lower(ThisItem.project_manager.Email) },
+                                                     If( m = gUserEmail || m = gUserMail || m = gUserUpn,
+                                                         "", "   ·   Support" ) )
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.Body
                                           Color: =gTheme.Color.TextPrimary
@@ -775,7 +802,7 @@ Screens:
                         - lblMyTasksTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open tasks I lead   (" & gTaskLed & ")"
+                              Text: ="Tasks   (" & CountRows( galMyTasks.AllItems ) & ")"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -789,7 +816,7 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Visible: =IsEmpty(galMyTasks.AllItems)
-                              Text: ="Nothing open — no task on any live project has you as its lead."
+                              Text: ="No Open Tasks"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -802,13 +829,13 @@ Screens:
                             Control: Gallery@2.15.0
                             Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
                             Properties:
-                              # colMyTasks is a LOCAL collection, so `<>` and the composite sort
+                              # colWorkTasks is a LOCAL collection, so `<>` and the composite sort
                               # cost nothing — neither has to delegate.
                               # ONE composite sort key, not two chained Sorts — Power Fx does not guarantee a
                               # stable sort. priority * 100000 dominates, the day count breaks ties, and +50000
                               # keeps an overdue (negative) count positive so no target date sorts last.
                               Items: |
-                                =Sort( Filter(colMyTasks, task_stage.Value <> "Completed"),
+                                =Sort( Filter(colWorkTasks, task_stage.Value <> "Completed"),
                                        Switch( task_priority.Value,
                                                "Critical", 1, "High", 2,
                                                "Moderate", 3, "Low", 4, 5 ) * 100000
@@ -902,7 +929,12 @@ Screens:
                                     - cellMyTaskName:
                                         Control: Label@2.5.1
                                         Properties:
-                                          Text: =ThisItem.task_name
+                                          # Tagged when the row is here because I SUPPORT it, not lead it.
+                                          Text: |
+                                            =ThisItem.task_name
+                                             & With( { l: Lower(ThisItem.task_lead.Email) },
+                                                     If( l = gUserEmail || l = gUserMail || l = gUserUpn,
+                                                         "", "   ·   Support" ) )
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.Body
                                           Color: =gTheme.Color.TextPrimary
@@ -946,7 +978,7 @@ Screens:
                                             =If( IsBlank(ThisItem.task_date_target), "-",
                                                  With( { d: DateDiff(Today(), ThisItem.task_date_target, TimeUnit.Days) },
                                                        If( d < 0, "Overdue",
-                                                           d = 0, "Due today",
+                                                           d = 0, "Due Today",
                                                                   d & "d Left" ) ) )
                                           Font: =gTheme.Font
                                           Size: =gTheme.Size.Small
@@ -1017,7 +1049,7 @@ Screens:
                         - lblMyIssuesTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open issues I own   (" & gIssMine & ")"
+                              Text: ="Issues   (" & gIssMine & ")"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1031,7 +1063,7 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Visible: =IsEmpty(galMyIssues.AllItems)
-                              Text: ="Nothing open — no issue on any live project is assigned to you."
+                              Text: ="No Open Issues"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -1232,7 +1264,7 @@ Screens:
                         - lblDueBarsTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Days to due"
+                              Text: ="Days To Due"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1247,9 +1279,9 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Open tasks I lead. Negative is overdue; end bars are 10 or more."
+                                ="My Open Tasks   ·   Below Zero Is Overdue   ·   Ends Are 10+"
                                  & If( gDueNoDate > 0,
-                                       "   ·   " & gDueNoDate & " no due date", "" )
+                                       "   ·   " & gDueNoDate & " No Due Date", "" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
@@ -1320,7 +1352,7 @@ Screens:
                         - lblPieHealthTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open tasks by health"
+                              Text: ="Task Health"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1406,7 +1438,7 @@ Screens:
                         - lblPieTasksTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Tasks by stage"
+                              Text: ="Task Stages"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1510,7 +1542,7 @@ Screens:
                         - lblPieIssuesTitle:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Issues by impact"
+                              Text: ="Issue Impact"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1530,7 +1562,7 @@ Screens:
                               Width: =Parent.Width - 24
                               Height: =Parent.Height - 48
                               # Same construction as imgPieTasks — read the notes there.
-                              # `issue_impact` is OPTIONAL in the golden source, so "Not set" is a REAL
+                              # `issue_impact` is OPTIONAL in the golden source, so "Not Set" is a REAL
                               # category, not a fallback: without it the slices would not account for
                               # every issue and the ring would understate the total it prints.
                               Image: |
@@ -1540,16 +1572,16 @@ Screens:
                                                        { i: 2, k: "High",     c: "#D69828" },
                                                        { i: 3, k: "Moderate", c: "#005A9E" },
                                                        { i: 4, k: "Low",      c: "#6E7882" },
-                                                       { i: 5, k: "Not set",  c: "#B9C0C8" },
+                                                       { i: 5, k: "Not Set",  c: "#B9C0C8" },
                                                        { i: 6, k: "Other",    c: "#8A5AA8" } ) As cat,
                                                 n, If( cat.k = "Other",
                                                        CountRows( Filter( colMyIssues,
-                                                           !( Coalesce(issue_impact.Value, "Not set") = "Critical"
-                                                           || Coalesce(issue_impact.Value, "Not set") = "High"
-                                                           || Coalesce(issue_impact.Value, "Not set") = "Moderate"
-                                                           || Coalesce(issue_impact.Value, "Not set") = "Low"
-                                                           || Coalesce(issue_impact.Value, "Not set") = "Not set" ) ) ),
-                                                       CountRows( Filter(colMyIssues, Coalesce(issue_impact.Value, "Not set") = cat.k) ) ) ) },
+                                                           !( Coalesce(issue_impact.Value, "Not Set") = "Critical"
+                                                           || Coalesce(issue_impact.Value, "Not Set") = "High"
+                                                           || Coalesce(issue_impact.Value, "Not Set") = "Moderate"
+                                                           || Coalesce(issue_impact.Value, "Not Set") = "Low"
+                                                           || Coalesce(issue_impact.Value, "Not Set") = "Not Set" ) ) ),
+                                                       CountRows( Filter(colMyIssues, Coalesce(issue_impact.Value, "Not Set") = cat.k) ) ) ) },
                                     With( { tot: Max(1, Sum(cats, n)) },
                                         With(
                                             { arcs: AddColumns( cats As r,
@@ -1640,7 +1672,8 @@ Screens:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                ="Weighted completion across " & CountRows(colMyTasks) & " task(s) you lead"
+                                ="Weighted Completion   ·   " & CountRows(colMyTasks)
+                                 & If( CountRows(colMyTasks) = 1, " Task", " Tasks" )
                               Font: =gTheme.Font
                               # A LITERAL 10, not gTheme.Size.Small — the theme's smallest step is 12
                               # and this caption has to wrap to three lines inside a 126px column.
