@@ -24,15 +24,9 @@
 # NO ROW-LEVEL ACTION, SO NO FULL-TEMPLATE HIT BUTTON. Each cell is its own target;
 # nothing is layered over an input.
 #
-# NOT YET LANDED IN THIS REPO — first suspects if the paste is rejected:
-#   1. OnChange on ModernDatePicker@1.0.1 (dtpQtRowDate). MS Learn documents it.
-#   2. OnChange on Classic/TextInput@2.3.2 (numQtRowNotional). Fallback: make it a
-#      ModernTextInput@1.1.1 (Placeholder for HintText, drop Format and Align).
-#   3. IsEditable =false on ModernDatePicker@1.0.1 (dtpQtODate). Fallback: =true.
-# No input control has ever sat inside a gallery here — behaviour, not tokens.
-# Also unproven here, behaviour not tokens: g.<control> in btnQtSave's AllItems sync
-# reaching a control inside rowQtCells (fallback: delete the sync block; OnChange alone
-# remains).
+# FIRST SUSPECT if a paste is rejected: IsEditable =false on dtpQtODate (fallback: =true).
+# Everything else here — in-gallery inputs and their OnChange, the AllItems sync, the
+# pop-up's shape (scrTransactionEdit's output editor) — has already landed.
 #
 # CONNECTION PREREQUISITES: Office 365 Users (manager and sales-owner picker) and
 # taskmaster_output (row outputs).
@@ -955,11 +949,13 @@ Screens:
                                     Width: =110
                                     Height: =36
                                     OnSelect: |
-                                      =If( !gSaving,
+                                      =// A new output defaults to what the row SHOWS (its sibling inputs), not
+                                       // ThisItem: a label typed just now may not have blurred into the row yet.
+                                       If( !gSaving,
                                            Set( gQtOutRow, ThisItem.q_rid );
                                            Set( gQtOHad,   ThisItem.q_hasOut );
-                                           Set( gQtOName,  If( ThisItem.q_hasOut, ThisItem.q_oName, Trim(ThisItem.q_name) ) );
-                                           Set( gQtODate,  If( ThisItem.q_hasOut, ThisItem.q_oDate, Coalesce( ThisItem.q_date, Today() ) ) );
+                                           Set( gQtOName,  If( ThisItem.q_hasOut, ThisItem.q_oName, Trim(txtQtRowName.Text) ) );
+                                           Set( gQtODate,  If( ThisItem.q_hasOut, ThisItem.q_oDate, Coalesce( dtpQtRowDate.SelectedDate, Today() ) ) );
                                            Set( gQtOFmt,   If( ThisItem.q_hasOut, ThisItem.q_oFmt, "" ) );
                                            Set( gQtOAud,   If( ThisItem.q_hasOut, ThisItem.q_oAud, "" ) );
                                            Set( gQtOLang,  If( ThisItem.q_hasOut, ThisItem.q_oLang, "" ) );
