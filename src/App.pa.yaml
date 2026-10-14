@@ -135,3 +135,8 @@ App:
       // silently — the read paths use this, the delete path deliberately does not.
       LiveTaskProducts = Filter( taskmaster_taskproduct,
           taskproduct_project_archived = false );
+
+      // Cross-project reads only (scrReports). A single project's outputs come straight off
+      // the raw list on the indexed Number FK, as comments do. Depends on every row carrying
+      // false, not blank — the app writes it on every insert.
+      LiveOutputs = Filter( taskmaster_output, output_project_archived = false );

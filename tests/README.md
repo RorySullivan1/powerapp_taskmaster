@@ -968,3 +968,35 @@ lessons worth carrying:
 2. **Probe the thing being shipped, not the scaffolding around it.** Three screens and a throwaway
    component had to be built and understood before a single question could be answered, and the
    design they were testing was never the thing the user asked for.
+
+---
+
+## `scrProbe-output-write.pa.yaml` — does `taskmaster_output` accept the app's insert?
+
+**Status: RUN 2026-10-14. ALL FOUR AS EXPECTED — the list accepts the app's insert.**
+
+### The claim under test
+
+The list is live, connected, and `LiveOutputs` is in App.Formulas, but nothing has
+written a row. Six columns are list-required (name, project id, format, audience,
+language, branding). The probe proves, each step with its own message:
+
+1. **WRITE** — a Patch naming every required column lands and returns an ID.
+2. **READ** — that row comes back through `LiveOutputs` with every field intact
+   (so `output_project_archived = false` was written and the formula resolves).
+3. **REQUIRED** — the same Patch minus `output_language` is rejected. Step 1 is
+   its positive control. A pass here means the column is NOT required in SharePoint.
+4. **CLEAN UP** — removes both rows.
+
+### Result
+
+Run by the user, 2026-10-14:
+1. **WRITE** — passed; the row was created.
+2. **READ** — passed; the row came back through `LiveOutputs` with its values.
+3. **REQUIRED** — rejected, as intended: `output_language` is enforced as required.
+4. **CLEAN UP** — removed the row.
+
+So `taskmaster_output` takes a Patch with Choice values as `{ Value: … }`, a Number FK,
+`Today()` into the date column and `false` into the archived flag; `LiveOutputs`
+resolves and delegates its `ID =` LookUp; and the list-level required setting is live.
+Only `output_language` was tested as required; the other five were set to required in the same pass and are taken on that evidence.

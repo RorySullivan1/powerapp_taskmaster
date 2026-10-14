@@ -1,0 +1,186 @@
+# =============================================================================
+# scrProbe-output-write — does taskmaster_output accept the app's insert shape?
+#
+# Issue #95 smoke test. The list is live and connected, LiveOutputs is in
+# App.Formulas, and nothing has written a row yet. Before any editor (#97/#98)
+# or the #96 flow depends on it, prove four things with SharePoint's own words:
+#   1. WRITE   — a Patch naming every required column lands and returns an ID.
+#   2. READ    — that row comes back through LiveOutputs (so archived=false was
+#                written and the named formula resolves), every field intact.
+#   3. REQUIRED — the same Patch minus output_language is REJECTED. WRITE is its
+#                positive control: same shape, one field removed.
+#   4. CLEAN UP — both rows are removed (if 3 wrongly landed one, it goes too).
+# Each step reports into its OWN variable, so one result cannot mask another.
+#
+# BREAKS RULE 1 ON PURPOSE, as scrProbe-junction-write does: the data source IS
+# the claim. Every other rule is kept.
+#
+# BEFORE PASTING: taskmaster_output must be in the Data pane and LiveOutputs in
+# App.Formulas. An unknown name makes OnSelect a compile error that runs nothing.
+# =============================================================================
+Screens:
+  scrProbeOutput:
+    Properties:
+      Fill: =RGBA(245, 247, 250, 1)
+    Children:
+      - lblPoTitle:
+          Control: Label@2.5.1
+          Properties:
+            # Block scalar: YAML eats " #" in a plain scalar along with the rest of the line.
+            Text: |
+              ="Output list smoke test  ·  issue #95"
+            Font: =Font.'Segoe UI'
+            Size: =20
+            FontWeight: =FontWeight.Semibold
+            Color: =RGBA(32, 38, 45, 1)
+            X: =16
+            Y: =16
+            Width: =820
+            Height: =28
+      - lblPoHow:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              ="Type the ID of any existing project, then press the four buttons IN ORDER.
+              Each one writes its own line below. Expected: 1 gives an ID, 2 shows the same
+              values back, 3 FAILS with a required-field message, 4 removes the rows."
+            Font: =Font.'Segoe UI'
+            Size: =13
+            Color: =RGBA(110, 120, 130, 1)
+            X: =16
+            Y: =52
+            Width: =820
+            Height: =60
+      - txtPoProject:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Placeholder: ="project ID"
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =16
+            Y: =124
+            Width: =150
+            Height: =40
+      - btnPoWrite:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="1 · WRITE"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =16
+            Y: =184
+            Width: =196
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  Set( vPoRow,
+                       Patch( taskmaster_output, Defaults(taskmaster_output),
+                              { output_name:             "SMOKE TEST - delete me",
+                                output_project_id:       Value(txtPoProject.Text),
+                                output_project_archived: false,
+                                output_date:             Today(),
+                                output_format:           { Value: "Deck" },
+                                output_audience:         { Value: "Internal Only" },
+                                output_language:         { Value: "EN" },
+                                output_branding:         { Value: "Barclays" },
+                                output_approval_flag:    false } ) );
+                  Set( vPoMsgW, "WRITE ok: new row ID " & Coalesce(Text(vPoRow.ID), "(none returned)") ),
+                  Set( vPoMsgW, "WRITE FAILED: " & FirstError.Message ) )
+      - btnPoRead:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="2 · READ BACK"
+            Fill: =RGBA(49, 130, 93, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =224
+            Y: =184
+            Width: =196
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  Set( vPoBack, LookUp( LiveOutputs, ID = vPoRow.ID ) );
+                  Set( vPoMsgR,
+                       If( IsBlank(vPoBack.ID),
+                           "READ: row " & vPoRow.ID & " NOT in LiveOutputs",
+                           "READ ok via LiveOutputs: " & vPoBack.output_name
+                           & "  |  project " & vPoBack.output_project_id
+                           & "  |  " & vPoBack.output_format.Value
+                           & " / " & vPoBack.output_audience.Value
+                           & " / " & vPoBack.output_language.Value
+                           & " / " & vPoBack.output_branding.Value
+                           & "  |  date " & Text(vPoBack.output_date, "yyyy-mm-dd")
+                           & "  |  archived " & If( vPoBack.output_project_archived, "true", "false" ) ) ),
+                  Set( vPoMsgR, "READ FAILED: " & FirstError.Message ) )
+      # NEGATIVE CASE. The WRITE above minus output_language. A pass here is a FAILURE
+      # of the test: the column is not actually required in SharePoint.
+      - btnPoRequired:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="3 · REQUIRED (should fail)"
+            Fill: =RGBA(168, 92, 0, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =432
+            Y: =184
+            Width: =196
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  Set( vPoBad,
+                       Patch( taskmaster_output, Defaults(taskmaster_output),
+                              { output_name:             "SMOKE TEST - delete me (no language)",
+                                output_project_id:       Value(txtPoProject.Text),
+                                output_project_archived: false,
+                                output_date:             Today(),
+                                output_format:           { Value: "Deck" },
+                                output_audience:         { Value: "Internal Only" },
+                                output_branding:         { Value: "Barclays" },
+                                output_approval_flag:    false } ) );
+                  Set( vPoMsgN, "REQUIRED: NOT ENFORCED - row " & Coalesce(Text(vPoBad.ID), "?") & " was written without a language" ),
+                  Set( vPoMsgN, "REQUIRED ok (rejected as expected): " & FirstError.Message ) )
+      - btnPoClean:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="4 · CLEAN UP"
+            Fill: =RGBA(110, 120, 130, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =640
+            Y: =184
+            Width: =196
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  If( !IsBlank(vPoRow.ID),
+                      Remove( taskmaster_output, LookUp( taskmaster_output, ID = vPoRow.ID ) ) );
+                  If( !IsBlank(vPoBad.ID),
+                      Remove( taskmaster_output, LookUp( taskmaster_output, ID = vPoBad.ID ) ) );
+                  Set( vPoMsgC, "CLEAN UP ok: removed the smoke-test row(s)" ),
+                  Set( vPoMsgC, "CLEAN UP FAILED: " & FirstError.Message & "  -  delete the SMOKE TEST rows in SharePoint" ) )
+      - lblPoResult:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =Coalesce(vPoMsgW, "1 -") & Char(10) & Char(10)
+              & Coalesce(vPoMsgR, "2 -") & Char(10) & Char(10)
+              & Coalesce(vPoMsgN, "3 -") & Char(10) & Char(10)
+              & Coalesce(vPoMsgC, "4 -")
+            Font: =Font.'Segoe UI'
+            Size: =14
+            Color: =RGBA(32, 38, 45, 1)
+            Fill: =RGBA(255, 255, 255, 1)
+            VerticalAlign: =VerticalAlign.Top
+            X: =16
+            Y: =248
+            Width: =820
+            Height: =260

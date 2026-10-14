@@ -25,10 +25,10 @@ Three were settled with the user on 2026-08-17 and belong in the Decisions ledge
 3. **Effort is proxied, and labelled as such.** The model has no hours or effort column. "Where time
    goes" is measured as **task volume** — by activity family, output audience, requestor and region
    — with elapsed duration surviving only as the per-person **median days** and **on-time %**. The
-   standalone median-cycle-time-by-family chart is gone. Output is reported twice: by **audience**,
-   which `scrTaskEdit` enforces, and by **format** (`task_output_format`, #86), which stays optional
-   (#87), so its Unspecified slice is permanent and its subtitle says how many tasks set one. The
-   screen says "volume and elapsed time" on its face and never calls either "effort".
+   standalone median-cycle-time-by-family chart is gone. Output is reported twice — by
+   **audience** and by **format** — over the **output log** (`taskmaster_output`, #100): one count
+   per piece of output dated in the period window, not per open task. The screen says "volume and
+   elapsed time" on its face and never calls either "effort".
 
 ---
 
@@ -67,6 +67,7 @@ that can't be date-bounded is self-limiting. That is what makes this screen scal
 | F3 | `colRptTx` | `Filter(taskmaster_transactions, transaction_project_archived = false && transaction_date >= gRptFrom2x)` | Yes — both indexed. **This is the load-bearing bound**; transactions grow fastest. |
 | F4 | `colRptPrj` | `ActiveProjects` | Yes (named formula). Bounded in the hundreds. |
 | F5 | `colRptIss` | `OpenIssues` | Yes (named formula). Small. |
+| F6 | `colRptOut` | `Filter(LiveOutputs, output_date >= gRptFrom && output_date <= gRptTo)` | Yes — named formula (indexed Boolean `=`) + indexed DateTime range. `gRptTo` is the start of tomorrow; the fold re-cuts at `< gRptTo` (see below). Output accumulates, so the truncation banner watches this fetch. |
 
 `gRptFrom2x` is **twice** the selected period. One fetch then serves both the current window and the
 prior-period delta, and feeds the monthly trend bars. Tasks get no prior-period delta — there is no
@@ -82,21 +83,23 @@ One dimension, because only one is still joined to. The product pies derive thei
 transactions themselves and no longer need a vocabulary list: they answer "what did we trade", not
 "what have we never traded", so an absent group is correctly absent.
 
-The output-format chart is the exception and still binds `Choices([@taskmaster_tasks].task_output_format)`
-inline, because a format nobody currently uses should still show as a zero — the same lesson
-`scrHome`'s donut records.
+The two output pies are the exception and bind `Choices([@taskmaster_output].output_audience)` /
+`.output_format` in the fold, because a value nobody currently uses should still show as a zero —
+the same lesson `scrHome`'s donut records.
 
 ### 2. Fetch, scope, then fold once at the finest grain
 
 **Two hidden buttons, not one.** `btnRptLoad` fetches into raw collections (`colRptOpenRaw`,
-`colRptDoneAll`, `colRptTxRaw`, `colRptPrjRaw`, `colRptIssRaw`) and builds what must stay
+`colRptDoneAll`, `colRptTxRaw`, `colRptPrjRaw`, `colRptIssRaw`, `colRptOutRaw`) and builds what must stay
 unscoped: `colRptProducts`, the truncation banner `gRptTrunc` (it counts what the connector
 returned), `colRptPrjMap` and the Scope options `colRptMgrOpts`. Its last step is
 `Select( btnRptFold )`. `btnRptFold` narrows the raw sets to the picked manager's projects
 (`colRptScopePId`) under the names every fold already reads — `colRptOpen`, `colRptDone`,
-`colRptTx`, `colRptTxCur`, `colRptPrj`, `colRptIss` — and then builds every fold below. **"All" is
-a pass-through, not a filter against every project id**, so a row with a blank or orphaned
-project lookup still counts under All.
+`colRptTx`, `colRptTxCur`, `colRptPrj`, `colRptIss`, `colRptOut` — and then builds every fold
+below. **"All" is a pass-through, not a filter against every project id**, so a row with a blank or
+orphaned project lookup still counts under All. Outputs scope on `output_project_id` (a plain
+Number, so no `.Id`) against the same `colRptScopePId`, and the fold re-applies the window
+(`output_date >= gRptFrom && < gRptTo`) for the same list-timezone reason as `colRptDone`.
 
 
 Everything renders from small pre-aggregated collections. **No `CountRows`, `LookUp` or `Filter`
@@ -107,7 +110,8 @@ over a fact collection may appear in any gallery `Items` or row property** — t
 |---|---|---|
 | `colRptScopePId` | one manager's projects | `colRptPrjMap` where `Mgr = gRptScope`; read only when a scope is set |
 | `colRptPrjMap` | ~hundreds | project ID → activity family L1, region L1, requestor, manager, supporter |
-| `colRptOpenTag` | = F1 | each open task tagged with family, region, requestor, audience and format off **one** hoisted project lookup — and the ONLY place that join happens |
+| `colRptOpenTag` | = F1 | each open task tagged with family, region and requestor off **one** hoisted project lookup — and the ONLY place that join happens |
+| `colRptOutTag` | = scoped F6 | each output row's audience and format as text, blank → `Unspecified`; feeds both output pies |
 | `colRptPersonSrc` | ~2× tasks | tasks unpivoted on `task_lead` / `task_supporter`, each row carrying its measures **and the task itself** — name, health, start, due — plus a `Dup` flag. **No project lookup**: the family and format it used to carry fed overlay mini-charts that no longer exist |
 | `colRptPerson` | ~20–50 | one row per person, every measure precomputed |
 | `colRptPTask` | one person's tasks | built on row tap, feeds the overlay, refetches nothing |
@@ -151,7 +155,7 @@ dropdown as a screen filter, so scope now refolds (#85).
 
 | Interaction | Refetch | Refold | Cost |
 |---|:-:|:-:|---|
-| Period change | yes (F1–F5) | yes | the only network cost on the screen |
+| Period change | yes (F1–F6) | yes | the only network cost on the screen |
 | Scope change (All / one manager) | no | **yes** | `btnRptFold` only — no connector call, "as at" does not move |
 | Coverage filter | no | no | re-filter `colRptGrid` / `colRptTxEnriched` |
 | Tap a person | no | no | overlay reads existing folds |
@@ -177,7 +181,7 @@ one-way gap returns only as "it didn't work".
 figures below are a floor, not a total. A report that silently undercounts is worse than no report,
 and this is the only place the app can detect it.
 
-**Vocabulary drift.** Fixed-vocabulary breakdowns (`task_output_format`, `task_status`, `task_stage`)
+**Vocabulary drift.** Fixed-vocabulary breakdowns (`output_format`, `output_audience`, `task_status`, `task_stage`)
 carry an explicit **"Other"** bucket counting rows matching none of the enumerated values, plus
 **"Unspecified"** for genuine blanks on optional columns. If Other is ever non-zero, SharePoint and
 `schema.yaml` disagree — visible on sight instead of silently reweighting every share.
@@ -240,18 +244,21 @@ have needed ~1370px:
 
 - **By activity family** — horizontal bars, top 6 + Other, share of open tasks. Joined through the
   parent project.
-- **By output audience** — a **pie**, fixed vocabulary + Unspecified + Other. Direct on the task, no
-  join. `task_output_audience` rather than `task_output_format` because **`scrTaskEdit` blocks the
-  save until an audience is picked whenever the Output section is on**, while format is never
-  enforced and will accumulate blanks indefinitely. The column is younger than the open backlog, so
-  Unspecified mostly means "predates the column" — the subtitle states its size, because on a pie
-  that case and a broken report look identical. A non-zero Other outranks it in the subtitle: rarer,
-  and a genuine data question.
-- **By output format** — a **pie** on `task_output_format`, beside the audience pie, built the same
-  way (vocabulary from `Choices()`, Unspecified and Other buckets). Format is **optional on save
-  (#87)**, so Unspecified is permanent, not transitional: the subtitle reads "Format set on X of Y
-  open tasks · Z unspecified" and Unspecified is muted grey, not a warning colour. Slice colours
-  are fixed **by value** (Deck is always the same colour).
+- **Outputs by audience** and **Outputs by format** — two **pies** over the **output log**
+  (`taskmaster_output`, #100), not over open tasks. **The unit is one piece of output dated in the
+  period window** (`output_date` from `gRptFrom` to today — the same 1W / 1M / 1QTR strip as every
+  other windowed figure): a task with three outputs moves a pie by three, a project-level output
+  counts, and a task with none counts nowhere. Under All, the slices sum to the number of output
+  rows dated in the window (`gRptOutN`); under a scope, to that manager's projects' rows. The
+  window ends at today, so an output dated in the future is not counted until its date arrives,
+  and an output with no date is in no window (the app always writes one).
+  Vocabulary from `Choices([@taskmaster_output].output_audience)` / `.output_format`, never a
+  literal list, plus **Unspecified** and **Other** buckets. Both columns are list-required, so
+  Unspecified should stay at zero — it is kept so a row written around the app is still counted,
+  never dropped. The subtitle states the basis on the panel: "N outputs dated in the last D days,
+  one per piece — not open tasks", appending an unspecified count when there is one; a non-zero
+  **Other** replaces it in red, because it means the column and `schema.yaml` disagree. Format
+  slice colours are fixed **by value** (Deck is always the same colour).
 - **By requestor** — bars, top 6 + Other, `project_requestor` through the parent project. The
   column is optional, so `Unassigned` is a real bucket and its size is stated even when it falls
   outside the top six.

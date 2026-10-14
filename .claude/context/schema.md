@@ -21,14 +21,15 @@ design. **Internal names freeze at creation** — the YAML's `name:` key *is* th
 | `taskmaster_transactions` | Trades, full transaction level | 4 |
 | `taskmaster_issues` | Freeform issues | 5 |
 | `taskmaster_projectcomments` | Free-form comments on a project; append-only, `scrProject` only. **Three columns** — author and date are the system `Created By` / `Created` | 1 |
+| `taskmaster_output` | The output log (epic #93): one row per output, many per task or transaction. **Singular name.** Number FKs only; dated by `output_date`, not `Modified` | 0 |
 | `taskmaster_clients` | Client dimension | 4 |
 | `taskmaster_products` | Product reference | 1 |
 | ~~`asset_approval`~~ | **RETIRED 2026-08-09** — approvals moved to an external portal; tasks now hold a free-text `task_output_approval_id`. Deprovision in SharePoint. | — |
 | `asset_library` | **Schema never supplied — bindings blocked** | ? |
 
 **Relationships** — via SharePoint **Lookup** columns, which Power Fx sees as *records*
-(`.Id` / `.Value`), never integers — **with one deliberate exception**: `taskmaster_projectcomments`
-and the `taskmaster_taskproduct` junction hold the parent's `ID` as a plain **Number**, so `=`
+(`.Id` / `.Value`), never integers — **with one deliberate exception**: `taskmaster_projectcomments`,
+`taskmaster_output` and the `taskmaster_taskproduct` junction hold the parent's `ID` as a plain **Number**, so `=`
 delegates and costs no join. See the note below the diagram.
 
 ```
@@ -46,6 +47,9 @@ taskmaster_tasks    ──< taskmaster_issues        (issue_task_name)
 taskmaster_transactions ──< taskmaster_issues    (issue_transaction_name)
 
 taskmaster_projects ──< taskmaster_projectcomments (projectcomment_project_id — NUMBER, not Lookup)
+taskmaster_projects ──< taskmaster_output        (output_project_id — NUMBER, required)
+taskmaster_tasks    ──< taskmaster_output        (output_task_id — NUMBER, optional)
+taskmaster_transactions ──< taskmaster_output    (output_transaction_id — NUMBER, optional; at most one of task/transaction)
 ```
 
 **Why comments break the Lookup pattern.** A Lookup FK is filtered as `<fk>.Id = <id>`, which does
@@ -90,13 +94,12 @@ Some rules are conditional on *another* field, and a SharePoint column can only 
 not. Those rules live in the app, which means **the list will happily accept a row that violates
 them** — anything writing outside `scrTaskEdit` bypasses them entirely.
 
-- **`task_output_approval_flag` → `task_output_approval_id`.** A task whose Output section is on
-  must carry an audience. Separately, a task whose approval flag is on must carry an approval id
-  **before it can reach stage `Completed`**. The flag is set per task; the audience VALUE gates
-  nothing. The id is deliberately *not* demanded earlier — the external approval portal issues it
-  late in the lifecycle, so requiring it at draft time would block ordinary work. All three
-  columns stay `required: false` in the golden source; `scrTaskEdit`'s `lblTkMissing` is the only
-  enforcement.
+- **The approval gate lives on output rows (`taskmaster_output`).** A task cannot reach stage
+  `Completed` while any of its outputs has `output_approval_flag` on and a blank
+  `output_approval_id`. The id is deliberately *not* demanded earlier — the external approval portal
+  issues it late in the lifecycle. SharePoint cannot express a conditional requirement, so
+  `scrTaskEdit`'s `lblTkMissing` is the only enforcement. Transactions have no stage and no gate.
+  The task-level `task_output_*` columns are retired in place.
 
 ---
 
