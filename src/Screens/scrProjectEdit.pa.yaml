@@ -462,7 +462,12 @@ Screens:
                   LayoutAlignItems: =LayoutAlignItems.Start
                   LayoutGap: =16
                   Width: =Parent.Width - 48
-                  Height: =104
+                  # Pinned: a flexible row in frmPrScroll takes its height from FillPortions,
+                  # not Height. 104 fits a picker (62) + gap (6) + department input (36); the
+                  # band collapses to the picker while neither requestor is set.
+                  FillPortions: =0
+                  LayoutMinHeight: =If( Len(gPrRequestor.Mail) > 0 || Len(gPrRequestor2.Mail) > 0, 104, 62 )
+                  Height: =If( Len(gPrRequestor.Mail) > 0 || Len(gPrRequestor2.Mail) > 0, 104, 62 )
                 Children:
                   # FOUR PICKERS, and the width divisor is a GAP COUNT, not a column count:
                   # rowPrPeople is horizontal auto-layout with LayoutGap 16, so four columns
