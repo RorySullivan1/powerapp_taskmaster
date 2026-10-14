@@ -486,8 +486,8 @@ lists:
       NAME IS SINGULAR — provisioned as taskmaster_output, not ...outputs
       (user-confirmed 2026-10-14). The #93 sub-issues say "taskmaster_outputs";
       this file is the authority.
-    provisioned: live        # 2026-10-14 — created in SharePoint by the user, Title renamed to
-                             # output_name, and the four FKs + output_project_archived indexed.
+    provisioned: live        # 2026-10-14 — created in SharePoint by the user, output_name as an
+                             # EXPLICIT column, and the four FKs + output_project_archived indexed.
                              # output_date IS NOT YET CREATED (see its line). NOT YET CONNECTED
                              # in Studio: a screen paste never adds a data source, so add
                              # taskmaster_output by hand in the Data pane before pasting
@@ -512,10 +512,10 @@ lists:
     # NO output_asset: asset_library is still `provisioned: unknown`, so the #94 rule
     # dropped the column. Adding it later is a new column, not a rename.
     columns:
-      # INTERNAL NAME IS `Title`, as on project_name. Power Fx identifiers resolve by display
-      # name, so `output_name` works in every formula; a column name passed as a STRING
-      # (SortByColumns) and every Power Automate action (#96, #101, #102) must use `Title`.
-      - { name: output_name,             type: Text,     required: true,  internal_name: Title, desc: "What was produced, e.g. \"Q3 autocall deck\". SharePoint's built-in Title, renamed" }
+      # AN EXPLICIT COLUMN, internal name = display name (user-confirmed 2026-10-14) — the
+      # mapping-list pattern, NOT the renamed-Title pattern of project_name. Title stays unused
+      # and MUST BE NOT-REQUIRED: the app never writes it, so a required Title fails every insert.
+      - { name: output_name,             type: Text,     required: true,                  desc: "What was produced, e.g. \"Q3 autocall deck\"" }
       # NUMBER, NOT LOOKUP — the projectcomment_project_id precedent. `=` on an indexed
       # Number delegates off the raw list; a Lookup's `.Id` does not. Do not convert.
       - { name: output_project_id,       type: Number,   required: true,  indexed: true,  desc: "ID of the parent project. Always set, including on task and transaction outputs" }
@@ -850,11 +850,11 @@ migration:
     have leaves the picker BLANK with no error. Do not reintroduce it without
     provisioning it first.
   title_column: >-
-    TWO PATTERNS ARE LIVE. The three mapping lists use an explicit name column and
-    leave Title unused and not required (confirmed). taskmaster_projects
-    (project_name, confirmed 2026-09-08) and taskmaster_output (output_name, created
-    that way 2026-10-14) RENAMED Title, so their `internal_name:` is Title. Both work
-    from Power Fx identifiers; only string column names and flows see the difference.
+    TWO PATTERNS ARE LIVE. The three mapping lists and taskmaster_output (output_name,
+    2026-10-14) use an explicit name column and leave Title unused and not required
+    (confirmed). taskmaster_projects RENAMED Title (project_name, confirmed 2026-09-08),
+    so its `internal_name:` is Title. Both work from Power Fx identifiers; only string
+    column names and flows see the difference.
     Every other main list is unverified — read `Field=` off the column before acting.
     IF a list ever does need converting: Title CANNOT be deleted, it belongs to
     the Item content type, so the pattern is create the explicit column, then set
