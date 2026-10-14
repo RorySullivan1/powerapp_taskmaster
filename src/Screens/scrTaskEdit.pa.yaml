@@ -813,14 +813,16 @@ Screens:
                   BorderColor: =gTheme.Color.Border
                   BorderThickness: =1
                   FillPortions: =0
-                  LayoutMinHeight: =408
+                  # Shown: 14 + head 26 + 10 + toggle 36 + 10 + log 194 + 10 + products 124 + 14 = 438.
+                  # Hidden: 14 + 26 + 10 + 36 + 14 = 100.
+                  LayoutMinHeight: =If( tglTkOutput.Value, 438, 100 )
                   Width: =Parent.Width - 48
-                  Height: =408
+                  Height: =If( tglTkOutput.Value, 438, 100 )
                 Children:
                   - lblsecTkOutputHead:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="Output requirements"
+                        Text: ="Outputs"
                         Font: =gTheme.Font
                         Size: =gTheme.Size.H3
                         FontWeight: =FontWeight.Semibold
@@ -842,21 +844,15 @@ Screens:
                         Width: =Parent.Width - 40
                         Height: =36
                       Children:
+                        # SHOW/HIDE ONLY. Nothing reads this toggle in a write path: the output log
+                        # and the product links save the same whether it is on or off. Do not gate a
+                        # write on it — that turns it into a delete button.
                         - tglTkOutput:
                             Control: Classic/Toggle@2.1.0
                             Properties:
                               Default: |
                                 =If( gEditMode = "Edit",
-                                     !IsBlank(gEditTask.task_output_format.Value)
-                                  || !IsBlank(gEditTask.task_output_language.Value)
-                                  || !IsBlank(gEditTask.task_output_branding.Value)
-                                  || !IsBlank(gEditTask.task_output_audience.Value)
-                                  || !IsBlank(gEditTask.task_output_approval_id)
-                                  || Coalesce(gEditTask.task_output_approval_flag, false)
-                                  // OnVisible seeds colTkProducts from the junction before this Default
-                                  // is read, so a task whose only output data is its products still opens
-                                  // the section instead of hiding them.
-                                  || !IsEmpty(colTkProducts),
+                                     !IsEmpty(colTkOut) || !IsEmpty(colTkProducts),
                                      false )
                               FalseText: =""
                               TrueText: =""
@@ -867,7 +863,10 @@ Screens:
                         - lbltglTkOutputCap:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Task Produces Output?"
+                              Text: |
+                                ="Task Produces Output?" &
+                                 If( !tglTkOutput.Value && !IsEmpty(colTkOut),
+                                     "   (" & CountRows(colTkOut) & " output(s) hidden — still saved with the task)", "" )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Body
                               Color: =gTheme.Color.TextPrimary
@@ -875,144 +874,255 @@ Screens:
                               FillPortions: =1
                               LayoutMinWidth: =200
                               Height: =24
-                  - rowTkOut1:
+                  # THE OUTPUT LOG. Read-only rows; every edit goes through the modal (mdTkOut*), so
+                  # no input control sits inside the gallery. Nothing here writes to SharePoint —
+                  # btnTkSave does, after the task Patch.
+                  # 194 = head 28 + 6 + gallery 160 (5 rows of 32). The empty label takes 22 + 6 out
+                  # of the gallery, which flexes down to 132.
+                  - blkTkOutLog:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
                       Properties:
-                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutDirection: =LayoutDirection.Vertical
                         LayoutAlignItems: =LayoutAlignItems.Start
-                        LayoutGap: =20
+                        LayoutGap: =6
                         FillPortions: =0
                         Visible: =tglTkOutput.Value
-                        LayoutMinHeight: =62
+                        LayoutMinHeight: =194
                         Width: =Parent.Width - 40
-                        Height: =62
+                        Height: =194
                       Children:
-                        - colTkAudience:
+                        - rowTkOutHead:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
                             Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =200
-                              Height: =62
-                            Children:
-                              - lblTkAudienceCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Output audience"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              # Descriptive only — the approval gate is tglTkApprovalReq, not a value in
-                              # this list. Every audience value behaves the same way.
-                              - cboTkAudience:
-                                  Control: ModernCombobox@1.1.1
-                                  Properties:
-                                    Items: =colTkAudOpts
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkAudience], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =gTheme.Color.TextPrimary
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set(gTkAudience, cboTkAudience.Selected.Value)
-                        # SITS BETWEEN THE AUDIENCE AND THE ID so the flag reads as part of the
-                        # approval pair. Pinned at 150, FillPortions 0 — only the text columns flex.
-                        - colTkApprovalReq:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =12
                               FillPortions: =0
-                              LayoutMinWidth: =150
-                              Width: =150
-                              Height: =62
+                              LayoutMinHeight: =28
+                              Width: =Parent.Width
+                              Height: =28
                             Children:
-                              - lblTkApprovalReqCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Approval required?"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              # THE GATE IS THIS FLAG, per task, not the audience value. While it is on,
-                              # lblTkMissing blocks stage Completed until the id beside it is filled — that
-                              # label is the only thing that stops the save and says why.
-                              - tglTkApprovalReq:
-                                  Control: Classic/Toggle@2.1.0
-                                  Properties:
-                                    Default: |
-                                      =If( gEditMode = "Edit",
-                                           Coalesce(gEditTask.task_output_approval_flag, false),
-                                           false )
-                                    FalseText: =""
-                                    TrueText: =""
-                                    FillPortions: =0
-                                    LayoutMinWidth: =60
-                                    Width: =60
-                                    Height: =30
-                        - colTkApproval:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =200
-                              Height: =62
-                            Children:
-                              - lblTkApprovalCap:
+                              - lblTkOutCap:
                                   Control: Label@2.5.1
                                   Properties:
                                     Text: |
-                                      ="Approval ID (external portal)" &
-                                       If( tglTkApprovalReq.Value,
-                                           "  ·  required to complete", "" )
+                                      ="Output log" &
+                                       If( CountRows(colTkOut) > 0, "   (" & CountRows(colTkOut) & ")", "" ) &
+                                       If( !IsEmpty( Filter(colTkOut, Dirty) ) || !IsEmpty(colTkOutDel),
+                                           "   ·   unsaved changes — Save to keep them", "" )
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.Small
                                     Color: =gTheme.Color.TextMuted
                                     VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              # Approvals live in a SEPARATE portal (out of scope). A plain free-text
-                              # pointer to that approval task's id — no lookup, no picker, no gallery.
-                              - txtTkApprovalId:
-                                  Control: ModernTextInput@1.1.1
+                                    FillPortions: =1
+                                    LayoutMinWidth: =140
+                                    Height: =28
+                              # PREFILLS format, audience, language and branding from the LAST row, so a
+                              # run of similar outputs is one field each. Name and approval start blank.
+                              - btnTkAddOutput:
+                                  Control: Classic/Button@2.2.0
                                   Properties:
-                                    Default: =If(gEditMode = "Edit", gEditTask.task_output_approval_id, "")
-                                    Placeholder: ="Approval task ID from the approval portal"
+                                    Text: ="＋  Add output"
+                                    Fill: =gTheme.Color.Surface
+                                    Color: =gTheme.Color.Primary
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderColor: =gTheme.Color.Primary
+                                    BorderThickness: =1
                                     Font: =gTheme.Font
-                                    Size: =gTheme.Size.Body
+                                    Size: =gTheme.Size.Small
                                     FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
+                                    LayoutMinWidth: =160
+                                    Width: =160
+                                    Height: =28
+                                    OnSelect: |
+                                      =Set( gTkOutSid, 0 );
+                                       Set( gTkOutName, "" );
+                                       Set( gTkOutDate, Today() );
+                                       Set( gTkOutFmt,   Coalesce( Last(colTkOut).Format, "" ) );
+                                       Set( gTkOutAud,   Coalesce( Last(colTkOut).Audience, "" ) );
+                                       Set( gTkOutLang,  Coalesce( Last(colTkOut).Language, "" ) );
+                                       Set( gTkOutBrand, Coalesce( Last(colTkOut).Branding, "" ) );
+                                       Set( gTkOutFlag, false );
+                                       Set( gTkOutAppr, "" );
+                                       Reset( txtTkOutName ); Reset( dtpTkOutDate );
+                                       Reset( cboTkOutFmt ); Reset( cboTkOutAud ); Reset( cboTkOutLang ); Reset( cboTkOutBrand );
+                                       Reset( tglTkOutFlag ); Reset( txtTkOutAppr );
+                                       Set( gTkOutOpen, true )
+                        - lblTkOutEmpty:
+                            Control: Label@2.5.1
+                            Properties:
+                              Visible: =IsEmpty(colTkOut)
+                              Text: ="No outputs logged yet."
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =22
+                              Width: =Parent.Width
+                              Height: =22
+                        - galTkOut:
+                            Control: Gallery@2.15.0
+                            Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                            Properties:
+                              # A LOCAL collection, so nothing here has to delegate.
+                              Items: =colTkOut
+                              WrapCount: =1
+                              TemplateSize: =32
+                              TemplatePadding: =0
+                              TemplateFill: =RGBA(0, 0, 0, 0)
+                              BorderThickness: =0
+                              ShowScrollbar: =true
+                              FillPortions: =1
+                              LayoutMinHeight: =60
+                              Width: =Parent.Width
+                              Height: =160
+                            Children:
+                              # Row budget: pad 4 + 4, five gaps of 10 and fixed 96 + 170 + 20 + 20 cost
+                              # 364; name and meta split the rest (min 140 + 200, so >= 704 wide).
+                              - rowTkOutBody:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Horizontal
+                                    LayoutAlignItems: =LayoutAlignItems.Center
+                                    LayoutGap: =10
+                                    PaddingLeft: =4
+                                    PaddingRight: =4
+                                    X: =0
+                                    Y: =0
+                                    Width: =Parent.TemplateWidth
+                                    Height: =Parent.TemplateHeight - 1
+                                  Children:
+                                    - cellTkOutName:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =ThisItem.Name
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Body
+                                          Color: =gTheme.Color.Primary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =140
+                                          Height: =26
+                                          OnSelect: |
+                                            =Set( gTkOutSid, ThisItem.Sid );
+                                             Set( gTkOutName, ThisItem.Name );
+                                             Set( gTkOutDate, ThisItem.ODate );
+                                             Set( gTkOutFmt, ThisItem.Format );
+                                             Set( gTkOutAud, ThisItem.Audience );
+                                             Set( gTkOutLang, ThisItem.Language );
+                                             Set( gTkOutBrand, ThisItem.Branding );
+                                             Set( gTkOutFlag, ThisItem.Flag );
+                                             Set( gTkOutAppr, ThisItem.ApprId );
+                                             Reset( txtTkOutName ); Reset( dtpTkOutDate );
+                                             Reset( cboTkOutFmt ); Reset( cboTkOutAud ); Reset( cboTkOutLang ); Reset( cboTkOutBrand );
+                                             Reset( tglTkOutFlag ); Reset( txtTkOutAppr );
+                                             Set( gTkOutOpen, true )
+                                    - cellTkOutDate:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: =If( IsBlank(ThisItem.ODate), "No date", Text(ThisItem.ODate, "dd mmm yyyy") )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinWidth: =96
+                                          Width: =96
+                                          Height: =26
+                                    - cellTkOutMeta:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            =ThisItem.Format & "  ·  " & ThisItem.Audience & "  ·  " &
+                                             ThisItem.Language & "  ·  " & ThisItem.Branding
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =1
+                                          LayoutMinWidth: =200
+                                          Height: =26
+                                    # RED while the flag is on and the id is blank — that row is what
+                                    # lblTkMissing names when the stage is Completed.
+                                    - cellTkOutAppr:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            =If( !ThisItem.Flag, "",
+                                                 Len(Trim(ThisItem.ApprId)) > 0, "Approval " & ThisItem.ApprId,
+                                                 "Approval ID missing" )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: |
+                                            =If( ThisItem.Flag && Len(Trim(ThisItem.ApprId)) = 0,
+                                                 gTheme.Color.Danger, gTheme.Color.TextMuted )
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinWidth: =170
+                                          Width: =170
+                                          Height: =26
+                                    - icoTkOutEdit:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Edit
+                                          Color: =gTheme.Color.TextMuted
+                                          HoverColor: =gTheme.Color.Primary
+                                          HoverFill: =RGBA(0, 0, 0, 0)
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: ="Edit this output"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =20
+                                          Width: =20
+                                          Height: =20
+                                          # Same handler as cellTkOutName — keep the two in step.
+                                          OnSelect: |
+                                            =Set( gTkOutSid, ThisItem.Sid );
+                                             Set( gTkOutName, ThisItem.Name );
+                                             Set( gTkOutDate, ThisItem.ODate );
+                                             Set( gTkOutFmt, ThisItem.Format );
+                                             Set( gTkOutAud, ThisItem.Audience );
+                                             Set( gTkOutLang, ThisItem.Language );
+                                             Set( gTkOutBrand, ThisItem.Branding );
+                                             Set( gTkOutFlag, ThisItem.Flag );
+                                             Set( gTkOutAppr, ThisItem.ApprId );
+                                             Reset( txtTkOutName ); Reset( dtpTkOutDate );
+                                             Reset( cboTkOutFmt ); Reset( cboTkOutAud ); Reset( cboTkOutLang ); Reset( cboTkOutBrand );
+                                             Reset( tglTkOutFlag ); Reset( txtTkOutAppr );
+                                             Set( gTkOutOpen, true )
+                                    - icoTkOutDel:
+                                        Control: Classic/Icon@2.5.0
+                                        Properties:
+                                          Icon: =Icon.Cancel
+                                          Color: =gTheme.Color.TextMuted
+                                          HoverColor: =gTheme.Color.Danger
+                                          HoverFill: =RGBA(197, 58, 58, 0.08)
+                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                          Tooltip: ="Remove this output from the task"
+                                          FillPortions: =0
+                                          LayoutMinWidth: =20
+                                          Width: =20
+                                          Height: =20
+                                          # Staging only. A row already in SharePoint is queued in colTkOutDel
+                                          # and removed by btnTkSave; the Collect must come BEFORE the RemoveIf.
+                                          OnSelect: |
+                                            =If( !gSaving,
+                                                 If( ThisItem.OutId > 0, Collect( colTkOutDel, { OutId: ThisItem.OutId } ) );
+                                                 RemoveIf( colTkOut, Sid = ThisItem.Sid ) )
+                              - rowTkOutLine:
+                                  Control: Rectangle@2.3.0
+                                  Properties:
+                                    Fill: =gTheme.Color.Border
+                                    X: =0
+                                    Y: =Parent.TemplateHeight - 1
+                                    Width: =Parent.TemplateWidth
+                                    Height: =1
                   # PRODUCTS ARE 1:n. A task is 1:1 with a client but can carry several products,
-                  # so this is a staged LIST plus an add button, in a full-width block of its own —
-                  # a chip row cannot share a 62px row with the approval id.
+                  # so this is a staged LIST plus an add button, in a full-width block of its own.
                   - blkTkProducts:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -1149,148 +1259,6 @@ Screens:
                                     Y: =Parent.TemplateHeight - 1
                                     Width: =Parent.TemplateWidth
                                     Height: =1
-                  - rowTkOut2:
-                      Control: GroupContainer@1.5.0
-                      Variant: AutoLayout
-                      Properties:
-                        LayoutDirection: =LayoutDirection.Horizontal
-                        LayoutAlignItems: =LayoutAlignItems.Start
-                        LayoutGap: =20
-                        FillPortions: =0
-                        Visible: =tglTkOutput.Value
-                        LayoutMinHeight: =62
-                        Width: =Parent.Width - 40
-                        Height: =62
-                      Children:
-                        - colTkLang:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =150
-                              Height: =62
-                            Children:
-                              - lblTkLangCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Output language"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - cboTkLanguage:
-                                  Control: ModernCombobox@1.1.1
-                                  Properties:
-                                    Items: =colTkLangOpts
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkLanguage], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =gTheme.Color.TextPrimary
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set(gTkLanguage, cboTkLanguage.Selected.Value)
-                        - colTkFormat:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =150
-                              Height: =62
-                            Children:
-                              - lblTkFormatCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Content format"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - cboTkFormat:
-                                  Control: ModernCombobox@1.1.1
-                                  Properties:
-                                    Items: =colTkFmtOpts
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkFormat], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =gTheme.Color.TextPrimary
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set(gTkFormat, cboTkFormat.Selected.Value)
-                        - colTkBrand:
-                            Control: GroupContainer@1.5.0
-                            Variant: AutoLayout
-                            Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              FillPortions: =1
-                              LayoutMinWidth: =150
-                              Height: =62
-                            Children:
-                              - lblTkBrandCap:
-                                  Control: Label@2.5.1
-                                  Properties:
-                                    Text: ="Branding"
-                                    Font: =gTheme.Font
-                                    Size: =gTheme.Size.Small
-                                    Color: =gTheme.Color.TextMuted
-                                    VerticalAlign: =VerticalAlign.Middle
-                                    FillPortions: =0
-                                    LayoutMinHeight: =18
-                                    Width: =Parent.Width
-                                    Height: =18
-                              - cboTkBranding:
-                                  Control: ModernCombobox@1.1.1
-                                  Properties:
-                                    Items: =colTkBrandOpts
-                                    ItemDisplayText: =ThisItem.Value
-                                    DefaultSelectedItems: =Filter( [gTkBranding], !IsBlank(Value) )
-                                    SelectMultiple: =false
-                                    IsSearchable: =false
-                                    InputTextPlaceholder: ="Select…"
-                                    Color: |
-                                      =gTheme.Color.TextPrimary
-                                    FillPortions: =0
-                                    LayoutMinHeight: =36
-                                    Width: =Parent.Width
-                                    Height: =36
-                                    OnChange: =Set(gTkBranding, cboTkBranding.Selected.Value)
-                  - lblTkAssetNote:
-                      Control: Label@2.5.1
-                      Properties:
-                        Visible: =tglTkOutput.Value
-                        Text: ="Linked asset is not editable here — asset_library carries only a name."
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.TextMuted
-                        FillPortions: =0
-                        LayoutMinHeight: =20
-                        Width: =Parent.Width - 40
-                        Height: =20
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -1339,7 +1307,10 @@ Screens:
                     =Set( gDelKind, "Task" );
                      Set( gDelId, gEditTask.ID );
                      Set( gDelName, gEditTask.task_name );
-                     Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_task_name.Id = gEditTask.ID) ) )
+                     Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_task_name.Id = gEditTask.ID) ) );
+                     // Outputs in SharePoint as loaded: rows still staged plus rows removed in the
+                     // log but not yet saved. The cascade itself deletes by FK, not from this count.
+                     Set( gTkDelOutN, CountRows( Filter(colTkOut, OutId > 0) ) + CountRows(colTkOutDel) )
             - lblTkMissing:
                 Control: Label@2.5.1
                 Properties:
@@ -1351,14 +1322,17 @@ Screens:
                               { L: "Lead",            M: Len(gTkLead.Mail) = 0 },
                               { L: "Parent Project",  M: gTkProject.Id = 0 },
                               { L: "Stage",           M: Len(gTkStage) = 0 },
-                              { L: "Priority",        M: Len(gTkPriority) = 0 },
-                              // A task that produces output must say who for.
-                              { L: "Output Audience", M: tglTkOutput.Value && gTkAudience = "(none)" },
-                              // Only once the task is being COMPLETED — the portal issues that id late, so
-                              // requiring it earlier would block ordinary drafting.
-                              { L: "Approval ID",     M: tglTkOutput.Value && gTkStage = "Completed" && tglTkApprovalReq.Value && Len(Trim(txtTkApprovalId.Text)) = 0 } ),
-                            M ), L, " | " ) },
-                       If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
+                              { L: "Priority",        M: Len(gTkPriority) = 0 } ),
+                            M ), L, " | " ),
+                         // THE APPROVAL GATE, per staged output row, whether or not the section is
+                         // shown. Only once the task is being COMPLETED — the portal issues the id
+                         // late, so requiring it earlier would block ordinary drafting.
+                         o: If( gTkStage = "Completed",
+                                Concat( Filter( colTkOut, Flag && Len(Trim(ApprId)) = 0 ),
+                                        "Output '" & Name & "': Approval ID", " | " ),
+                                "" ) },
+                       With( { a: m & If( Len(m) > 0 && Len(o) > 0, " | ", "" ) & o },
+                             If( Len(a) > 0, "Required Fields Remaining: " & a, "" ) ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.Danger
@@ -1491,13 +1465,6 @@ Screens:
                     If( Len(gTkSupporter.Mail) > 0,
                     { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",   Claims:      gClaimPrefix & Lower(gTkSupporter.Mail),   DisplayName: gTkSupporter.DisplayName,   Email:       gTkSupporter.Mail,   Department: "", JobTitle: "", Picture: "" },
                     Blank() ),
-                    // FALSE, never Blank(), when Output is off: a blank Yes/No reads as No anyway, so
-                    // writing the boolean keeps the stored value and the toggle saying the same thing.
-                    task_output_approval_flag:
-                    tglTkOutput.Value && tglTkApprovalReq.Value,
-                    task_output_approval_id:
-                    If( tglTkOutput.Value && Len(Trim(txtTkApprovalId.Text)) > 0,
-                    Trim(txtTkApprovalId.Text), Blank() ),
                     task_client_name:
                     If( tglTkClient.Value && gTkClient.Id > 0,
                     { Id: gTkClient.Id, Value: gTkClient.Value }, Blank() ),
@@ -1505,14 +1472,8 @@ Screens:
                     // from what the junction actually holds — written before, the task row could claim
                     // products with no links behind it, and reopening (which seeds from the JUNCTION)
                     // showed none.
-                    task_output_language:
-                    If( tglTkOutput.Value && gTkLanguage <> "(none)", { Value: gTkLanguage }, Blank() ),
-                    task_output_format:
-                    If( tglTkOutput.Value && gTkFormat <> "(none)", { Value: gTkFormat }, Blank() ),
-                    task_output_branding:
-                    If( tglTkOutput.Value && gTkBranding <> "(none)", { Value: gTkBranding }, Blank() ),
-                    task_output_audience:
-                    If( tglTkOutput.Value && gTkAudience <> "(none)", { Value: gTkAudience }, Blank() ),
+                    // NO OUTPUT COLUMNS ON THE TASK ROW. Outputs are rows of taskmaster_output,
+                    // written below once the task has an ID.
                     task_client_stage:
                     If( tglTkClient.Value && gTkClientStage <> "(none)", { Value: gTkClientStage }, Blank() ) } ) ),
                     Set( gTkErr, FirstError.Message ) );
@@ -1597,6 +1558,65 @@ Screens:
                     Patch( taskmaster_tasks, gTkSaved,
                     { task_product_summary: Concat(colTkLinksAfter, Uid, ", ") } ) ),
                     Set( gTkWarn, gTkWarn & "the product summary didn't update: " & FirstError.Message & "   " ) ) );
+                    // --- the output log: deletes, then upserts, then a re-read ---------
+                    // AFTER the task Patch, so a new task's ID exists. NOT gated on tglTkOutput — that
+                    // toggle only shows or hides the log.
+                    // DELETES take the product reconcile's shape: the FK filter delegates, the `in` test
+                    // runs client-side over this task's handful, and Remove() takes the scope record. The
+                    // RAW list, so a row is found whatever its archived flag.
+                    If( !IsEmpty(colTkOutDel),
+                    ForAll( Filter( taskmaster_output, output_task_id = gTkSaved.ID ) As r,
+                    If( r.ID in colTkOutDel.OutId,
+                    Remove( taskmaster_output, r ) ) ) );
+                    // UPSERTS, only rows the modal touched. ForAll may run its rows in any order, so each
+                    // result is Collected (no Set inside), and every IfError arm is Text.
+                    Clear( colTkOutRes );
+                    ForAll( Filter( colTkOut, Dirty ) As o,
+                    Collect( colTkOutRes,
+                    { Sid: o.Sid, Name: o.Name,
+                    Message:
+                    IfError( Text(
+                    Patch( taskmaster_output,
+                    If( o.OutId > 0, LookUp( taskmaster_output, ID = o.OutId ), Defaults(taskmaster_output) ),
+                    { output_name:             o.Name,
+                    output_project_id:       gTkProject.Id,
+                    output_task_id:          gTkSaved.ID,
+                    // The same expression the task Patch wrote to task_project_archived. Written on
+                    // every save: `= false` does not match a blank, so an unwritten row vanishes
+                    // from LiveOutputs.
+                    output_project_archived: Coalesce( gTkParentProj.project_phase.Value, "" ) = "Archived",
+                    output_date:             o.ODate,
+                    output_format:           { Value: o.Format },
+                    output_audience:         { Value: o.Audience },
+                    output_language:         { Value: o.Language },
+                    output_branding:         { Value: o.Branding },
+                    output_approval_flag:    o.Flag,
+                    output_approval_id:      If( Len(Trim(o.ApprId)) > 0, Trim(o.ApprId), Blank() ) } )
+                    .ID ),
+                    FirstError.Message,
+                    "" ) } ) );
+                    // RE-READ — the truth the checks below and a retry rebuild run against.
+                    ClearCollect( colTkOutNow,
+                    ForAll( Filter( taskmaster_output, output_task_id = gTkSaved.ID ) As o,
+                    { Sid:      o.ID,
+                    OutId:    o.ID,
+                    Name:     o.output_name,
+                    ODate:    If( IsBlank(o.output_date), Blank(),
+                    Date( Year(o.output_date), Month(o.output_date), Day(o.output_date) ) ),
+                    Format:   o.output_format.Value,
+                    Audience: o.output_audience.Value,
+                    Language: o.output_language.Value,
+                    Branding: o.output_branding.Value,
+                    Flag:     Coalesce(o.output_approval_flag, false),
+                    ApprId:   Coalesce(o.output_approval_id, ""),
+                    Dirty:    false } ) );
+                    ClearCollect( colTkOutDelLeft,
+                    ShowColumns( Filter( colTkOutNow, OutId in colTkOutDel.OutId ), OutId ) );
+                    Set( gTkOutFailN, CountRows( Filter( colTkOutRes, Len(Message) > 0 ) ) );
+                    // A write can be dropped without throwing; the count catches that too.
+                    If( gTkOutFailN = 0 && IsEmpty(colTkOutDelLeft) && CountRows(colTkOutNow) <> CountRows(colTkOut),
+                    Set( gTkWarn, gTkWarn & "the output log holds " & CountRows(colTkOutNow)
+                    & " output(s), expected " & CountRows(colTkOut) & ".   " ) );
                     // --- C3: rewrite the parent project's weighted completion ---------
                     // SKIPPED ENTIRELY unless the stage moved. The rollup is a weighted average over
                     // task STAGES, so any other edit cannot change it — and computing it costs a fetch
@@ -1638,12 +1658,35 @@ Screens:
                     Patch( taskmaster_projects, gTkParentProj, { project_perc_completion: newPc } ) );
                     Set( gSelProject, LookUp( taskmaster_projects, ID = gTkParentProj.ID ) ),
                     Set( gTkWarn, gTkWarn & "Task saved, but the project rollup didn't update: " & FirstError.Message & "   " )) ) ) ) );
+                    // AN OUTPUT ROW FAILED: STAY, so it can be retried. Failed rows stay staged (still
+                    // Dirty); everything else is rebuilt from the re-read. The task now EXISTS, so the
+                    // screen becomes an edit of it — a second Save must update it, never insert again.
+                    If( gTkOutFailN > 0 || !IsEmpty(colTkOutDelLeft),
+                    ClearCollect( colTkOutKeep,
+                    Filter( colTkOut, Sid in ShowColumns( Filter( colTkOutRes, Len(Message) > 0 ), Sid ) ) );
+                    ClearCollect( colTkOut,
+                    Filter( colTkOutNow, !(OutId in colTkOutKeep.OutId) && !(OutId in colTkOutDelLeft.OutId) ),
+                    colTkOutKeep );
+                    ClearCollect( colTkOutDel, colTkOutDelLeft );
+                    Set( gEditTask, LookUp( taskmaster_tasks, ID = gTkSaved.ID ) );
+                    If( IsBlank(gEditTask.ID), Set( gEditTask, gTkSaved ) );
+                    Set( gEditMode, "Edit" );
+                    Set( gTkKey, "E" & gTkSaved.ID );
+                    Notify( "Task saved, but the output log didn't fully save — the rows are still listed, press Save to retry.   "
+                    & If( gTkOutFailN > 0,
+                    gTkOutFailN & " output(s) failed. '" & First( Filter( colTkOutRes, Len(Message) > 0 ) ).Name
+                    & "': " & First( Filter( colTkOutRes, Len(Message) > 0 ) ).Message & "   ", "" )
+                    & If( !IsEmpty(colTkOutDelLeft),
+                    CountRows(colTkOutDelLeft) & " removed output(s) are still in the list.   ", "" )
+                    & gTkWarn,
+                    NotificationType.Error ) );
+                    If( gTkOutFailN = 0 && IsEmpty(colTkOutDelLeft),
                     If( Len(gTkWarn) > 0,
                     Notify( "Task saved, but: " & gTkWarn, NotificationType.Warning ) );
                     If( Len(gTkWarn) = 0,
                     Notify( If(gEditMode = "Edit", "Task saved", "Task created"), NotificationType.Success ) );
                     Set( gTkResumeKey, "" );
-                    Back() ) );
+                    Back() ) ) );
                     Set( gSaving, false ) )
       # =====================================================================
       # PICKER — ONE cmpPicker instance for BOTH person fields AND both lookups.
@@ -1767,6 +1810,9 @@ Screens:
             Title: ="Delete this task?"
             Message: |
               ="Delete " & gDelName & "? Its product links go with it." &
+                       If( gTkDelOutN > 0,
+                           " " & gTkDelOutN & " output(s) logged against it will be DELETED too.",
+                           "" ) &
                        If( gDelRefs > 0,
                            " " & gDelRefs & " issue(s) linked to it will be KEPT — only the link to this task is cleared.",
                            "" ) &
@@ -1780,7 +1826,7 @@ Screens:
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
-               If( gDelRefs >= 500, Set( gDelBlock, true ) );
+               If( gDelRefs >= 500 || gTkDelOutN >= 500, Set( gDelBlock, true ) );
                // DETACH FIRST, then remove — the reverse leaves issues pointing at a row that is
                // already gone. COUNT AND REFUSE rather than half-do it: a local ForAll over a
                // delegable Filter clears SOME references past the data row limit and raises NO error.
@@ -1789,16 +1835,24 @@ Screens:
                                  ForAll( Filter( taskmaster_issues, issue_task_name.Id = gDelId ) As iss,
                                          Patch( taskmaster_issues, iss, { issue_task_name: Blank() } ) ) ),
                             Set( gDelErr, FirstError.Message ) ) );
+               // OUTPUTS BEFORE THE TASK. Their FK is a plain Number, so SharePoint cascades
+               // nothing: a task removed first leaves rows no screen can reach. NOT gated on the
+               // count — RemoveIf matches on the server's rows, including any added elsewhere
+               // since this screen loaded. Under 500 it completes; the guard above refuses past it.
+               If( Len(gDelErr) = 0 && !gDelBlock,
+                   IfError( Set( gDelScrapTkOut,
+                                 RemoveIf( taskmaster_output, output_task_id = gDelId ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
                If( Len(gDelErr) = 0 && !gDelBlock,
                    IfError( Set( gDelScrapT,
                                  Remove( taskmaster_tasks, LookUp(taskmaster_tasks, ID = gDelId) ) ),
                             Set( gDelErr, FirstError.Message ) ) );
                If( gDelBlock,
-                   Notify( "Too many issues reference this to detach in one pass. Nothing was deleted — ask for the cleanup workflow.",
+                   Notify( "Too many issues or outputs reference this to clear in one pass. Nothing was deleted — ask for the cleanup workflow.",
                            NotificationType.Error ),
                    Len(gDelErr) > 0,
                    Notify( "Couldn't delete it: " & gDelErr
-                             & " Some issue links may already have been cleared — reopen the project to check.",
+                             & " Some issue links or outputs may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( "Task deleted.", NotificationType.Success );
                    // Clears the resume key, same reason as Cancel.
