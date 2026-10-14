@@ -18,9 +18,9 @@
   colWorkProjects / colWorkTasks (supported rows prefixed "Support ·"); Issues list unchanged (no supporter column, by decision).
 - **project_date_start FIX — AUTHORED 2026-10-13: scrProject (auto-stamp) + scrProjectEdit (calendar-only) pastes, then a ONE-OFF
   FLOW** (`docs/notes/backfill-project-date-start.md`) to copy Created into blank starts. Flow NOT RUN YET; check the column's internal name first.
-- **EPIC #93 OUTPUT LOG — FILED 2026-10-14, NOTHING BUILT.** New list `taskmaster_outputs` (one row per output; Number FKs to project
-  (required) / task / transaction; output_project_archived). Subs #94-#102. **#94 DECIDED 2026-10-14 (closed); #95 schema +
-  provisioning is NEXT.** task_output_* get migrated (#96) then RETIRED IN PLACE, never deleted.
+- **EPIC #93 OUTPUT LOG — #95 SCHEMA RECORDED 2026-10-14.** List is **`taskmaster_output` (SINGULAR — the sub-issues say ...outputs)**,
+  live in SharePoint with Title renamed to output_name. **USER STILL TO: (1) create `output_date` (Date only, indexed); (2) connect the list in
+  Studio; (3) append `LiveOutputs` to App.Formulas; (4) smoke-test one Patch + read-back.** Then #96 migration. No output_asset (dropped).
 - **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14; BOTH TEXT COLUMNS CREATED IN SHAREPOINT (user, 2026-10-14)
   (project_requestor_department, project_requestor_2_department). NEXT: refresh taskmaster_projects in Studio, then paste scrProjectEdit.** Back-fill of existing projects is the USER's (no flow from us).
 - **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
@@ -322,6 +322,7 @@ not know them will author something broken:
 
 - [2026-10-14] **#94 OUTPUT RECORD MODEL (user took every recommendation).** taskmaster_outputs columns FINAL as proposed in #94 — output_name (renamed Title), output_project_id (Number, REQUIRED, idx), output_task_id / output_transaction_id (Number, optional, idx), output_project_archived (idx), output_date (idx, app-default today), format/audience/language/branding (Choices copied from the live task columns), output_asset (Lookup asset_library — ONLY IF asset_library is confirmed live at provisioning, else DROPPED), output_approval_flag/_id. **NO extra columns.** Rules: AT MOST ONE parent (task XOR transaction XOR neither = project-level, which IS allowed); approval gate moves to outputs (task can't reach Completed while any output is flagged without an id; transactions have no gate); "bulk" = IN-APP MULTI-ROW entry (file import #102 DEFERRED); deleting a task or transaction DELETES its outputs (confirm states the count), a project delete always does. scrTaskEdit: tglTkOutput becomes SHOW/HIDE ONLY (never deletes); audience required PER OUTPUT ROW — INDEX Decisions
 - [2026-10-14] **#103 (user): BOTH requestors get a department column — project_requestor_department + project_requestor_2_department (Text, optional, NOT indexed).** Snapshot at pick time via `Office365Users.UserProfile(mail).Department` (MS Learn-grounded) in IfError(Set,Set), outside cmpPrPick's Switch so its arms stay all-Set; prefilled but EDITABLE (ModernTextInput under each requestor picker, hidden while no requestor); save writes Trim(.Text) gated on the requestor's mail, so clearing a requestor blanks its department. Not shown on scrProject (that screen shows no requestor at all). User back-fills existing projects themselves — INDEX Decisions
+- [2026-10-14] **#95 AS BUILT (user): list name `taskmaster_output` SINGULAR; `output_asset` DROPPED (asset_library unconfirmed); `output_date` KEPT AS A REAL COLUMN, NOT `Modified` (user first proposed Modified, then took the recommendation).** Modified moves on every edit — adding an approval id at sign-off, the archival flow's flag flip — and is read-only, so #96 could not backdate migrated outputs (every one would carry migration day). output_name is renamed Title: `internal_name: Title`, so flows (#96/#101/#102) and any SortByColumns string must say `Title`. **Do not re-propose Modified or Created as the output date.**
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
@@ -380,3 +381,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-14 | #94 decided (all recommendations) and closed; #95/#97/#99/#102 annotated; epic #93 updated. #95 next | (no session file)
 - 2026-10-14 | #103 filed: project_requestor_department (Text, optional) — fill on pick via UserProfile().Department in IfError, seed/clear/save on scrProjectEdit, optional scrProject display + back-fill flow. Awaiting answers to its 4 open questions | (no session file)
 - 2026-10-14 | #103 decided (requestor_2 too; editable; unindexed; user back-fills) and authored: schema + scrProjectEdit, 23/23 valid | (no session file)
+- 2026-10-14 | #95 schema: taskmaster_output (singular) recorded in schema.yaml as built; output_date to be added by user; LiveOutputs appended to App.Formulas; schema brief + title_column note corrected. 23/23 valid | (no session file)
