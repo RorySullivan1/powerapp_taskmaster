@@ -1576,8 +1576,10 @@ Screens:
                     ForAll( Filter( colTkOut, Dirty ) As o,
                     Collect( colTkOutRes,
                     { Sid: o.Sid, Name: o.Name,
+                    // TRUST THE RECORD, NEVER THE MESSAGE: a write can be dropped with no error at all,
+                    // so a returned record without an ID is a failure too. Every arm is Text.
                     Message:
-                    IfError( Text(
+                    IfError( If( IsBlank(
                     Patch( taskmaster_output,
                     If( o.OutId > 0, LookUp( taskmaster_output, ID = o.OutId ), Defaults(taskmaster_output) ),
                     { output_name:             o.Name,
@@ -1593,10 +1595,9 @@ Screens:
                     output_language:         { Value: o.Language },
                     output_branding:         { Value: o.Branding },
                     output_approval_flag:    o.Flag,
-                    output_approval_id:      If( Len(Trim(o.ApprId)) > 0, Trim(o.ApprId), Blank() ) } )
-                    .ID ),
-                    FirstError.Message,
-                    "" ) } ) );
+                    output_approval_id:      If( Len(Trim(o.ApprId)) > 0, Trim(o.ApprId), Blank() ) } ).ID ),
+                    "SharePoint returned no record", "" ),
+                    Coalesce( FirstError.Message, "SharePoint rejected the row" ) ) } ) );
                     // RE-READ — the truth the checks below and a retry rebuild run against.
                     ClearCollect( colTkOutNow,
                     ForAll( Filter( taskmaster_output, output_task_id = gTkSaved.ID ) As o,
@@ -2307,7 +2308,10 @@ Screens:
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
-               If( gDelRefs >= 500 || gTkDelOutN >= 500, Set( gDelBlock, true ) );
+               // Counted off the LIST, not the screen's snapshot: outputs added elsewhere since the
+               // screen loaded must count too, or a partial RemoveIf goes through silently.
+               Set( gTkDelOutNow, CountRows( Filter( taskmaster_output, output_task_id = gDelId ) ) );
+               If( gDelRefs >= 500 || gTkDelOutNow >= 500, Set( gDelBlock, true ) );
                // DETACH FIRST, then remove — the reverse leaves issues pointing at a row that is
                // already gone. COUNT AND REFUSE rather than half-do it: a local ForAll over a
                // delegable Filter clears SOME references past the data row limit and raises NO error.
