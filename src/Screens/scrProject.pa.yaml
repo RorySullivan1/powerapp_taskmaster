@@ -2392,10 +2392,14 @@ Screens:
                     If( gDelKind = "Issue",
                         Coalesce( LookUp(taskmaster_issues, ID = gDelId).issue_task_name.Id, 0 ),
                         0 ) );
-               // gDelOuts is counted off colProjectOut, which is itself capped at the data row
-               // limit — a capped count reads as exactly the limit and still trips this.
-               If( gDelRefs >= 500
-                || ( (gDelKind = "Task" || gDelKind = "Transaction") && gDelOuts >= 500 ),
+               // Counted off the LIST, not colProjectOut: that snapshot is capped per project, so
+               // one task's share of it can read low and let a partial RemoveIf through silently.
+               Set( gPrjDelOutsNow,
+                    Switch( gDelKind,
+                        "Task",        CountRows( Filter( taskmaster_output, output_task_id = gDelId ) ),
+                        "Transaction", CountRows( Filter( taskmaster_output, output_transaction_id = gDelId ) ),
+                        0 ) );
+               If( gDelRefs >= 500 || gPrjDelOutsNow >= 500,
                    Set( gDelBlock, true ) );
                If( !gDelBlock && gDelKind = "Task" && gDelRefs > 0,
                    IfError( Set( gDelScrapDT,
@@ -3300,7 +3304,9 @@ Screens:
                             Control: ModernDatePicker@1.0.1
                             Properties:
                               DefaultDate: |
-                                =If( gOeEditId > 0 && !IsBlank(gOeRec.output_date), gOeRec.output_date, Today() )
+                                =If( gOeEditId > 0 && !IsBlank(gOeRec.output_date),
+                                     Date( Year(gOeRec.output_date), Month(gOeRec.output_date), Day(gOeRec.output_date) ),
+                                     Today() )
                               Placeholder: ="Output date"
                               Format: =DatePickerFormat.LongAbbreviated
                               StartOfWeek: =StartOfWeek.Monday
