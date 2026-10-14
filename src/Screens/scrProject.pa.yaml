@@ -2407,7 +2407,7 @@ Screens:
                                  ForAll( Filter( taskmaster_issues, issue_transaction_name.Id = gDelId ) As iss,
                                          Patch( taskmaster_issues, iss, { issue_transaction_name: Blank() } ) ) ),
                             Set( gDelErr, FirstError.Message ) ) );
-               // OUTPUTS ARE DELETED, NOT DETACHED (#94). RUN EVEN WHEN gDelOuts IS 0: that count
+               // OUTPUTS ARE DELETED, NOT DETACHED. RUN EVEN WHEN gDelOuts IS 0: that count
                // is the screen's snapshot and only feeds the message, while this reads the list.
                If( Len(gDelErr) = 0 && !gDelBlock && gDelKind = "Task",
                    IfError( Set( gDelScrapOT,
@@ -2844,3 +2844,799 @@ Screens:
             OnSelect: |
               =Reset( txtCvBody );
                Set( gCmtEditing, false )
+      # =====================================================================
+      # OUTPUTS LIST — every output on the project, newest first, from colProjectOut.
+      # Card 900 x 540 centred; mdOlBody is the top 460, mdOlClose sits in the 80 below.
+      # SOURCE NAMES RESOLVE OFF colProjectTasks / colProjectTx, which are already loaded —
+      # a per-row LookUp on a collection is local, never a query. They hold LIVE rows only,
+      # so on an archived project the name falls back to the bare ID.
+      # ONLY PROJECT-LEVEL ROWS ARE EDITED HERE. A task's or transaction's output opens its
+      # owner's screen; it has no delete icon here, because its owner's save would not know.
+      # Every part is gated on gOlOpen: a visible scrim swallows every tap beneath it.
+      # =====================================================================
+      - mdOlScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gOlOpen
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set( gOlOpen, false )
+      - mdOlBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gOlOpen
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 900) / 2
+            Y: =(Parent.Height - 540) / 2
+            Width: =900
+            Height: =540
+      # 40 head + 12 + gallery + 12 + 18 note = the 420 inside 24 + 16 padding, so the
+      # gallery is Parent.Height - 122. Gallery and empty label are exact negations.
+      - mdOlBody:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Visible: =gOlOpen
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            PaddingTop: =24
+            PaddingBottom: =16
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =(Parent.Width - 900) / 2
+            Y: =(Parent.Height - 540) / 2
+            Width: =900
+            Height: =460
+          Children:
+            - rowOlHead:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =12
+                  FillPortions: =0
+                  LayoutMinHeight: =40
+                  Width: =Parent.Width - 48
+                  Height: =40
+                Children:
+                  - lblOlTitle:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Outputs   " & CountRows(colProjectOut)
+                           & "   ·   " & Coalesce(gSelProject.project_name, "this project")
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.H3
+                        FontWeight: =FontWeight.Semibold
+                        Color: =gTheme.Color.Primary
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =32
+                  # Same archive gate as every other creator on this screen. The seeds are SET
+                  # before the Resets because each control re-reads its default ONLY on Reset.
+                  # Format, audience, language and branding carry over from the newest output on
+                  # the project — consecutive outputs usually share them.
+                  - btnOlAdd:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Visible: =Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
+                        Fill: =gTheme.Color.Surface
+                        Color: =gTheme.Color.Primary
+                        BorderColor: =gTheme.Color.Primary
+                        BorderThickness: =1
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        Text: ="+  Add output"
+                        FillPortions: =0
+                        LayoutMinWidth: =150
+                        Width: =150
+                        Height: =36
+                        OnSelect: |
+                          =Set( gOeEditId, 0 );
+                           Set( gOeErr, "" );
+                           Set( gOeFormat,   Coalesce( First( Sort(colProjectOut, output_date, SortOrder.Descending) ).output_format.Value, "" ) );
+                           Set( gOeAudience, Coalesce( First( Sort(colProjectOut, output_date, SortOrder.Descending) ).output_audience.Value, "" ) );
+                           Set( gOeLanguage, Coalesce( First( Sort(colProjectOut, output_date, SortOrder.Descending) ).output_language.Value, "" ) );
+                           Set( gOeBranding, Coalesce( First( Sort(colProjectOut, output_date, SortOrder.Descending) ).output_branding.Value, "" ) );
+                           Reset( txtOeName ); Reset( dtpOeDate );
+                           Reset( cboOeFormat ); Reset( cboOeAudience ); Reset( cboOeLanguage ); Reset( cboOeBranding );
+                           Reset( tglOeFlag ); Reset( txtOeApprId );
+                           Set( gOeOpen, true )
+            - lblOlEmpty:
+                Control: Label@2.5.1
+                Properties:
+                  Visible: =IsEmpty(colProjectOut)
+                  Text: ="No outputs logged on this project yet."
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =24
+                  Width: =Parent.Width - 48
+                  Height: =24
+            # Sorted again over the collection: the fetch's order is not a contract.
+            - galOutputs:
+                Control: Gallery@2.15.0
+                Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                Properties:
+                  Visible: =!IsEmpty(colProjectOut)
+                  Items: =Sort( colProjectOut, output_date, SortOrder.Descending )
+                  WrapCount: =1
+                  TemplateSize: =44
+                  TemplatePadding: =0
+                  TemplateFill: =RGBA(0, 0, 0, 0)
+                  BorderThickness: =0
+                  ShowScrollbar: =true
+                  FillPortions: =1
+                  LayoutMinHeight: =200
+                  Width: =Parent.Width - 48
+                  Height: =Parent.Height - 122
+                Children:
+                  - rowOutBody:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =10
+                        PaddingLeft: =8
+                        PaddingRight: =8
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth
+                        Height: =Parent.TemplateHeight - 1
+                      Children:
+                        - cellOutName:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =ThisItem.output_name
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Body
+                              Color: =gTheme.Color.TextPrimary
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =3
+                              LayoutMinWidth: =160
+                              Height: =38
+                        - cellOutSrc:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( Coalesce(ThisItem.output_task_id, 0) > 0,
+                                     "Task: " & Coalesce( LookUp(colProjectTasks, ID = ThisItem.output_task_id).task_name,
+                                                          "ID " & ThisItem.output_task_id ),
+                                     Coalesce(ThisItem.output_transaction_id, 0) > 0,
+                                     "Transaction: " & Coalesce( LookUp(colProjectTx, ID = ThisItem.output_transaction_id).transaction_name,
+                                                                 "ID " & ThisItem.output_transaction_id ),
+                                     "Project" )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =3
+                              LayoutMinWidth: =160
+                              Height: =38
+                        - cellOutFmt:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =Coalesce(ThisItem.output_format.Value, "—") & "  ·  "
+                                 & Coalesce(ThisItem.output_language.Value, "—")
+                                 & If( Coalesce(ThisItem.output_approval_flag, false)
+                                    && Len(Trim(Coalesce(ThisItem.output_approval_id, ""))) = 0,
+                                       "  ·  approval pending", "" )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =2
+                              LayoutMinWidth: =110
+                              Height: =38
+                        - cellOutDate:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                =If( IsBlank(ThisItem.output_date), "-",
+                                     Text(ThisItem.output_date, "dd mmm yyyy") )
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              Align: =Align.Right
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinWidth: =96
+                              Width: =96
+                              Height: =38
+                        # PROJECT-LEVEL ROWS ONLY, and never on an archived project. Hands off to
+                        # cmpPrjConfirmDel, which is declared EARLIER and would open underneath
+                        # this dialog — so the dialog closes first and the confirm reopens it.
+                        - icoDelOut:
+                            Control: Classic/Icon@2.5.0
+                            Properties:
+                              Visible: |
+                                =Coalesce(ThisItem.output_task_id, 0) = 0
+                                 && Coalesce(ThisItem.output_transaction_id, 0) = 0
+                                 && Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
+                              Icon: =Icon.Trash
+                              Color: =gTheme.Color.Danger
+                              HoverColor: =gTheme.Color.Danger
+                              HoverFill: =RGBA(197, 58, 58, 0.08)
+                              HoverBorderColor: =RGBA(0, 0, 0, 0)
+                              Tooltip: ="Delete this output"
+                              FillPortions: =0
+                              LayoutMinWidth: =24
+                              Width: =24
+                              Height: =24
+                              OnSelect: |
+                                =Set( gOlOpen, false );
+                                 Set( gDelKind, "Output" );
+                                 Set( gDelId, ThisItem.ID );
+                                 Set( gDelName, ThisItem.output_name );
+                                 Set( gDelRefs, 0 );
+                                 Set( gDelOuts, 0 )
+                  - rowOutLine:
+                      Control: Rectangle@2.3.0
+                      Properties:
+                        Fill: =gTheme.Color.Border
+                        X: =0
+                        Y: =Parent.TemplateHeight - 1
+                        Width: =Parent.TemplateWidth
+                        Height: =1
+                  # A task's or transaction's output opens its OWNER, exactly as galTasksHit and
+                  # galTransactionsHit do — that screen is where its outputs are edited. A
+                  # project-level output opens mdOe. Every branch re-reads the live row.
+                  - galOutputsHit:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: =""
+                        Fill: =RGBA(0, 0, 0, 0)
+                        HoverFill: =gTheme.Color.Hover
+                        PressedFill: =gTheme.Color.Press
+                        BorderThickness: =0
+                        X: =0
+                        Y: =0
+                        Width: =Parent.TemplateWidth - 46
+                        Height: =Parent.TemplateHeight
+                        OnSelect: |
+                          =Select(Parent);
+                           If( Coalesce(ThisItem.output_task_id, 0) > 0,
+                               Set( gEditTask, LookUp(taskmaster_tasks, ID = ThisItem.output_task_id) );
+                               If( IsBlank(gEditTask.ID),
+                                   Notify( "That output's task no longer exists. Reopen the project to refresh the list.",
+                                           NotificationType.Error ),
+                                   Set( gOlOpen, false );
+                                   Set( gEditMode, "Edit" );
+                                   Navigate( scrTaskEdit, ScreenTransition.Cover ) ),
+                               Coalesce(ThisItem.output_transaction_id, 0) > 0,
+                               Set( gEditTransaction, LookUp(taskmaster_transactions, ID = ThisItem.output_transaction_id) );
+                               If( IsBlank(gEditTransaction.ID),
+                                   Notify( "That output's transaction no longer exists. Reopen the project to refresh the list.",
+                                           NotificationType.Error ),
+                                   Set( gOlOpen, false );
+                                   Set( gEditMode, "Edit" );
+                                   Navigate( scrTransactionEdit, ScreenTransition.Cover ) ),
+                               Coalesce(gSelProject.project_phase.Value, "") = "Archived",
+                               Notify( "This project is archived — its outputs are read-only.",
+                                       NotificationType.Information ),
+                               Set( gOeRec, LookUp(taskmaster_output, ID = ThisItem.ID) );
+                               If( IsBlank(gOeRec.ID),
+                                   Notify( "That output no longer exists — it may have been deleted. Reopen the project to refresh the list.",
+                                           NotificationType.Error ),
+                                   Set( gOeEditId, gOeRec.ID );
+                                   Set( gOeErr, "" );
+                                   Set( gOeFormat,   Coalesce(gOeRec.output_format.Value, "") );
+                                   Set( gOeAudience, Coalesce(gOeRec.output_audience.Value, "") );
+                                   Set( gOeLanguage, Coalesce(gOeRec.output_language.Value, "") );
+                                   Set( gOeBranding, Coalesce(gOeRec.output_branding.Value, "") );
+                                   Reset( txtOeName ); Reset( dtpOeDate );
+                                   Reset( cboOeFormat ); Reset( cboOeAudience ); Reset( cboOeLanguage ); Reset( cboOeBranding );
+                                   Reset( tglOeFlag ); Reset( txtOeApprId );
+                                   Set( gOeOpen, true ) ) )
+            - lblOlNote:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Task and transaction outputs are edited on their own screens — tap one to open it."
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+      - mdOlClose:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gOlOpen
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Close"
+            X: =(Parent.Width - 900) / 2 + 900 - 24 - 100
+            Y: =(Parent.Height - 540) / 2 + 540 - 24 - 40
+            Width: =100
+            Height: =40
+            OnSelect: =Set( gOlOpen, false )
+      # =====================================================================
+      # PROJECT-LEVEL OUTPUT EDITOR — add (gOeEditId = 0) or edit one row, Patched directly.
+      # DECLARED AFTER mdOl so it floats over the list; closing it returns to the list.
+      # Card 700 x 560: mdOeBody is the top 480 (title 28 + five 62 rows + 18 nudge + six
+      # 12 gaps + 40 padding = 468), the buttons sit at 496..536.
+      # The text inputs, date picker and toggle read gOeRec directly in their defaults; the
+      # four combo boxes need gOe* globals because their OnChange is the only read-back.
+      # =====================================================================
+      - mdOeScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gOeOpen
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set( gOeOpen, false )
+      - mdOeBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gOeOpen
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 700) / 2
+            Y: =(Parent.Height - 560) / 2
+            Width: =700
+            Height: =560
+      - mdOeBody:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Visible: =gOeOpen
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =24
+            PaddingBottom: =16
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =(Parent.Width - 700) / 2
+            Y: =(Parent.Height - 560) / 2
+            Width: =700
+            Height: =480
+          Children:
+            - mdOeTitle:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =If( gOeEditId > 0, "Edit project output", "Add a project output" )
+                  Font: =gTheme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =gTheme.Size.H3
+                  Color: =gTheme.Color.TextPrimary
+                  Width: =Parent.Width - 48
+                  Height: =28
+            - rowOeName:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =8
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblOeNameCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Output name  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width
+                        Height: =18
+                  - txtOeName:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =If( gOeEditId > 0, gOeRec.output_name, "" )
+                        Placeholder: ="What was produced?"
+                        TriggerOutput: =TriggerOutput.Delayed
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        FillPortions: =0
+                        LayoutMinHeight: =36
+                        Width: =Parent.Width
+                        Height: =36
+            - rowOeA:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - colOeDate:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblOeDateCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Output date  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        # A blank stored date opens as today rather than empty.
+                        - dtpOeDate:
+                            Control: ModernDatePicker@1.0.1
+                            Properties:
+                              DefaultDate: |
+                                =If( gOeEditId > 0 && !IsBlank(gOeRec.output_date), gOeRec.output_date, Today() )
+                              Placeholder: ="Output date"
+                              Format: =DatePickerFormat.LongAbbreviated
+                              StartOfWeek: =StartOfWeek.Monday
+                              IsEditable: =true
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                  - colOeFmt:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblOeFmtCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Format  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - cboOeFormat:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colOeFmtOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gOeFormat], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set( gOeFormat, cboOeFormat.Selected.Value )
+            - rowOeB:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - colOeAud:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblOeAudCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Audience  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - cboOeAudience:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colOeAudOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gOeAudience], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set( gOeAudience, cboOeAudience.Selected.Value )
+                  - colOeLang:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblOeLangCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Language  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - cboOeLanguage:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colOeLangOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gOeLanguage], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set( gOeLanguage, cboOeLanguage.Selected.Value )
+            - rowOeC:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - colOeBrand:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblOeBrandCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Branding  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - cboOeBranding:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colOeBrandOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gOeBranding], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set( gOeBranding, cboOeBranding.Selected.Value )
+                  - colOeFlag:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =8
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblOeFlagCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Needs external approval"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - tglOeFlag:
+                            Control: Classic/Toggle@2.1.0
+                            Properties:
+                              Default: |
+                                =If( gOeEditId > 0, Coalesce(gOeRec.output_approval_flag, false), false )
+                              FalseText: =""
+                              TrueText: =""
+                              FillPortions: =0
+                              LayoutMinWidth: =60
+                              Width: =60
+                              Height: =30
+            - rowOeAppr:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =8
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblOeApprCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Approval ID"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width
+                        Height: =18
+                  - txtOeApprId:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: |
+                          =If( gOeEditId > 0, Coalesce(gOeRec.output_approval_id, ""), "" )
+                        Placeholder: ="Approval task ID from the approval portal"
+                        TriggerOutput: =TriggerOutput.Delayed
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        FillPortions: =0
+                        LayoutMinHeight: =36
+                        Width: =Parent.Width
+                        Height: =36
+            # mdOeSave READS THIS LABEL'S TEXT as its gate, so the list of required fields
+            # lives in one place. All five are list-required (output date is the app's own
+            # rule); the approval id is not, and gates nothing on a project-level output.
+            - lblOeMissing:
+                Control: Label@2.5.1
+                Properties:
+                  Visible: =Len(Self.Text) > 0
+                  Text: |
+                    =With(
+                       { m: Concat( Filter( Table(
+                              { L: "Name",     M: Len(Trim(txtOeName.Text)) = 0 },
+                              { L: "Date",     M: IsBlank(dtpOeDate.SelectedDate) },
+                              { L: "Format",   M: Len(gOeFormat) = 0 },
+                              { L: "Audience", M: Len(gOeAudience) = 0 },
+                              { L: "Language", M: Len(gOeLanguage) = 0 },
+                              { L: "Branding", M: Len(gOeBranding) = 0 } ),
+                            M ), L, " | " ) },
+                       If( Len(m) > 0, "Required fields remaining: " & m, "" ) )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.Danger
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =18
+                  Width: =Parent.Width - 48
+                  Height: =18
+      # ALWAYS ENABLED — a disabled button cannot fire OnSelect, so a blocked save would
+      # say nothing. The gate is lblOeMissing, enforced inside.
+      # TRUST THE RECORD, NOT THE MESSAGE: judged by whether a record with an ID came back.
+      # output_project_archived IS WRITTEN ON EVERY SAVE: `= false` does not match a blank,
+      # so a row without it is invisible to LiveOutputs. The task and transaction ids are
+      # never written here — a project-level output has neither.
+      - mdOeSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gOeOpen
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: =If( gOeSaving, "Saving…", If( gOeEditId > 0, "Save output", "Add output" ) )
+            X: =(Parent.Width - 700) / 2 + 700 - 24 - 140
+            Y: =(Parent.Height - 560) / 2 + 560 - 24 - 40
+            Width: =140
+            Height: =40
+            OnSelect: |
+              =If( gOeSaving,
+                   false,
+                   Set( gOeSaving, true );
+                   If( Len(lblOeMissing.Text) > 0,
+                       Notify( "Can't save yet. " & lblOeMissing.Text, NotificationType.Error ),
+                       Set( gOeErr, "" );
+                       Set( gOeScrap, Blank() );
+                       IfError( Set( gOeScrap,
+                                     Patch( taskmaster_output,
+                                            If( gOeEditId > 0, gOeRec, Defaults(taskmaster_output) ),
+                                            { output_name:             Trim(txtOeName.Text),
+                                              output_project_id:       gSelProject.ID,
+                                              output_project_archived:
+                                                  Coalesce(gSelProject.project_phase.Value, "") = "Archived",
+                                              output_date:             dtpOeDate.SelectedDate,
+                                              output_format:           { Value: gOeFormat },
+                                              output_audience:         { Value: gOeAudience },
+                                              output_language:         { Value: gOeLanguage },
+                                              output_branding:         { Value: gOeBranding },
+                                              output_approval_flag:    tglOeFlag.Value,
+                                              output_approval_id:      Trim(txtOeApprId.Text) } ) ),
+                                Set( gOeErr, FirstError.Message ) );
+                       If( IsBlank(gOeScrap.ID),
+                           Notify( "Couldn't save that output: " & gOeErr, NotificationType.Error ),
+                           // The outputs fetch alone — an output moves no phase and no rollup.
+                           Select( btnPrjOutFetch );
+                           Set( gOeOpen, false );
+                           Notify( If( gOeEditId > 0, "Output updated.", "Output added." ),
+                                   NotificationType.Success ) ) );
+                   Set( gOeSaving, false ) )
+      - mdOeCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gOeOpen
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Cancel"
+            X: =(Parent.Width - 700) / 2 + 700 - 24 - 140 - 12 - 120
+            Y: =(Parent.Height - 560) / 2 + 560 - 24 - 40
+            Width: =120
+            Height: =40
+            OnSelect: =Set( gOeOpen, false )
