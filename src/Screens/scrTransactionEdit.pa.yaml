@@ -512,6 +512,219 @@ Screens:
                         Width: =Parent.Width
                         Height: =40
                         Visible: =Len(Self.Text) > 0
+            # ---------------------------------------------------------------------
+            # OUTPUTS — read-only staged rows; the modal below edits one at a time. Nothing is
+            # written until Save. LAST in the scroll so the validation line stays beside the
+            # fields it validates.
+            # blkTxOut's Height is the exact sum of its visible children, and a hidden child takes
+            # no space: 36 head + 8 gap + (24 empty label | rows x 34 + 2 gallery). A gallery row
+            # pitch is TemplateSize + TemplatePadding = 34, plus one 2px padding at the end.
+            # Capped at 6 rows; more scroll inside the gallery.
+            # The row is auto-layout: the name label (FillPortions 1) carries OnSelect, so no
+            # full-template overlay sits over the delete icon.
+            # ---------------------------------------------------------------------
+            - blkTxOut:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =8
+                  FillPortions: =0
+                  LayoutMinHeight: |
+                    =36 + 8 + If( IsEmpty(colTxOut), 24, Min(CountRows(colTxOut), 6) * 34 + 2 )
+                  Width: =Parent.Width - 48
+                  Height: |
+                    =36 + 8 + If( IsEmpty(colTxOut), 24, Min(CountRows(colTxOut), 6) * 34 + 2 )
+                Children:
+                  - rowTxOutHead:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGap: =12
+                        FillPortions: =0
+                        LayoutMinHeight: =36
+                        Width: =Parent.Width
+                        Height: =36
+                      Children:
+                        - lblTxOutHead:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: |
+                                ="Outputs" &
+                                 If( IsEmpty(colTxOut), "",
+                                     "   (" & CountRows(colTxOut) & ")   ·   select a name to edit it" )
+                              Font: =gTheme.Font
+                              FontWeight: =FontWeight.Semibold
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =1
+                              LayoutMinWidth: =120
+                              Height: =36
+                        - btnTxOutAdd:
+                            Control: Classic/Button@2.2.0
+                            Properties:
+                              Text: ="+  Add output"
+                              Fill: =gTheme.Color.Surface
+                              Color: =gTheme.Color.Primary
+                              BorderColor: =gTheme.Color.Primary
+                              BorderThickness: =1
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Body
+                              FillPortions: =0
+                              LayoutMinWidth: =180
+                              Width: =180
+                              Height: =36
+                              # PREFILLED FROM THE LAST ROW: consecutive outputs usually share their
+                              # format, audience, language and branding. Blank when there is no row.
+                              OnSelect: |
+                                =Set( gTxOEditSid, 0 );
+                                 Set( gTxOName, "" );
+                                 Set( gTxODate, Today() );
+                                 Set( gTxOFormat,   Coalesce( Last(colTxOut).Format, "" ) );
+                                 Set( gTxOAudience, Coalesce( Last(colTxOut).Audience, "" ) );
+                                 Set( gTxOLanguage, Coalesce( Last(colTxOut).Language, "" ) );
+                                 Set( gTxOBranding, Coalesce( Last(colTxOut).Branding, "" ) );
+                                 Set( gTxOFlag, false );
+                                 Set( gTxOApprId, "" );
+                                 Reset( txtTxOName ); Reset( dtpTxODate );
+                                 Reset( cboTxOFormat ); Reset( cboTxOAudience );
+                                 Reset( cboTxOLanguage ); Reset( cboTxOBranding );
+                                 Reset( tglTxOFlag ); Reset( txtTxOApprId );
+                                 Set( gTxOutOpen, true )
+                  - lblTxOutEmpty:
+                      Control: Label@2.5.1
+                      Properties:
+                        Visible: =IsEmpty(colTxOut)
+                        Text: ="No outputs logged on this transaction."
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =24
+                        Width: =Parent.Width
+                        Height: =24
+                  - galTxOut:
+                      Control: Gallery@2.15.0
+                      Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+                      Properties:
+                        Visible: =!IsEmpty(colTxOut)
+                        Items: =colTxOut
+                        WrapCount: =1
+                        TemplateSize: =32
+                        TemplatePadding: =2
+                        TemplateFill: =RGBA(0, 0, 0, 0)
+                        BorderThickness: =0
+                        FillPortions: =1
+                        LayoutMinHeight: =36
+                        Width: =Parent.Width
+                        Height: =Min(CountRows(colTxOut), 6) * 34 + 2
+                      Children:
+                        - rowTxOutItem:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =12
+                              PaddingLeft: =8
+                              PaddingRight: =8
+                              X: =0
+                              Y: =0
+                              Width: =Parent.TemplateWidth
+                              Height: =28
+                            Children:
+                              - lblTxOutName:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =ThisItem.Name
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextPrimary
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =1
+                                    LayoutMinWidth: =120
+                                    Height: =24
+                                    OnSelect: |
+                                      =Set( gTxOEditSid, ThisItem.Sid );
+                                      Set( gTxOName, ThisItem.Name );
+                                      Set( gTxODate, ThisItem.ODate );
+                                      Set( gTxOFormat, ThisItem.Format );
+                                      Set( gTxOAudience, ThisItem.Audience );
+                                      Set( gTxOLanguage, ThisItem.Language );
+                                      Set( gTxOBranding, ThisItem.Branding );
+                                      Set( gTxOFlag, ThisItem.Flag );
+                                      Set( gTxOApprId, ThisItem.ApprId );
+                                      Reset( txtTxOName ); Reset( dtpTxODate );
+                                      Reset( cboTxOFormat ); Reset( cboTxOAudience );
+                                      Reset( cboTxOLanguage ); Reset( cboTxOBranding );
+                                      Reset( tglTxOFlag ); Reset( txtTxOApprId );
+                                      Set( gTxOutOpen, true )
+                              - lblTxOutDate:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: =Text(ThisItem.ODate, "[$-en-US]dd mmm yyyy")
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =0
+                                    LayoutMinWidth: =100
+                                    Width: =100
+                                    Height: =24
+                              - lblTxOutMeta:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: |
+                                      =ThisItem.Format & "  ·  " & ThisItem.Audience & "  ·  " &
+                                       ThisItem.Language & "  ·  " & ThisItem.Branding
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =0
+                                    LayoutMinWidth: =360
+                                    Width: =360
+                                    Height: =24
+                              - lblTxOutAppr:
+                                  Control: Label@2.5.1
+                                  Properties:
+                                    Text: |
+                                      =If( !ThisItem.Flag, "",
+                                           Len(ThisItem.ApprId) > 0, "Approval " & ThisItem.ApprId,
+                                           "Approval ID missing" )
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: |
+                                      =If( ThisItem.Flag && Len(ThisItem.ApprId) = 0,
+                                           gTheme.Color.Danger, gTheme.Color.TextMuted )
+                                    VerticalAlign: =VerticalAlign.Middle
+                                    FillPortions: =0
+                                    LayoutMinWidth: =180
+                                    Width: =180
+                                    Height: =24
+                              # A saved row is only QUEUED for removal here; Save removes it from
+                              # SharePoint. Collect before RemoveIf — ThisItem is gone afterwards.
+                              - icoTxOutDel:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =gTheme.Color.TextMuted
+                                    HoverColor: =gTheme.Color.Danger
+                                    HoverFill: =RGBA(0, 0, 0, 0)
+                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                    Tooltip: ="Remove this output"
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Width: =16
+                                    Height: =16
+                                    OnSelect: |
+                                      =If( ThisItem.OutId > 0, Collect( colTxOutDel, { OutId: ThisItem.OutId } ) );
+                                      RemoveIf( colTxOut, Sid = ThisItem.Sid )
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -586,7 +799,7 @@ Screens:
                   LayoutMinWidth: =220
                   Width: =220
                   Height: =48
-                  # Every column this form owns is required, so a single Patch covers it.
+                  # One Patch for the transaction, then its staged outputs, in that order.
                   # transaction_notional_usd is NOT written: it has no app-side writer by decision.
                   OnSelect: |
                     =If( gSaving,
@@ -602,19 +815,24 @@ Screens:
                     NotificationType.Error ),
                     Set( gTxSaved, Blank() );
                     Set( gTxErr, "" );
+                    // Captured BEFORE the write: a successful save flips gEditMode to "Edit" below.
+                    Set( gTxInsert, gEditMode <> "Edit" );
+                    // Mirrors the PARENT's phase so cross-project queries can exclude archived work with
+                    // a delegable `= false`. Written on EVERY save. Read LIVE from the list, not from
+                    // gSelProject — that global is a gallery snapshot, so a project archived since would
+                    // stamp `false` and the row would stay in scope forever.
+                    // ONE VALUE, TWO WRITERS: the transaction and each of its output rows carry it, and
+                    // they must agree.
+                    Set( gTxArchived,
+                         Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
+                                           project_phase.Value ), "" ) = "Archived" );
                     IfError(
                         // The Set wrapper is not decoration: IfError requires all its arguments to be
                         // type-compatible, and a bare Patch (record) against a Set fallback is rejected.
                         Set( gTxSaved,
                         Patch( taskmaster_transactions,
                                If( gEditMode = "Edit", gEditTransaction, Defaults(taskmaster_transactions) ),
-                               // Mirrors the PARENT's phase so cross-project queries can exclude archived work with
-                               // a delegable `= false`. Written on EVERY save. Read LIVE from the list, not from
-                               // gSelProject — that global is a gallery snapshot, so a project archived since would
-                               // stamp `false` and the row would stay in scope forever.
-                               { transaction_project_archived:
-                                     Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
-                                                       project_phase.Value ), "" ) = "Archived",
+                               { transaction_project_archived: gTxArchived,
                                transaction_name:        Trim(txtTxName.Text),
                                  transaction_project_id:  { Id: gTxProject.Id, Value: gTxProject.Value },
                                  // BOTH OPTIONAL. An unset lookup must write Blank(), never {Id: 0};
@@ -651,9 +869,75 @@ Screens:
                     If( Len(gTxErr) > 0,
                         Notify("Couldn't save the transaction: " & gTxErr, NotificationType.Error) );
                     If( Len(gTxErr) = 0,
-                        Notify( If(gEditMode = "Edit", "Transaction saved", "Transaction created"),
-                                NotificationType.Success );
-                        Back() ) );
+                        // --- the transaction now EXISTS. Never insert it twice. -------------
+                        // A failed output row keeps the user on this screen to retry, and that retry
+                        // must PATCH this record, not create a second one. Read back rather than
+                        // reusing Patch's return value, which is not guaranteed to carry every column.
+                        Set( gEditTransaction, LookUp(taskmaster_transactions, ID = gTxSaved.ID) );
+                        If( IsBlank(gEditTransaction.ID), Set( gEditTransaction, gTxSaved ) );
+                        Set( gEditMode, "Edit" );
+                        // --- outputs: AFTER the parent, because a new parent's ID must exist first.
+                        // Res is the new row's ID as text, or "!" + the error. ONE text field because
+                        // IfError's arguments must be type-compatible; an empty Res is a write that
+                        // returned no record. ForAll may run rows in any order, so Collect, never Set.
+                        // output_task_id is NEVER named: a row has at most one parent.
+                        Clear( colTxOutRes );
+                        ForAll( colTxOut As r,
+                            Collect( colTxOutRes,
+                                { Sid: r.Sid, Name: r.Name,
+                                  Res:
+                                    IfError( Text(
+                                        Patch( taskmaster_output,
+                                               If( r.OutId > 0,
+                                                   LookUp( taskmaster_output, ID = r.OutId ),
+                                                   Defaults(taskmaster_output) ),
+                                               { output_name:             r.Name,
+                                                 output_project_id:       gTxProject.Id,
+                                                 output_transaction_id:   gTxSaved.ID,
+                                                 // Written on EVERY row, never left to the column
+                                                 // default: `= false` does not match a blank.
+                                                 output_project_archived: gTxArchived,
+                                                 output_date:             r.ODate,
+                                                 output_format:           { Value: r.Format },
+                                                 output_audience:         { Value: r.Audience },
+                                                 output_language:         { Value: r.Language },
+                                                 output_branding:         { Value: r.Branding },
+                                                 output_approval_flag:    r.Flag,
+                                                 output_approval_id:      r.ApprId } )
+                                        .ID ),
+                                        "!" & FirstError.Message ) } ) );
+                        // A written row keeps its new ID, so a retry UPDATES it instead of
+                        // inserting it again. Failed rows stay staged as they were.
+                        ForAll( Filter( colTxOutRes, Len(Res) > 0 && !StartsWith(Res, "!") ) As k,
+                            Patch( colTxOut, LookUp( colTxOut, Sid = k.Sid ), { OutId: Value(k.Res) } ) );
+                        // THE FILTER DELEGATES, THE MEMBERSHIP TEST DOES NOT — so they are separate,
+                        // as in scrTaskEdit's product-link reconcile. Remove() takes the scope record.
+                        // Then RE-READ: a removal confirmed gone leaves colTxOutDel, and whatever is
+                        // still listed failed and is retried on the next Save.
+                        If( !IsEmpty(colTxOutDel),
+                            ForAll( Filter( taskmaster_output, output_transaction_id = gTxSaved.ID ) As o,
+                                    If( o.ID in colTxOutDel.OutId,
+                                        Remove( taskmaster_output, o ) ) );
+                            ClearCollect( colTxOutLeft,
+                                ForAll( Filter( taskmaster_output, output_transaction_id = gTxSaved.ID ) As o,
+                                        { OutId: o.ID } ) );
+                            RemoveIf( colTxOutDel, !(OutId in colTxOutLeft.OutId) ) );
+                        Set( gTxOutFail, CountRows( Filter( colTxOutRes, Len(Res) = 0 || StartsWith(Res, "!") ) ) );
+                        If( gTxOutFail > 0 || !IsEmpty(colTxOutDel),
+                            With( { f: First( Filter( colTxOutRes, Len(Res) = 0 || StartsWith(Res, "!") ) ) },
+                                Notify( "Transaction saved, but its outputs did not all save — press Save to retry."
+                                          & If( gTxOutFail > 0,
+                                                "   " & gTxOutFail & " not written. """ & f.Name & """: "
+                                                  & If( Len(f.Res) = 0, "SharePoint returned no record.", Mid(f.Res, 2) ),
+                                                "" )
+                                          & If( !IsEmpty(colTxOutDel),
+                                                "   " & CountRows(colTxOutDel) & " removed output(s) are still in SharePoint.",
+                                                "" ),
+                                        NotificationType.Error ) ) );
+                        If( gTxOutFail = 0 && IsEmpty(colTxOutDel),
+                            Notify( If(gTxInsert, "Transaction created", "Transaction saved"),
+                                    NotificationType.Success );
+                            Back() ) ) );
                     Set( gSaving, false ) )
             - btnTxCancel:
                 Control: Classic/Button@2.2.0

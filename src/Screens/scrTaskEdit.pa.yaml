@@ -1,6 +1,11 @@
-# scrTaskEdit — one task, on containers. Output is an optional section behind a
-# toggle; switching it OFF on an edit CLEARS every output field on save, or the
-# section would hide values that are still stored.
+# scrTaskEdit — one task, on containers. The Output section holds the task's OUTPUT LOG
+# (rows of taskmaster_output, staged in colTkOut and written by btnTkSave after the task
+# Patch) and its product links. tglTkOutput only SHOWS OR HIDES that section: hiding it
+# never deletes or blanks a row, and staged rows still save while it is off.
+#
+# OUTPUT MODAL (mdTkOut*), absolute, card 640 x 570 centred:
+#   body   card.y +   0 .. 486   24 pad + title 28 + 5 rows x (12 + 62) + 12 + missing 36 + 16 pad
+#   buttons card.y + 506 .. 546  Cancel x 344..464, Add x 476..616 (24 from the card's right edge)
 #
 # DERIVED, WITH NO CONTROL ON THIS SCREEN: the project (from the task on Edit, from
 # gSelProject on New), the completion date (Complete stamps it, anything else clears
@@ -65,6 +70,29 @@ Screens:
         // the junction a second time. Inside the resume guard with every other seed: coming back
         // from "create a new product" must not re-baseline what the user has already staged.
         ClearCollect( colTkProductsLoaded, colTkProducts );
+        // THE OUTPUT LOG, staged. Off the RAW list: `=` on the indexed Number FK delegates, and
+        // a task's outputs are read whatever their archived flag. Sid = the SharePoint ID for a
+        // loaded row and a NEGATIVE counter for a new one, so the two can never collide.
+        // ODate goes through Date() so every row holds the same type as dtpTkOutDate.SelectedDate.
+        // Dirty marks a row the modal touched — btnTkSave writes only those.
+        Clear( colTkOut ); Clear( colTkOutDel );
+        Set( gTkOutSeq, 0 );
+        If( gEditMode = "Edit",
+            Collect( colTkOut,
+                     ForAll( Filter( taskmaster_output, output_task_id = gEditTask.ID ) As o,
+                             { Sid:      o.ID,
+                               OutId:    o.ID,
+                               Name:     o.output_name,
+                               ODate:    If( IsBlank(o.output_date), Blank(),
+                                             Date( Year(o.output_date), Month(o.output_date), Day(o.output_date) ) ),
+                               Format:   o.output_format.Value,
+                               Audience: o.output_audience.Value,
+                               Language: o.output_language.Value,
+                               Branding: o.output_branding.Value,
+                               Flag:     Coalesce(o.output_approval_flag, false),
+                               ApprId:   Coalesce(o.output_approval_id, ""),
+                               Dirty:    false } ) ) );
+        Set( gTkOutOpen, false ); Set( gTkOutSid, 0 );
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — never
         // hard-code one, look it up by Label, which is what each DefaultId does.
@@ -85,51 +113,42 @@ Screens:
                                     { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ) );
         Set( gTkStage,    If( gEditMode = "Edit", Coalesce(gEditTask.task_stage.Value, "Not Started"), "Not Started" ) );
         Set( gTkPriority, If( gEditMode = "Edit", Coalesce(gEditTask.task_priority.Value, "Moderate"), "Moderate" ) );
-        Set( gTkLanguage, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_language.Value, "(none)"), "(none)" ) );
-        Set( gTkFormat,   If( gEditMode = "Edit", Coalesce(gEditTask.task_output_format.Value, "(none)"), "(none)" ) );
-        Set( gTkBranding, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_branding.Value, "(none)"), "(none)" ) );
-        Set( gTkAudience, If( gEditMode = "Edit", Coalesce(gEditTask.task_output_audience.Value, "(none)"), "(none)" ) );
         Set( gTkClientStage, If( gEditMode = "Edit", Coalesce(gEditTask.task_client_stage.Value, "(none)"), "(none)" ) );
         Set( gTkPicker, "" );
         Reset( txtTkName ); Reset( txtTkDesc );
         Reset( cmpTkPick );
         Set( gTkQuery, "" );
-        Reset( txtTkApprovalId );
         // THE OPTION LISTS LOAD HERE, after the modal and query state is cleared and before
         // the combo Resets that read them: nothing that decides whether the screen is USABLE
         // may sit below this block. Concurrent's arms fail INDEPENDENTLY — a Choices() that
         // errors leaves its own list empty and the rest still load, where the serial chain
         // this replaces stopped dead at the first failure.
         // EVERY OPTION LIST COMES FROM ITS COLUMN, not a literal copy — a literal drifts
-        // silently both ways when someone edits the Choice in SharePoint. "(none)" is the
-        // FIRST ITEM so it sorts to the top; it is an app concept, and the save maps it back
-        // to Blank(). ClearCollect takes several items, which is what keeps each list to ONE
-        // statement — and a Concurrent arm is one formula.
-        // THE Opts SUFFIX IS LOAD-BEARING. This screen names its column containers col* too
-        // (colTkFormat, colTkLang, colTkBrand are CONTROLS), so a collection named after the
-        // container it sits in resolves to the control instead, and every reader of it fails
-        // as an incompatible type one hop from the cause.
-        // <= 1, NOT IsEmpty, AND THE DIFFERENCE MATTERS. These five carry a "(none)" row this
-        // screen adds itself, so a Choices() that returned nothing still leaves the list
-        // non-empty — IsEmpty would latch that one-row list for the whole session and every
-        // save would write Blank() from a dropdown that offered nothing else. Counting the
-        // sentinel out means "the fetch delivered no members", which is worth retrying.
+        // silently both ways when someone edits the Choice in SharePoint. The four output
+        // lists read taskmaster_output, never the task's own columns.
+        // THE Opts SUFFIX IS LOAD-BEARING. Controls and collections share one namespace, so a
+        // collection named like a control resolves to the control instead, and every reader of
+        // it fails as an incompatible type one hop from the cause.
+        // The output lists carry NO "(none)" row: all four columns are list-required, so a blank
+        // pick is a missing field, not a value. IsEmpty is therefore the right retry test for
+        // them. The client-stage list keeps its "(none)" row, hence <= 1 — IsEmpty would latch a
+        // list holding only the sentinel for the whole session.
         Concurrent(
-            If( CountRows(colTkFmtOpts) <= 1,
-                ClearCollect( colTkFmtOpts, { Value: "(none)" },
-                         ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+            If( IsEmpty(colTkOutFmtOpts),
+                ClearCollect( colTkOutFmtOpts,
+                         ForAll( Choices([@taskmaster_output].output_format) As c,
                                  { Value: c.Value } ) ) ),
-            If( CountRows(colTkLangOpts) <= 1,
-                ClearCollect( colTkLangOpts, { Value: "(none)" },
-                         ForAll( Choices([@taskmaster_tasks].task_output_language) As c,
+            If( IsEmpty(colTkOutLangOpts),
+                ClearCollect( colTkOutLangOpts,
+                         ForAll( Choices([@taskmaster_output].output_language) As c,
                                  { Value: c.Value } ) ) ),
-            If( CountRows(colTkBrandOpts) <= 1,
-                ClearCollect( colTkBrandOpts, { Value: "(none)" },
-                         ForAll( Choices([@taskmaster_tasks].task_output_branding) As c,
+            If( IsEmpty(colTkOutBrandOpts),
+                ClearCollect( colTkOutBrandOpts,
+                         ForAll( Choices([@taskmaster_output].output_branding) As c,
                                  { Value: c.Value } ) ) ),
-            If( CountRows(colTkAudOpts) <= 1,
-                ClearCollect( colTkAudOpts, { Value: "(none)" },
-                         ForAll( Choices([@taskmaster_tasks].task_output_audience) As c,
+            If( IsEmpty(colTkOutAudOpts),
+                ClearCollect( colTkOutAudOpts,
+                         ForAll( Choices([@taskmaster_output].output_audience) As c,
                                  { Value: c.Value } ) ) ),
             If( CountRows(colTkCliStageOpts) <= 1,
                 ClearCollect( colTkCliStageOpts, { Value: "(none)" },
@@ -139,8 +158,9 @@ Screens:
         // task's stage/priority survive and the strip DISAGREES WITH THE SAVE.
         Reset( selTkStage ); Reset( selTkPriority );
         // A combo box re-reads DefaultSelectedItems ONLY on Reset.
-        Reset( cboTkLanguage ); Reset( cboTkFormat ); Reset( cboTkBranding ); Reset( cboTkAudience ); Reset( cboTkClientStage );
-        Reset( tglTkOutput ); Reset( tglTkClient ); Reset( tglTkApprovalReq );
+        Reset( cboTkClientStage );
+        // AFTER colTkOut and colTkProducts are seeded: the toggle's Default reads both.
+        Reset( tglTkOutput ); Reset( tglTkClient );
         // A date picker re-reads DefaultDate ONLY on Reset. Without these the seeds never
         // take on a second visit and the Patch writes Blank() over the stored dates.
         Reset( dtpTkStart ); Reset( dtpTkTarget )

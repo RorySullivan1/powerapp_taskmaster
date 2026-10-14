@@ -420,7 +420,9 @@ Screens:
                         LayoutGap: =8
                         FillPortions: =1
                         LayoutMinWidth: =420
-                        Height: =140
+                        # 36 name + 3 x 40 fact rows + 3 x 8 gaps = 180, inside cardInfo's 198
+                        # (230 less 16 + 16 padding). A fourth row does not fit.
+                        Height: =180
                       Children:
                         - lblProjName:
                             Control: Label@2.5.1
@@ -749,6 +751,77 @@ Screens:
                                           LayoutMinHeight: =22
                                           Width: =Parent.Width
                                           Height: =22
+                        # OUTPUTS: the count by source, and the one door into mdOl. Read off
+                        # colProjectOut, so this costs no query of its own. A row with no task
+                        # and no transaction id is project-level; Coalesce treats 0 as unset.
+                        - rowFacts3:
+                            Control: GroupContainer@1.5.0
+                            Variant: AutoLayout
+                            Properties:
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =16
+                              FillPortions: =0
+                              LayoutMinHeight: =40
+                              Width: =Parent.Width
+                              Height: =40
+                            Children:
+                              - colFact30:
+                                  Control: GroupContainer@1.5.0
+                                  Variant: AutoLayout
+                                  Properties:
+                                    LayoutDirection: =LayoutDirection.Vertical
+                                    LayoutAlignItems: =LayoutAlignItems.Start
+                                    LayoutGap: =2
+                                    FillPortions: =1
+                                    LayoutMinWidth: =240
+                                    Height: =40
+                                  Children:
+                                    - lblFactCap30:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: ="Outputs"
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          Color: =gTheme.Color.TextMuted
+                                          FillPortions: =0
+                                          LayoutMinHeight: =16
+                                          Width: =Parent.Width
+                                          Height: =16
+                                    - lblFactVal30:
+                                        Control: Label@2.5.1
+                                        Properties:
+                                          Text: |
+                                            =If( IsEmpty(colProjectOut), "None logged",
+                                                 CountRows(colProjectOut) & "   ·   "
+                                                 & CountRows( Filter(colProjectOut, Coalesce(output_task_id, 0) > 0) ) & " task   ·   "
+                                                 & CountRows( Filter(colProjectOut, Coalesce(output_transaction_id, 0) > 0) ) & " transaction   ·   "
+                                                 & CountRows( Filter(colProjectOut, Coalesce(output_task_id, 0) = 0
+                                                                                 && Coalesce(output_transaction_id, 0) = 0) ) & " project" )
+                                          Font: =gTheme.Font
+                                          Size: =gTheme.Size.Small
+                                          FontWeight: =FontWeight.Semibold
+                                          Color: =gTheme.Color.TextPrimary
+                                          VerticalAlign: =VerticalAlign.Middle
+                                          FillPortions: =0
+                                          LayoutMinHeight: =22
+                                          Width: =Parent.Width
+                                          Height: =22
+                              - btnPrjOutputs:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Fill: =gTheme.Color.Surface
+                                    Color: =gTheme.Color.Primary
+                                    BorderColor: =gTheme.Color.Primary
+                                    BorderThickness: =1
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Text: ="Outputs…"
+                                    FillPortions: =0
+                                    LayoutMinWidth: =140
+                                    Width: =140
+                                    Height: =32
+                                    OnSelect: =Set( gOlOpen, true )
                   # The ring is WRAPPED because the layout properties belong on the wrapper:
                   # FillPortions and LayoutMinWidth are proven on GroupContainer but NOT on a
                   # CanvasComponent instance, and the contract check rejects them there. Without a
@@ -1360,7 +1433,9 @@ Screens:
                                                   =Set( gDelKind, "Task" );
                                                    Set( gDelId, ThisItem.ID );
                                                    Set( gDelName, ThisItem.task_name );
-                                                   Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_task_name.Id = ThisItem.ID) ) )
+                                                   Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_task_name.Id = ThisItem.ID) ) );
+                                                   // Off the loaded collection, not a query — the confirm only quotes it.
+                                                   Set( gDelOuts, CountRows( Filter(colProjectOut, output_task_id = ThisItem.ID) ) )
                                     - rowTasksLine:
                                         Control: Rectangle@2.3.0
                                         Properties:
@@ -1601,7 +1676,8 @@ Screens:
                                                   =Set( gDelKind, "Transaction" );
                                                    Set( gDelId, ThisItem.ID );
                                                    Set( gDelName, ThisItem.transaction_name );
-                                                   Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = ThisItem.ID) ) )
+                                                   Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = ThisItem.ID) ) );
+                                                   Set( gDelOuts, CountRows( Filter(colProjectOut, output_transaction_id = ThisItem.ID) ) )
                                     - rowTxLine:
                                         Control: Rectangle@2.3.0
                                         Properties:
@@ -1929,7 +2005,8 @@ Screens:
                                                 =Set( gDelKind, "Issue" );
                                                  Set( gDelId, ThisItem.ID );
                                                  Set( gDelName, ThisItem.issue_name );
-                                                 Set( gDelRefs, 0 )
+                                                 Set( gDelRefs, 0 );
+                                                 Set( gDelOuts, 0 )
                                   - rowIssLine:
                                       Control: Rectangle@2.3.0
                                       Properties:
@@ -2239,8 +2316,9 @@ Screens:
                                                  Set( gCmtViewOpen, true ) )
 
       # =====================================================================
-      # DELETE CONFIRMATION — one instance serving all three galleries, keyed by
-      # gDelKind. Declared LAST so positional z-order floats it over the content.
+      # DELETE CONFIRMATION — one instance serving every delete on the screen, keyed by
+      # gDelKind. Declared after the content so positional z-order floats it over it, but
+      # BEFORE the dialogs: mdCv and mdOl close themselves before handing off to it.
       #
       # STUDIO CHECK BEFORE THIS SCREEN IS PASTED: a component crosses the gap in TWO
       # parts and only the CONTROLS paste — every custom property is declared and typed
@@ -2265,6 +2343,7 @@ Screens:
                        "Transaction", "Delete this transaction?",
                        "Issue",       "Delete this issue?",
                        "Comment",     "Delete this comment?",
+                       "Output",      "Delete this output?",
                        "Delete?" )
             # Says what ELSE changes — an arm cannot explain that issues are about to
             # be detached, which is why this one is a dialog.
@@ -2272,12 +2351,18 @@ Screens:
               =Switch( gDelKind,
                        "Task",
                        "Delete " & gDelName & "? Its product links go with it." &
+                       If( gDelOuts > 0,
+                           " Its " & gDelOuts & " output(s) will be DELETED with it.",
+                           "" ) &
                        If( gDelRefs > 0,
                            " " & gDelRefs & " issue(s) raised against it will be KEPT — only the link to this task is cleared.",
                            "" ) &
                        " This cannot be undone.",
                        "Transaction",
                        "Delete " & gDelName & "?" &
+                       If( gDelOuts > 0,
+                           " Its " & gDelOuts & " output(s) will be DELETED with it.",
+                           "" ) &
                        If( gDelRefs > 0,
                            " " & gDelRefs & " issue(s) linked to it will be KEPT — only the link to this transaction is cleared.",
                            "" ) &
@@ -2286,12 +2371,15 @@ Screens:
                        "Delete " & gDelName & "? Nothing else references an issue. This cannot be undone.",
                        "Comment",
                        "Delete this comment? " & gDelName & " Nothing else references a comment. This cannot be undone.",
+                       "Output",
+                       "Delete " & gDelName & "? Nothing else references an output. This cannot be undone.",
                        "" )
             ConfirmLabel: ="Delete"
             CancelLabel: ="Cancel"
             Destructive: =true
-            # Order is deliberate: DETACH the referencing issues first, then remove the row.
-            # The reverse leaves issues pointing at a row that no longer exists.
+            # Order is deliberate: DETACH the referencing issues, DELETE the row's outputs, then
+            # remove the row. The reverse leaves issues and outputs pointing at a row that no
+            # longer exists — output FKs are plain Numbers, so SharePoint would never notice.
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
@@ -2304,7 +2392,11 @@ Screens:
                     If( gDelKind = "Issue",
                         Coalesce( LookUp(taskmaster_issues, ID = gDelId).issue_task_name.Id, 0 ),
                         0 ) );
-               If( gDelRefs >= 500, Set( gDelBlock, true ) );
+               // gDelOuts is counted off colProjectOut, which is itself capped at the data row
+               // limit — a capped count reads as exactly the limit and still trips this.
+               If( gDelRefs >= 500
+                || ( (gDelKind = "Task" || gDelKind = "Transaction") && gDelOuts >= 500 ),
+                   Set( gDelBlock, true ) );
                If( !gDelBlock && gDelKind = "Task" && gDelRefs > 0,
                    IfError( Set( gDelScrapDT,
                                  ForAll( Filter( taskmaster_issues, issue_task_name.Id = gDelId ) As iss,
@@ -2314,6 +2406,16 @@ Screens:
                    IfError( Set( gDelScrapDX,
                                  ForAll( Filter( taskmaster_issues, issue_transaction_name.Id = gDelId ) As iss,
                                          Patch( taskmaster_issues, iss, { issue_transaction_name: Blank() } ) ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
+               // OUTPUTS ARE DELETED, NOT DETACHED (#94). RUN EVEN WHEN gDelOuts IS 0: that count
+               // is the screen's snapshot and only feeds the message, while this reads the list.
+               If( Len(gDelErr) = 0 && !gDelBlock && gDelKind = "Task",
+                   IfError( Set( gDelScrapOT,
+                                 RemoveIf( taskmaster_output, output_task_id = gDelId ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
+               If( Len(gDelErr) = 0 && !gDelBlock && gDelKind = "Transaction",
+                   IfError( Set( gDelScrapOX,
+                                 RemoveIf( taskmaster_output, output_transaction_id = gDelId ) ),
                             Set( gDelErr, FirstError.Message ) ) );
                // LookUp, not the gallery record. A task's product links are removed by
                // SharePoint's own CASCADE on taskproduct_task_id — the app must not delete them.
@@ -2338,23 +2440,37 @@ Screens:
                            IfError( Set( gDelScrapCm,
                                          Remove( taskmaster_projectcomments,
                                                  LookUp(taskmaster_projectcomments, ID = gDelId) ) ),
+                                    Set( gDelErr, FirstError.Message ) ),
+                           // Only project-level outputs reach here — mdOl offers no delete on a
+                           // task's or transaction's output.
+                           "Output",
+                           IfError( Set( gDelScrapO,
+                                         Remove( taskmaster_output,
+                                                 LookUp(taskmaster_output, ID = gDelId) ) ),
                                     Set( gDelErr, FirstError.Message ) ) ) );
                If( gDelBlock,
-                   Notify( "Too many issues reference this to detach in one pass. Nothing was deleted — ask for the cleanup workflow.",
+                   Notify( "Too many issues or outputs are attached to this to handle in one pass. Nothing was deleted — ask for the cleanup workflow.",
                            NotificationType.Error ),
                    Len(gDelErr) > 0,
                    // No transaction exists here: the detach has already committed.
                    Notify( "Couldn't delete it: " & gDelErr
-                             & " Some issue links may already have been cleared — reopen the project to check.",
+                             & " Some issue links or outputs may already have been changed — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( gDelKind & " deleted.", NotificationType.Success );
                    If( gDelIssTask > 0,
                        ClearCollect( colHlTasks, { Id: gDelIssTask } );
                        Select( btnPrjHealth ) );
-                   // The ONE call that repairs project_phase and the completion rollup.
-                   Select( btnPrjRecompute ) );
+                   // The ONE call that repairs project_phase and the completion rollup — and
+                   // refetches colProjectOut. An output cannot move either, so it fetches alone.
+                   If( gDelKind = "Output",
+                       Select( btnPrjOutFetch ),
+                       Select( btnPrjRecompute ) ) );
+               // Back to the list the output delete came from.
+               If( gDelKind = "Output", Set( gOlOpen, true ) );
                Set( gDelKind, "" )
-            OnCancel: =Set( gDelKind, "" )
+            OnCancel: |
+              =If( gDelKind = "Output", Set( gOlOpen, true ) );
+               Set( gDelKind, "" )
       # =====================================================================
       # ADD A COMMENT — a SCREEN-LOCAL modal, deliberately not a component. One screen
       # needs it, and a component crosses the gap in two parts: only the controls paste
@@ -2661,6 +2777,7 @@ Screens:
                Set( gDelKind, "Comment" );
                Set( gDelId, gCmtView.ID );
                Set( gDelRefs, 0 );
+               Set( gDelOuts, 0 );
                Set( gDelName,
                     With( { t: Trim( Substitute(
                                  Substitute( Coalesce(gCmtView.projectcomment_comment, ""),
