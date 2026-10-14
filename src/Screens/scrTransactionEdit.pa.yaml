@@ -97,7 +97,10 @@ Screens:
                         { Sid:      o.ID,
                           OutId:    o.ID,
                           Name:     o.output_name,
-                          ODate:    o.output_date,
+                          // Rebuilt as a DATE so a loaded row and a modal-staged row
+                          // (dtpTxODate.SelectedDate) carry the same type in one collection.
+                          ODate:    If( IsBlank(o.output_date), Blank(),
+                                        Date( Year(o.output_date), Month(o.output_date), Day(o.output_date) ) ),
                           Format:   o.output_format.Value,
                           Audience: o.output_audience.Value,
                           Language: o.output_language.Value,
@@ -954,6 +957,409 @@ Screens:
                   Width: =140
                   Height: =48
                   OnSelect: =Back()
+      # =======================================================================
+      # MODAL — ADD / EDIT ONE OUTPUT     card 780 x 500, buttons pinned to the card
+      # Edits ONE staged row of colTxOut; nothing reaches SharePoint until Save.
+      # Declared after the footer so the scrim covers Save; before cmpTxPick and
+      # cmpTxConfirmDel, neither of which can open while the scrim is up.
+      # Every part is gated on gTxOutOpen and shares the card's anchor expressions.
+      # Card band at 1366 x 768: x 293..1073, y 134..634.
+      #   body 134..554 (420 tall; content 412 = 24 pad + 28 title + 4 x (12 + 62) rows
+      #        + 12 + 36 message + 16 pad), so it never scrolls at this size
+      #   buttons y 570..610 (card bottom - 24 - 40): Cancel x 767..887, OK x 899..1049
+      # =======================================================================
+      - mdTxOScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gTxOutOpen
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set( gTxOEditSid, 0 ); Set( gTxOutOpen, false )
+      - mdTxOBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gTxOutOpen
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 780) / 2
+            Y: =(Parent.Height - 500) / 2
+            Width: =780
+            Height: =500
+      - mdTxOBody:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Visible: =gTxOutOpen
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =24
+            PaddingBottom: =16
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =(Parent.Width - 780) / 2
+            Y: =(Parent.Height - 500) / 2
+            Width: =780
+            Height: =420
+          Children:
+            - mdTxOTitle:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =If( gTxOEditSid > 0, "Edit output", "Add an output" )
+                  Font: =gTheme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =gTheme.Size.H3
+                  Color: =gTheme.Color.TextPrimary
+                  Width: =Parent.Width - 48
+                  Height: =28
+            - rowTxOName:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblTxONameCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Output name  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - txtTxOName:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =gTxOName
+                        Placeholder: ="e.g. Q3 autocall deck"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                  - lblTxODateCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Output date  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - dtpTxODate:
+                      Control: ModernDatePicker@1.0.1
+                      Properties:
+                        DefaultDate: =gTxODate
+                        Placeholder: ="Output date"
+                        Format: =DatePickerFormat.LongAbbreviated
+                        StartOfWeek: =StartOfWeek.Monday
+                        IsEditable: =true
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+            # THE FOUR CHOICES ARE LIST-REQUIRED, so no "(none)" row. A blank global shows an
+            # empty box; the Filter keeps a blank out of DefaultSelectedItems.
+            - rowTxOFmt:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblTxOFmtCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Format  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboTxOFormat:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colTxOFmtOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gTxOFormat], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gTxOFormat, cboTxOFormat.Selected.Value)
+                  - lblTxOAudCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Audience  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboTxOAudience:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colTxOAudOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gTxOAudience], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gTxOAudience, cboTxOAudience.Selected.Value)
+            - rowTxOLang:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblTxOLangCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Language  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboTxOLanguage:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colTxOLangOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gTxOLanguage], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gTxOLanguage, cboTxOLanguage.Selected.Value)
+                  - lblTxOBrandCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Branding  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboTxOBranding:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colTxOBrandOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gTxOBranding], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gTxOBranding, cboTxOBranding.Selected.Value)
+            # NO GATE ON A TRANSACTION: the flag and the id are recorded, but a transaction has no
+            # stage for a missing approval id to block.
+            - rowTxOAppr:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblTxOFlagCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Approval required?"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - tglTxOFlag:
+                      Control: Classic/Toggle@2.1.0
+                      Properties:
+                        Default: =gTxOFlag
+                        FalseText: =""
+                        TrueText: =""
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =60
+                        Height: =30
+                  - lblTxOApprCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Approval ID (external portal)"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - txtTxOApprId:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =gTxOApprId
+                        Placeholder: ="Approval task ID from the approval portal"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+            # Read by mdTxOOk, which stays enabled so a blocked add can name what is missing.
+            # The approval id is NOT here: it may be filled in after the output exists.
+            - lblTxOMissing:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =With(
+                       { m: Concat( Filter( Table(
+                              { L: "Name",     M: Len(Trim(txtTxOName.Text)) = 0 },
+                              // Not list-required, but every reader sorts and windows on it.
+                              { L: "Date",     M: IsBlank(dtpTxODate.SelectedDate) },
+                              { L: "Format",   M: Len(gTxOFormat) = 0 },
+                              { L: "Audience", M: Len(gTxOAudience) = 0 },
+                              { L: "Language", M: Len(gTxOLanguage) = 0 },
+                              { L: "Branding", M: Len(gTxOBranding) = 0 } ),
+                            M ), L, " | " ) },
+                       If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.Danger
+                  Width: =Parent.Width - 48
+                  Height: =36
+      - mdTxOOk:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gTxOutOpen
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: =If( gTxOEditSid > 0, "Save output", "Add output" )
+            X: =(Parent.Width - 780) / 2 + 780 - 24 - 150
+            Y: =(Parent.Height - 500) / 2 + 500 - 24 - 40
+            Width: =150
+            Height: =40
+            # FOUR SINGLE-ARM Ifs, not one If with mixed arms: Notify, Patch, Collect and Set
+            # return different types. None of them changes what the guard reads, so all four
+            # agree.
+            OnSelect: |
+              =If( Len(lblTxOMissing.Text) > 0,
+                   Notify( "Can't add this output yet. " & lblTxOMissing.Text, NotificationType.Error ) );
+               If( Len(lblTxOMissing.Text) = 0 && gTxOEditSid > 0,
+                   Patch( colTxOut, LookUp( colTxOut, Sid = gTxOEditSid ),
+                          { Name:     Trim(txtTxOName.Text),
+                            ODate:    dtpTxODate.SelectedDate,
+                            Format:   gTxOFormat,
+                            Audience: gTxOAudience,
+                            Language: gTxOLanguage,
+                            Branding: gTxOBranding,
+                            Flag:     tglTxOFlag.Value,
+                            ApprId:   Trim(txtTxOApprId.Text) } ) );
+               If( Len(lblTxOMissing.Text) = 0 && gTxOEditSid = 0,
+                   Collect( colTxOut,
+                          { Sid:      If( IsEmpty(colTxOut), 1, Max(colTxOut, Sid) + 1 ),
+                            OutId:    0,
+                            Name:     Trim(txtTxOName.Text),
+                            ODate:    dtpTxODate.SelectedDate,
+                            Format:   gTxOFormat,
+                            Audience: gTxOAudience,
+                            Language: gTxOLanguage,
+                            Branding: gTxOBranding,
+                            Flag:     tglTxOFlag.Value,
+                            ApprId:   Trim(txtTxOApprId.Text) } ) );
+               If( Len(lblTxOMissing.Text) = 0,
+                   Set( gTxOEditSid, 0 ); Set( gTxOutOpen, false ) )
+      - mdTxOCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gTxOutOpen
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Cancel"
+            X: =(Parent.Width - 780) / 2 + 780 - 24 - 150 - 12 - 120
+            Y: =(Parent.Height - 500) / 2 + 500 - 24 - 40
+            Width: =120
+            Height: =40
+            OnSelect: =Set( gTxOEditSid, 0 ); Set( gTxOutOpen, false )
       # =====================================================================
       # PICKER — ONE cmpPicker instance for the sales owner AND both lookups. Declared LAST
       # so the dialog paints above the footer. See scrTaskEdit's instance for the contract.
@@ -1047,6 +1453,9 @@ Screens:
             Title: ="Delete this transaction?"
             Message: |
               ="Delete " & gDelName & "?" &
+                       If( gTxDelOuts > 0,
+                           " Its " & gTxDelOuts & " output(s) will be DELETED with it.",
+                           "" ) &
                        If( gDelRefs > 0,
                            " " & gDelRefs & " issue(s) linked to it will be KEPT — only the link to this transaction is cleared.",
                            "" ) &
@@ -1060,7 +1469,10 @@ Screens:
             OnConfirm: |
               =Set( gDelErr, "" );
                Set( gDelBlock, false );
-               If( gDelRefs >= 500, Set( gDelBlock, true ) );
+               // Re-counted from the LIST, not from the dialog's staged figure: rows added
+               // elsewhere since this screen loaded are deleted too.
+               Set( gTxDelOutsNow, CountRows( Filter( taskmaster_output, output_transaction_id = gDelId ) ) );
+               If( gDelRefs >= 500 || gTxDelOutsNow >= 500, Set( gDelBlock, true ) );
                // DETACH FIRST, then remove — the reverse leaves issues pointing at a row that is
                // already gone. COUNT AND REFUSE rather than half-do it: a local ForAll over a
                // delegable Filter clears SOME references past the data row limit and raises NO error.
@@ -1069,16 +1481,23 @@ Screens:
                                  ForAll( Filter( taskmaster_issues, issue_transaction_name.Id = gDelId ) As iss,
                                          Patch( taskmaster_issues, iss, { issue_transaction_name: Blank() } ) ) ),
                             Set( gDelErr, FirstError.Message ) ) );
+               // OUTPUTS ARE DELETED, NOT DETACHED, and BEFORE the transaction: their FK is a plain
+               // Number, so SharePoint cascades nothing and a surviving row is an orphan no screen
+               // reaches. RemoveIf is not delegable — the 500 guard above is what keeps it whole.
+               If( Len(gDelErr) = 0 && !gDelBlock && gTxDelOutsNow > 0,
+                   IfError( Set( gDelScrapTxO,
+                                 RemoveIf( taskmaster_output, output_transaction_id = gDelId ) ),
+                            Set( gDelErr, FirstError.Message ) ) );
                If( Len(gDelErr) = 0 && !gDelBlock,
                    IfError( Set( gDelScrapX,
                                  Remove( taskmaster_transactions, LookUp(taskmaster_transactions, ID = gDelId) ) ),
                             Set( gDelErr, FirstError.Message ) ) );
                If( gDelBlock,
-                   Notify( "Too many issues reference this to detach in one pass. Nothing was deleted — ask for the cleanup workflow.",
+                   Notify( "Too many issues or outputs reference this to clear in one pass. Nothing was deleted — ask for the cleanup workflow.",
                            NotificationType.Error ),
                    Len(gDelErr) > 0,
                    Notify( "Couldn't delete it: " & gDelErr
-                             & " Some issue links may already have been cleared — reopen the project to check.",
+                             & " Some issue links or outputs may already have been cleared — reopen the project to check.",
                            NotificationType.Error ),
                    Notify( "Transaction deleted.", NotificationType.Success );
                    // Back() lands on scrProject, whose OnVisible calls btnPrjRecompute.
