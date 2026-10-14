@@ -154,12 +154,13 @@ Screens:
                   // OUTPUT ROWS DATED IN THE WINDOW, feeding the audience and format pies. Hand
                   // projection (LiveOutputs is a named formula); Choice columns copied WHOLE so
                   // .Value resolves in the fold. Both bounds ride the indexed output_date. The
-                  // upper bound is inclusive here and exclusive in btnRptFold: the server compares
-                  // in the list's timezone, so the fetch keeps a day of slack and the fold cuts.
+                  // server compares in the list's timezone, so the fetch keeps a day of slack at
+                  // EACH end and btnRptFold makes the exact cut.
                   // A dateless output is in no window and is not counted; the app always writes one.
                   ClearCollect( colRptOutRaw,
                       ForAll( Filter( LiveOutputs,
-                                      output_date >= gRptFrom && output_date <= gRptTo ) As o,
+                                      output_date >= DateAdd(gRptFrom, -1, TimeUnit.Days)
+                                      && output_date <= gRptTo ) As o,
                           { ID:                o.ID,
                             output_project_id: o.output_project_id,
                             output_date:       o.output_date,
