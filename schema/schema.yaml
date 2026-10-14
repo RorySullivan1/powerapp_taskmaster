@@ -515,10 +515,10 @@ lists:
       - { name: output_task_id,          type: Number,   required: false, indexed: true,  desc: "ID of the task this output came from. Blank on a transaction or project-level output" }
       - { name: output_transaction_id,   type: Number,   required: false, indexed: true,  desc: "ID of the transaction this output came from. Blank on a task or project-level output" }
       # Fifth mirror of the parent-archived flag, same contract as projectcomment_project_archived.
-      # Owned by the EXTERNAL archival flow (#101); the app only ever writes false at insert, and
-      # must write it — `= false` does not match a blank, so an unwritten row is invisible to
-      # LiveOutputs.
-      - { name: output_project_archived, type: Boolean,  required: false, indexed: true,  default: false, desc: "TRUE when the PARENT project is archived. Maintained by the external archival flow, not the app" }
+      # Flipped by the EXTERNAL archival flow (#101). Every app save also writes it, copying the
+      # parent's archived state, and must — `= false` does not match a blank, so an unwritten row
+      # is invisible to LiveOutputs.
+      - { name: output_project_archived, type: Boolean,  required: false, indexed: true,  default: false, desc: "TRUE when the PARENT project is archived. Flipped by the external archival flow; every app save writes the parent's state" }
       # Date and Time, format DATE ONLY, indexed: #99 sorts the project panel on it and #100
       # windows reports on it.
       - { name: output_date,             type: DateTime, required: false, indexed: true,  desc: "When the output was produced or published. The app defaults it to today and lets the user change it; #96 back-fills it from task_date_completion, else the task's Created. Not Modified — see the list note" }

@@ -92,10 +92,12 @@ Screens:
         Clear( colTxOutDel );
         Clear( colTxOut );
         If( gEditMode = "Edit",
+            // Value(Text(o.ID)), NOT o.ID: a built-in ID projected out of a ForAll row breaks a
+            // later LookUp(..., ID = <copy>) against the list. Do not simplify it.
             Collect( colTxOut,
                 ForAll( Filter( taskmaster_output, output_transaction_id = gEditTransaction.ID ) As o,
-                        { Sid:      o.ID,
-                          OutId:    o.ID,
+                        { Sid:      Value(Text(o.ID)),
+                          OutId:    Value(Text(o.ID)),
                           Name:     o.output_name,
                           // Rebuilt as a DATE so a loaded row and a modal-staged row
                           // (dtpTxODate.SelectedDate) carry the same type in one collection.
@@ -822,12 +824,12 @@ Screens:
                     Set( gTxInsert, gEditMode <> "Edit" );
                     // Mirrors the PARENT's phase so cross-project queries can exclude archived work with
                     // a delegable `= false`. Written on EVERY save. Read LIVE from the list, not from
-                    // gSelProject — that global is a gallery snapshot, so a project archived since would
+                    // a gallery snapshot — that would be stale, so a project archived since would
                     // stamp `false` and the row would stay in scope forever.
                     // ONE VALUE, TWO WRITERS: the transaction and each of its output rows carry it, and
                     // they must agree.
                     Set( gTxArchived,
-                         Coalesce( LookUp( taskmaster_projects, ID = gSelProject.ID,
+                         Coalesce( LookUp( taskmaster_projects, ID = gTxProject.Id,
                                            project_phase.Value ), "" ) = "Archived" );
                     IfError(
                         // The Set wrapper is not decoration: IfError requires all its arguments to be
@@ -923,7 +925,7 @@ Screens:
                                         Remove( taskmaster_output, o ) ) );
                             ClearCollect( colTxOutLeft,
                                 ForAll( Filter( taskmaster_output, output_transaction_id = gTxSaved.ID ) As o,
-                                        { OutId: o.ID } ) );
+                                        { OutId: Value(Text(o.ID)) } ) );
                             RemoveIf( colTxOutDel, !(OutId in colTxOutLeft.OutId) ) );
                         Set( gTxOutFail, CountRows( Filter( colTxOutRes, Len(Res) = 0 || StartsWith(Res, "!") ) ) );
                         If( gTxOutFail > 0 || !IsEmpty(colTxOutDel),
@@ -1239,18 +1241,31 @@ Screens:
                         LayoutGridRowEnd: =3
                         Width: =Parent.Width
                         Height: =18
-                  - tglTxOFlag:
-                      Control: Classic/Toggle@2.1.0
+                  # Wrapped: every toggle in the app sits in an auto-layout container, so the grid
+                  # cell goes on the wrapper and the toggle keeps its own 60x30.
+                  - stkTxOFlag:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
                       Properties:
-                        Default: =gTxOFlag
-                        FalseText: =""
-                        TrueText: =""
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGridColumnStart: =1
                         LayoutGridColumnEnd: =1
                         LayoutGridRowStart: =4
                         LayoutGridRowEnd: =10
-                        Width: =60
-                        Height: =30
+                        Width: =Parent.Width
+                        Height: =36
+                      Children:
+                        - tglTxOFlag:
+                            Control: Classic/Toggle@2.1.0
+                            Properties:
+                              Default: =gTxOFlag
+                              FalseText: =""
+                              TrueText: =""
+                              FillPortions: =0
+                              LayoutMinWidth: =60
+                              Width: =60
+                              Height: =30
                   - lblTxOApprCap:
                       Control: Label@2.5.1
                       Properties:

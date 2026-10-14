@@ -78,10 +78,12 @@ Screens:
         Clear( colTkOut ); Clear( colTkOutDel );
         Set( gTkOutSeq, 0 );
         If( gEditMode = "Edit",
+            // Value(Text(o.ID)), NOT o.ID: a built-in ID projected out of a ForAll row breaks a
+            // later LookUp(..., ID = <copy>) against the list. Do not simplify it.
             Collect( colTkOut,
                      ForAll( Filter( taskmaster_output, output_task_id = gEditTask.ID ) As o,
-                             { Sid:      o.ID,
-                               OutId:    o.ID,
+                             { Sid:      Value(Text(o.ID)),
+                               OutId:    Value(Text(o.ID)),
                                Name:     o.output_name,
                                ODate:    If( IsBlank(o.output_date), Blank(),
                                              Date( Year(o.output_date), Month(o.output_date), Day(o.output_date) ) ),
@@ -1598,8 +1600,8 @@ Screens:
                     // RE-READ — the truth the checks below and a retry rebuild run against.
                     ClearCollect( colTkOutNow,
                     ForAll( Filter( taskmaster_output, output_task_id = gTkSaved.ID ) As o,
-                    { Sid:      o.ID,
-                    OutId:    o.ID,
+                    { Sid:      Value(Text(o.ID)),
+                    OutId:    Value(Text(o.ID)),
                     Name:     o.output_name,
                     ODate:    If( IsBlank(o.output_date), Blank(),
                     Date( Year(o.output_date), Month(o.output_date), Day(o.output_date) ) ),
