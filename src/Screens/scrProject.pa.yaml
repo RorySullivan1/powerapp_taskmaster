@@ -206,6 +206,22 @@ Screens:
                            // A failed re-phase is not worth interrupting a read-only screen for.
                            Set( gPrjPhaseErr, FirstError.Message ) );
                   Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
+              // THE START DATE IS STAMPED THE FIRST TIME WORK IS SEEN TO START: a started task or any
+              // transaction, the same test that makes the phase Active (tested directly, so an open
+              // issue holding the phase at Stalled does not hide it). Only while the stored start is
+              // BLANK — a date someone picked is never overwritten — and only on a live project, so
+              // opening an old Complete one does not stamp it with today.
+              If( Coalesce(gSelProject.project_phase.Value, "") <> "Complete"
+               && Coalesce(gSelProject.project_phase.Value, "") <> "Archived"
+               && IsBlank(gSelProject.project_date_start)
+               && ( CountRows( Filter(colProjectTasks, task_stage.Value <> "Not Started") ) > 0
+                    || CountRows(colProjectTx) > 0 ),
+                  IfError( Set( gPrjStartScrap,
+                                Patch( taskmaster_projects,
+                                       LookUp(taskmaster_projects, ID = gSelProject.ID),
+                                       { project_date_start: Today() } ) ),
+                           Set( gPrjStartErr, FirstError.Message ) );
+                  Set( gSelProject, LookUp(taskmaster_projects, ID = gSelProject.ID) ) );
               // DERIVED HERE for the same reason as the phase: the STORED value is only ever as
               // fresh as the last task save whose STAGE MOVED, and is blank outright on an
               // untouched project. Written back on a change, so opening a project repairs the

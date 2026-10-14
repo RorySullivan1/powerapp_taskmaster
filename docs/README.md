@@ -25,7 +25,7 @@ Manuals describe; they never define. The golden sources are `schema/schema.yaml`
 | `managed-metadata-picker.md` | The Managed Metadata problem and the picker that replaced it |
 | `msapp-and-git-integration.md` | `.msapp` structure and what the CLI can and cannot do here |
 | `claudebrain-inventory.md` | Inventory of the `.claude/` asset set as it stood when written |
-| `notes/` | Build notes per area — `components.md`, `edit-screens.md`, `shell-screens.md` |
+| `notes/` | Build notes per area — `components.md`, `edit-screens.md`, `shell-screens.md` — plus `backfill-project-date-start.md`, a one-off SharePoint flow runbook |
 
 These are kept because they record *why* something was built the way it was. They are not
 maintained as current descriptions of the app; when they disagree with the manuals or with a

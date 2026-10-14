@@ -36,6 +36,8 @@ Screens:
                   { DisplayName: Coalesce(gEditProject.project_requestor_2.DisplayName, ""),
                     Mail:        Coalesce(gEditProject.project_requestor_2.Email, "") },
                   { DisplayName: "", Mail: "" } ) );
+        Set( gPrReqDept,  If( gEditMode = "Edit", Coalesce(gEditProject.project_requestor_department, ""), "" ) );
+        Set( gPrReq2Dept, If( gEditMode = "Edit", Coalesce(gEditProject.project_requestor_2_department, ""), "" ) );
         // Priority opens on its column default. The phase is DERIVED on scrProject and this
         // screen offers no control for it.
         Set( gPrPriority, If( gEditMode = "Edit", Coalesce(gEditProject.project_priority.Value, "Moderate"), "Moderate" ) );
@@ -116,6 +118,7 @@ Screens:
         // Text inputs and date pickers re-read their Default only on Reset. Missing these
         // was how an Edit opened with blank dates and then wrote Blank() over the stored ones.
         Reset( txtPrName ); Reset( txtPrPathway ); Reset( txtPrDesc );
+        Reset( txtPrReqDept ); Reset( txtPrReq2Dept );
         Reset( dtpPrStart ); Reset( dtpPrTarget );
         Set( gPrPicker, "" ); Set( gPrQuery, "" ); Reset( cmpPrPick );
         Reset( txtNtName ); Reset( dtpNtTarget );
@@ -333,7 +336,10 @@ Screens:
                         Placeholder: ="Actual start date"
                         Format: =DatePickerFormat.LongAbbreviated
                         StartOfWeek: =StartOfWeek.Monday
-                        IsEditable: =true
+                        # CALENDAR ONLY. A typed date the picker cannot parse leaves SelectedDate blank,
+                        # and the save then writes Blank with no warning. Left blank, scrProject stamps
+                        # the start the first time work is seen to start.
+                        IsEditable: =false
                         LayoutGridColumnStart: =1
                         LayoutGridColumnEnd: =1
                         LayoutGridRowStart: =4
@@ -456,7 +462,12 @@ Screens:
                   LayoutAlignItems: =LayoutAlignItems.Start
                   LayoutGap: =16
                   Width: =Parent.Width - 48
-                  Height: =58
+                  # Pinned: a flexible row in frmPrScroll takes its height from FillPortions,
+                  # not Height. 104 fits a picker (62) + gap (6) + department input (36); the
+                  # band collapses to the picker while neither requestor is set.
+                  FillPortions: =0
+                  LayoutMinHeight: =If( Len(gPrRequestor.Mail) > 0 || Len(gPrRequestor2.Mail) > 0, 104, 62 )
+                  Height: =If( Len(gPrRequestor.Mail) > 0 || Len(gPrRequestor2.Mail) > 0, 104, 62 )
                 Children:
                   # FOUR PICKERS, and the width divisor is a GAP COUNT, not a column count:
                   # rowPrPeople is horizontal auto-layout with LayoutGap 16, so four columns
@@ -524,7 +535,7 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =6
                         Width: =(Parent.Width - 48) / 4
-                        Height: =58
+                        Height: =104
                       Children:
                         - fldRequestor:
                             Control: CanvasComponent
@@ -541,7 +552,23 @@ Screens:
                                  Reset( cmpPrPick );
                                  Set( gPrQuery, "" )
                               OnClear: |
-                                =Set( gPrRequestor, { DisplayName: "", Mail: "" } )
+                                =Set( gPrRequestor, { DisplayName: "", Mail: "" } );
+                                 Set( gPrReqDept, "" ); Reset( txtPrReqDept )
+                        # Prefilled from the directory on pick (cmpPrPick.OnConfirm) and
+                        # editable, because some directory profiles have no department.
+                        # The save reads .Text, so a typed correction needs no OnChange.
+                        - txtPrReqDept:
+                            Control: ModernTextInput@1.1.1
+                            Properties:
+                              Default: =gPrReqDept
+                              Placeholder: ="Department"
+                              Visible: =Len(gPrRequestor.Mail) > 0
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
                   - colPrReq2:
                       Control: GroupContainer@1.5.0
                       Variant: AutoLayout
@@ -550,7 +577,7 @@ Screens:
                         LayoutAlignItems: =LayoutAlignItems.Center
                         LayoutGap: =6
                         Width: =(Parent.Width - 48) / 4
-                        Height: =58
+                        Height: =104
                       Children:
                         - fldRequestor2:
                             Control: CanvasComponent
@@ -567,7 +594,23 @@ Screens:
                                  Reset( cmpPrPick );
                                  Set( gPrQuery, "" )
                               OnClear: |
-                                =Set( gPrRequestor2, { DisplayName: "", Mail: "" } )
+                                =Set( gPrRequestor2, { DisplayName: "", Mail: "" } );
+                                 Set( gPrReq2Dept, "" ); Reset( txtPrReq2Dept )
+                        # Prefilled from the directory on pick (cmpPrPick.OnConfirm) and
+                        # editable, because some directory profiles have no department.
+                        # The save reads .Text, so a typed correction needs no OnChange.
+                        - txtPrReq2Dept:
+                            Control: ModernTextInput@1.1.1
+                            Properties:
+                              Default: =gPrReq2Dept
+                              Placeholder: ="Department"
+                              Visible: =Len(gPrRequestor2.Mail) > 0
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
             - divPrClass:
                 Control: Rectangle@2.3.0
                 Properties:
@@ -1253,6 +1296,11 @@ Screens:
                                             Email:       gPrRequestor2.Mail,
                                             Department: "", JobTitle: "", Picture: "" },
                                           Blank() ),
+                                  // Blank with its requestor: the hidden input can still hold a stale value.
+                                  project_requestor_department:
+                                      If( Len(gPrRequestor.Mail) > 0, Trim(txtPrReqDept.Text), "" ),
+                                  project_requestor_2_department:
+                                      If( Len(gPrRequestor2.Mail) > 0, Trim(txtPrReq2Dept.Text), "" ),
                                   project_supporter:
                                       If( Len(gPrSupporter.Mail) > 0,
                                           { '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
@@ -2088,6 +2136,16 @@ Screens:
               "NxSales",   Set( gNxSales,     { DisplayName: cmpPrPick.Picked.Primary, Mail: cmpPrPick.Picked.Secondary } ),
               "NxClient",  Set( gNxClient,    { Id: Value(cmpPrPick.Picked.Key), Value: cmpPrPick.Picked.Primary } ),
               "NxProduct", Set( gNxProduct,   { Id: Value(cmpPrPick.Picked.Key), Value: cmpPrPick.Picked.Primary } ) );
+              // Outside the Switch so its arms stay all-Set. UserProfile takes a mail or UPN;
+              // a profile with no department, or a failed call, leaves the input blank to type.
+              If( gPrPicker = "Requestor",
+                  IfError( Set( gPrReqDept, Coalesce( Office365Users.UserProfile( cmpPrPick.Picked.Secondary ).Department, "" ) ),
+                           Set( gPrReqDept, "" ) );
+                  Reset( txtPrReqDept ) );
+              If( gPrPicker = "Requestor2",
+                  IfError( Set( gPrReq2Dept, Coalesce( Office365Users.UserProfile( cmpPrPick.Picked.Secondary ).Department, "" ) ),
+                           Set( gPrReq2Dept, "" ) );
+                  Reset( txtPrReq2Dept ) );
               Set( gPrPicker, "" )
             # The staged transaction survives because the resume key makes OnVisible skip its
             # clears. gPrPicker is cleared BEFORE navigating so the dialog is not still open.
