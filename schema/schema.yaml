@@ -149,6 +149,12 @@ lists:
       # scrProjects: one unindexed arm drops delegation for the whole filter and truncates
       # in silence. "Mine" is manager or supporter (decision C2).
       - { name: project_requestor_2,     type: Person, multi: false, required: false,                 desc: "Second requesting user. Optional, like project_requestor. multi:false IS LOAD-BEARING — project_requestor itself was provisioned multi-Person and corrected the same day; a multi column returns a TABLE, so the read errors and the write fails." }
+      # A SNAPSHOT, NOT A LIVE VALUE. A Person column's own .Department comes from the site's
+      # user-info list (often blank, and it follows the person when they move), so each
+      # requestor's department is copied into Text at pick time. NOT INDEXED: grouped in the
+      # reports, never filtered at volume. Both are blank whenever their requestor is.
+      - { name: project_requestor_department,   type: Text, required: false, desc: "Primary requestor's department when the project was requested. scrProjectEdit fills it from Office365Users.UserProfile(mail).Department on pick; the user can overwrite it. Not kept in sync if the person later moves.", review: "NOT YET PROVISIONED — create in SharePoint with exactly this internal name before pasting scrProjectEdit. Existing projects are back-filled by the user." }
+      - { name: project_requestor_2_department, type: Text, required: false, desc: "Secondary requestor's department, same rules as project_requestor_department.", review: "NOT YET PROVISIONED — as project_requestor_department." }
       # DERIVED BY THE APP, NOT PICKED BY A USER (2026-08-13). scrProjectEdit no longer
       # offers a phase control; scrProject recomputes it on open and writes it back when
       # it differs:
