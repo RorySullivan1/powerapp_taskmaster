@@ -21,8 +21,8 @@
 - **EPIC #93 OUTPUT LOG — FILED 2026-10-14, NOTHING BUILT.** New list `taskmaster_outputs` (one row per output; Number FKs to project
   (required) / task / transaction; output_project_archived). Subs #94-#102. **#94 DECIDED 2026-10-14 (closed); #95 schema +
   provisioning is NEXT.** task_output_* get migrated (#96) then RETIRED IN PLACE, never deleted.
-- **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14: PROVISION 2 TEXT COLUMNS (project_requestor_department,
-  project_requestor_2_department), THEN ONE PASTE (scrProjectEdit).** Back-fill of existing projects is the USER's (no flow from us).
+- **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14; BOTH TEXT COLUMNS CREATED IN SHAREPOINT (user, 2026-10-14)
+  (project_requestor_department, project_requestor_2_department). NEXT: refresh taskmaster_projects in Studio, then paste scrProjectEdit.** Back-fill of existing projects is the USER's (no flow from us).
 - **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
   scrTransactionEdit is RESTORED byte-for-byte to pre-PR-#88 (quick mode #79-#82 reverted). **The #88 quick-mode version
   WAS pasted into Studio (user, 2026-10-08), so the restore NEEDS A PASTE: delete the screen, then paste.** scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
