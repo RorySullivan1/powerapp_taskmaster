@@ -14,7 +14,7 @@
 #  4. Select() QUEUES btnRptLoad and btnRptFold — nothing may read a fold in the
 #     formula that Selects either. btnRptLoad Selects btnRptFold as its LAST step.
 #
-# SCOPE APPLIES TO THE WHOLE SCREEN. btnRptFold narrows the six fetched sets to the
+# SCOPE APPLIES TO THE WHOLE SCREEN. btnRptFold narrows the fetched fact sets to the
 # picked manager's projects before any fold reads them; "All" is a pass-through.
 #
 # Header and control bar are absolute (0..136); bodyRoot below them is a vertical
@@ -31,7 +31,7 @@ Screens:
         If( IsBlank(gUserEmail), Set( gUserEmail, Lower(User().Email) ) );
         // SAME REASON, AND THE COST OF MISSING IT IS A FALSE BANNER: blank compares as zero, so
         // an unseeded gDataRowLimit makes every `>= gDataRowLimit` below true and gRptTrunc
-        // reports all six datasets truncated. Must match App.OnStart.
+        // reports every dataset truncated. Must match App.OnStart.
         If( IsBlank(gDataRowLimit), Set( gDataRowLimit, 2000 ) );
         If( IsBlank(gRptPeriod), Set( gRptPeriod, "1QTR" ) );
         // "" is the All value and is itself blank, so IsBlank cannot seed this.
@@ -63,6 +63,9 @@ Screens:
               Set( gRptSpanDays,
                    Switch( gRptPeriod, "1W", 7, "1M", 30, "1QTR", 90, 90 ) );
               Set( gRptFrom, DateAdd( Today(), -gRptSpanDays, TimeUnit.Days ) );
+              // Start of TOMORROW: the exclusive end of the window for anything dated by the
+              // user, so an output dated today counts whatever hour its date-only value reads back at.
+              Set( gRptTo, DateAdd( Today(), 1, TimeUnit.Days ) );
               // Exactly ONE window before gRptFrom — the prior-period delta has to compare equal
               // spans. One transaction fetch serves current, prior and the trend bars.
               Set( gRptFrom2x, DateAdd( gRptFrom, -gRptSpanDays, TimeUnit.Days ) );
@@ -91,9 +94,7 @@ Screens:
                             task_date_target:     s.task_date_target,
                             task_lead:            s.task_lead,
                             task_supporter:       s.task_supporter,
-                            task_project_id:      s.task_project_id,
-                            task_output_audience: s.task_output_audience,
-                                          task_output_format:   s.task_output_format } ) ),
+                            task_project_id:      s.task_project_id } ) ),
                   // BOUNDED ON THE PERIOD, AND THE NULL ARM IS WHAT MAKES THAT SAFE.
                   // task_date_completion is OPTIONAL and `>= gRptFrom` is FALSE for a blank date,
                   // so a bare date bound would drop every dateless Completed task and leave Done
@@ -149,7 +150,21 @@ Screens:
                   ClearCollect( colRptIssRaw,
                       ForAll( OpenIssues As i,
                           { ID:               i.ID,
-                            issue_project_id: i.issue_project_id } ) )
+                            issue_project_id: i.issue_project_id } ) ),
+                  // OUTPUT ROWS DATED IN THE WINDOW, feeding the audience and format pies. Hand
+                  // projection (LiveOutputs is a named formula); Choice columns copied WHOLE so
+                  // .Value resolves in the fold. Both bounds ride the indexed output_date. The
+                  // upper bound is inclusive here and exclusive in btnRptFold: the server compares
+                  // in the list's timezone, so the fetch keeps a day of slack and the fold cuts.
+                  // A dateless output is in no window and is not counted; the app always writes one.
+                  ClearCollect( colRptOutRaw,
+                      ForAll( Filter( LiveOutputs,
+                                      output_date >= gRptFrom && output_date <= gRptTo ) As o,
+                          { ID:                o.ID,
+                            output_project_id: o.output_project_id,
+                            output_date:       o.output_date,
+                            output_audience:   o.output_audience,
+                            output_format:     o.output_format } ) )
               );
               // Fetched whole because a transaction reaches a product by ID, not by path.
               ClearCollect( colRptProducts,
@@ -165,6 +180,7 @@ Screens:
                      If( CountRows(colRptTxRaw) >= gDataRowLimit, "transactions  ", "" ) &
                      If( CountRows(colRptPrjRaw) >= gDataRowLimit, "projects  ", "" ) &
                      If( CountRows(colRptIssRaw) >= gDataRowLimit, "issues  ", "" ) &
+                     If( CountRows(colRptOutRaw) >= gDataRowLimit, "outputs  ", "" ) &
                      If( CountRows(colRptProducts) >= gDataRowLimit, "products  ", "" ) ) );
               // Level 1 of an "A | B | C" path with Find/Left, NOT Split — the separator is part
               // of the stored data and blanks need their own bucket.
@@ -229,7 +245,7 @@ Screens:
                        Coalesce( LookUp(colRptMgrOpts, Em = gRptScope, Value), gRptScope ), "" ) );
               ClearCollect( colRptScopePId,
                   ForAll( Filter( colRptPrjMap, Mgr = Coalesce(gRptScope, "") ) As m, { PId: m.PId } ) );
-              // Every fold below reads these six names and nothing else, so scoping them scopes the screen.
+              // Every fold below reads these seven names and nothing else, so scoping them scopes the screen.
               ClearCollect( colRptOpen,
                   Filter( colRptOpenRaw, !gRptScoped || task_project_id.Id in colRptScopePId.PId ) );
               // A completed task with NO completion date is in, in every window. The count is
@@ -256,6 +272,12 @@ Screens:
                   Filter( colRptPrjRaw, !gRptScoped || ID in colRptScopePId.PId ) );
               ClearCollect( colRptIss,
                   Filter( colRptIssRaw, !gRptScoped || issue_project_id.Id in colRptScopePId.PId ) );
+              // output_project_id is a plain Number, so no .Id. The window is re-applied for the
+              // same timezone reason as colRptDone; the < gRptTo end is what excludes future dates.
+              ClearCollect( colRptOut,
+                  Filter( colRptOutRaw,
+                          output_date >= gRptFrom && output_date < gRptTo
+                       && ( !gRptScoped || output_project_id in colRptScopePId.PId ) ) );
               // TWO ATTRIBUTION PATHS, BOTH FROM TASKS: task_lead owns, task_supporter supports.
               // Counted separately and NEVER summed into one workload number — that double-counts
               // the desk. Days and OnT carry -1 for "not applicable" so the medians and rates can
@@ -375,6 +397,7 @@ Screens:
               Set( gRptTxN,    CountRows(colRptTxCur) );
               Set( gRptTxPrev, CountRows( Filter(colRptTx, transaction_date < gRptFrom) ) );
               Set( gRptIssN,   CountRows(colRptIss) );
+              Set( gRptOutN,   CountRows(colRptOut) );
               // Tag each open task ONCE with everything the breakdowns group on, so no chart
               // re-joins per category. The LookUp is HOISTED — family, region and requestor all
               // come off the same project row, and three LookUps would triple the join.
@@ -383,9 +406,7 @@ Screens:
                       With( { pm: LookUp(colRptPrjMap, PId = t.task_project_id.Id) },
                           { Fam: Coalesce( pm.Fam, "Unclassified" ),
                             Rgn: Coalesce( pm.Rgn, "Unassigned" ),
-                            Req: Coalesce( pm.Req, "Unassigned" ),
-                            Aud: Coalesce( t.task_output_audience.Value, "Unspecified" ),
-                            Fmt: Coalesce( t.task_output_format.Value, "Unspecified" ) } ) ) );
+                            Req: Coalesce( pm.Req, "Unassigned" ) } ) ) );
               ClearCollect( colRptFamAll,
                   ForAll( Distinct(colRptOpenTag, Fam) As f,
                       { K: f.Value, N: CountRows( Filter(colRptOpenTag, Fam = f.Value) ) } ) );
@@ -401,27 +422,34 @@ Screens:
                   Collect( colRptFamBar,
                       { Idx: CountRows(colRptFam) + 1, K: "Other", N: gRptFamOther } ) );
               Set( gRptFamMax, Max( 1, Coalesce(Max(colRptFamBar, N), 0) ) );
+              // ---- outputs: audience and format --------------------------------------
+              // ONE ROW PER PIECE OF OUTPUT dated in the window, not per open task: a task with
+              // three outputs counts three times, and a project-level output counts too.
+              ClearCollect( colRptOutTag,
+                  ForAll( colRptOut As o,
+                      { Aud: Coalesce( o.output_audience.Value, "Unspecified" ),
+                        Fmt: Coalesce( o.output_format.Value, "Unspecified" ) } ) );
               // THE VOCABULARY COMES FROM THE COLUMN via Choices(), never a literal list that
               // drifts when someone edits the column. It returns EVERY value the column offers,
-              // so a value no task holds still draws a zero bar — which a GroupBy would delete.
+              // so a value no output holds still draws a zero bar — which a GroupBy would delete.
+              // Both columns are list-required, so Unspecified only catches a row written around
+              // the app; it stays so the slices always sum to gRptOutN. "Other" means a value rows
+              // still hold that the column no longer offers.
               ClearCollect( colRptAudVocab,
-                  ForAll( Choices([@taskmaster_tasks].task_output_audience) As c,
+                  ForAll( Choices([@taskmaster_output].output_audience) As c,
                           { K: c.Value } ) );
+              Set( gRptAudUnsp, CountRows( Filter(colRptOutTag, Aud = "Unspecified") ) );
+              Set( gRptAudOther, CountRows( Filter( colRptOutTag,
+                                     Aud <> "Unspecified" && !(Aud in colRptAudVocab.K) ) ) );
               Clear( colRptAudBar );
               Collect( colRptAudBar,
                   ForAll( Sequence( CountRows(colRptAudVocab) ) As s,
                       With( { k: Index(colRptAudVocab, s.Value).K },
                           { Idx: s.Value, K: k,
-                            N: CountRows( Filter(colRptOpenTag, Aud = k) ) } ) ) );
-              // Blank is not a Choice value and needs its own bucket. Unspecified is mostly
-              // "predates the column", not "nobody bothered"; "Other" means a value tasks still
-              // hold that the column no longer offers.
+                            N: CountRows( Filter(colRptOutTag, Aud = k) ) } ) ) );
               Collect( colRptAudBar,
-                  { Idx: CountRows(colRptAudVocab) + 1, K: "Unspecified",
-                    N: CountRows( Filter(colRptOpenTag, Aud = "Unspecified") ) },
-                  { Idx: CountRows(colRptAudVocab) + 2, K: "Other",
-                    N: CountRows( Filter( colRptOpenTag,
-                           Aud <> "Unspecified" && !(Aud in colRptAudVocab.K) ) ) } );
+                  { Idx: CountRows(colRptAudVocab) + 1, K: "Unspecified", N: gRptAudUnsp },
+                  { Idx: CountRows(colRptAudVocab) + 2, K: "Other",       N: gRptAudOther } );
               // A PIE, so it needs slice geometry rather than a bar maximum.
               Set( gRptAudTot, Max( 1, Coalesce(Sum(colRptAudBar, N), 0) ) );
               ClearCollect( colRptAudPie,
@@ -438,22 +466,19 @@ Screens:
                                          Switch( Mod(r.Idx - 1, 6),
                                                  0, "#005A9E", 1, "#2E8B9A", 2, "#D69828",
                                                  3, "#7A6FB0", 4, "#C05F3C", "#4A9E63" ) ) ) } ) ) );
-              // OUTPUT FORMAT, the audience fold's shape on task_output_format. Format is OPTIONAL
-              // on save, so Unspecified is a STANDING bucket, not one the backlog will drain — the
-              // subtitle states it, and the counts it needs are folded here, not in the property.
+              // OUTPUT FORMAT, the audience fold's shape on output_format.
               ClearCollect( colRptFmtVocab,
-                  ForAll( Choices([@taskmaster_tasks].task_output_format) As c,
+                  ForAll( Choices([@taskmaster_output].output_format) As c,
                           { K: c.Value } ) );
-              Set( gRptFmtUnsp, CountRows( Filter(colRptOpenTag, Fmt = "Unspecified") ) );
-              Set( gRptFmtOther, CountRows( Filter( colRptOpenTag,
+              Set( gRptFmtUnsp, CountRows( Filter(colRptOutTag, Fmt = "Unspecified") ) );
+              Set( gRptFmtOther, CountRows( Filter( colRptOutTag,
                                      Fmt <> "Unspecified" && !(Fmt in colRptFmtVocab.K) ) ) );
-              Set( gRptFmtSet, CountRows(colRptOpenTag) - gRptFmtUnsp );
               Clear( colRptFmtBar );
               Collect( colRptFmtBar,
                   ForAll( Sequence( CountRows(colRptFmtVocab) ) As s,
                       With( { k: Index(colRptFmtVocab, s.Value).K },
                           { Idx: s.Value, K: k,
-                            N: CountRows( Filter(colRptOpenTag, Fmt = k) ) } ) ) );
+                            N: CountRows( Filter(colRptOutTag, Fmt = k) ) } ) ) );
               Collect( colRptFmtBar,
                   { Idx: CountRows(colRptFmtVocab) + 1, K: "Unspecified", N: gRptFmtUnsp },
                   { Idx: CountRows(colRptFmtVocab) + 2, K: "Other",       N: gRptFmtOther } );
@@ -1887,7 +1912,8 @@ Screens:
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
                                           & "No open tasks</text>", "" )
                                       & "</svg>" ) )
-            # BAND 3b — what the work produces: the two task-output pies side by side.
+            # BAND 3b — what the work produces: two pies over OUTPUT ROWS dated in the period
+            # window (colRptOut), one slice count per piece of output, side by side.
             # TWO COLUMNS AT LayoutMinWidth 260 + one 16 gap = 536px, well under band 5's ~1150,
             # so this row never sets the scroll width.
             - rowRptOutput:
@@ -1923,7 +1949,7 @@ Screens:
                         - lblRptAudT:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open tasks by output audience"
+                              Text: ="Outputs by audience"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -1933,28 +1959,20 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        # THE SUBTITLE CARRIES BOTH GAPS, because a slice cannot. A large Unspecified
-                        # wedge means the column is YOUNGER than the backlog, not that the report is
-                        # broken, and those two look identical on a pie. Other outranks it: rarer, and
-                        # a data question.
+                        # THE SUBTITLE STATES THE BASIS: output pieces in the period, not open tasks.
+                        # Other outranks it because it is a data question (column and schema disagree).
                         - lblRptAudS:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
-                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
+                                =If( gRptAudOther > 0,
                                      "Other is non-zero — a value the column no longer offers.",
-                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
-                                     LookUp(colRptAudBar, K = "Unspecified", N) & " of "
-                                       & gRptOpenN & " unspecified.",
-                                     "Open tasks that produce output." )
+                                     gRptOutN & " outputs dated in the last " & gRptSpanDays
+                                       & " days, one per piece — not open tasks."
+                                       & If( gRptAudUnsp > 0, "   ·   " & gRptAudUnsp & " unspecified", "" ) )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
-                              Color: |
-                                =If( LookUp(colRptAudBar, K = "Other", N) > 0,
-                                     gTheme.Color.Danger,
-                                     LookUp(colRptAudBar, K = "Unspecified", N) > 0,
-                                     gTheme.Color.Warning,
-                                     gTheme.Color.TextMuted )
+                              Color: =If( gRptAudOther > 0, gTheme.Color.Danger, gTheme.Color.TextMuted )
                               FillPortions: =0
                               LayoutMinHeight: =32
                               Width: =Parent.Width - 32
@@ -1999,7 +2017,7 @@ Screens:
                                       & If( n = 0,
                                             "<text x='230' y='79' text-anchor='middle' font-size='14'"
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                          & "No open tasks</text>", "" )
+                                          & "No outputs in this window</text>", "" )
                                       & "</svg>" ) )
                   - pnlRptFmt:
                       Control: GroupContainer@1.5.0
@@ -2022,7 +2040,7 @@ Screens:
                         - lblRptFmtT:
                             Control: Label@2.5.1
                             Properties:
-                              Text: ="Open tasks by output format"
+                              Text: ="Outputs by format"
                               Font: =gTheme.Font
                               Size: =gTheme.Size.H3
                               FontWeight: =FontWeight.Semibold
@@ -2032,20 +2050,16 @@ Screens:
                               LayoutMinHeight: =24
                               Width: =Parent.Width - 32
                               Height: =24
-                        # THE SUBTITLE IS THE MAIN READING AID, NOT A CAVEAT. Format is optional on save,
-                        # so the coloured slices describe only the tasks that set one; this says how
-                        # many that is. Unspecified is muted, not a warning: it is the expected state.
-                        # A non-zero Other still outranks it, as on the audience pie.
+                        # Same subtitle as the audience pie, on the format column.
                         - lblRptFmtS:
                             Control: Label@2.5.1
                             Properties:
                               Text: |
                                 =If( gRptFmtOther > 0,
                                      "Other is non-zero — a value the column no longer offers.",
-                                     gRptFmtUnsp > 0,
-                                     "Format set on " & gRptFmtSet & " of " & (gRptFmtSet + gRptFmtUnsp)
-                                       & " open tasks   ·   " & gRptFmtUnsp & " unspecified.",
-                                     "What each open task produces." )
+                                     gRptOutN & " outputs dated in the last " & gRptSpanDays
+                                       & " days, one per piece — not open tasks."
+                                       & If( gRptFmtUnsp > 0, "   ·   " & gRptFmtUnsp & " unspecified", "" ) )
                               Font: =gTheme.Font
                               Size: =gTheme.Size.Small
                               Color: =If( gRptFmtOther > 0, gTheme.Color.Danger, gTheme.Color.TextMuted )
@@ -2089,7 +2103,7 @@ Screens:
                                       & If( n = 0,
                                             "<text x='230' y='79' text-anchor='middle' font-size='14'"
                                           & " font-family='Segoe UI, sans-serif' fill='#6E7882'>"
-                                          & "No open tasks</text>", "" )
+                                          & "No outputs in this window</text>", "" )
                                       & "</svg>" ) )
             # BAND 4 — how projects are trending
             # Past · present · future, and ONLY THE LEFT PANEL IS BOUND BY THE PERIOD STRIP:
