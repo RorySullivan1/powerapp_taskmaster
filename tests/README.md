@@ -968,3 +968,26 @@ lessons worth carrying:
 2. **Probe the thing being shipped, not the scaffolding around it.** Three screens and a throwaway
    component had to be built and understood before a single question could be answered, and the
    design they were testing was never the thing the user asked for.
+
+---
+
+## `scrProbe-output-write.pa.yaml` — does `taskmaster_output` accept the app's insert?
+
+**Status: NOT YET RUN.** Written 2026-10-14 for issue #95.
+
+### The claim under test
+
+The list is live, connected, and `LiveOutputs` is in App.Formulas, but nothing has
+written a row. Six columns are list-required (name, project id, format, audience,
+language, branding). The probe proves, each step with its own message:
+
+1. **WRITE** — a Patch naming every required column lands and returns an ID.
+2. **READ** — that row comes back through `LiveOutputs` with every field intact
+   (so `output_project_archived = false` was written and the formula resolves).
+3. **REQUIRED** — the same Patch minus `output_language` is rejected. Step 1 is
+   its positive control. A pass here means the column is NOT required in SharePoint.
+4. **CLEAN UP** — removes both rows.
+
+### Result
+
+_Not yet run._ Record each step's message here, then delete the screen in Studio.
