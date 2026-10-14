@@ -24,6 +24,11 @@
   **scrTaskEdit (#97) ONLY AFTER the user's #96 migration has run** (else tasks show empty logs / pies drop). All four: delete screen, then paste; check no `_1`.
   scrTransactionEdit: re-type cmpTxConfirmDel + cmpTxPick custom props after paste. #101 runbook `docs/notes/archival-flow-outputs.md` (user adds the MERGE step to their flow);
   #102 designed-not-built (`docs/notes/output-file-import.md`). **First suspects on paste:** `Value(Text(o.ID))` copies (fallback: Patch via scope record), Classic/Toggle in wrapped grid cell, `Sid: -gTkOutSeq`.
+- **/code-review OF THE OUTPUTS + scrQuickTx COMMITS (2026-10-14): 10 FINDINGS, NONE FIXED YET.** Real bugs first:
+  (1) scrProject: with mdOe/btnOlAdd/icoDelOut removed, a legacy output with NEITHER id cannot be edited or deleted anywhere (needs a cleanup path or a delete in mdOl);
+  (2) scrQuickTx: q_oName/q_oDate are seeded once when the output pop-up opens, so a later label/date edit leaves the output stale (copy at save time instead);
+  (3) dtpQtRowDate/hdQtDate 150px may clip LongAbbreviated dates. Rest: stale comments (scrProject cmpPrjConfirmDel ~L2282, scrReports ~L428),
+  changelog comments in src/ (scrQuickTx ~L28, scrProject ~L715, scrTransactionEdit ~L694), 8x ThisItem.q_hasOut If in btnQtRowOutput, 3 hand-copied empty-row literals + dead q_oDate seed.
 - **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14; BOTH TEXT COLUMNS CREATED IN SHAREPOINT (user, 2026-10-14)
   (project_requestor_department, project_requestor_2_department). NEXT: refresh taskmaster_projects in Studio, then paste scrProjectEdit.** Back-fill of existing projects is the USER's (no flow from us).
 - **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
@@ -406,3 +411,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-14 | Outputs task/transaction-only: scrProject outputs read-only; scrTaskEdit "Outputs & Products"; scrTransactionEdit outputs above required fields | (no session file)
 - 2026-10-14 | Epic #93 sub-issues closed by the user's request: #96-#101 completed (all screens pasted, migration run by the user), #102 not planned. Epic #93 itself left open pending the user | (no session file)
 - 2026-10-14 | Epic #93 closed (user) | (no session file)
+- 2026-10-14 | /code-review of recent commits: 10 findings recorded in State (orphaned no-parent outputs, stale quick-tx output name/date, narrow date pickers, comment hygiene); none fixed | (no session file)
