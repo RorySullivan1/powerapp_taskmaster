@@ -12,6 +12,7 @@
 # VERTICAL BANDS (768 tall). gTheme.Space: HeaderH 64 · Gutter 24 · Gap 16.
 #     0 ..  64   appBar        (declared LAST so the fly-out floats over content)
 #    88 .. 148   hdrProjects   = HeaderH + Gutter, height 60
+#   100 .. 136   btnPrjsQuickTx, over the header beside its action button
 #   164 .. 204   rowFilters    = off hdrProjects,  height 40
 #   220 .. 268   rowTableHead  = absolute 220, height 48
 #   272 .. 744   galProjects   = absolute 272, fills to the bottom gutter
@@ -81,6 +82,31 @@ Screens:
                Set( gEditProject, Blank() );
                Set( gSelProject, Blank() );
                Navigate( scrProjectEdit, ScreenTransition.Cover )
+      # QUICK TRANSACTION, beside the header's own New project button. cmpSectionHeader has
+      # one action slot, so this sits OVER the header, declared after it so it takes the click.
+      # The header's action is 140 wide at its right edge; this is 200 wide, 12 to its left,
+      # and vertically centred in the 60-tall header. The title labels end 160 short of the
+      # right edge but their text is far shorter, so nothing visible is covered.
+      # Same look as scrHome's btnQuickTx.
+      - btnPrjsQuickTx:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="+  Quick Transaction"
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            HoverFill: =gTheme.Color.Hover
+            PressedFill: =gTheme.Color.Press
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - gTheme.Space.Gutter - 140 - 12 - 200
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 12
+            Width: =200
+            Height: =36
+            OnSelect: |
+              =Set( gQtResume, false ); Set( gQtFrom, "Projects" );
+               Navigate( scrQuickTx, ScreenTransition.Cover )
       # ---- Filter row -------------------------------------------------------
       # ONE auto-layout row; the controls carry no X and the search box takes the slack.
       # THE COVERAGE FILTER IS NOT HERE — it lives in its own column heading, so the
