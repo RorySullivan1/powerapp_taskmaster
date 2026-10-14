@@ -488,10 +488,8 @@ lists:
       this file is the authority.
     provisioned: live        # 2026-10-14 — created in SharePoint by the user, output_name as an
                              # EXPLICIT column, and the four FKs + output_project_archived indexed.
-                             # output_date IS NOT YET CREATED (see its line). NOT YET CONNECTED
-                             # in Studio: a screen paste never adds a data source, so add
-                             # taskmaster_output by hand in the Data pane before pasting
-                             # App.Formulas (LiveOutputs) or any screen that names it.
+                             # output_date added by the user the same day; the list is
+                             # CONNECTED in Studio (user, 2026-10-14).
     # 0. Every FK is a plain Number and nothing is a Lookup or Person; a view adds joins
     # only if it projects the system Created By / Modified By.
     join_cost: 0
@@ -526,9 +524,8 @@ lists:
       # must write it — `= false` does not match a blank, so an unwritten row is invisible to
       # LiveOutputs.
       - { name: output_project_archived, type: Boolean,  required: false, indexed: true,  default: false, desc: "TRUE when the PARENT project is archived. Maintained by the external archival flow, not the app" }
-      # ---- NOT YET IN SHAREPOINT -----------------------------------------------
-      # CREATE BEFORE #96 RUNS OR ANY SCREEN PASTES. Date and Time, format DATE ONLY, indexed:
-      # #99 sorts the project panel on it and #100 windows reports on it.
+      # Date and Time, format DATE ONLY, indexed: #99 sorts the project panel on it and #100
+      # windows reports on it.
       - { name: output_date,             type: DateTime, required: false, indexed: true,  desc: "When the output was produced or published. The app defaults it to today and lets the user change it; #96 back-fills it from task_date_completion, else the task's Created. Not Modified — see the list note" }
       # Choice values copied from the task_output_* columns they replace, in the same order.
       - { name: output_format,           type: Choice,   required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
