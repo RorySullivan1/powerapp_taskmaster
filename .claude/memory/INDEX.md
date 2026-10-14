@@ -19,8 +19,8 @@
 - **project_date_start FIX — AUTHORED 2026-10-13: scrProject (auto-stamp) + scrProjectEdit (calendar-only) pastes, then a ONE-OFF
   FLOW** (`docs/notes/backfill-project-date-start.md`) to copy Created into blank starts. Flow NOT RUN YET; check the column's internal name first.
 - **EPIC #93 OUTPUT LOG — #95 SCHEMA RECORDED 2026-10-14.** List is **`taskmaster_output` (SINGULAR — the sub-issues say ...outputs)**,
-  live in SharePoint with output_name an EXPLICIT column (not renamed Title; confirm Title is NOT required). output_date CREATED and list CONNECTED in Studio (user, 2026-10-14). REQUIRED: name, project id, format, audience, language, branding. **USER STILL TO: (3) append `LiveOutputs` to
-  App.Formulas (formula bar); (4) smoke-test one Patch + read-back.** Then #96 migration. No output_asset (dropped).
+  live in SharePoint with output_name an EXPLICIT column (not renamed Title; confirm Title is NOT required). output_date CREATED and list CONNECTED in Studio (user, 2026-10-14). REQUIRED: name, project id, format, audience, language, branding. LiveOutputs in App.Formulas; SMOKE TEST PASSED (user,
+  2026-10-14: write, read-back via LiveOutputs, required rejected, clean-up). **#95 DONE — #96 migration is next.** Then #96 migration. No output_asset (dropped).
 - **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14; BOTH TEXT COLUMNS CREATED IN SHAREPOINT (user, 2026-10-14)
   (project_requestor_department, project_requestor_2_department). NEXT: refresh taskmaster_projects in Studio, then paste scrProjectEdit.** Back-fill of existing projects is the USER's (no flow from us).
 - **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
@@ -386,3 +386,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-14 | #95 correction (user): output_name is an explicit column, not renamed Title; schema, title_column note and memory fixed | (no session file)
 - 2026-10-14 | #95: user created output_date and connected taskmaster_output in Studio; LiveOutputs line handed over for App.Formulas | (no session file)
 - 2026-10-14 | #95: six output fields made required (name, project id, format, audience, language, branding); schema updated; #96 flagged (blank task outputs can't migrate as-is) | (no session file)
+- 2026-10-14 | #95 smoke test PASSED in Studio (tests/scrProbe-output-write): write, LiveOutputs read-back, output_language required enforced, clean-up. #95 closed; #96 next | (no session file)

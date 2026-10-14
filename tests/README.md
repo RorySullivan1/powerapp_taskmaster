@@ -973,7 +973,7 @@ lessons worth carrying:
 
 ## `scrProbe-output-write.pa.yaml` — does `taskmaster_output` accept the app's insert?
 
-**Status: NOT YET RUN.** Written 2026-10-14 for issue #95.
+**Status: RUN 2026-10-14. ALL FOUR AS EXPECTED — the list accepts the app's insert.**
 
 ### The claim under test
 
@@ -990,4 +990,13 @@ language, branding). The probe proves, each step with its own message:
 
 ### Result
 
-_Not yet run._ Record each step's message here, then delete the screen in Studio.
+Run by the user, 2026-10-14:
+1. **WRITE** — passed; the row was created.
+2. **READ** — passed; the row came back through `LiveOutputs` with its values.
+3. **REQUIRED** — rejected, as intended: `output_language` is enforced as required.
+4. **CLEAN UP** — removed the row.
+
+So `taskmaster_output` takes a Patch with Choice values as `{ Value: … }`, a Number FK,
+`Today()` into the date column and `false` into the archived flag; `LiveOutputs`
+resolves and delegates its `ID =` LookUp; and the list-level required setting is live.
+Only `output_language` was tested as required; the other five were set to required in the same pass and are taken on that evidence.
