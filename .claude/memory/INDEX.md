@@ -18,7 +18,7 @@
   colWorkProjects / colWorkTasks (supported rows prefixed "Support ·"); Issues list unchanged (no supporter column, by decision).
 - **project_date_start FIX — AUTHORED 2026-10-13: scrProject (auto-stamp) + scrProjectEdit (calendar-only) pastes, then a ONE-OFF
   FLOW** (`docs/notes/backfill-project-date-start.md`) to copy Created into blank starts. Flow NOT RUN YET; check the column's internal name first.
-- **EPIC #93 OUTPUT LOG — BUILT AND PASTED (user, 2026-10-14); SUB-ISSUES #96-#101 CLOSED, #102 NOT PLANNED. Detail below is historical.**
+- **EPIC #93 OUTPUT LOG — BUILT AND PASTED (user, 2026-10-14); SUB-ISSUES #96-#101 CLOSED, #102 NOT PLANNED; EPIC CLOSED. Detail below is historical.**
   List `taskmaster_output` (SINGULAR) live, connected, smoke-tested; LiveOutputs in App.Formulas. task_output_* RETIRED IN PLACE (schema `retired: true`; no src/ reads).
   **PASTE ORDER:** scrProject (#99) and scrTransactionEdit (#98; still needs `transaction_comment` to exist) any time; scrReports (#100) and
   **scrTaskEdit (#97) ONLY AFTER the user's #96 migration has run** (else tasks show empty logs / pies drop). All four: delete screen, then paste; check no `_1`.
@@ -405,3 +405,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-14 | scrQuickTx output pop-up + single-line rows; pre-paste review PASTE (defaults read on-screen values). 23/23 | (no session file)
 - 2026-10-14 | Outputs task/transaction-only: scrProject outputs read-only; scrTaskEdit "Outputs & Products"; scrTransactionEdit outputs above required fields | (no session file)
 - 2026-10-14 | Epic #93 sub-issues closed by the user's request: #96-#101 completed (all screens pasted, migration run by the user), #102 not planned. Epic #93 itself left open pending the user | (no session file)
+- 2026-10-14 | Epic #93 closed (user) | (no session file)
