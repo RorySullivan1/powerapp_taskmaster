@@ -21,6 +21,8 @@
 - **EPIC #93 OUTPUT LOG — FILED 2026-10-14, NOTHING BUILT.** New list `taskmaster_outputs` (one row per output; Number FKs to project
   (required) / task / transaction; output_project_archived). Subs #94-#102. **#94 DECIDED 2026-10-14 (closed); #95 schema +
   provisioning is NEXT.** task_output_* get migrated (#96) then RETIRED IN PLACE, never deleted.
+- **#103 project_requestor_department — FILED 2026-10-14, NOTHING BUILT.** New Text column, snapshot of the primary requestor's
+  directory department via `Office365Users.UserProfile(mail).Department` on pick (scrProjectEdit). Open: requestor_2 too? editable? index? back-fill?
 - **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
   scrTransactionEdit is RESTORED byte-for-byte to pre-PR-#88 (quick mode #79-#82 reverted). **The #88 quick-mode version
   WAS pasted into Studio (user, 2026-10-08), so the restore NEEDS A PASTE: delete the screen, then paste.** scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
@@ -375,3 +377,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-13 | project_date_start fix authored: scrProject auto-stamps on first sign of work, scrProjectEdit start picker calendar-only, schema desc rewritten, back-fill runbook in docs/notes. 23/23. AWAITING PASTE + FLOW RUN | (no session file)
 - 2026-10-14 | Epic #93 filed (output log): taskmaster_outputs with indexed Number FKs (projectcomments precedent), task_output_* migrated then retired, multi-row editors on scrTaskEdit/scrTransactionEdit, Outputs panel + cascade on scrProject, scrReports re-pointed, archival flow, optional file import. Subs #94-#102; #94 decision first | (no session file)
 - 2026-10-14 | #94 decided (all recommendations) and closed; #95/#97/#99/#102 annotated; epic #93 updated. #95 next | (no session file)
+- 2026-10-14 | #103 filed: project_requestor_department (Text, optional) — fill on pick via UserProfile().Department in IfError, seed/clear/save on scrProjectEdit, optional scrProject display + back-fill flow. Awaiting answers to its 4 open questions | (no session file)
