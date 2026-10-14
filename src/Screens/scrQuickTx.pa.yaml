@@ -24,8 +24,8 @@
 #   3. TriggerOutput.FocusOut on ModernTextInput (txtQtRowName). Safe to delete.
 # No input control has ever sat inside a gallery here — behaviour, not tokens.
 # Also unproven here, behaviour not tokens: Reset() of a combo box from a sibling in the
-# same gallery row (icoQtRowOutClr), and g.<control> in AllItems reaching a control two
-# containers deep (cboQtRow* inside rowQtLine1 / rowQtLine2).
+# same gallery row (icoQtRowOutClr), and g.<control> in btnQtSave's AllItems sync reaching
+# a control inside rowQtLine1 (fallback: delete the sync block; OnChange alone remains).
 #
 # CONNECTION PREREQUISITES: Office 365 Users (manager and sales-owner picker) and
 # taskmaster_output (row outputs).
@@ -522,7 +522,7 @@ Screens:
             # 88 (9 x 8 + 16), 9 portions share 862 (~96 each), so no LayoutMinWidth binds.
             # Line 2 (no heading): fixed 130 (28+16+50+16+20), gaps+padding 88, 6 portions
             # share 1082 (~180 each): sales 2/180 -> ~361, four outputs 1/120 -> ~180 each;
-            # mins bind only below TemplateWidth 878.
+            # mins bind only below TemplateWidth 938.
             # Row = 2 + 40 + 4 + 40 = 86 inside TemplateSize 88; rctQtRowLine is the 88th px.
             # The gallery grows a row at a time up to 4, then scrolls. 110 = 18 + 4 + 88.
             # ---------------------------------------------------------------------
@@ -1240,6 +1240,9 @@ Screens:
                     // (the combobox and date picker re-read their defaults only on Reset). So the
                     // visible values are copied back first. AllItems is complete here: the gallery
                     // is bound to a local collection, not a paged data source.
+                    // THE OUTPUT BOXES ARE DELIBERATELY NOT COPIED: a combo box commits on selection,
+                    // so colQtRows already holds them, and a reused row can SHOW the previous row's
+                    // output — copying that back would log an output nobody chose.
                     If( !gSaving,
                         ClearCollect( colQtSync,
                             ForAll( galQtRows.AllItems As g,
@@ -1247,17 +1250,11 @@ Screens:
                                   s_name: g.txtQtRowName.Text,
                                   s_date: g.dtpQtRowDate.SelectedDate,
                                   s_not:  g.numQtRowNotional.Text,
-                                  s_ccy:  g.cboQtRowCcy.Selected.Value,
-                                  s_oFmt:   Coalesce( g.cboQtRowOutFmt.Selected.Value, "" ),
-                                  s_oAud:   Coalesce( g.cboQtRowOutAud.Selected.Value, "" ),
-                                  s_oLang:  Coalesce( g.cboQtRowOutLang.Selected.Value, "" ),
-                                  s_oBrand: Coalesce( g.cboQtRowOutBrand.Selected.Value, "" ) } ) );
+                                  s_ccy:  g.cboQtRowCcy.Selected.Value } ) );
                         ForAll( colQtSync As s,
                             Patch( colQtRows, LookUp( colQtRows, q_rid = s.s_rid ),
                                    { q_name: s.s_name, q_date: s.s_date,
-                                     q_notional: s.s_not, q_ccy: s.s_ccy,
-                                     q_oFmt: s.s_oFmt, q_oAud: s.s_oAud,
-                                     q_oLang: s.s_oLang, q_oBrand: s.s_oBrand } ) ) );
+                                     q_notional: s.s_not, q_ccy: s.s_ccy } ) ) );
                     If( gSaving,
                     // A SECOND TAP WHILE THE FIRST WRITE IS STILL IN FLIGHT. Do nothing — the button
                     // stays live during a Patch, and a double-tap ran the handler twice.
