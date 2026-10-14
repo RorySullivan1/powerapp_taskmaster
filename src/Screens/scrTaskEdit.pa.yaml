@@ -1563,13 +1563,14 @@ Screens:
                     // --- the output log: deletes, then upserts, then a re-read ---------
                     // AFTER the task Patch, so a new task's ID exists. NOT gated on tglTkOutput — that
                     // toggle only shows or hides the log.
-                    // DELETES take the product reconcile's shape: the FK filter delegates, the `in` test
-                    // runs client-side over this task's handful, and Remove() takes the scope record. The
-                    // RAW list, so a row is found whatever its archived flag.
+                    // DELETES LOOP OVER THE LOCAL QUEUE, NEVER THE LIST: Studio rejects a Remove on
+                    // the data source a ForAll is iterating. Each queued ID is looked up (`=` on ID
+                    // delegates) and removed only if it is still there; the re-read below reports
+                    // any that survive.
                     If( !IsEmpty(colTkOutDel),
-                    ForAll( Filter( taskmaster_output, output_task_id = gTkSaved.ID ) As r,
-                    If( r.ID in colTkOutDel.OutId,
-                    Remove( taskmaster_output, r ) ) ) );
+                    ForAll( colTkOutDel As d,
+                    With( { x: LookUp( taskmaster_output, ID = d.OutId ) },
+                    If( !IsBlank(x.ID), Remove( taskmaster_output, x ) ) ) ) );
                     // UPSERTS, only rows the modal touched. ForAll may run its rows in any order, so each
                     // result is Collected (no Set inside), and every IfError arm is Text.
                     Clear( colTkOutRes );

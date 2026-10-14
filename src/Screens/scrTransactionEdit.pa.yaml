@@ -915,14 +915,15 @@ Screens:
                         // inserting it again. Failed rows stay staged as they were.
                         ForAll( Filter( colTxOutRes, Len(Res) > 0 && !StartsWith(Res, "!") ) As k,
                             Patch( colTxOut, LookUp( colTxOut, Sid = k.Sid ), { OutId: Value(k.Res) } ) );
-                        // THE FILTER DELEGATES, THE MEMBERSHIP TEST DOES NOT — so they are separate,
-                        // as in scrTaskEdit's product-link reconcile. Remove() takes the scope record.
-                        // Then RE-READ: a removal confirmed gone leaves colTxOutDel, and whatever is
-                        // still listed failed and is retried on the next Save.
+                        // DELETES LOOP OVER THE LOCAL QUEUE, NEVER THE LIST: Studio rejects a Remove
+                        // on the data source a ForAll is iterating. Each queued ID is looked up (`=` on
+                        // ID delegates) and removed only if it is still there. Then RE-READ: a removal
+                        // confirmed gone leaves colTxOutDel, and whatever is still listed failed and is
+                        // retried on the next Save.
                         If( !IsEmpty(colTxOutDel),
-                            ForAll( Filter( taskmaster_output, output_transaction_id = gTxSaved.ID ) As o,
-                                    If( o.ID in colTxOutDel.OutId,
-                                        Remove( taskmaster_output, o ) ) );
+                            ForAll( colTxOutDel As d,
+                                    With( { x: LookUp( taskmaster_output, ID = d.OutId ) },
+                                          If( !IsBlank(x.ID), Remove( taskmaster_output, x ) ) ) );
                             ClearCollect( colTxOutLeft,
                                 ForAll( Filter( taskmaster_output, output_transaction_id = gTxSaved.ID ) As o,
                                         { OutId: Value(Text(o.ID)) } ) );
