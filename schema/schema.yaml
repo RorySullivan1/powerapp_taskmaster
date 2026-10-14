@@ -528,10 +528,14 @@ lists:
       # windows reports on it.
       - { name: output_date,             type: DateTime, required: false, indexed: true,  desc: "When the output was produced or published. The app defaults it to today and lets the user change it; #96 back-fills it from task_date_completion, else the task's Created. Not Modified — see the list note" }
       # Choice values copied from the task_output_* columns they replace, in the same order.
-      - { name: output_format,           type: Choice,   required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
-      - { name: output_audience,         type: Choice,   required: false,                 desc: "Who the output is for. Descriptive only — gates nothing. NOT list-required: the app requires it per output row", values: ["Direct Retail", "Indirect Retail", "Client-Specific", "Generic", "Internal Only"] }
-      - { name: output_language,         type: Choice,   required: false,                 desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
-      - { name: output_branding,         type: Choice,   required: false,                 desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
+      # ALL FOUR ARE LIST-REQUIRED (user, 2026-10-14), unlike the optional task_output_* columns
+      # they replace. Every insert — app Patch or #96 flow — must name all four with a real
+      # member, or SharePoint rejects the whole row. A migrated task with any of them blank
+      # cannot be copied as-is.
+      - { name: output_format,           type: Choice,   required: true,                  desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
+      - { name: output_audience,         type: Choice,   required: true,                  desc: "Who the output is for. Descriptive only — gates nothing", values: ["Direct Retail", "Indirect Retail", "Client-Specific", "Generic", "Internal Only"] }
+      - { name: output_language,         type: Choice,   required: true,                  desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
+      - { name: output_branding,         type: Choice,   required: true,                  desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
       - { name: output_approval_flag,    type: Boolean,  required: false,                 default: false, desc: "TRUE when this output needs an external approval. While true and output_approval_id is blank, the parent task cannot reach Completed" }
       - { name: output_approval_id,      type: Text,     required: false,                 desc: "ID of the approval in the EXTERNAL portal. Free-text pointer only — not a lookup, not validated, not indexed" }
 
