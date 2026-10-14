@@ -1689,6 +1689,485 @@ Screens:
                     Back() ) ) );
                     Set( gSaving, false ) )
       # =====================================================================
+      # OUTPUT MODAL — add or edit ONE staged row of colTkOut. Card 640 x 570; geometry in
+      # the file header. Above the action bar, so the scrim blocks Save while it is open.
+      # Writes only the staging collection; btnTkSave writes SharePoint.
+      # =====================================================================
+      - mdTkOutScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gTkOutOpen
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set( gTkOutOpen, false ); Set( gTkOutSid, 0 )
+      - mdTkOutBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gTkOutOpen
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 640) / 2
+            Y: =(Parent.Height - 570) / 2
+            Width: =640
+            Height: =570
+      - mdTkOutBody:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Visible: =gTkOutOpen
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =24
+            PaddingBottom: =16
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =(Parent.Width - 640) / 2
+            Y: =(Parent.Height - 570) / 2
+            Width: =640
+            Height: =486
+          Children:
+            - mdTkOutTitle:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =If( gTkOutSid <> 0, "Edit output", "Add an output" )
+                  Font: =gTheme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =gTheme.Size.H3
+                  Color: =gTheme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =28
+                  Width: =Parent.Width - 48
+                  Height: =28
+            - rowTkOmName:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =4
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblTkOmNameCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Output name  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width
+                        Height: =18
+                  - txtTkOutName:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =gTkOutName
+                        Placeholder: ="e.g. Q3 autocall deck"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FillPortions: =0
+                        LayoutMinHeight: =36
+                        Width: =Parent.Width
+                        Height: =36
+            # Two-up rows: (592 content - 16 gap) / 2 = 288 per stack.
+            - rowTkOmA:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - stkTkOmDate:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =4
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblTkOmDateCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Output date"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - dtpTkOutDate:
+                            Control: ModernDatePicker@1.0.1
+                            Properties:
+                              DefaultDate: =gTkOutDate
+                              Placeholder: ="Pick a date"
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                  - stkTkOmFmt:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =4
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblTkOmFmtCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Format  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - cboTkOutFmt:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colTkOutFmtOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gTkOutFmt], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              Color: |
+                                =gTheme.Color.TextPrimary
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set(gTkOutFmt, cboTkOutFmt.Selected.Value)
+            - rowTkOmB:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - stkTkOmAud:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =4
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblTkOmAudCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Audience  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        # Descriptive only — the approval gate is the flag below, not a value here.
+                        - cboTkOutAud:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colTkOutAudOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gTkOutAud], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              Color: |
+                                =gTheme.Color.TextPrimary
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set(gTkOutAud, cboTkOutAud.Selected.Value)
+                  - stkTkOmLang:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =4
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblTkOmLangCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Language  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - cboTkOutLang:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colTkOutLangOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gTkOutLang], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              Color: |
+                                =gTheme.Color.TextPrimary
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set(gTkOutLang, cboTkOutLang.Selected.Value)
+            - rowTkOmC:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Horizontal
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =16
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - stkTkOmBrand:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =4
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblTkOmBrandCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Branding  *"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        - cboTkOutBrand:
+                            Control: ModernCombobox@1.1.1
+                            Properties:
+                              Items: =colTkOutBrandOpts
+                              ItemDisplayText: =ThisItem.Value
+                              DefaultSelectedItems: =Filter( [gTkOutBrand], !IsBlank(Value) )
+                              SelectMultiple: =false
+                              IsSearchable: =false
+                              InputTextPlaceholder: ="Select…"
+                              Color: |
+                                =gTheme.Color.TextPrimary
+                              FillPortions: =0
+                              LayoutMinHeight: =36
+                              Width: =Parent.Width
+                              Height: =36
+                              OnChange: =Set(gTkOutBrand, cboTkOutBrand.Selected.Value)
+                  - stkTkOmFlag:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Vertical
+                        LayoutAlignItems: =LayoutAlignItems.Start
+                        LayoutGap: =4
+                        FillPortions: =1
+                        LayoutMinWidth: =200
+                        Height: =62
+                      Children:
+                        - lblTkOmFlagCap:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Approval required?"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              VerticalAlign: =VerticalAlign.Middle
+                              FillPortions: =0
+                              LayoutMinHeight: =18
+                              Width: =Parent.Width
+                              Height: =18
+                        # THE GATE IS THIS FLAG, per output. While it is on and the id below is blank,
+                        # lblTkMissing blocks the task from being saved as Completed.
+                        - tglTkOutFlag:
+                            Control: Classic/Toggle@2.1.0
+                            Properties:
+                              Default: =gTkOutFlag
+                              FalseText: =""
+                              TrueText: =""
+                              FillPortions: =0
+                              LayoutMinWidth: =60
+                              Width: =60
+                              Height: =30
+            - rowTkOmAppr:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Start
+                  LayoutGap: =4
+                  FillPortions: =0
+                  LayoutMinHeight: =62
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblTkOmApprCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          ="Approval ID (external portal)" &
+                           If( tglTkOutFlag.Value, "  ·  required before the task can be Completed", "" )
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        VerticalAlign: =VerticalAlign.Middle
+                        FillPortions: =0
+                        LayoutMinHeight: =18
+                        Width: =Parent.Width
+                        Height: =18
+                  # A free-text pointer to the approval in a SEPARATE portal — no lookup, no picker.
+                  # Not required to stage the row: the portal issues the id late.
+                  - txtTkOutAppr:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =gTkOutAppr
+                        Placeholder: ="Approval task ID from the approval portal"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FillPortions: =0
+                        LayoutMinHeight: =36
+                        Width: =Parent.Width
+                        Height: =36
+            - lblTkOutMissing:
+                Control: Label@2.5.1
+                Properties:
+                  Visible: =Len(Self.Text) > 0
+                  Text: |
+                    =With(
+                       { m: Concat( Filter( Table(
+                              { L: "Name",     M: Len(Trim(txtTkOutName.Text)) = 0 },
+                              { L: "Format",   M: Len(gTkOutFmt) = 0 },
+                              { L: "Audience", M: Len(gTkOutAud) = 0 },
+                              { L: "Language", M: Len(gTkOutLang) = 0 },
+                              { L: "Branding", M: Len(gTkOutBrand) = 0 } ),
+                            M ), L, " | " ) },
+                       If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.Danger
+                  VerticalAlign: =VerticalAlign.Middle
+                  FillPortions: =0
+                  LayoutMinHeight: =36
+                  Width: =Parent.Width - 48
+                  Height: =36
+      - mdTkOutCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gTkOutOpen
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Cancel"
+            X: =(Parent.Width - 640) / 2 + 640 - 24 - 140 - 12 - 120
+            Y: =(Parent.Height - 570) / 2 + 570 - 24 - 40
+            Width: =120
+            Height: =40
+            OnSelect: =Set( gTkOutOpen, false ); Set( gTkOutSid, 0 )
+      # ALWAYS ENABLED, like btnTkSave: a disabled button cannot say what is missing.
+      # The four IFs stay separate — Patch returns a record, Collect a table, Notify a
+      # boolean, and one If cannot mix them.
+      - mdTkOutAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gTkOutOpen
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: =If( gTkOutSid <> 0, "Save output", "Add output" )
+            X: =(Parent.Width - 640) / 2 + 640 - 24 - 140
+            Y: =(Parent.Height - 570) / 2 + 570 - 24 - 40
+            Width: =140
+            Height: =40
+            OnSelect: |
+              =Set( gTkOutOk, Len(lblTkOutMissing.Text) = 0 );
+               If( !gTkOutOk,
+                   Notify( "Can't add this output yet. " & lblTkOutMissing.Text, NotificationType.Error ) );
+               If( gTkOutOk && gTkOutSid <> 0,
+                   Patch( colTkOut, LookUp( colTkOut, Sid = gTkOutSid ),
+                          { Name:     Trim(txtTkOutName.Text),
+                            ODate:    dtpTkOutDate.SelectedDate,
+                            Format:   gTkOutFmt,
+                            Audience: gTkOutAud,
+                            Language: gTkOutLang,
+                            Branding: gTkOutBrand,
+                            Flag:     tglTkOutFlag.Value,
+                            ApprId:   Trim(txtTkOutAppr.Text),
+                            Dirty:    true } ) );
+               // A NEW ROW TAKES A NEGATIVE Sid, so it can never equal a loaded row's SharePoint ID.
+               If( gTkOutOk && gTkOutSid = 0,
+                   Set( gTkOutSeq, gTkOutSeq + 1 );
+                   Collect( colTkOut,
+                            { Sid:      -gTkOutSeq,
+                              OutId:    0,
+                              Name:     Trim(txtTkOutName.Text),
+                              ODate:    dtpTkOutDate.SelectedDate,
+                              Format:   gTkOutFmt,
+                              Audience: gTkOutAud,
+                              Language: gTkOutLang,
+                              Branding: gTkOutBrand,
+                              Flag:     tglTkOutFlag.Value,
+                              ApprId:   Trim(txtTkOutAppr.Text),
+                              Dirty:    true } ) );
+               If( gTkOutOk, Set( gTkOutOpen, false ); Set( gTkOutSid, 0 ) )
+      # =====================================================================
       # PICKER — ONE cmpPicker instance for BOTH person fields AND both lookups.
       # Declared LAST so the dialog paints above the fixed footer. gTkPicker names the
       # field being filled AND selects which KIND of row to list, so Visible, Title,
