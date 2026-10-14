@@ -441,7 +441,7 @@ Screens:
                                 =Coalesce( LookUp(colTxCurrencyOpts, Label = gTxCurrency, Id), 1 )
                               OnChange: |
                                 =Set(gTxCurrency, selTxCurrency.Selected.Label)
-            # FULL WIDTH, and last before the validation line. It is the only free-text field
+            # FULL WIDTH, and the last field before the outputs. It is the only free-text field
             # here and the only one that can run long; a half-width multiline box is unusable
             # for it. PLAIN multiline — transaction_comment is Note, not rich text, and a
             # ModernTextInput cannot render markup either way.
@@ -478,49 +478,10 @@ Screens:
                         LayoutMinHeight: =84
                         Width: =Parent.Width
                         Height: =84
-            # GATED ON THE MESSAGE, not just its two children. Both were already Visible-gated,
-            # so this row sat as 62px of blank space on every valid form. Reading a hidden
-            # control's .Text is fine and is already how btnTxSave gates the save — same
-            # pattern as lblClMissing on scrClientEdit.
-            - colTxMissing:
-                Control: GroupContainer@1.5.0
-                Variant: AutoLayout
-                Properties:
-                  Visible: =Len(lblTxMissing.Text) > 0
-                  LayoutDirection: =LayoutDirection.Vertical
-                  LayoutAlignItems: =LayoutAlignItems.Center
-                  LayoutGap: =4
-                  Width: =Parent.Width - 48
-                  Height: =62
-                Children:
-                  - lblTxMissing:
-                      Control: Label@2.5.1
-                      Properties:
-                        Text: |
-                          =With(
-                             { m: Concat( Filter( Table(
-                                    { L: "Label",          M: Len(Trim(txtTxName.Text)) = 0 },
-                                    // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
-                                    // so a user cannot act on this one — reopen the transaction from the project
-                                    // screen. A blank would otherwise be rejected by SharePoint silently.
-                                    { L: "Parent Project", M: gTxProject.Id <= 0 },
-                                    { L: "Trade Date",     M: IsBlank(dtpTxDate.SelectedDate) },
-                                    // THE ONE VALIDITY TEST IN THIS LIST, not a missing-field test: the notional is
-                                    // OPTIONAL, so an empty box is fine and only an entry that will not parse fires
-                                    // this. It reads as a required field because the list has one format.
-                                    { L: "Notional",       M: Len(Trim(numTxNotional.Text)) > 0 && IsBlank(Value(numTxNotional.Text)) } ),
-                                  M ), L, " | " ) },
-                             If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Small
-                        Color: =gTheme.Color.Danger
-                        Width: =Parent.Width
-                        Height: =40
-                        Visible: =Len(Self.Text) > 0
             # ---------------------------------------------------------------------
             # OUTPUTS — read-only staged rows; the modal below edits one at a time. Nothing is
-            # written until Save. LAST in the scroll so the validation line stays beside the
-            # fields it validates.
+            # written until Save. Sits ABOVE the validation line, so "Required Fields Remaining"
+            # stays the last thing before the action bar.
             # blkTxOut's Height is the exact sum of its visible children, and a hidden child takes
             # no space: 36 head + 8 gap + (24 empty label | rows x 34 + 2 gallery). A gallery row
             # pitch is TemplateSize + TemplatePadding = 34, plus one 2px padding at the end.
@@ -730,6 +691,45 @@ Screens:
                                     OnSelect: |
                                       =If( ThisItem.OutId > 0, Collect( colTxOutDel, { OutId: ThisItem.OutId } ) );
                                       RemoveIf( colTxOut, Sid = ThisItem.Sid )
+            # GATED ON THE MESSAGE, not just its two children. Both were already Visible-gated,
+            # so this row sat as 62px of blank space on every valid form. Reading a hidden
+            # control's .Text is fine and is already how btnTxSave gates the save — same
+            # pattern as lblClMissing on scrClientEdit.
+            - colTxMissing:
+                Control: GroupContainer@1.5.0
+                Variant: AutoLayout
+                Properties:
+                  Visible: =Len(lblTxMissing.Text) > 0
+                  LayoutDirection: =LayoutDirection.Vertical
+                  LayoutAlignItems: =LayoutAlignItems.Center
+                  LayoutGap: =4
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblTxMissing:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: |
+                          =With(
+                             { m: Concat( Filter( Table(
+                                    { L: "Label",          M: Len(Trim(txtTxName.Text)) = 0 },
+                                    // SAFETY NET, not a prompt. The project is DERIVED and has no field on this form,
+                                    // so a user cannot act on this one — reopen the transaction from the project
+                                    // screen. A blank would otherwise be rejected by SharePoint silently.
+                                    { L: "Parent Project", M: gTxProject.Id <= 0 },
+                                    { L: "Trade Date",     M: IsBlank(dtpTxDate.SelectedDate) },
+                                    // THE ONE VALIDITY TEST IN THIS LIST, not a missing-field test: the notional is
+                                    // OPTIONAL, so an empty box is fine and only an entry that will not parse fires
+                                    // this. It reads as a required field because the list has one format.
+                                    { L: "Notional",       M: Len(Trim(numTxNotional.Text)) > 0 && IsBlank(Value(numTxNotional.Text)) } ),
+                                  M ), L, " | " ) },
+                             If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.Danger
+                        Width: =Parent.Width
+                        Height: =40
+                        Visible: =Len(Self.Text) > 0
       - actionBarBg:
           Control: Rectangle@2.3.0
           Properties:
@@ -1232,7 +1232,7 @@ Screens:
                   - lblTxOFlagCap:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="Approval required?"
+                        Text: ="Approval Required"
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
@@ -1270,7 +1270,7 @@ Screens:
                   - lblTxOApprCap:
                       Control: Label@2.5.1
                       Properties:
-                        Text: ="Approval ID (external portal)"
+                        Text: ="Approval ID"
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         Color: =gTheme.Color.TextMuted
@@ -1284,7 +1284,7 @@ Screens:
                       Control: ModernTextInput@1.1.1
                       Properties:
                         Default: =gTxOApprId
-                        Placeholder: ="Approval task ID from the approval portal"
+                        Placeholder: ="Approval ID"
                         Font: =gTheme.Font
                         Size: =gTheme.Size.Small
                         LayoutGridColumnStart: =2

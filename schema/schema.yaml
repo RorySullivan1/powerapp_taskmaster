@@ -489,9 +489,11 @@ lists:
     # only if it projects the system Created By / Modified By.
     join_cost: 0
     # LINK RULES (#94), held by the app because SharePoint cannot express them:
-    #   - output_project_id is always set.
-    #   - AT MOST ONE of output_task_id / output_transaction_id. Neither = a project-level
-    #     output, which is allowed. One parent keeps reports from double-counting.
+    #   - output_project_id is always set — the parent's project, denormalised so a project's
+    #     outputs read on one indexed FK.
+    #   - EXACTLY ONE of output_task_id / output_transaction_id (user, 2026-10-14). An output
+    #     belongs to a task or a transaction and is created on that screen; scrProject only
+    #     lists them. One parent keeps reports from double-counting.
     #   - THE TASK APPROVAL GATE READS THIS LIST: a task cannot reach stage Completed while
     #     any of its outputs has output_approval_flag = true and a blank output_approval_id.
     #     Transactions have no stage, so no gate.
@@ -512,8 +514,8 @@ lists:
       # NUMBER, NOT LOOKUP — the projectcomment_project_id precedent. `=` on an indexed
       # Number delegates off the raw list; a Lookup's `.Id` does not. Do not convert.
       - { name: output_project_id,       type: Number,   required: true,  indexed: true,  desc: "ID of the parent project. Always set, including on task and transaction outputs" }
-      - { name: output_task_id,          type: Number,   required: false, indexed: true,  desc: "ID of the task this output came from. Blank on a transaction or project-level output" }
-      - { name: output_transaction_id,   type: Number,   required: false, indexed: true,  desc: "ID of the transaction this output came from. Blank on a task or project-level output" }
+      - { name: output_task_id,          type: Number,   required: false, indexed: true,  desc: "ID of the task this output came from. Blank on a transaction output" }
+      - { name: output_transaction_id,   type: Number,   required: false, indexed: true,  desc: "ID of the transaction this output came from. Blank on a task output" }
       # Fifth mirror of the parent-archived flag, same contract as projectcomment_project_archived.
       # Flipped by the EXTERNAL archival flow (#101). Every app save also writes it, copying the
       # parent's archived state, and must — `= false` does not match a blank, so an unwritten row
