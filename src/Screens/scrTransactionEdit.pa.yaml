@@ -23,14 +23,31 @@ Screens:
         // cmpSelection needs {Id, Label} and Choices() returns only Value, so the Id is
         // synthesised POSITIONALLY. The Ids mean nothing beyond "which row" — DefaultId looks
         // the value up by Label. No "(none)" row: the column is REQUIRED.
-        // ONCE PER SESSION, NOT ONCE PER VISIT: an EMPTY list is the only reason to fetch the
-        // vocabulary again, and a new currency is picked up on the next app start. No
-        // Concurrent here — this screen has exactly one cacheable list, and Concurrent needs two.
-        If( IsEmpty(colTxCurrencyOpts),
-            ClearCollect( colTxCurrencyOpts,
-                      With( { ch: Choices([@taskmaster_transactions].transaction_currency) },
-                            ForAll( Sequence( CountRows(ch) ) As n,
-                                    { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) );
+        // ONCE PER SESSION, NOT ONCE PER VISIT: an EMPTY list is the only reason to fetch a
+        // vocabulary again, and a new value is picked up on the next app start.
+        // The four output lists feed the output modal's combo boxes. All four columns are
+        // REQUIRED, so there is no "(none)" row — the empty state is not a legal value.
+        // Concurrent's arms fail independently: one Choices() that errors leaves only its own
+        // list empty, and the IsEmpty guard retries it on the next visit.
+        Set( gTxOutOpen, false );
+        Concurrent(
+            If( IsEmpty(colTxCurrencyOpts),
+                ClearCollect( colTxCurrencyOpts,
+                          With( { ch: Choices([@taskmaster_transactions].transaction_currency) },
+                                ForAll( Sequence( CountRows(ch) ) As n,
+                                        { Id: n.Value, Label: Index(ch, n.Value).Value } ) ) ) ),
+            If( IsEmpty(colTxOFmtOpts),
+                ClearCollect( colTxOFmtOpts,
+                         ForAll( Choices([@taskmaster_output].output_format) As c, { Value: c.Value } ) ) ),
+            If( IsEmpty(colTxOAudOpts),
+                ClearCollect( colTxOAudOpts,
+                         ForAll( Choices([@taskmaster_output].output_audience) As c, { Value: c.Value } ) ) ),
+            If( IsEmpty(colTxOLangOpts),
+                ClearCollect( colTxOLangOpts,
+                         ForAll( Choices([@taskmaster_output].output_language) As c, { Value: c.Value } ) ) ),
+            If( IsEmpty(colTxOBrandOpts),
+                ClearCollect( colTxOBrandOpts,
+                         ForAll( Choices([@taskmaster_output].output_branding) As c, { Value: c.Value } ) ) ) );
         If( gTxResume,
          Set( gTxResume, false ),
          Set( gTxProject,
@@ -67,6 +84,26 @@ Screens:
         // Reset, or the previous transaction's notional is written onto the next one.
         Reset( numTxNotional );
         Reset( dtpTxDate );
+        // OUTPUT STAGING. INSIDE the resume guard: returning from ＋ New must not discard rows
+        // staged before stepping out. Read off the RAW list — `=` on the indexed Number FK
+        // delegates, and LiveOutputs would hide an archived project's rows from its own editor.
+        // Sid is the row's identity in the grid; a loaded row reuses its SharePoint ID, and a
+        // new row takes Max + 1, so the two can never collide.
+        Clear( colTxOutDel );
+        Clear( colTxOut );
+        If( gEditMode = "Edit",
+            Collect( colTxOut,
+                ForAll( Filter( taskmaster_output, output_transaction_id = gEditTransaction.ID ) As o,
+                        { Sid:      o.ID,
+                          OutId:    o.ID,
+                          Name:     o.output_name,
+                          ODate:    o.output_date,
+                          Format:   o.output_format.Value,
+                          Audience: o.output_audience.Value,
+                          Language: o.output_language.Value,
+                          Branding: o.output_branding.Value,
+                          Flag:     Coalesce(o.output_approval_flag, false),
+                          ApprId:   Coalesce(o.output_approval_id, "") } ) ) );
         // cmpSelection re-reads its DefaultId ONLY on Reset.
         // INSIDE the resume guard on purpose: returning from ＋ New must not re-seed from the
         // stored record and discard a currency the user picked before stepping out.
@@ -522,7 +559,10 @@ Screens:
                     =Set( gDelKind, "Transaction" );
                      Set( gDelId, gEditTransaction.ID );
                      Set( gDelName, gEditTransaction.transaction_name );
-                     Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = gEditTransaction.ID) ) )
+                     Set( gDelRefs, CountRows( Filter(taskmaster_issues, issue_transaction_name.Id = gEditTransaction.ID) ) );
+                     // For the dialog's wording only. Rows removed in the grid but not yet saved are
+                     // still in SharePoint, so they count. OnConfirm re-counts from the list.
+                     Set( gTxDelOuts, CountRows( Filter(colTxOut, OutId > 0) ) + CountRows(colTxOutDel) )
             - lblTxFooterSpacer:
                 Control: Label@2.5.1
                 Properties:

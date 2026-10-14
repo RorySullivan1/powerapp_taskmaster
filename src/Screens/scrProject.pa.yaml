@@ -1,5 +1,8 @@
 # One project: info card + KPI ring over a work band — tasks and transactions stacked
 # left, issues over comments right. Containers throughout below the header.
+# OUTPUTS LIVE IN A DIALOG, NOT A FIFTH CARD: the work band is ~330 tall at 768 and
+# both columns already sit on their 160 card floors. The info card carries the count
+# and the button that opens mdOl (list) and mdOe (project-level editor).
 #
 # THREE RULES EVERY GALLERY ROW ON THIS SCREEN OBEYS:
 #  1. The delete icon is the row container's LAST auto-layout child and carries NO X
@@ -11,8 +14,8 @@
 #  3. That button is TemplateWidth - 46, stopping short of the delete icon's strip, or
 #     it sits over the icon and swallows every tap meant for it.
 #
-# EVERY CHILD COUNT, GALLERY AND TOTAL READS ONE OF THE FOUR COLLECTIONS btnPrjRecompute
-# folds — colProjectTasks, colProjectTx, colProjectIss, colProjectCmt. Never a gallery's
+# EVERY CHILD COUNT, GALLERY AND TOTAL READS ONE OF THE FIVE COLLECTIONS btnPrjRecompute
+# folds — colProjectTasks, colProjectTx, colProjectIss, colProjectCmt, colProjectOut. Never a gallery's
 # AllItems (that is
 # "what is on screen so far"), and never a fresh Filter of the list: those round trips are
 # what the collections exist to remove. Anything that changes a child re-Selects the recompute.
@@ -36,7 +39,30 @@ Screens:
          Set( gCmtSaving, false );
          Set( gCmtViewOpen, false );
          Set( gCmtEditing, false );
+         Set( gOlOpen, false );
+         Set( gOeOpen, false );
+         Set( gOeSaving, false );
          Reset( txtPrjDesc );
+         // The output editor's option lists come from their columns, never a literal copy.
+         // The Opts suffix keeps them clear of the colOe* CONTAINERS in mdOe: a collection
+         // named after a control resolves to the control.
+         Concurrent(
+             If( IsEmpty(colOeFmtOpts),
+                 ClearCollect( colOeFmtOpts,
+                       ForAll( Choices([@taskmaster_output].output_format) As c,
+                               { Value: c.Value } ) ) ),
+             If( IsEmpty(colOeAudOpts),
+                 ClearCollect( colOeAudOpts,
+                       ForAll( Choices([@taskmaster_output].output_audience) As c,
+                               { Value: c.Value } ) ) ),
+             If( IsEmpty(colOeLangOpts),
+                 ClearCollect( colOeLangOpts,
+                       ForAll( Choices([@taskmaster_output].output_language) As c,
+                               { Value: c.Value } ) ) ),
+             If( IsEmpty(colOeBrandOpts),
+                 ClearCollect( colOeBrandOpts,
+                       ForAll( Choices([@taskmaster_output].output_branding) As c,
+                               { Value: c.Value } ) ) ) );
          // SELF-HEAL, same as scrHome and scrProjects. App.OnStart is NON-BLOCKING, so this
          // screen can run before it finishes, and a blank gUserEmail would hide Edit and Delete
          // from the very person who wrote the comment.
@@ -135,8 +161,8 @@ Screens:
             Height: =1
             OnSelect: |
               =// ONE FETCH PER CHILD LIST, ISSUED TOGETHER — every count, gallery, title and total
-              // on this screen reads these four collections, so nothing below re-queries a list.
-              // Concurrent's arms must not share state: four arms, four collections.
+              // on this screen reads these five collections, so nothing below re-queries a list.
+              // Concurrent's arms must not share state: five arms, five collections.
               //
               // OVER THE NAMED FORMULAS, NOT THE RAW LISTS. The FK alone is enough to scope these
               // rows, but against a raw list this screen came back EMPTY for recent projects
@@ -167,7 +193,15 @@ Screens:
                   ClearCollect( colProjectCmt,
                       Sort( Filter( taskmaster_projectcomments,
                                 projectcomment_project_id = gSelProject.ID ),
-                            Created, SortOrder.Descending ) ) );
+                            Created, SortOrder.Descending ) ),
+                  // OUTPUTS READ THE RAW LIST FOR THE SAME REASON AS COMMENTS: output_project_id is
+                  // an indexed NUMBER, so `=` delegates, and the archived flag is deliberately NOT a
+                  // predicate. Sorted server-side so a truncation keeps the newest rows.
+                  // DUPLICATED IN btnPrjOutFetch — change one, change the other.
+                  ClearCollect( colProjectOut,
+                      Sort( Filter( taskmaster_output,
+                                output_project_id = gSelProject.ID ),
+                            output_date, SortOrder.Descending ) ) );
               // PHASE IS DERIVED HERE, not chosen by anyone — scrProjectEdit has no phase control.
               //   any OPEN issue                        -> Stalled
               //   any started task, or any transaction  -> Active
@@ -176,6 +210,9 @@ Screens:
               // COMMENTS ARE NOT A CHILD FOR THIS PURPOSE and colProjectCmt is deliberately absent
               // below: a note on an untouched project is not work starting on it, and counting one
               // would move a Not Started project to Planning the moment somebody asked a question.
+              // OUTPUTS ARE NOT A CHILD EITHER, and colProjectOut is absent below for the same
+              // reason: an output records something produced, not work started, and a project-level
+              // one can exist with no task or transaction at all.
               Set( gPrjOpenIss,
                    CountRows( Filter( colProjectIss, issue_status.Value = "Open" ) ) );
               Set( gPrjOpenTasks,
@@ -281,6 +318,25 @@ Screens:
                    Sort( Filter( taskmaster_projectcomments,
                              projectcomment_project_id = gSelProject.ID ),
                          Created, SortOrder.Descending ) )
+      # THE OUTPUTS FETCH ON ITS OWN, for the output write paths — same reasoning as
+      # btnPrjCmtFetch. THE QUERY IS DUPLICATED IN btnPrjRecompute's Concurrent. Change one,
+      # change the other.
+      - btnPrjOutFetch:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            Fill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =ClearCollect( colProjectOut,
+                   Sort( Filter( taskmaster_output,
+                             output_project_id = gSelProject.ID ),
+                         output_date, SortOrder.Descending ) )
       - HeaderBar:
           Control: Rectangle@2.3.0
           Properties:
@@ -795,7 +851,7 @@ Screens:
                                                  Set( gPrDelArm, true ),
                                                  Set( gPrDelErr, "" );
                                                  Set( gPrDelErrI, "" ); Set( gPrDelErrX, "" ); Set( gPrDelErrT, "" );
-                                                 Set( gPrDelErrC, "" );
+                                                 Set( gPrDelErrC, "" ); Set( gPrDelErrO, "" );
                                                  // Children FIRST. Every child carries a REQUIRED lookup to the
                                                  // project, so removing the parent while they exist leaves rows
                                                  // SharePoint will not let anything edit afterwards.
@@ -804,18 +860,20 @@ Screens:
                                                  // row limit and deletes them one by one, and a partial pass raises
                                                  // NO error. COUNT, THEN REFUSE — never half-do it.
                                                  Set( gPrDelBlock, false );
-                                                 // THE FOUR GUARD COUNTS, ISSUED TOGETHER. They cannot stay in a
+                                                 // THE FIVE GUARD COUNTS, ISSUED TOGETHER. They cannot stay in a
                                                  // `With`: Concurrent takes BEHAVIOUR formulas, so each count has to
                                                  // land in a global before anything can test it.
                                                  // COMMENTS NEED THIS CASCADE MORE THAN THE OTHER THREE, NOT LESS.
                                                  // Their FK is a plain Number, so SharePoint enforces nothing: leave
                                                  // them and they become rows no screen can reach and no filter excludes.
+                                                 // OUTPUTS ARE THE SAME CASE: every FK on taskmaster_output is a Number.
                                                  Concurrent(
                                                      Set( gPrDelNI, CountRows( Filter(taskmaster_issues,       issue_project_id.Id       = gSelProject.ID) ) ),
                                                      Set( gPrDelNX, CountRows( Filter(taskmaster_transactions, transaction_project_id.Id = gSelProject.ID) ) ),
                                                      Set( gPrDelNT, CountRows( Filter(taskmaster_tasks,        task_project_id.Id        = gSelProject.ID) ) ),
-                                                     Set( gPrDelNC, CountRows( Filter(taskmaster_projectcomments, projectcomment_project_id = gSelProject.ID) ) ) );
-                                                 If( gPrDelNI >= 500 || gPrDelNX >= 500 || gPrDelNT >= 500 || gPrDelNC >= 500,
+                                                     Set( gPrDelNC, CountRows( Filter(taskmaster_projectcomments, projectcomment_project_id = gSelProject.ID) ) ),
+                                                     Set( gPrDelNO, CountRows( Filter(taskmaster_output,          output_project_id         = gSelProject.ID) ) ) );
+                                                 If( gPrDelNI >= 500 || gPrDelNX >= 500 || gPrDelNT >= 500 || gPrDelNC >= 500 || gPrDelNO >= 500,
                                                      Set( gPrDelBlock, true ),
                                                      // ISSUES ALONE AND FIRST. issue_task_name and issue_transaction_name
                                                      // point at the other two children, so an issue must never outlive
@@ -824,8 +882,9 @@ Screens:
                                                                    RemoveIf( taskmaster_issues,
                                                                              issue_project_id.Id = gSelProject.ID ) ),
                                                               Set( gPrDelErrI, FirstError.Message ) );
-                                                     // Transactions, tasks and comments reference each other in NO
-                                                     // direction, so they go together. PER-ARM ERROR GLOBALS, not one
+                                                     // Transactions, tasks, comments and outputs: nothing SharePoint
+                                                     // enforces runs between them (an output's task/transaction ids
+                                                     // are plain Numbers), so they go together. PER-ARM ERROR GLOBALS, not one
                                                      // shared gPrDelErr — Concurrent's arms must not write the same state.
                                                      Concurrent(
                                                          IfError( Set( gPrDelScrapX,
@@ -839,11 +898,15 @@ Screens:
                                                          IfError( Set( gPrDelScrapC,
                                                                        RemoveIf( taskmaster_projectcomments,
                                                                                  projectcomment_project_id = gSelProject.ID ) ),
-                                                                  Set( gPrDelErrC, FirstError.Message ) ) ) );
+                                                                  Set( gPrDelErrC, FirstError.Message ) ),
+                                                         IfError( Set( gPrDelScrapO,
+                                                                       RemoveIf( taskmaster_output,
+                                                                                 output_project_id = gSelProject.ID ) ),
+                                                                  Set( gPrDelErrO, FirstError.Message ) ) ) );
                                                  // ONE error string for everything below, which still reads only
                                                  // gPrDelErr. Coalesce skips an EMPTY STRING as well as a blank, so the
-                                                 // three seeds above do not mask a real message.
-                                                 Set( gPrDelErr, Coalesce( gPrDelErrI, gPrDelErrX, gPrDelErrT, gPrDelErrC, "" ) );
+                                                 // seeds above do not mask a real message.
+                                                 Set( gPrDelErr, Coalesce( gPrDelErrI, gPrDelErrX, gPrDelErrT, gPrDelErrC, gPrDelErrO, "" ) );
                                                  If( Len(gPrDelErr) = 0 && !gPrDelBlock,
                                                      IfError( Set( gPrDelScrapP,
                                                                    Remove( taskmaster_projects, gSelProject ) ),
@@ -863,6 +926,7 @@ Screens:
                                                      Clear( colProjectTx );
                                                      Clear( colProjectIss );
                                                      Clear( colProjectCmt );
+                                                     Clear( colProjectOut );
                                                      Notify( "Project deleted, with everything attached to it.",
                                                              NotificationType.Success );
                                                      Navigate( scrProjects, ScreenTransition.UnCover ) );
