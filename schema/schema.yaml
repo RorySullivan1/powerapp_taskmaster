@@ -489,9 +489,11 @@ lists:
     # only if it projects the system Created By / Modified By.
     join_cost: 0
     # LINK RULES (#94), held by the app because SharePoint cannot express them:
-    #   - output_project_id is always set.
-    #   - AT MOST ONE of output_task_id / output_transaction_id. Neither = a project-level
-    #     output, which is allowed. One parent keeps reports from double-counting.
+    #   - output_project_id is always set — the parent's project, denormalised so a project's
+    #     outputs read on one indexed FK.
+    #   - EXACTLY ONE of output_task_id / output_transaction_id (user, 2026-10-14). An output
+    #     belongs to a task or a transaction and is created on that screen; scrProject only
+    #     lists them. One parent keeps reports from double-counting.
     #   - THE TASK APPROVAL GATE READS THIS LIST: a task cannot reach stage Completed while
     #     any of its outputs has output_approval_flag = true and a blank output_approval_id.
     #     Transactions have no stage, so no gate.
