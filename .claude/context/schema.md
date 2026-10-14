@@ -94,13 +94,12 @@ Some rules are conditional on *another* field, and a SharePoint column can only 
 not. Those rules live in the app, which means **the list will happily accept a row that violates
 them** — anything writing outside `scrTaskEdit` bypasses them entirely.
 
-- **`task_output_approval_flag` → `task_output_approval_id`.** A task whose Output section is on
-  must carry an audience. Separately, a task whose approval flag is on must carry an approval id
-  **before it can reach stage `Completed`**. The flag is set per task; the audience VALUE gates
-  nothing. The id is deliberately *not* demanded earlier — the external approval portal issues it
-  late in the lifecycle, so requiring it at draft time would block ordinary work. All three
-  columns stay `required: false` in the golden source; `scrTaskEdit`'s `lblTkMissing` is the only
-  enforcement.
+- **The approval gate lives on output rows (`taskmaster_output`).** A task cannot reach stage
+  `Completed` while any of its outputs has `output_approval_flag` on and a blank
+  `output_approval_id`. The id is deliberately *not* demanded earlier — the external approval portal
+  issues it late in the lifecycle. SharePoint cannot express a conditional requirement, so
+  `scrTaskEdit`'s `lblTkMissing` is the only enforcement. Transactions have no stage and no gate.
+  The task-level `task_output_*` columns are retired in place.
 
 ---
 

@@ -194,7 +194,7 @@ lists:
       DELIBERATELY UNCLASSIFIED (2026-08-05): a task has no activity-type column.
       Its activity family is already reachable through task_project_id, so storing
       it again on the task would be a second copy that can disagree with the first,
-      and task_output_format already answers "what kind of thing is this producing".
+      and a task's outputs (taskmaster_output.output_format) already answer "what kind of thing is this producing".
       Add one only if tasks within a single project are found to differ in a way
       neither the parent nor the output format captures — mapping_activitytype stays
       in place, so that is a column, not a redesign.
@@ -264,24 +264,17 @@ lists:
       # working — an unindexed column in that position fails outright once the list
       # passes 5,000 items, and an index CANNOT be added past 20,000.
       - { name: task_date_completion,  type: DateTime,        required: false, indexed: true,  desc: "Date completed" }
-      # NOT list-required, deliberately. The requirement is conditional on the app's
-      # Output section being on, and a SharePoint column cannot express "required only
-      # when another field is set" — marking it required here would reject every task
-      # that produces no output at all. scrTaskEdit enforces both this and the approval
-      # rule in the desc below; SharePoint holds the value, not the constraint.
-      - { name: task_output_audience,  type: Choice,          required: false,                 desc: "Who the output is for. Descriptive only — it gates nothing; task_output_approval_flag decides whether an approval id is required.", values: ["Direct Retail", "Indirect Retail", "Client-Specific", "Generic", "Internal Only"] }
-      # THE APPROVAL GATE. Live in SharePoint, internal name CONFIRMED by the user.
-      # Set per task rather than derived from the audience: the two
-      # are independent, and an audience value is a poor proxy for "someone must sign
-      # this off". scrTaskEdit blocks stage Completed while this is true and the id is
-      # empty. NOT list-required and NOT enforceable in SharePoint — a conditional
-      # requirement has no column-level expression, so the app holds the rule.
-      - { name: task_output_approval_flag, type: Boolean,      required: false,                 default: false, desc: "TRUE when this task's output needs an external approval. Gates task_output_approval_id: while true, the task cannot reach stage Completed without an id." }
-      - { name: task_output_approval_id, type: Text,          required: false,                 desc: "ID of the approval task in the EXTERNAL approval portal (out of scope). Free-text pointer only — NOT a lookup, not validated, not indexed. Replaced the task_output_approval lookup on 2026-08-09 when asset_approval was retired." }
-      - { name: task_output_language,  type: Choice,          required: false,                 desc: "Output language", values: [EN, FR, DE, ES, IT, JP] }
-      - { name: task_output_format,    type: Choice,          required: false,                 desc: "Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
-      - { name: task_output_branding,  type: Choice,          required: false,                 desc: "Branding requirement", values: [Barclays, QIS, EXO, Custom] }
-      - { name: task_output_asset,     type: Lookup,          required: false,                 desc: "Linked asset", lookup: { list: asset_library, show: asset_name } }
+      # RETIRED, LEFT IN PLACE — superseded by the taskmaster_output list (epic #93), where a task
+      # can have many outputs. Nothing in src/ reads or writes these; their values stay as a
+      # historical snapshot, migrated by hand (#96). Do not delete them, and do not read them
+      # again: the output log is the only source of a task's outputs.
+      - { name: task_output_audience,  type: Choice,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. Who the output is for. Descriptive only — it gates nothing; task_output_approval_flag decides whether an approval id is required.", values: ["Direct Retail", "Indirect Retail", "Client-Specific", "Generic", "Internal Only"] }
+      - { name: task_output_approval_flag, type: Boolean,      required: false, retired: true,                 default: false, desc: "RETIRED — use taskmaster_output. TRUE when this task's output needs an external approval. Gates task_output_approval_id: while true, the task cannot reach stage Completed without an id." }
+      - { name: task_output_approval_id, type: Text,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. ID of the approval task in the EXTERNAL approval portal (out of scope). Free-text pointer only — NOT a lookup, not validated, not indexed. Replaced the task_output_approval lookup on 2026-08-09 when asset_approval was retired." }
+      - { name: task_output_language,  type: Choice,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. Output language", values: [EN, FR, DE, ES, IT, JP] }
+      - { name: task_output_format,    type: Choice,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. Content format", values: [Flyer, Email, PDF, Webpage, Deck, Video] }
+      - { name: task_output_branding,  type: Choice,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. Branding requirement", values: [Barclays, QIS, EXO, Custom] }
+      - { name: task_output_asset,     type: Lookup,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. Linked asset", lookup: { list: asset_library, show: asset_name } }
       - { name: task_client_name,      type: Lookup,          required: false,                 desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
       # RETIRED 2026-08-14 — superseded by the taskmaster_taskproduct junction. The
       # column is LEFT IN PLACE rather than deleted: dropping it destroys the stored
@@ -657,7 +650,7 @@ lists:
   # ---------------------------------------------------------------------------
   asset_library:
     role: >-
-      Linked output assets. Referenced by taskmaster_tasks.task_output_asset only.
+      Linked output assets. Referenced only by the retired taskmaster_tasks.task_output_asset.
       taskmaster_output carries no asset column while this list stays unconfirmed.
     provisioned: unknown
     join_cost: 1
