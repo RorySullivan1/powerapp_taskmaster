@@ -6,13 +6,20 @@
 # Bands (1366 x 768):   0 ..  64  rowQtHead     (auto-layout, owns no X beyond 0)
 #                       64 .. 680  frmQtScroll   (scrolls)
 #                      680 .. 768  rowQtAction   (OPAQUE bar behind it)
+#                       card 293..1073 x 134..634  mdQtO* output pop-up (gQtOutOpen-gated)
 #                       full screen cmpQtPick     (declared LAST, Visible-gated)
+#
+# ONE LINE PER ROW (galQtRows, TemplateSize 44): # | label | date | notional | ccy |
+# client | product | sales owner | output | delete. The output is a button that opens
+# the pop-up; the row holds the output's fields (q_hasOut, q_oName, q_oDate, q_oFmt,
+# q_oAud, q_oLang, q_oBrand, q_oFlag, q_oAppr) and the save writes one taskmaster_output
+# row for each saved transaction whose row has one.
 #
 # THE ROWS LIVE IN colQtRows AND NOWHERE ELSE. Every row input writes itself back on
 # OnChange (which fires on blur), and every reader — validation, + Add row, the save,
-# the picker — reads the collection, never galQtRows.AllItems. A gallery row re-reads
-# its Defaults whenever its record changes, so a value held only in a control is lost
-# the moment the picker, a delete or a partial save touches the collection.
+# the picker, the pop-up — reads the collection, never galQtRows.AllItems. A gallery
+# row re-reads its Defaults whenever its record changes, so a value held only in a
+# control is lost the moment the picker, a delete or a partial save touches it.
 #
 # NO ROW-LEVEL ACTION, SO NO FULL-TEMPLATE HIT BUTTON. Each cell is its own target;
 # nothing is layered over an input.
@@ -21,11 +28,11 @@
 #   1. OnChange on ModernDatePicker@1.0.1 (dtpQtRowDate). MS Learn documents it.
 #   2. OnChange on Classic/TextInput@2.3.2 (numQtRowNotional). Fallback: make it a
 #      ModernTextInput@1.1.1 (Placeholder for HintText, drop Format and Align).
-#   3. TriggerOutput.FocusOut on ModernTextInput (txtQtRowName). Safe to delete.
+#   3. IsEditable =false on ModernDatePicker@1.0.1 (dtpQtODate). Fallback: =true.
 # No input control has ever sat inside a gallery here — behaviour, not tokens.
-# Also unproven here, behaviour not tokens: Reset() of a combo box from a sibling in the
-# same gallery row (icoQtRowOutClr), and g.<control> in btnQtSave's AllItems sync reaching
-# a control inside rowQtLine1 (fallback: delete the sync block; OnChange alone remains).
+# Also unproven here, behaviour not tokens: g.<control> in btnQtSave's AllItems sync
+# reaching a control inside rowQtCells (fallback: delete the sync block; OnChange alone
+# remains).
 #
 # CONNECTION PREREQUISITES: Office 365 Users (manager and sales-owner picker) and
 # taskmaster_output (row outputs).
@@ -36,6 +43,7 @@ Screens:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnQtSave
+         Set( gQtOutOpen, false );
          // RETURNING FROM "+ New client / product" must keep the batch: colQtRows and the new
          // project's fields exist nowhere else until Save. Every caller that opens this screen
          // fresh clears gQtResume first; only the picker's OnCreateNew raises it.
@@ -53,8 +61,9 @@ Screens:
              If( IsEmpty(colMapActivity), ClearCollect( colMapActivity, mapping_activitytype ) ) );
          // cmpSelection needs {Id, Label}; Choices() returns only Value, so the Id is
          // positional and means nothing — every DefaultId looks its value up by Label.
-         // colQtCcyOpts and the four colQtOut*Opts are {Value} for the row combo boxes. No blank
-         // rows: every one of these columns is list-required. An unset output is "", never a row.
+         // colQtCcyOpts ({Value}) feeds the row currency box; the four colQtOut*Opts feed the
+         // output pop-up's boxes. No blank rows: every one of these columns is list-required.
+         // An unset choice is "", never a row.
          Concurrent(
              If( IsEmpty(colQtPrioOpts),
                  ClearCollect( colQtPrioOpts,
@@ -88,13 +97,17 @@ Screens:
                                { Value: c.Value } ) ) ) );
          // ONE empty row dated today. q_notional is the raw TEXT so an entry that will not
          // parse can be named by lblQtMissing instead of saving as blank. Every text field
-         // starts "" (not blank): the sales owner and the four output fields test Len().
+         // starts "" (not blank): the sales owner and the pop-up's choices test Len().
+         // EVERY CONSTRUCTOR OF A ROW (here, btnQtAddRow, btnQtSave's fresh row) CARRIES THE
+         // SAME FIELDS — the collection's shape is their union. The output starts empty.
          Clear( colQtRows );
          Collect( colQtRows,
              { q_rid: 1, q_name: "", q_date: Today(), q_notional: "", q_ccy: "USD",
                q_clientId: 0, q_clientValue: "", q_productId: 0, q_productValue: "",
                q_salesName: "", q_salesMail: "",
-               q_oFmt: "", q_oAud: "", q_oLang: "", q_oBrand: "" } );
+               q_hasOut: false, q_oName: "", q_oDate: Today(),
+               q_oFmt: "", q_oAud: "", q_oLang: "", q_oBrand: "",
+               q_oFlag: false, q_oAppr: "" } );
          Clear( colQtResult );
          Clear( colQtOutResult );
          Set( gQtSeedPending, true ) );
@@ -518,13 +531,13 @@ Screens:
             # THE GRID. The heading row and the gallery row carry IDENTICAL FillPortions /
             # LayoutMinWidth pair-for-pair; change one and change the other — nothing in
             # Power Fx keeps them in step. The heading's width is READ from the gallery.
-            # At TemplateWidth ~1300, line 1: fixed 350 (28+170+100+16+16+20), gaps+padding
-            # 88 (9 x 8 + 16), 9 portions share 862 (~96 each), so no LayoutMinWidth binds.
-            # Line 2 (no heading): fixed 130 (28+16+50+16+20), gaps+padding 88, 6 portions
-            # share 1082 (~180 each): sales 2/180 -> ~361, four outputs 1/120 -> ~180 each;
-            # mins bind only below TemplateWidth 938.
-            # Row = 2 + 40 + 4 + 40 = 86 inside TemplateSize 88; rctQtRowLine is the 88th px.
-            # The gallery grows a row at a time up to 4, then scrolls. 110 = 18 + 4 + 88.
+            # 13 cells: # | label 3 | date | notional 2 | ccy | client 2 | clr | product 2 | clr |
+            # sales owner 2 | clr | output | delete. At TemplateWidth ~1300: fixed 446
+            # (28+150+90+16+16+16+110+20), gaps+padding 112 (12 x 8 + 16), 11 portions share
+            # ~742 (~67 each): label ~202, the four 2-portion cells ~135. Mins total 650
+            # (180+110+3x120) <= 742; they bind only below TemplateWidth 1218 (portion < 60).
+            # Row: 36-tall cells centred in 43; rctQtRowLine is the 44th px.
+            # The gallery grows a row at a time up to 6, then scrolls. 66 = 18 + 4 + 44.
             # ---------------------------------------------------------------------
             - boxQtGrid:
                 Control: GroupContainer@1.5.0
@@ -534,7 +547,7 @@ Screens:
                   LayoutAlignItems: =LayoutAlignItems.Start
                   LayoutGap: =4
                   FillPortions: =0
-                  LayoutMinHeight: =110
+                  LayoutMinHeight: =66
                   Width: =Parent.Width - 48
                   Height: =22 + galQtRows.Height
                 Children:
@@ -570,7 +583,7 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =3
-                              LayoutMinWidth: =200
+                              LayoutMinWidth: =180
                               Height: =18
                         - hdQtDate:
                             Control: Label@2.5.1
@@ -580,8 +593,8 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =0
-                              LayoutMinWidth: =170
-                              Width: =170
+                              LayoutMinWidth: =150
+                              Width: =150
                               Height: =18
                         - hdQtNotional:
                             Control: Label@2.5.1
@@ -591,7 +604,7 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =2
-                              LayoutMinWidth: =130
+                              LayoutMinWidth: =110
                               Height: =18
                         - hdQtCcy:
                             Control: Label@2.5.1
@@ -601,8 +614,8 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =0
-                              LayoutMinWidth: =100
-                              Width: =100
+                              LayoutMinWidth: =90
+                              Width: =90
                               Height: =18
                         - hdQtClient:
                             Control: Label@2.5.1
@@ -612,7 +625,7 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =2
-                              LayoutMinWidth: =140
+                              LayoutMinWidth: =120
                               Height: =18
                         - hdQtClientClr:
                             Control: Label@2.5.1
@@ -633,7 +646,7 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =2
-                              LayoutMinWidth: =140
+                              LayoutMinWidth: =120
                               Height: =18
                         - hdQtProductClr:
                             Control: Label@2.5.1
@@ -645,6 +658,38 @@ Screens:
                               FillPortions: =0
                               LayoutMinWidth: =16
                               Width: =16
+                              Height: =18
+                        - hdQtSales:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Sales owner"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =2
+                              LayoutMinWidth: =120
+                              Height: =18
+                        - hdQtSalesClr:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: =""
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinWidth: =16
+                              Width: =16
+                              Height: =18
+                        - hdQtOutput:
+                            Control: Label@2.5.1
+                            Properties:
+                              Text: ="Output"
+                              Font: =gTheme.Font
+                              Size: =gTheme.Size.Small
+                              Color: =gTheme.Color.TextMuted
+                              FillPortions: =0
+                              LayoutMinWidth: =110
+                              Width: =110
                               Height: =18
                         - hdQtDel:
                             Control: Label@2.5.1
@@ -663,401 +708,286 @@ Screens:
                       Properties:
                         Items: =colQtRows
                         WrapCount: =1
-                        TemplateSize: =88
+                        TemplateSize: =44
                         TemplatePadding: =0
                         TemplateFill: =gTheme.Color.Surface
                         BorderThickness: =0
                         ShowScrollbar: =true
                         FillPortions: =0
-                        LayoutMinHeight: =88
+                        LayoutMinHeight: =44
                         Width: =Parent.Width
-                        Height: =Min( Max( CountRows(colQtRows), 1 ), 4 ) * 88
+                        Height: =Min( Max( CountRows(colQtRows), 1 ), 6 ) * 44
                       Children:
-                        # TWO LINES PER ROW. Line 1 mirrors rowQtGridHead column for column; line 2
-                        # carries the sales owner and the optional output. Each line owns its own
-                        # padding and gap, so line 1 keeps the heading's 8 / 8 / 8 exactly.
+                        # ONE LINE PER ROW, mirroring rowQtGridHead cell for cell (8 / 8 / 8). The
+                        # output is edited in the pop-up (mdQtO*), so the row carries only its button.
                         - rowQtCells:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
                             Properties:
-                              LayoutDirection: =LayoutDirection.Vertical
-                              LayoutAlignItems: =LayoutAlignItems.Start
-                              LayoutGap: =4
-                              PaddingTop: =2
+                              LayoutDirection: =LayoutDirection.Horizontal
+                              LayoutAlignItems: =LayoutAlignItems.Center
+                              LayoutGap: =8
+                              PaddingLeft: =8
+                              PaddingRight: =8
                               X: =0
                               Y: =0
                               Width: =Parent.TemplateWidth
                               Height: =Parent.TemplateHeight - 1
                             Children:
-                              - rowQtLine1:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
+                              # Position, not q_rid: ids only ever grow, so this counts the
+                              # rows at or above this one and matches lblQtMissing's "Row n".
+                              - lblQtRowNo:
+                                  Control: Label@2.5.1
                                   Properties:
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =8
-                                    PaddingLeft: =8
-                                    PaddingRight: =8
+                                    Text: =Text( CountRows( Filter( colQtRows, q_rid <= ThisItem.q_rid ) ) )
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    Color: =gTheme.Color.TextMuted
+                                    Align: =Align.Center
+                                    VerticalAlign: =VerticalAlign.Middle
                                     FillPortions: =0
-                                    LayoutMinHeight: =40
-                                    Width: =Parent.Width
-                                    Height: =40
-                                  Children:
-                                    # Position, not q_rid: ids only ever grow, so this counts the
-                                    # rows at or above this one and matches lblQtMissing's "Row n".
-                                    - lblQtRowNo:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =Text( CountRows( Filter( colQtRows, q_rid <= ThisItem.q_rid ) ) )
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          Color: =gTheme.Color.TextMuted
-                                          Align: =Align.Center
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =0
-                                          LayoutMinWidth: =28
-                                          Width: =28
-                                          Height: =36
-                                    # EVERY ROW INPUT WRITES ITSELF BACK, keyed on q_rid. FocusOut: the
-                                    # write happens as the user leaves the box, never mid-typing.
-                                    - txtQtRowName:
-                                        Control: ModernTextInput@1.1.1
-                                        Properties:
-                                          Default: =ThisItem.q_name
-                                          Placeholder: ="e.g. QIS-2026-0417 EMEA autocall"
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          FillPortions: =3
-                                          LayoutMinWidth: =200
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_name: Self.Text } )
-                                    - dtpQtRowDate:
-                                        Control: ModernDatePicker@1.0.1
-                                        Properties:
-                                          DefaultDate: =ThisItem.q_date
-                                          Placeholder: ="Trade date"
-                                          Format: =DatePickerFormat.LongAbbreviated
-                                          StartOfWeek: =StartOfWeek.Monday
-                                          IsEditable: =true
-                                          FillPortions: =0
-                                          LayoutMinWidth: =170
-                                          Width: =170
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_date: Self.SelectedDate } )
-                                    # Format restricts typing to digits. The raw text is stored so a
-                                    # non-numeric entry is named by lblQtMissing, not saved as blank.
-                                    - numQtRowNotional:
-                                        Control: Classic/TextInput@2.3.2
-                                        Properties:
-                                          Default: =ThisItem.q_notional
-                                          Format: =TextFormat.Number
-                                          HintText: ="e.g. 25000000"
-                                          Align: =Align.Right
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          FillPortions: =2
-                                          LayoutMinWidth: =130
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_notional: Self.Text } )
-                                    # ThisItem in ItemDisplayText is the COMBO BOX's option; everywhere
-                                    # else on this control it is the gallery row.
-                                    - cboQtRowCcy:
-                                        Control: ModernCombobox@1.1.1
-                                        Properties:
-                                          Items: =colQtCcyOpts
-                                          ItemDisplayText: =ThisItem.Value
-                                          InputTextPlaceholder: ="Ccy"
-                                          SelectMultiple: =false
-                                          IsSearchable: =false
-                                          DefaultSelectedItems: =[ThisItem.q_ccy]
-                                          FillPortions: =0
-                                          LayoutMinWidth: =100
-                                          Width: =100
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_ccy: Self.Selected.Value } )
-                                    # Client and product go through the screen's ONE picker. gQtPickRow
-                                    # says which row the pick lands on.
-                                    - btnQtRowClient:
-                                        Control: Classic/Button@2.2.0
-                                        Properties:
-                                          Text: =If( ThisItem.q_clientId > 0, ThisItem.q_clientValue, "＋  Client" )
-                                          Align: =Align.Left
-                                          Fill: =gTheme.Color.Bg
-                                          Color: =If( ThisItem.q_clientId > 0, gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
-                                          HoverFill: =gTheme.Color.Hover
-                                          PressedFill: =gTheme.Color.Press
-                                          BorderColor: =gTheme.Color.Border
-                                          BorderThickness: =1
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          FillPortions: =2
-                                          LayoutMinWidth: =140
-                                          Height: =36
-                                          OnSelect: |
-                                            =Set( gQtPickRow, ThisItem.q_rid );
-                                             Set( gQtPicker, "Client" );
-                                             Reset( cmpQtPick );
-                                             Set( gQtQuery, "" )
-                                    # ALWAYS VISIBLE, painted transparent when there is nothing to clear:
-                                    # a hidden auto-layout child gives its width away, which would pull
-                                    # this row's columns out of line with the heading.
-                                    - icoQtRowClientClr:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =If( ThisItem.q_clientId > 0, gTheme.Color.TextMuted, RGBA(0, 0, 0, 0) )
-                                          HoverColor: =If( ThisItem.q_clientId > 0, gTheme.Color.Danger, RGBA(0, 0, 0, 0) )
-                                          HoverFill: =RGBA(0, 0, 0, 0)
-                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                          Tooltip: ="Clear the client"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_clientId: 0, q_clientValue: "" } )
-                                    - btnQtRowProduct:
-                                        Control: Classic/Button@2.2.0
-                                        Properties:
-                                          Text: =If( ThisItem.q_productId > 0, ThisItem.q_productValue, "＋  Product" )
-                                          Align: =Align.Left
-                                          Fill: =gTheme.Color.Bg
-                                          Color: =If( ThisItem.q_productId > 0, gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
-                                          HoverFill: =gTheme.Color.Hover
-                                          PressedFill: =gTheme.Color.Press
-                                          BorderColor: =gTheme.Color.Border
-                                          BorderThickness: =1
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          FillPortions: =2
-                                          LayoutMinWidth: =140
-                                          Height: =36
-                                          OnSelect: |
-                                            =Set( gQtPickRow, ThisItem.q_rid );
-                                             Set( gQtPicker, "Product" );
-                                             Reset( cmpQtPick );
-                                             Set( gQtQuery, "" )
-                                    - icoQtRowProductClr:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =If( ThisItem.q_productId > 0, gTheme.Color.TextMuted, RGBA(0, 0, 0, 0) )
-                                          HoverColor: =If( ThisItem.q_productId > 0, gTheme.Color.Danger, RGBA(0, 0, 0, 0) )
-                                          HoverFill: =RGBA(0, 0, 0, 0)
-                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                          Tooltip: ="Clear the product"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_productId: 0, q_productValue: "" } )
-                                    # Ignored while a save is in flight: the save removes rows by q_rid
-                                    # when it finishes.
-                                    - icoQtRowDel:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Trash
-                                          Color: =gTheme.Color.TextMuted
-                                          HoverColor: =gTheme.Color.Danger
-                                          HoverFill: =RGBA(0, 0, 0, 0)
-                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                          Tooltip: ="Remove this row"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =20
-                                          Width: =20
-                                          Height: =20
-                                          OnSelect: |
-                                            =If( !gSaving, RemoveIf( colQtRows, q_rid = ThisItem.q_rid ) )
-                              # Line 2. The 28 spacer sits under the row number and the 20 spacer
-                              # under the delete icon, so the sales owner starts under the label
-                              # and the output's clear icon lands under the product's.
-                              - rowQtLine2:
-                                  Control: GroupContainer@1.5.0
-                                  Variant: AutoLayout
+                                    LayoutMinWidth: =28
+                                    Width: =28
+                                    Height: =36
+                              # EVERY ROW INPUT WRITES ITSELF BACK, keyed on q_rid. FocusOut: the
+                              # write happens as the user leaves the box, never mid-typing.
+                              - txtQtRowName:
+                                  Control: ModernTextInput@1.1.1
                                   Properties:
-                                    LayoutDirection: =LayoutDirection.Horizontal
-                                    LayoutAlignItems: =LayoutAlignItems.Center
-                                    LayoutGap: =8
-                                    PaddingLeft: =8
-                                    PaddingRight: =8
+                                    Default: =ThisItem.q_name
+                                    Placeholder: ="e.g. QIS-2026-0417 EMEA autocall"
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    FillPortions: =3
+                                    LayoutMinWidth: =180
+                                    Height: =36
+                                    OnChange: |
+                                      =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
+                                              { q_name: Self.Text } )
+                              - dtpQtRowDate:
+                                  Control: ModernDatePicker@1.0.1
+                                  Properties:
+                                    DefaultDate: =ThisItem.q_date
+                                    Placeholder: ="Trade date"
+                                    Format: =DatePickerFormat.LongAbbreviated
+                                    StartOfWeek: =StartOfWeek.Monday
+                                    IsEditable: =true
                                     FillPortions: =0
-                                    LayoutMinHeight: =40
-                                    Width: =Parent.Width
-                                    Height: =40
-                                  Children:
-                                    - lblQtRowPadL:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =""
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          FillPortions: =0
-                                          LayoutMinWidth: =28
-                                          Width: =28
-                                          Height: =36
-                                    # Sales owner goes through the screen's ONE picker, like client and
-                                    # product. Optional.
-                                    - btnQtRowSales:
-                                        Control: Classic/Button@2.2.0
-                                        Properties:
-                                          Text: =If( Len(ThisItem.q_salesMail) > 0, ThisItem.q_salesName, "＋  Sales owner" )
-                                          Align: =Align.Left
-                                          Fill: =gTheme.Color.Bg
-                                          Color: =If( Len(ThisItem.q_salesMail) > 0, gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
-                                          HoverFill: =gTheme.Color.Hover
-                                          PressedFill: =gTheme.Color.Press
-                                          BorderColor: =gTheme.Color.Border
-                                          BorderThickness: =1
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          FillPortions: =2
-                                          LayoutMinWidth: =180
-                                          Height: =36
-                                          OnSelect: |
-                                            =Set( gQtPickRow, ThisItem.q_rid );
-                                             Set( gQtPicker, "Sales" );
-                                             Reset( cmpQtPick );
-                                             Set( gQtQuery, "" )
-                                    # ALWAYS VISIBLE, transparent when empty — see icoQtRowClientClr.
-                                    - icoQtRowSalesClr:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: =If( Len(ThisItem.q_salesMail) > 0, gTheme.Color.TextMuted, RGBA(0, 0, 0, 0) )
-                                          HoverColor: =If( Len(ThisItem.q_salesMail) > 0, gTheme.Color.Danger, RGBA(0, 0, 0, 0) )
-                                          HoverFill: =RGBA(0, 0, 0, 0)
-                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                          Tooltip: ="Clear the sales owner"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_salesName: "", q_salesMail: "" } )
-                                    - lblQtRowOutCap:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: ="Output"
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          Color: =gTheme.Color.TextMuted
-                                          Align: =Align.Right
-                                          VerticalAlign: =VerticalAlign.Middle
-                                          FillPortions: =0
-                                          LayoutMinWidth: =50
-                                          Width: =50
-                                          Height: =36
-                                    # THE OUTPUT IS OPTIONAL, BUT ALL FOUR OR NONE: the four columns are
-                                    # list-required on taskmaster_output, and lblQtMissing names a partial
-                                    # set. "" means unset; the Filter keeps "" out of the selection.
-                                    # ThisItem in ItemDisplayText is the option, elsewhere the gallery row.
-                                    - cboQtRowOutFmt:
-                                        Control: ModernCombobox@1.1.1
-                                        Properties:
-                                          Items: =colQtOutFmtOpts
-                                          ItemDisplayText: =ThisItem.Value
-                                          InputTextPlaceholder: ="Format"
-                                          SelectMultiple: =false
-                                          IsSearchable: =false
-                                          DefaultSelectedItems: =Filter( [ThisItem.q_oFmt], !IsBlank(Value) )
-                                          FillPortions: =1
-                                          LayoutMinWidth: =120
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_oFmt: Coalesce( Self.Selected.Value, "" ) } )
-                                    - cboQtRowOutAud:
-                                        Control: ModernCombobox@1.1.1
-                                        Properties:
-                                          Items: =colQtOutAudOpts
-                                          ItemDisplayText: =ThisItem.Value
-                                          InputTextPlaceholder: ="Audience"
-                                          SelectMultiple: =false
-                                          IsSearchable: =false
-                                          DefaultSelectedItems: =Filter( [ThisItem.q_oAud], !IsBlank(Value) )
-                                          FillPortions: =1
-                                          LayoutMinWidth: =120
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_oAud: Coalesce( Self.Selected.Value, "" ) } )
-                                    - cboQtRowOutLang:
-                                        Control: ModernCombobox@1.1.1
-                                        Properties:
-                                          Items: =colQtOutLangOpts
-                                          ItemDisplayText: =ThisItem.Value
-                                          InputTextPlaceholder: ="Language"
-                                          SelectMultiple: =false
-                                          IsSearchable: =false
-                                          DefaultSelectedItems: =Filter( [ThisItem.q_oLang], !IsBlank(Value) )
-                                          FillPortions: =1
-                                          LayoutMinWidth: =120
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_oLang: Coalesce( Self.Selected.Value, "" ) } )
-                                    - cboQtRowOutBrand:
-                                        Control: ModernCombobox@1.1.1
-                                        Properties:
-                                          Items: =colQtOutBrandOpts
-                                          ItemDisplayText: =ThisItem.Value
-                                          InputTextPlaceholder: ="Branding"
-                                          SelectMultiple: =false
-                                          IsSearchable: =false
-                                          DefaultSelectedItems: =Filter( [ThisItem.q_oBrand], !IsBlank(Value) )
-                                          FillPortions: =1
-                                          LayoutMinWidth: =120
-                                          Height: =36
-                                          OnChange: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_oBrand: Coalesce( Self.Selected.Value, "" ) } )
-                                    # The Resets are what empty the boxes: a combo box re-reads
-                                    # DefaultSelectedItems only on Reset, and Save copies what the boxes
-                                    # SHOW back into colQtRows. Reset reaches this row's own instances.
-                                    - icoQtRowOutClr:
-                                        Control: Classic/Icon@2.5.0
-                                        Properties:
-                                          Icon: =Icon.Cancel
-                                          Color: |
-                                            =If( Len(ThisItem.q_oFmt & ThisItem.q_oAud & ThisItem.q_oLang & ThisItem.q_oBrand) > 0,
-                                                 gTheme.Color.TextMuted, RGBA(0, 0, 0, 0) )
-                                          HoverColor: |
-                                            =If( Len(ThisItem.q_oFmt & ThisItem.q_oAud & ThisItem.q_oLang & ThisItem.q_oBrand) > 0,
-                                                 gTheme.Color.Danger, RGBA(0, 0, 0, 0) )
-                                          HoverFill: =RGBA(0, 0, 0, 0)
-                                          HoverBorderColor: =RGBA(0, 0, 0, 0)
-                                          Tooltip: ="Clear the output"
-                                          FillPortions: =0
-                                          LayoutMinWidth: =16
-                                          Width: =16
-                                          Height: =16
-                                          OnSelect: |
-                                            =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
-                                                    { q_oFmt: "", q_oAud: "", q_oLang: "", q_oBrand: "" } );
-                                             Reset( cboQtRowOutFmt ); Reset( cboQtRowOutAud );
-                                             Reset( cboQtRowOutLang ); Reset( cboQtRowOutBrand )
-                                    - lblQtRowPadR:
-                                        Control: Label@2.5.1
-                                        Properties:
-                                          Text: =""
-                                          Font: =gTheme.Font
-                                          Size: =gTheme.Size.Small
-                                          FillPortions: =0
-                                          LayoutMinWidth: =20
-                                          Width: =20
-                                          Height: =36
+                                    LayoutMinWidth: =150
+                                    Width: =150
+                                    Height: =36
+                                    OnChange: |
+                                      =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
+                                              { q_date: Self.SelectedDate } )
+                              # Format restricts typing to digits. The raw text is stored so a
+                              # non-numeric entry is named by lblQtMissing, not saved as blank.
+                              - numQtRowNotional:
+                                  Control: Classic/TextInput@2.3.2
+                                  Properties:
+                                    Default: =ThisItem.q_notional
+                                    Format: =TextFormat.Number
+                                    HintText: ="e.g. 25000000"
+                                    Align: =Align.Right
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    FillPortions: =2
+                                    LayoutMinWidth: =110
+                                    Height: =36
+                                    OnChange: |
+                                      =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
+                                              { q_notional: Self.Text } )
+                              # ThisItem in ItemDisplayText is the COMBO BOX's option; everywhere
+                              # else on this control it is the gallery row.
+                              - cboQtRowCcy:
+                                  Control: ModernCombobox@1.1.1
+                                  Properties:
+                                    Items: =colQtCcyOpts
+                                    ItemDisplayText: =ThisItem.Value
+                                    InputTextPlaceholder: ="Ccy"
+                                    SelectMultiple: =false
+                                    IsSearchable: =false
+                                    DefaultSelectedItems: =[ThisItem.q_ccy]
+                                    FillPortions: =0
+                                    LayoutMinWidth: =90
+                                    Width: =90
+                                    Height: =36
+                                    OnChange: |
+                                      =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
+                                              { q_ccy: Self.Selected.Value } )
+                              # Client and product go through the screen's ONE picker. gQtPickRow
+                              # says which row the pick lands on.
+                              - btnQtRowClient:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Text: =If( ThisItem.q_clientId > 0, ThisItem.q_clientValue, "＋  Client" )
+                                    Align: =Align.Left
+                                    Fill: =gTheme.Color.Bg
+                                    Color: =If( ThisItem.q_clientId > 0, gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderColor: =gTheme.Color.Border
+                                    BorderThickness: =1
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    FillPortions: =2
+                                    LayoutMinWidth: =120
+                                    Height: =36
+                                    OnSelect: |
+                                      =Set( gQtPickRow, ThisItem.q_rid );
+                                       Set( gQtPicker, "Client" );
+                                       Reset( cmpQtPick );
+                                       Set( gQtQuery, "" )
+                              # ALWAYS VISIBLE, painted transparent when there is nothing to clear:
+                              # a hidden auto-layout child gives its width away, which would pull
+                              # this row's columns out of line with the heading.
+                              - icoQtRowClientClr:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =If( ThisItem.q_clientId > 0, gTheme.Color.TextMuted, RGBA(0, 0, 0, 0) )
+                                    HoverColor: =If( ThisItem.q_clientId > 0, gTheme.Color.Danger, RGBA(0, 0, 0, 0) )
+                                    HoverFill: =RGBA(0, 0, 0, 0)
+                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                    Tooltip: ="Clear the client"
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Width: =16
+                                    Height: =16
+                                    OnSelect: |
+                                      =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
+                                              { q_clientId: 0, q_clientValue: "" } )
+                              - btnQtRowProduct:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Text: =If( ThisItem.q_productId > 0, ThisItem.q_productValue, "＋  Product" )
+                                    Align: =Align.Left
+                                    Fill: =gTheme.Color.Bg
+                                    Color: =If( ThisItem.q_productId > 0, gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderColor: =gTheme.Color.Border
+                                    BorderThickness: =1
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    FillPortions: =2
+                                    LayoutMinWidth: =120
+                                    Height: =36
+                                    OnSelect: |
+                                      =Set( gQtPickRow, ThisItem.q_rid );
+                                       Set( gQtPicker, "Product" );
+                                       Reset( cmpQtPick );
+                                       Set( gQtQuery, "" )
+                              - icoQtRowProductClr:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =If( ThisItem.q_productId > 0, gTheme.Color.TextMuted, RGBA(0, 0, 0, 0) )
+                                    HoverColor: =If( ThisItem.q_productId > 0, gTheme.Color.Danger, RGBA(0, 0, 0, 0) )
+                                    HoverFill: =RGBA(0, 0, 0, 0)
+                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                    Tooltip: ="Clear the product"
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Width: =16
+                                    Height: =16
+                                    OnSelect: |
+                                      =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
+                                              { q_productId: 0, q_productValue: "" } )
+                              # Sales owner goes through the screen's ONE picker, like client and
+                              # product. Optional.
+                              - btnQtRowSales:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Text: =If( Len(ThisItem.q_salesMail) > 0, ThisItem.q_salesName, "＋  Sales owner" )
+                                    Align: =Align.Left
+                                    Fill: =gTheme.Color.Bg
+                                    Color: =If( Len(ThisItem.q_salesMail) > 0, gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderColor: =gTheme.Color.Border
+                                    BorderThickness: =1
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    FillPortions: =2
+                                    LayoutMinWidth: =120
+                                    Height: =36
+                                    OnSelect: |
+                                      =Set( gQtPickRow, ThisItem.q_rid );
+                                       Set( gQtPicker, "Sales" );
+                                       Reset( cmpQtPick );
+                                       Set( gQtQuery, "" )
+                              # ALWAYS VISIBLE, transparent when empty — see icoQtRowClientClr.
+                              - icoQtRowSalesClr:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Cancel
+                                    Color: =If( Len(ThisItem.q_salesMail) > 0, gTheme.Color.TextMuted, RGBA(0, 0, 0, 0) )
+                                    HoverColor: =If( Len(ThisItem.q_salesMail) > 0, gTheme.Color.Danger, RGBA(0, 0, 0, 0) )
+                                    HoverFill: =RGBA(0, 0, 0, 0)
+                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                    Tooltip: ="Clear the sales owner"
+                                    FillPortions: =0
+                                    LayoutMinWidth: =16
+                                    Width: =16
+                                    Height: =16
+                                    OnSelect: |
+                                      =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
+                                              { q_salesName: "", q_salesMail: "" } )
+                              # THE OUTPUT LIVES ON THE ROW (q_hasOut, q_o*) and is edited only in
+                              # the pop-up. Opening it seeds the pop-up's globals from this row and
+                              # Resets its inputs, which re-read their defaults only on Reset. A row
+                              # without an output defaults the name and date to its own.
+                              - btnQtRowOutput:
+                                  Control: Classic/Button@2.2.0
+                                  Properties:
+                                    Text: =If( ThisItem.q_hasOut, "✓  " & ThisItem.q_oFmt, "＋  Output" )
+                                    Align: =Align.Left
+                                    Fill: =gTheme.Color.Bg
+                                    Color: =If( ThisItem.q_hasOut, gTheme.Color.TextPrimary, gTheme.Color.TextMuted )
+                                    HoverFill: =gTheme.Color.Hover
+                                    PressedFill: =gTheme.Color.Press
+                                    BorderColor: =gTheme.Color.Border
+                                    BorderThickness: =1
+                                    Font: =gTheme.Font
+                                    Size: =gTheme.Size.Small
+                                    FillPortions: =0
+                                    LayoutMinWidth: =110
+                                    Width: =110
+                                    Height: =36
+                                    OnSelect: |
+                                      =If( !gSaving,
+                                           Set( gQtOutRow, ThisItem.q_rid );
+                                           Set( gQtOHad,   ThisItem.q_hasOut );
+                                           Set( gQtOName,  If( ThisItem.q_hasOut, ThisItem.q_oName, Trim(ThisItem.q_name) ) );
+                                           Set( gQtODate,  If( ThisItem.q_hasOut, ThisItem.q_oDate, Coalesce( ThisItem.q_date, Today() ) ) );
+                                           Set( gQtOFmt,   If( ThisItem.q_hasOut, ThisItem.q_oFmt, "" ) );
+                                           Set( gQtOAud,   If( ThisItem.q_hasOut, ThisItem.q_oAud, "" ) );
+                                           Set( gQtOLang,  If( ThisItem.q_hasOut, ThisItem.q_oLang, "" ) );
+                                           Set( gQtOBrand, If( ThisItem.q_hasOut, ThisItem.q_oBrand, "" ) );
+                                           Set( gQtOFlag,  If( ThisItem.q_hasOut, ThisItem.q_oFlag, false ) );
+                                           Set( gQtOAppr,  If( ThisItem.q_hasOut, ThisItem.q_oAppr, "" ) );
+                                           Reset( txtQtOName ); Reset( dtpQtODate );
+                                           Reset( cboQtOFmt ); Reset( cboQtOAud );
+                                           Reset( cboQtOLang ); Reset( cboQtOBrand );
+                                           Reset( tglQtOFlag ); Reset( txtQtOAppr );
+                                           Set( gQtOutOpen, true ) )
+                              # Ignored while a save is in flight: the save removes rows by q_rid
+                              # when it finishes.
+                              - icoQtRowDel:
+                                  Control: Classic/Icon@2.5.0
+                                  Properties:
+                                    Icon: =Icon.Trash
+                                    Color: =gTheme.Color.TextMuted
+                                    HoverColor: =gTheme.Color.Danger
+                                    HoverFill: =RGBA(0, 0, 0, 0)
+                                    HoverBorderColor: =RGBA(0, 0, 0, 0)
+                                    Tooltip: ="Remove this row"
+                                    FillPortions: =0
+                                    LayoutMinWidth: =20
+                                    Width: =20
+                                    Height: =20
+                                    OnSelect: |
+                                      =If( !gSaving, RemoveIf( colQtRows, q_rid = ThisItem.q_rid ) )
                         - rctQtRowLine:
                             Control: Rectangle@2.3.0
                             Properties:
@@ -1110,10 +1040,15 @@ Screens:
                                          q_productValue: Coalesce( last.q_productValue, "" ),
                                          q_salesName:    Coalesce( last.q_salesName, "" ),
                                          q_salesMail:    Coalesce( last.q_salesMail, "" ),
+                                         q_hasOut:       false,
+                                         q_oName:        "",
+                                         q_oDate:        Coalesce( last.q_date, Today() ),
                                          q_oFmt:         "",
                                          q_oAud:         "",
                                          q_oLang:        "",
-                                         q_oBrand:       "" } ) ) )
+                                         q_oBrand:       "",
+                                         q_oFlag:        false,
+                                         q_oAppr:        "" } ) ) )
                   - lblQtAddHint:
                       Control: Label@2.5.1
                       Properties:
@@ -1173,24 +1108,19 @@ Screens:
                             M ), L, " | " ),
                          mRows: Concat( Filter(
                               ForAll( colQtRows As r,
-                                  // The output is optional per row, but a PARTIAL one is an error:
-                                  // all four of its columns are list-required.
-                                  With( { oAny: Len(r.q_oFmt & r.q_oAud & r.q_oLang & r.q_oBrand) > 0 },
+                                  // No output rule: the output pop-up validates its own fields, so
+                                  // a row's output is either complete (q_hasOut) or absent.
                                   With( { bad: Concat( Filter( Table(
                                               { L: "Label",      M: Len(Trim(r.q_name)) = 0 },
                                               { L: "Trade Date", M: IsBlank(r.q_date) },
                                               { L: "Currency",   M: Len(r.q_ccy) = 0 },
                                               // A VALIDITY test, not a missing-field one: the notional is
                                               // optional, so only an entry that will not parse fires it.
-                                              { L: "Notional",   M: Len(Trim(r.q_notional)) > 0 && IsBlank(Value(r.q_notional)) },
-                                              { L: "Output Format",   M: oAny && Len(r.q_oFmt) = 0 },
-                                              { L: "Output Audience", M: oAny && Len(r.q_oAud) = 0 },
-                                              { L: "Output Language", M: oAny && Len(r.q_oLang) = 0 },
-                                              { L: "Output Branding", M: oAny && Len(r.q_oBrand) = 0 } ),
+                                              { L: "Notional",   M: Len(Trim(r.q_notional)) > 0 && IsBlank(Value(r.q_notional)) } ),
                                             M ), L, ", " ) },
                                       { Msg: If( Len(bad) > 0,
                                                  "Row " & CountRows( Filter(colQtRows, q_rid <= r.q_rid) ) & " " & bad,
-                                                 "" ) } ) ) ),
+                                                 "" ) } ) ),
                               Len(Msg) > 0 ), Msg, " | " ) },
                        With( { m: mProj & If( Len(mProj) > 0 && Len(mRows) > 0, " | ", "" ) & mRows },
                              If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) ) )
@@ -1240,9 +1170,8 @@ Screens:
                     // (the combobox and date picker re-read their defaults only on Reset). So the
                     // visible values are copied back first. AllItems is complete here: the gallery
                     // is bound to a local collection, not a paged data source.
-                    // THE OUTPUT BOXES ARE DELIBERATELY NOT COPIED: a combo box commits on selection,
-                    // so colQtRows already holds them, and a reused row can SHOW the previous row's
-                    // output — copying that back would log an output nobody chose.
+                    // The output is not copied: it has no control in the row, and the pop-up writes
+                    // it to colQtRows directly.
                     If( !gSaving,
                         ClearCollect( colQtSync,
                             ForAll( galQtRows.AllItems As g,
@@ -1366,31 +1295,35 @@ Screens:
                         Set( gQtOkN,   CountRows( colQtResult ) - gQtFailN );
                         // --- 2b. outputs ---------------------------------------------------
                         // BEFORE the saved rows leave colQtRows, which is where their output
-                        // lives. Only a saved transaction with all four output fields set gets
-                        // one. Same res contract as above. A failed output does NOT keep its
-                        // transaction in the grid — the transaction is saved, and a retry would
-                        // insert it twice — so the Notify sends the user to the transaction screen.
+                        // lives. Only a saved transaction whose row has an output (q_hasOut, set
+                        // only by the pop-up after it validated all four choices) gets one. Same
+                        // res contract as above. A failed output does NOT keep its transaction in
+                        // the grid — the transaction is saved, and a retry would insert it twice —
+                        // so the Notify sends the user to the transaction screen.
                         // output_task_id is NEVER named: a row has at most one parent.
                         ForAll( Filter( colQtResult, Len(Message) = 0 && TxId > 0 ) As k,
                             With( { r: LookUp( colQtRows, q_rid = k.Rid ) },
-                                If( Len(r.q_oFmt) > 0 && Len(r.q_oAud) > 0 && Len(r.q_oLang) > 0 && Len(r.q_oBrand) > 0,
+                                If( r.q_hasOut,
                                     Collect( colQtOutResult,
                                         With( { res:
                                                   IfError(
                                                       Text(
                                                           Patch( taskmaster_output, Defaults(taskmaster_output),
-                                                                 { output_name:             k.Name,
+                                                                 { output_name:             Coalesce( Trim(r.q_oName), Trim(r.q_name) ),
                                                                    output_project_id:       gQtPid,
                                                                    output_transaction_id:   k.TxId,
                                                                    // Written on EVERY row, never left to the column
                                                                    // default: `= false` does not match a blank.
                                                                    output_project_archived: gQtArchived,
-                                                                   output_date:             r.q_date,
+                                                                   output_date:             Coalesce( r.q_oDate, r.q_date ),
                                                                    output_format:           { Value: r.q_oFmt },
                                                                    output_audience:         { Value: r.q_oAud },
                                                                    output_language:         { Value: r.q_oLang },
                                                                    output_branding:         { Value: r.q_oBrand },
-                                                                   output_approval_flag:    false } ).ID ),
+                                                                   output_approval_flag:    r.q_oFlag,
+                                                                   // Optional: Blank() when empty, never "".
+                                                                   output_approval_id:
+                                                                       If( Len(Trim(r.q_oAppr)) > 0, Trim(r.q_oAppr), Blank() ) } ).ID ),
                                                       "!" & Coalesce( FirstError.Message, "SharePoint rejected the output" ) ) },
                                               { Rid:     k.Rid,
                                                 Name:    k.Name,
@@ -1430,10 +1363,15 @@ Screens:
                                   q_productValue: Coalesce( gQtCarry.q_productValue, "" ),
                                   q_salesName:    Coalesce( gQtCarry.q_salesName, "" ),
                                   q_salesMail:    Coalesce( gQtCarry.q_salesMail, "" ),
+                                  q_hasOut:       false,
+                                  q_oName:        "",
+                                  q_oDate:        Coalesce( gQtCarry.q_date, Today() ),
                                   q_oFmt:         "",
                                   q_oAud:         "",
                                   q_oLang:        "",
-                                  q_oBrand:       "" } );
+                                  q_oBrand:       "",
+                                  q_oFlag:        false,
+                                  q_oAppr:        "" } );
                             Notify( "Logged " & gQtOkN & If( gQtOkN = 1, " transaction", " transactions" )
                                       & " to " & gQtPname & "." & gQtOutMsg,
                                     If( gQtOutFailN > 0, NotificationType.Warning, NotificationType.Success ) ),
@@ -1445,6 +1383,435 @@ Screens:
                                       & gQtOutMsg,
                                     NotificationType.Error ) ) );
                     Set( gSaving, false ) )
+      # =======================================================================
+      # POP-UP — ONE ROW'S OUTPUT     card 780 x 500, buttons pinned to the card
+      # Edits the colQtRows row gQtOutRow names; nothing reaches SharePoint until Save.
+      # Declared after the footer so the scrim covers Save; before cmpQtPick, which cannot
+      # open while the scrim is up. Every part is gated on gQtOutOpen and shares the card's
+      # anchor expressions. Card band at 1366 x 768: x 293..1073, y 134..634.
+      #   body 134..554 (420 tall; content 412 = 24 pad + 28 title + 4 x (12 + 62) rows
+      #        + 12 + 36 message + 16 pad), so it never scrolls at this size
+      #   buttons y 570..610 (card bottom - 24 - 40): Remove x 317..467 (left),
+      #        Cancel x 767..887, Save x 899..1049 (right)
+      # =======================================================================
+      - mdQtOScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gQtOutOpen
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            OnSelect: =Set( gQtOutOpen, false )
+      - mdQtOBg:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gQtOutOpen
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =(Parent.Width - 780) / 2
+            Y: =(Parent.Height - 500) / 2
+            Width: =780
+            Height: =500
+      - mdQtOBody:
+          Control: GroupContainer@1.5.0
+          Variant: AutoLayout
+          Properties:
+            Visible: =gQtOutOpen
+            LayoutDirection: =LayoutDirection.Vertical
+            LayoutAlignItems: =LayoutAlignItems.Center
+            LayoutGap: =12
+            LayoutOverflowY: =LayoutOverflow.Scroll
+            PaddingTop: =24
+            PaddingBottom: =16
+            PaddingLeft: =24
+            PaddingRight: =24
+            X: =(Parent.Width - 780) / 2
+            Y: =(Parent.Height - 500) / 2
+            Width: =780
+            Height: =420
+          Children:
+            # Position, not q_rid — the same count lblQtRowNo shows.
+            - mdQtOTitle:
+                Control: Label@2.5.1
+                Properties:
+                  Text: ="Output for row " & CountRows( Filter( colQtRows, q_rid <= gQtOutRow ) )
+                  Font: =gTheme.Font
+                  FontWeight: =FontWeight.Semibold
+                  Size: =gTheme.Size.H3
+                  Color: =gTheme.Color.TextPrimary
+                  Width: =Parent.Width - 48
+                  Height: =28
+            - rowQtOName:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblQtONameCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Output name  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - txtQtOName:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =gQtOName
+                        Placeholder: ="e.g. Q3 autocall deck"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                  - lblQtODateCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Output date  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - dtpQtODate:
+                      Control: ModernDatePicker@1.0.1
+                      Properties:
+                        DefaultDate: =gQtODate
+                        Placeholder: ="Output date"
+                        Format: =DatePickerFormat.LongAbbreviated
+                        StartOfWeek: =StartOfWeek.Monday
+                        # CALENDAR ONLY. A typed date the picker cannot parse leaves SelectedDate
+                        # blank, and lblQtOMissing would then block with no hint why.
+                        IsEditable: =false
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+            # THE FOUR CHOICES ARE LIST-REQUIRED, so no "(none)" row. A blank global shows an
+            # empty box; the Filter keeps a blank out of DefaultSelectedItems.
+            - rowQtOFmt:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblQtOFmtCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Format  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboQtOFmt:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colQtOutFmtOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gQtOFmt], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gQtOFmt, cboQtOFmt.Selected.Value)
+                  - lblQtOAudCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Audience  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboQtOAud:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colQtOutAudOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gQtOAud], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gQtOAud, cboQtOAud.Selected.Value)
+            - rowQtOLang:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblQtOLangCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Language  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboQtOLang:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colQtOutLangOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gQtOLang], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gQtOLang, cboQtOLang.Selected.Value)
+                  - lblQtOBrandCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Branding  *"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - cboQtOBrand:
+                      Control: ModernCombobox@1.1.1
+                      Properties:
+                        Items: =colQtOutBrandOpts
+                        ItemDisplayText: =ThisItem.Value
+                        DefaultSelectedItems: =Filter( [gQtOBrand], !IsBlank(Value) )
+                        SelectMultiple: =false
+                        IsSearchable: =false
+                        InputTextPlaceholder: ="Select…"
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                        OnChange: =Set(gQtOBrand, cboQtOBrand.Selected.Value)
+            # NO GATE ON A TRANSACTION: the flag and the id are recorded, but a transaction has no
+            # stage for a missing approval id to block.
+            - rowQtOAppr:
+                Control: GroupContainer@1.5.0
+                Variant: GridLayout
+                Properties:
+                  LayoutGridColumns: =2
+                  LayoutGridRows: =10
+                  Width: =Parent.Width - 48
+                  Height: =62
+                Children:
+                  - lblQtOFlagCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Approval required?"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  # Wrapped: every toggle in the app sits in an auto-layout container, so the grid
+                  # cell goes on the wrapper and the toggle keeps its own 60x30.
+                  - stkQtOFlag:
+                      Control: GroupContainer@1.5.0
+                      Variant: AutoLayout
+                      Properties:
+                        LayoutDirection: =LayoutDirection.Horizontal
+                        LayoutAlignItems: =LayoutAlignItems.Center
+                        LayoutGridColumnStart: =1
+                        LayoutGridColumnEnd: =1
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+                      Children:
+                        - tglQtOFlag:
+                            Control: Classic/Toggle@2.1.0
+                            Properties:
+                              Default: =gQtOFlag
+                              FalseText: =""
+                              TrueText: =""
+                              FillPortions: =0
+                              LayoutMinWidth: =60
+                              Width: =60
+                              Height: =30
+                  - lblQtOApprCap:
+                      Control: Label@2.5.1
+                      Properties:
+                        Text: ="Approval ID"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        Color: =gTheme.Color.TextMuted
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =1
+                        LayoutGridRowEnd: =3
+                        Width: =Parent.Width
+                        Height: =18
+                  - txtQtOAppr:
+                      Control: ModernTextInput@1.1.1
+                      Properties:
+                        Default: =gQtOAppr
+                        Placeholder: ="Approval portal ID"
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Small
+                        LayoutGridColumnStart: =2
+                        LayoutGridColumnEnd: =2
+                        LayoutGridRowStart: =4
+                        LayoutGridRowEnd: =10
+                        Width: =Parent.Width
+                        Height: =36
+            # Read by mdQtOOk, which stays enabled so a blocked save can name what is missing.
+            # The approval id is NOT here: it may be filled in after the output exists.
+            - lblQtOMissing:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =With(
+                       { m: Concat( Filter( Table(
+                              { L: "Name",     M: Len(Trim(txtQtOName.Text)) = 0 },
+                              // Not list-required, but every reader sorts and windows on it.
+                              { L: "Date",     M: IsBlank(dtpQtODate.SelectedDate) },
+                              { L: "Format",   M: Len(gQtOFmt) = 0 },
+                              { L: "Audience", M: Len(gQtOAud) = 0 },
+                              { L: "Language", M: Len(gQtOLang) = 0 },
+                              { L: "Branding", M: Len(gQtOBrand) = 0 } ),
+                            M ), L, " | " ) },
+                       If( Len(m) > 0, "Required Fields Remaining: " & m, "" ) )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.Danger
+                  Width: =Parent.Width - 48
+                  Height: =36
+      # Only for a row that already had an output when the pop-up opened (gQtOHad).
+      - mdQtORemove:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gQtOutOpen && gQtOHad
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Danger
+            BorderColor: =gTheme.Color.Danger
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Remove output"
+            X: =(Parent.Width - 780) / 2 + 24
+            Y: =(Parent.Height - 500) / 2 + 500 - 24 - 40
+            Width: =150
+            Height: =40
+            OnSelect: |
+              =Patch( colQtRows, LookUp( colQtRows, q_rid = gQtOutRow ),
+                      { q_hasOut: false, q_oName: "", q_oDate: Blank(),
+                        q_oFmt: "", q_oAud: "", q_oLang: "", q_oBrand: "",
+                        q_oFlag: false, q_oAppr: "" } );
+               Set( gQtOutOpen, false )
+      - mdQtOOk:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gQtOutOpen
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Save output"
+            X: =(Parent.Width - 780) / 2 + 780 - 24 - 150
+            Y: =(Parent.Height - 500) / 2 + 500 - 24 - 40
+            Width: =150
+            Height: =40
+            # THREE SINGLE-ARM Ifs, not one If with mixed arms: Notify, Patch and Set return
+            # different types. None of them changes what the guard reads, so all three agree.
+            OnSelect: |
+              =If( Len(lblQtOMissing.Text) > 0,
+                   Notify( "Can't save this output yet. " & lblQtOMissing.Text, NotificationType.Error ) );
+               If( Len(lblQtOMissing.Text) = 0,
+                   Patch( colQtRows, LookUp( colQtRows, q_rid = gQtOutRow ),
+                          { q_hasOut: true,
+                            q_oName:  Trim(txtQtOName.Text),
+                            q_oDate:  dtpQtODate.SelectedDate,
+                            q_oFmt:   gQtOFmt,
+                            q_oAud:   gQtOAud,
+                            q_oLang:  gQtOLang,
+                            q_oBrand: gQtOBrand,
+                            q_oFlag:  tglQtOFlag.Value,
+                            q_oAppr:  Trim(txtQtOAppr.Text) } ) );
+               If( Len(lblQtOMissing.Text) = 0,
+                   Set( gQtOutOpen, false ) )
+      - mdQtOCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gQtOutOpen
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Text: ="Cancel"
+            X: =(Parent.Width - 780) / 2 + 780 - 24 - 150 - 12 - 120
+            Y: =(Parent.Height - 500) / 2 + 500 - 24 - 40
+            Width: =120
+            Height: =40
+            OnSelect: =Set( gQtOutOpen, false )
       # =====================================================================
       # PICKER — ONE cmpPicker instance, FIVE states: the project (Existing), the manager
       # (New), and a row's client, product or sales owner (gQtPickRow names the row).
