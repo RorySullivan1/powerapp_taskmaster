@@ -302,8 +302,8 @@ Screens:
                            Set( gEditProject, Blank() );
                            Set( gSelProject, Blank() );
                            Navigate( scrProjectEdit, ScreenTransition.Cover )
-                  # SAME LOOK AS New project, its sibling. Opens scrQuickTx, which owns its own
-                  # state and resets it on arrival, so nothing needs clearing here.
+                  # SAME LOOK AS New project, its sibling. scrQuickTx resets its own state on
+                  # arrival unless gQtResume is up, so the caller lowers it.
                   - btnQuickTx:
                       Control: Classic/Button@2.2.0
                       Properties:
@@ -320,7 +320,10 @@ Screens:
                         LayoutMinWidth: =200
                         Width: =200
                         Height: =36
-                        OnSelect: =Navigate( scrQuickTx, ScreenTransition.Cover )
+                        # gQtResume false = open a FRESH batch; gQtFrom is where Close returns.
+                        OnSelect: |
+                          =Set( gQtResume, false ); Set( gQtFrom, "Home" );
+                           Navigate( scrQuickTx, ScreenTransition.Cover )
             # PLAIN CONTAINERS, NOT cmpStatusCard. The component carries a full-bleed
             # transparent button with a hover wash, so it reads as tappable; these are inert.
             - rowCards:

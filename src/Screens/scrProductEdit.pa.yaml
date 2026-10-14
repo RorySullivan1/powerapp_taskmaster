@@ -616,6 +616,10 @@ Screens:
               // product — so this Sets rather than Collects.
               If( gPdReturn = "NxProduct",
               Set( gNxProduct, { Id: gPdSaved.ID, Value: gPdSaved.product_uid } ) );
+              // QtProduct is a ROW of scrQuickTx's batch, named by gQtPickRow — one product per row.
+              If( gPdReturn = "QtProduct",
+              Patch( colQtRows, LookUp( colQtRows, q_rid = gQtPickRow ),
+              { q_productId: gPdSaved.ID, q_productValue: gPdSaved.product_uid } ) );
               Set( gPdReturn, "" );
               Notify( If(gPdMode = "Edit", "Product saved", "Product created"), NotificationType.Success );
               Back() ) ) );

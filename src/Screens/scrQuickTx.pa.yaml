@@ -1,6 +1,7 @@
 # =============================================================================
 # scrQuickTx — log one or many transactions against one project in a single Save.
-# The project is an existing open one, or a new one built from its required fields only.
+# The project is a new one built from its required fields only (the default), or an
+# existing open one. Opened from scrHome or scrProjects; gQtFrom names which, for Close.
 #
 # Bands (1366 x 768):   0 ..  64  rowQtHead     (auto-layout, owns no X beyond 0)
 #                       64 .. 680  frmQtScroll   (scrolls)
@@ -31,7 +32,12 @@ Screens:
       Fill: =gTheme.Color.Bg
       OnVisible: |
         =Set( gSaving, false );   // see btnQtSave
-         Set( gQtMode, "Existing" );
+         // RETURNING FROM "+ New client / product" must keep the batch: colQtRows and the new
+         // project's fields exist nowhere else until Save. Every caller that opens this screen
+         // fresh clears gQtResume first; only the picker's OnCreateNew raises it.
+         If( gQtResume,
+         Set( gQtResume, false ),
+         Set( gQtMode, "New" );
          Set( gQtProject, { Id: 0, Value: "" } );
          Set( gQtPicker, "" ); Set( gQtQuery, "" ); Set( gQtPickRow, 0 );
          Reset( cmpQtPick );
@@ -66,8 +72,10 @@ Screens:
              { q_rid: 1, q_name: "", q_date: Today(), q_notional: "", q_ccy: "USD",
                q_clientId: 0, q_clientValue: "", q_productId: 0, q_productValue: "" } );
          Clear( colQtResult );
+         Set( gQtSeedPending, true ) );
          // Queued — runs after this formula, so colQtCovOpts is already loaded for its seed.
-         Select( btnQtSeedNew )
+         // Outside the If so neither of its arms ends in a Select.
+         If( gQtSeedPending, Set( gQtSeedPending, false ); Select( btnQtSeedNew ) )
     Children:
       # =====================================================================
       # NEW-PROJECT SEED — hidden, 1x1, declared FIRST so it can never cover a control.
@@ -143,7 +151,8 @@ Screens:
                   LayoutMinWidth: =24
                   Width: =24
                   Height: =24
-                  OnSelect: =Navigate( scrHome, ScreenTransition.UnCover )
+                  OnSelect: =If( gQtFrom = "Projects", Navigate( scrProjects, ScreenTransition.UnCover ),
+                                 Navigate( scrHome, ScreenTransition.UnCover ) )
       - rctQtSheet:
           Control: Rectangle@2.3.0
           Properties:
@@ -191,23 +200,6 @@ Screens:
                   Width: =Parent.Width - 48
                   Height: =36
                 Children:
-                  - btnQtModeExisting:
-                      Control: Classic/Button@2.2.0
-                      Properties:
-                        Text: ="Existing project"
-                        Fill: =If( gQtMode = "Existing", gTheme.Color.Primary, gTheme.Color.Surface )
-                        Color: =If( gQtMode = "Existing", gTheme.Color.OnPrimary, gTheme.Color.Primary )
-                        HoverFill: =If( gQtMode = "Existing", gTheme.Color.PrimaryDark, gTheme.Color.Hover )
-                        PressedFill: =If( gQtMode = "Existing", gTheme.Color.PrimaryDark, gTheme.Color.Press )
-                        BorderColor: =gTheme.Color.Primary
-                        BorderThickness: =1
-                        Font: =gTheme.Font
-                        Size: =gTheme.Size.Body
-                        FillPortions: =0
-                        LayoutMinWidth: =180
-                        Width: =180
-                        Height: =36
-                        OnSelect: =Set( gQtMode, "Existing" )
                   - btnQtModeNew:
                       Control: Classic/Button@2.2.0
                       Properties:
@@ -225,6 +217,23 @@ Screens:
                         Width: =180
                         Height: =36
                         OnSelect: =Set( gQtMode, "New" )
+                  - btnQtModeExisting:
+                      Control: Classic/Button@2.2.0
+                      Properties:
+                        Text: ="Existing project"
+                        Fill: =If( gQtMode = "Existing", gTheme.Color.Primary, gTheme.Color.Surface )
+                        Color: =If( gQtMode = "Existing", gTheme.Color.OnPrimary, gTheme.Color.Primary )
+                        HoverFill: =If( gQtMode = "Existing", gTheme.Color.PrimaryDark, gTheme.Color.Hover )
+                        PressedFill: =If( gQtMode = "Existing", gTheme.Color.PrimaryDark, gTheme.Color.Press )
+                        BorderColor: =gTheme.Color.Primary
+                        BorderThickness: =1
+                        Font: =gTheme.Font
+                        Size: =gTheme.Size.Body
+                        FillPortions: =0
+                        LayoutMinWidth: =180
+                        Width: =180
+                        Height: =36
+                        OnSelect: =Set( gQtMode, "Existing" )
             # ---- Existing: one lookup over OpenProjects ---------------------------
             - boxQtExisting:
                 Control: GroupContainer@1.5.0
@@ -966,7 +975,8 @@ Screens:
                   Text: ="Cancel"
                   Width: =140
                   Height: =48
-                  OnSelect: =Navigate( scrHome, ScreenTransition.UnCover )
+                  OnSelect: =If( gQtFrom = "Projects", Navigate( scrProjects, ScreenTransition.UnCover ),
+                                 Navigate( scrHome, ScreenTransition.UnCover ) )
             # ALWAYS ENABLED — a disabled button cannot say why. The rules live in lblQtMissing.
             # Order: project (insert + re-read when New) -> rows -> outcome. Once a new project
             # exists the screen switches to Existing with it picked, WHATEVER the rows did, so a
@@ -1195,8 +1205,10 @@ Screens:
               Primary:   p.product_uid,
               Secondary: Coalesce(p.product_type_path, "") } ) )
             OnSearch: =Set( gQtQuery, cmpQtPick.Query )
-            # Pick-only in every state: "＋ New" would navigate away mid-batch.
-            AllowCreate: =false
+            # "＋ New" for a ROW'S client or product only. It leaves the screen mid-batch, so
+            # OnCreateNew raises gQtResume (OnVisible then keeps everything) and the edit screen
+            # writes the new record into the row gQtPickRow names (QtClient / QtProduct).
+            AllowCreate: =gQtPicker = "Client" || gQtPicker = "Product"
             OnConfirm: |
               =// THE Set ARMS AND THE Patch ARMS ARE KEPT APART: one Switch mixing a Boolean
               // (Set) with a record (Patch) is the type clash scrTaskEdit and scrProductEdit
@@ -1211,5 +1223,11 @@ Screens:
                   Patch( colQtRows, LookUp( colQtRows, q_rid = gQtPickRow ),
                          { q_productId: Value(cmpQtPick.Picked.Key), q_productValue: cmpQtPick.Picked.Primary } ) );
               Set( gQtPicker, "" )
-            OnCreateNew: =Set( gQtPicker, "" )
+            OnCreateNew: |
+              =Set( gQtResume, true );
+               If( gQtPicker = "Client",
+                   Set( gClMode, "New" ); Set( gClReturn, "QtClient" ); Set( gQtPicker, "" );
+                   Navigate( scrClientEdit, ScreenTransition.Cover ),
+                   Set( gPdMode, "New" ); Set( gPdReturn, "QtProduct" ); Set( gQtPicker, "" );
+                   Navigate( scrProductEdit, ScreenTransition.Cover ) )
             OnCancel: =Set( gQtPicker, "" )
