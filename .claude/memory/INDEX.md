@@ -24,7 +24,7 @@
   **scrTaskEdit (#97) ONLY AFTER the user's #96 migration has run** (else tasks show empty logs / pies drop). All four: delete screen, then paste; check no `_1`.
   scrTransactionEdit: re-type cmpTxConfirmDel + cmpTxPick custom props after paste. #101 runbook `docs/notes/archival-flow-outputs.md` (user adds the MERGE step to their flow);
   #102 designed-not-built (`docs/notes/output-file-import.md`). **First suspects on paste:** `Value(Text(o.ID))` copies (fallback: Patch via scope record), Classic/Toggle in wrapped grid cell, `Sid: -gTkOutSeq`.
-- **EPIC #108 (code-review follow-ups) — AUTHORED 2026-10-15 on branch claude/dazzling-brown-pq0nim, PR OPEN. ONE PASTE: scrQuickTx (delete, then paste;
+- **EPIC #108 (code-review follow-ups) — AUTHORED 2026-10-15 PR #135 OPEN. ONE PASTE: scrQuickTx (delete, then paste;
   re-type cmpQtPick custom props).** #113 output name/date follow the row, #114 date col 170 / label min 160, #115 template row + folded If. Other screens: comment-only,
   NO PASTE NEEDED. #112 = user runs `docs/notes/unlinked-outputs-cleanup.md` in SharePoint. #116 was already done in code (OpenIssues); only stale comments fixed.
 - **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14; BOTH TEXT COLUMNS CREATED IN SHAREPOINT (user, 2026-10-14)
