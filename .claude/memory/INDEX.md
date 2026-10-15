@@ -18,12 +18,17 @@
   colWorkProjects / colWorkTasks (supported rows prefixed "Support ·"); Issues list unchanged (no supporter column, by decision).
 - **project_date_start FIX — AUTHORED 2026-10-13: scrProject (auto-stamp) + scrProjectEdit (calendar-only) pastes, then a ONE-OFF
   FLOW** (`docs/notes/backfill-project-date-start.md`) to copy Created into blank starts. Flow NOT RUN YET; check the column's internal name first.
-- **EPIC #93 OUTPUT LOG — ALL BUILD WORK AUTHORED 2026-10-14; FOUR PASTES PENDING, each pre-paste-reviewed PASTE (review fixes applied).**
+- **EPIC #93 OUTPUT LOG — BUILT AND PASTED (user, 2026-10-14); SUB-ISSUES #96-#101 CLOSED, #102 NOT PLANNED; EPIC CLOSED. Detail below is historical.**
   List `taskmaster_output` (SINGULAR) live, connected, smoke-tested; LiveOutputs in App.Formulas. task_output_* RETIRED IN PLACE (schema `retired: true`; no src/ reads).
   **PASTE ORDER:** scrProject (#99) and scrTransactionEdit (#98; still needs `transaction_comment` to exist) any time; scrReports (#100) and
   **scrTaskEdit (#97) ONLY AFTER the user's #96 migration has run** (else tasks show empty logs / pies drop). All four: delete screen, then paste; check no `_1`.
   scrTransactionEdit: re-type cmpTxConfirmDel + cmpTxPick custom props after paste. #101 runbook `docs/notes/archival-flow-outputs.md` (user adds the MERGE step to their flow);
   #102 designed-not-built (`docs/notes/output-file-import.md`). **First suspects on paste:** `Value(Text(o.ID))` copies (fallback: Patch via scope record), Classic/Toggle in wrapped grid cell, `Sid: -gTkOutSeq`.
+- **/code-review OF THE OUTPUTS + scrQuickTx COMMITS (2026-10-14): 10 FINDINGS, NONE FIXED YET.** Real bugs first:
+  (1) scrProject: with mdOe/btnOlAdd/icoDelOut removed, a legacy output with NEITHER id cannot be edited or deleted anywhere (needs a cleanup path or a delete in mdOl);
+  (2) scrQuickTx: q_oName/q_oDate are seeded once when the output pop-up opens, so a later label/date edit leaves the output stale (copy at save time instead);
+  (3) dtpQtRowDate/hdQtDate 150px may clip LongAbbreviated dates. Rest: stale comments (scrProject cmpPrjConfirmDel ~L2282, scrReports ~L428),
+  changelog comments in src/ (scrQuickTx ~L28, scrProject ~L715, scrTransactionEdit ~L694), 8x ThisItem.q_hasOut If in btnQtRowOutput, 3 hand-copied empty-row literals + dead q_oDate seed.
 - **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14; BOTH TEXT COLUMNS CREATED IN SHAREPOINT (user, 2026-10-14)
   (project_requestor_department, project_requestor_2_department). NEXT: refresh taskmaster_projects in Studio, then paste scrProjectEdit.** Back-fill of existing projects is the USER's (no flow from us).
 - **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
@@ -155,8 +160,8 @@
   **The `project_coverage` and `client_type`/`client_coverage`/`product_assetclass` vocabularies
   are still PLACEHOLDERs in `schema.yaml`** — only `INTERNAL` is confirmed, uppercase.
 - **LANDED IS NOT EXERCISED — do not claim these work.** The completion gate has never blocked a
-  save; the confirm dialog has never been seen to open; `scrProjects`' contains-search is bounded
-  by the 2000 data row limit and fails SILENTLY (confirm Settings > General > Data row limit);
+  save; the confirm dialog has never been seen to open; `scrProjects`' search is a delegable
+  `StartsWith(project_name, …)` PREFIX match — complete past 2,000 rows, but prefix-only (#132 proposes partial/multi-word);
   #22 back-fills nothing, so a task keeps its last health until touched; on `scrReports` the
   truncation banner has never fired and no trend bar has yet carried two currencies.
 - **THE PERF BACKLOG #27–#40 WAS NEVER MEASURED.** All fourteen landed on paste confirmations —
@@ -334,6 +339,7 @@ not know them will author something broken:
 - [2026-10-14] **STUDIO REJECTS Remove() ON THE DATA SOURCE A ForAll IS ITERATING** (user, on paste of scrTaskEdit btnTkSave + scrTransactionEdit btnTxSave: "can not use remove on same data source where forall is used"). Fix: loop over the LOCAL delete queue (colTkOutDel / colTxOutDel) and `With({x: LookUp(list, ID = d.OutId)}, If(!IsBlank(x.ID), Remove(list, x)))`. Read-only ForAll over a list is fine; Patch on the iterated list (issue detach) is not flagged. **Watch scrTaskEdit's taskmaster_taskproduct reconcile — same shape (ForAll over taskmaster_taskproduct → Remove on it); if Studio flags it, apply the same fix.** — INDEX Decisions
 - [2026-10-14] **QUICK TX OUTPUT IS A PER-ROW POP-UP (user) — supersedes the two-line row with four in-row combos.** Rows are ONE line again: # | label | date | notional | ccy | client | product | sales owner | Output button | delete (heading row matches cell for cell). btnQtRowOutput opens mdQtO* (gQtOutOpen) for that row: output name, date, format, audience, language, branding, **approval flag + approval ID** (requested, not gated — transactions have no stage). New outputs default to the row's on-screen label and date. Row fields q_hasOut, q_oName, q_oDate, q_oFmt/Aud/Lang/Brand, q_oFlag, q_oAppr; save writes them for rows with q_hasOut. — INDEX Decisions
 - [2026-10-14] **OUTPUTS LINK TO A TASK OR A TRANSACTION, NEVER DIRECTLY TO A PROJECT (user) — supersedes #94's "project-level outputs allowed".** scrProject's Outputs dialog (mdOl) is a READ-ONLY overview: no add, no edit (mdOe* removed), no delete (icoDelOut and cmpPrjConfirmDel's "Output" kind removed, btnPrjOutFetch removed); tapping a row opens its task/transaction. Any legacy row with neither id shows as "unlinked" in the count. Project/task/transaction delete cascades are unchanged. Same day: scrTaskEdit's section heading is "Outputs & Products"; scrTransactionEdit's outputs block (blkTxOut) sits ABOVE the required-fields line (colTxMissing). — INDEX Decisions
+- [2026-10-15] **#132 FLEXIBLE PROJECT SEARCH (user chose "load live projects").** ID-range windows are NOT delegable on SharePoint (MS Learn: only `=` on ID), Created windows fail on the one-day back-fill, first-letter windows cost ~40 requests. So: on first search scrProjects does ONE `ClearCollect(colPrjIdx, ActiveProjects)`; galProjects.Items = `If(search && gPrjIdxLoaded && !gPrjIdxTrunc, <local word-AND contains branch>, <the 32 delegable server branches unchanged>)`, generator-owned. At ≥ gDataRowLimit live projects it falls back to prefix search with a visible warning — **if live projects are already ≥2,000 the feature is inert; the follow-up then is an indexed bucket column (ID mod 10) for delegable windows.** Local "mine" LOWER-CASES the stored email (local `=` is case-sensitive, server Person equality is not). Row clicks re-read `LookUp(taskmaster_projects, ID = ThisItem.ID)` — a colPrjIdx row is column-trimmed and would blank fields through scrProjectEdit's save. — INDEX Decisions
 
 ## Log              (append-only pointers)
 Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
@@ -404,3 +410,9 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-14 | User pasted all screens, migration running. Fixed Remove-inside-ForAll-over-same-list in btnTkSave / btnTxSave (formula-bar re-paste of both OnSelects) | (no session file)
 - 2026-10-14 | scrQuickTx output pop-up + single-line rows; pre-paste review PASTE (defaults read on-screen values). 23/23 | (no session file)
 - 2026-10-14 | Outputs task/transaction-only: scrProject outputs read-only; scrTaskEdit "Outputs & Products"; scrTransactionEdit outputs above required fields | (no session file)
+- 2026-10-14 | Epic #93 sub-issues closed by the user's request: #96-#101 completed (all screens pasted, migration run by the user), #102 not planned. Epic #93 itself left open pending the user | (no session file)
+- 2026-10-14 | Epic #93 closed (user) | (no session file)
+- 2026-10-14 | /code-review of recent commits: 10 findings recorded in State (orphaned no-parent outputs, stale quick-tx output name/date, narrow date pickers, comment hygiene); none fixed | (no session file)
+- 2026-10-15 | Backlog filed on GitHub as 4 epics: #108 app correctness & code-review follow-ups (#112 unlinked outputs, #113 quick-tx stale output name/date, #114 quick-tx date width, #115 comment/formula clean-up, #116 health-derivation decision); #109 SharePoint data hygiene (#117 date_start back-fill, #118 Complete=100%, #119 phase default, #120 taskproduct/task_supporter indexes, #121 placeholder vocabularies, #122 requestor-dept back-fill, #123 missing-projects investigation, #124 archival-flow reopen race); #110 verify never-exercised behaviours (#125 gate+confirm dialogs, #126 search vs row limit, #127 scrReports chain/scope/banner/currencies, #128 perf baseline); #111 housekeeping (#129 superseded components, #130 stale docs, #131 memory prune). The GitHub issues are now the backlog of record | (no session file)
+- 2026-10-15 | #132 filed: flexible project search (partial + multi-word; true fuzzy ruled out). Recommended: a session-local project index loaded in delegable ID windows, searched client-side. #126 corrected (search is StartsWith, delegable) | (no session file)
+- 2026-10-15 | #132 authored: local multi-word project search; review blockers (case-insensitive mine, LookUp on navigate) fixed; gDataRowLimit seeded on scrProjects | (no session file)
