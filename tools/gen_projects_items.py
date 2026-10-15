@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Generate galProjects.Items for src/Screens/scrProjects.pa.yaml.
 
+One local branch (partial, multi-word search over a loaded index) in front of
+32 delegable server branches — see TWO SEARCH MODES below.
+
 THIS FORMULA IS MACHINE-GENERATED. It is hundreds of lines of near-identical
 delegable branches, and the whole point of every one of them is that it folds
 into a single server query. Hand-editing one branch is how the arms drift apart
@@ -36,6 +39,26 @@ TWO SORT SHAPES, and the choice is a real trade rather than a preference:
 
 Both are generated from the same branch builder, so switching between them is
 one flag and costs nothing but a paste.
+
+TWO SEARCH MODES. Everything above is the SERVER formula. An outer If puts a
+LOCAL branch in front of it:
+
+  local    search text present AND the index is loaded AND not truncated.
+           Filters colPrjIdx (one ClearCollect of ActiveProjects, loaded by
+           txtProjSearch.OnChange) and requires EVERY space-separated word to
+           appear anywhere in project_name. Substring `in` does not delegate, so
+           this is only correct because the index holds every live project —
+           which is what `gPrjIdxTrunc` (row count reached gDataRowLimit) guards.
+           Its completed / mine / coverage / priority predicates are the server
+           ones with each "off" state written as an Or, so a filter means the
+           same thing in both modes. It sorts with `Sort` on a LITERAL identifier
+           per gPrjSortCol key, so the internal-name question never reaches it.
+
+  server   no search text, index not loaded yet, or index truncated: the 32
+           branches, unchanged. Search here is the delegable name prefix.
+
+Truncated means the user sees prefix results plus scrProjects' lblPrjSearchWarn.
+Change a server predicate and change its local twin in `_local` with it.
 
 THE INTERNAL-NAME TRAP, and it is the reason `switch` exists at all: a column
 name passed as a STRING is matched against the SharePoint INTERNAL name, while a
@@ -75,6 +98,9 @@ MINE = ["( project_manager.Email = gUserEmail",
 SRCH = "StartsWith( project_name, Trim(txtProjSearch.Text) )"
 ALLC = 'Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"'
 ALLP = 'Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"'
+# The LOCAL branch runs only over a COMPLETE index. Truncated, or not loaded yet,
+# and the gallery stays on the server branches, whose prefix search is never wrong.
+LOCAL_ON = "Len( Trim(txtProjSearch.Text) ) > 0 && gPrjIdxLoaded && !gPrjIdxTrunc"
 
 
 def _branch(ind, src, sort_arg, preds, last):
@@ -129,19 +155,57 @@ def _block(ind, sort_arg):
     return out
 
 
-def items(mode):
+def _server(ind, mode):
+    """The 32 (dynamic) or 96 (switch) delegable branches, starting at column ind."""
     if mode == "dynamic":
-        lines = [" "*14 + "="] ; lines = []
-        body = _block(14, ("SortByColumns", "gPrjSortCol, gPrjSortOrd"))
-        body[0] = " "*14 + "=" + body[0].strip()
-        lines = body
-    else:
-        lines = [" "*14 + "=Switch( gPrjSortCol,"]
-        for ident, internal in COLUMNS[:-1]:
-            lines += [" "*19 + '"%s",' % internal] + _block(19, ("Sort", "%s, gPrjSortOrd" % ident))
-            lines[-1] += ","
-        lines += _block(19, ("Sort", "%s, gPrjSortOrd" % COLUMNS[-1][0]))
-        lines[-1] += " )"
+        return _block(ind, ("SortByColumns", "gPrjSortCol, gPrjSortOrd"))
+    lines = [" "*ind + "Switch( gPrjSortCol,"]
+    for ident, internal in COLUMNS[:-1]:
+        lines += [" "*(ind+5) + '"%s",' % internal] + _block(ind+5, ("Sort", "%s, gPrjSortOrd" % ident))
+        lines[-1] += ","
+    lines += _block(ind+5, ("Sort", "%s, gPrjSortOrd" % COLUMNS[-1][0]))
+    lines[-1] += " )"
+    return lines
+
+
+def _local(ind):
+    """The LOCAL branch: every filter and every search word, over colPrjIdx.
+
+    Each predicate is the server branches' predicate with its "off" state folded
+    in as an Or, which is legal here because nothing has to delegate.
+    colPrjIdx holds ActiveProjects, so "not Complete" over it is exactly
+    OpenProjects. Sorted with Sort on a LITERAL identifier per arm: identifiers
+    resolve by display name, so the internal-name key in gPrjSortCol never has to
+    name a collection column.
+    """
+    I = " "*ind
+    F = I + " "*20                                  # predicate column inside hits
+    out = [I + "With( { kw: Filter( ForAll( Split( Lower( Trim(txtProjSearch.Text) ), \" \" ) As t,",
+           I + "                            { Wd: t.Value } ),",
+           I + "                    Len(Wd) > 0 ) },",
+           I + "    With( { hits: Filter( colPrjIdx,",
+           F + '( tglShowComplete.Value || project_phase.Value <> "Complete" )',
+           F[:-3] + "&& ( !tglOnlyMine.Value",
+           F[:-3] + "  || " + MINE[0]]
+    out += [F[:-3] + "  " + " "*(len(MINE[0].split()[0]) - len(ln.split()[0]) + 3) + ln for ln in MINE[1:]]
+    out[-1] += " )"
+    out += [F[:-3] + "&& ( " + ALLC,
+            F[:-3] + "  || " + COV + " )",
+            F[:-3] + "&& ( " + ALLP,
+            F[:-3] + "  || " + PRI + " )",
+            F[:-3] + "&& IsEmpty( Filter( kw, !( Wd in Lower(project_name) ) ) ) ) },",
+            I + "        Switch( gPrjSortCol,"]
+    w = max(len(c[1]) for c in COLUMNS[:-1]) + 3
+    for ident, internal in COLUMNS[:-1]:
+        out.append(I + "            " + ('"%s",' % internal).ljust(w) + " Sort( hits, %s, gPrjSortOrd )," % ident)
+    out.append(I + "            Sort( hits, %s, gPrjSortOrd ) ) ) )" % COLUMNS[-1][0])
+    return out
+
+
+def items(mode):
+    lines = [" "*14 + "=If( " + LOCAL_ON + ","]
+    lines += _local(19); lines[-1] += ","
+    lines += _server(19, mode); lines[-1] += " )"
     return "            Items: |\n" + "\n".join(lines) + "\n"
 
 
@@ -166,7 +230,8 @@ def main():
         return 0 if same else 1
     if args.write:
         SCREEN.write_text(text[:a] + gen + text[b:])
-        print("wrote --mode %s: %d branches" % (args.mode, gen.count("gPrjSortOrd")))
+        print("wrote --mode %s: %d server branches + 1 local branch"
+              % (args.mode, gen.count("gPrjSortOrd") - len(COLUMNS)))
         return 0
     sys.stdout.write(gen)
     return 0
