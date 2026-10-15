@@ -160,8 +160,8 @@
   **The `project_coverage` and `client_type`/`client_coverage`/`product_assetclass` vocabularies
   are still PLACEHOLDERs in `schema.yaml`** — only `INTERNAL` is confirmed, uppercase.
 - **LANDED IS NOT EXERCISED — do not claim these work.** The completion gate has never blocked a
-  save; the confirm dialog has never been seen to open; `scrProjects`' contains-search is bounded
-  by the 2000 data row limit and fails SILENTLY (confirm Settings > General > Data row limit);
+  save; the confirm dialog has never been seen to open; `scrProjects`' search is a delegable
+  `StartsWith(project_name, …)` PREFIX match — complete past 2,000 rows, but prefix-only (#132 proposes partial/multi-word);
   #22 back-fills nothing, so a task keeps its last health until touched; on `scrReports` the
   truncation banner has never fired and no trend bar has yet carried two currencies.
 - **THE PERF BACKLOG #27–#40 WAS NEVER MEASURED.** All fourteen landed on paste confirmations —
@@ -413,3 +413,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-14 | Epic #93 closed (user) | (no session file)
 - 2026-10-14 | /code-review of recent commits: 10 findings recorded in State (orphaned no-parent outputs, stale quick-tx output name/date, narrow date pickers, comment hygiene); none fixed | (no session file)
 - 2026-10-15 | Backlog filed on GitHub as 4 epics: #108 app correctness & code-review follow-ups (#112 unlinked outputs, #113 quick-tx stale output name/date, #114 quick-tx date width, #115 comment/formula clean-up, #116 health-derivation decision); #109 SharePoint data hygiene (#117 date_start back-fill, #118 Complete=100%, #119 phase default, #120 taskproduct/task_supporter indexes, #121 placeholder vocabularies, #122 requestor-dept back-fill, #123 missing-projects investigation, #124 archival-flow reopen race); #110 verify never-exercised behaviours (#125 gate+confirm dialogs, #126 search vs row limit, #127 scrReports chain/scope/banner/currencies, #128 perf baseline); #111 housekeeping (#129 superseded components, #130 stale docs, #131 memory prune). The GitHub issues are now the backlog of record | (no session file)
+- 2026-10-15 | #132 filed: flexible project search (partial + multi-word; true fuzzy ruled out). Recommended: a session-local project index loaded in delegable ID windows, searched client-side. #126 corrected (search is StartsWith, delegable) | (no session file)
