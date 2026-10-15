@@ -420,3 +420,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-15 | #132 authored: local multi-word project search; review blockers (case-insensitive mine, LookUp on navigate) fixed; gDataRowLimit seeded on scrProjects | (no session file)
 - 2026-10-15 | #132 search still prefix-only in Studio; data row limit confirmed already 2000 (not the cause); bucket follow-up dropped; probe-label diagnosis pending | (no session file)
 - 2026-10-15 | #132 reworked to universe count + Search() (<2000) / prefix (>=2000) | (no session file)
+- 2026-10-15 | #132 search (universe count + Search() / prefix fallback) MERGED (PR #134), PASTED and CONFIRMED WORKING by the user; #132 and #126 closed | (no session file)
