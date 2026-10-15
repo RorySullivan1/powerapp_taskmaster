@@ -74,7 +74,10 @@ Screens:
          If( IsBlank(gDataRowLimit), Set( gDataRowLimit, 2000 ) );
          // THE SEARCH UNIVERSE, counted on every visit. CountRows does not delegate, so it
          // stops at the data row limit — which is exactly the question: under it, Search()
-         // over the same universe sees every project. The same Set is tglShowComplete.OnChange.
+         // over the same universe sees every project. The same Sets are tglShowComplete.OnChange.
+         // Blanked first: a blank count reads as "at the limit", so the gallery stays on the
+         // prefix search until the count lands instead of Searching a stale universe.
+         Set( gPrjUniverseN, Blank() );
          Set( gPrjUniverseN, CountRows( If( tglShowComplete.Value, ActiveProjects, OpenProjects ) ) )
     Children:
       - hdrProjects:
@@ -195,7 +198,9 @@ Screens:
                   Default: =false
                   # The universe changes with this toggle, so it is recounted. Same Set as the
                   # end of scrProjects.OnVisible.
-                  OnChange: =Set( gPrjUniverseN, CountRows( If( tglShowComplete.Value, ActiveProjects, OpenProjects ) ) )
+                  OnChange: |
+                    =Set( gPrjUniverseN, Blank() );
+                     Set( gPrjUniverseN, CountRows( If( tglShowComplete.Value, ActiveProjects, OpenProjects ) ) )
                   FalseText: =""
                   TrueText: =""
                   FillPortions: =0
