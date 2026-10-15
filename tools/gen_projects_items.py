@@ -41,23 +41,25 @@ Both are generated from the same branch builder, so switching between them is
 one flag and costs nothing but a paste.
 
 TWO SEARCH MODES. Everything above is the SERVER formula. An outer If puts a
-LOCAL branch in front of it:
+SEARCH branch in front of it, chosen by the size of the universe the user is
+looking at:
 
-  local    search text present AND the index is loaded AND not truncated.
-           Filters colPrjIdx (one ClearCollect of ActiveProjects, loaded by
-           txtProjSearch.OnChange) and requires EVERY space-separated word to
-           appear anywhere in project_name. Substring `in` does not delegate, so
-           this is only correct because the index holds every live project —
-           which is what `gPrjIdxTrunc` (row count reached gDataRowLimit) guards.
-           Its completed / mine / coverage / priority predicates are the server
-           ones with each "off" state written as an Or, so a filter means the
-           same thing in both modes. It sorts with `Sort` on a LITERAL identifier
-           per gPrjSortCol key, so the internal-name question never reaches it.
+  search   search text present AND gPrjUniverseN < gDataRowLimit. gPrjUniverseN is
+           CountRows of the projects in view — ActiveProjects with "show completed"
+           on, OpenProjects with it off — set by scrProjects.OnVisible and
+           tglShowComplete.OnChange. Under the limit the whole universe fits in one
+           fetch, so `Search(...)` over it (which SharePoint cannot delegate) still
+           sees every project: the phrase may appear anywhere in project_name,
+           case-insensitive. Its mine / coverage / priority predicates are the
+           server ones with each "off" state written as an Or; "mine" lower-cases
+           the stored email because this Filter runs in the app, where `=` is
+           case-sensitive. It sorts with `Sort` on a LITERAL identifier per
+           gPrjSortCol key, so the internal-name question never reaches it.
 
-  server   no search text, index not loaded yet, or index truncated: the 32
-           branches, unchanged. Search here is the delegable name prefix.
-
-Truncated means the user sees prefix results plus scrProjects' lblPrjSearchWarn.
+  server   no search text, or the universe is at the limit (CountRows of a
+           non-delegable query stops there): the 32 branches, unchanged. Search
+           here is the delegable name PREFIX, complete at any size, and
+           scrProjects' lblPrjSearchWarn says so.
 Change a server predicate and change its local twin in `_local` with it.
 
 THE INTERNAL-NAME TRAP, and it is the reason `switch` exists at all: a column
@@ -107,9 +109,10 @@ MINE_LOCAL = ["( Lower(project_manager.Email) = gUserEmail",
 SRCH = "StartsWith( project_name, Trim(txtProjSearch.Text) )"
 ALLC = 'Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"'
 ALLP = 'Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"'
-# The LOCAL branch runs only over a COMPLETE index. Truncated, or not loaded yet,
-# and the gallery stays on the server branches, whose prefix search is never wrong.
-LOCAL_ON = "Len( Trim(txtProjSearch.Text) ) > 0 && gPrjIdxLoaded && !gPrjIdxTrunc"
+# The SEARCH branch runs only while the universe in view is under the row limit, so
+# its non-delegable Search() still sees every project. Unknown (blank) counts as at
+# the limit, and the gallery stays on the server branches, whose prefix is never wrong.
+LOCAL_ON = "Len( Trim(txtProjSearch.Text) ) > 0 && Coalesce(gPrjUniverseN, gDataRowLimit) < gDataRowLimit"
 
 
 def _branch(ind, src, sort_arg, preds, last):
@@ -178,36 +181,36 @@ def _server(ind, mode):
 
 
 def _local(ind):
-    """The LOCAL branch: every filter and every search word, over colPrjIdx.
+    """The SEARCH branch: Search() over the universe in view, every filter applied.
 
     Each predicate is the server branches' predicate with its "off" state folded
-    in as an Or, which is legal here because nothing has to delegate.
-    colPrjIdx holds ActiveProjects, so "not Complete" over it is exactly
-    OpenProjects. Sorted with Sort on a LITERAL identifier per arm: identifiers
-    resolve by display name, so the internal-name key in gPrjSortCol never has to
-    name a collection column.
+    in as an Or; nothing here has to delegate, because the branch only runs while
+    the universe is under the row limit. Sorted with Sort on a LITERAL identifier
+    per arm: identifiers resolve by display name, so the internal-name key in
+    gPrjSortCol never has to name a column of this local result.
     """
     I = " "*ind
-    F = I + " "*20                                  # predicate column inside hits
-    out = [I + "With( { kw: Filter( ForAll( Split( Lower( Trim(txtProjSearch.Text) ), \" \" ) As t,",
-           I + "                            { Wd: t.Value } ),",
-           I + "                    Len(Wd) > 0 ) },",
-           I + "    With( { hits: Filter( colPrjIdx,",
-           F + '( tglShowComplete.Value || project_phase.Value <> "Complete" )',
-           F[:-3] + "&& ( !tglOnlyMine.Value",
-           F[:-3] + "  || " + MINE_LOCAL[0]]
-    out += [F[:-3] + "  " + " "*(len(MINE_LOCAL[0].split()[0]) - len(ln.split()[0]) + 3) + ln for ln in MINE_LOCAL[1:]]
-    out[-1] += " )"
-    out += [F[:-3] + "&& ( " + ALLC,
-            F[:-3] + "  || " + COV + " )",
-            F[:-3] + "&& ( " + ALLP,
-            F[:-3] + "  || " + PRI + " )",
-            F[:-3] + "&& IsEmpty( Filter( kw, !( Wd in Lower(project_name) ) ) ) ) },",
-            I + "        Switch( gPrjSortCol,"]
+    def flt(src):
+        F = I + " "*22
+        o = [I + "                  Search( Filter( %s," % src,
+             F + "( !tglOnlyMine.Value",
+             F + "  || " + MINE_LOCAL[0]]
+        o += [F + "  " + " "*(len(MINE_LOCAL[0].split()[0]) - len(ln.split()[0]) + 3) + ln for ln in MINE_LOCAL[1:]]
+        o[-1] += " )"
+        o += [F + "&& ( " + ALLC,
+              F + "  || " + COV + " )",
+              F + "&& ( " + ALLP,
+              F + "  || " + PRI + " ) ),",
+              I + "                          Trim(txtProjSearch.Text), project_name )"]
+        return o
+    out = [I + "With( { hits: If( tglShowComplete.Value,"]
+    out += flt("ActiveProjects"); out[-1] += ","
+    out += flt("OpenProjects");   out[-1] += " ) },"
+    out.append(I + "    Switch( gPrjSortCol,")
     w = max(len(c[1]) for c in COLUMNS[:-1]) + 3
     for ident, internal in COLUMNS[:-1]:
-        out.append(I + "            " + ('"%s",' % internal).ljust(w) + " Sort( hits, %s, gPrjSortOrd )," % ident)
-    out.append(I + "            Sort( hits, %s, gPrjSortOrd ) ) ) )" % COLUMNS[-1][0])
+        out.append(I + "        " + ('"%s",' % internal).ljust(w) + " Sort( hits, %s, gPrjSortOrd )," % ident)
+    out.append(I + "        Sort( hits, %s, gPrjSortOrd ) ) )" % COLUMNS[-1][0])
     return out
 
 
