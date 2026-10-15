@@ -1,11 +1,12 @@
 # Projects browser: a TABLE. Search + two toggles ("only mine", "show completed")
 # above a sortable column header, over a five-column gallery.
 #
-# TWO SEARCH MODES. Typing loads colPrjIdx — every live project, one ClearCollect —
-# and the gallery then matches EVERY word anywhere in the name, locally. If that load
-# reaches gDataRowLimit the index is incomplete, so the gallery stays on the delegable
-# server search (name STARTS WITH the text) and lblPrjSearchWarn says so. No search
-# text means the server formula, exactly as without the index.
+# TWO SEARCH MODES, chosen by gPrjUniverseN — the number of projects in view (ActiveProjects
+# with Show completed on, OpenProjects with it off), counted on every visit and whenever the
+# toggle changes. Under gDataRowLimit the gallery uses Search(): the text may appear anywhere
+# in the name. At the limit the count itself is capped, so the gallery stays on the delegable
+# server search (name STARTS WITH the text) and lblPrjSearchWarn says so. No search text
+# means the server formula either way.
 #
 # THE HEADER ROW AND THE GALLERY ROW ARE ONE COLUMN BUDGET IN TWO PLACES. Same
 # order, same FillPortions, same LayoutMinWidth, same 16px gap and padding, or the
@@ -68,20 +69,16 @@ Screens:
          // on load and the heading arrows disagree with the order on screen.
          Set( gPrjSortCol, "Title" );
          Set( gPrjSortOrd, SortOrder.Ascending );
-         // SAME SEED AS scrHome and scrReports: a blank limit compares as 0 and would mark the
-         // index truncated on a cold start that beat App.OnStart.
+         // SAME SEED AS scrHome and scrReports: a blank limit compares as 0 and would push
+         // every search onto the prefix fallback on a cold start that beat App.OnStart.
          If( IsBlank(gDataRowLimit), Set( gDataRowLimit, 2000 ) );
-         // SEARCH INDEX, dropped on every visit so a search never runs over stale rows.
-         // The flag goes false BEFORE the Clear, so the gallery never reads an emptied index.
-         // Text left in the box from the last visit reloads it at once: the same three steps
-         // as txtProjSearch.OnChange — keep the two in step.
-         Set( gPrjIdxLoaded, false );
-         Set( gPrjIdxTrunc, false );
-         Clear( colPrjIdx );
-         If( Len( Trim(txtProjSearch.Text) ) > 0,
-             ClearCollect( colPrjIdx, ActiveProjects );
-             Set( gPrjIdxTrunc, CountRows(colPrjIdx) >= gDataRowLimit );
-             Set( gPrjIdxLoaded, true ) )
+         // THE SEARCH UNIVERSE, counted on every visit. CountRows does not delegate, so it
+         // stops at the data row limit — which is exactly the question: under it, Search()
+         // over the same universe sees every project. The same Sets are tglShowComplete.OnChange.
+         // Blanked first: a blank count reads as "at the limit", so the gallery stays on the
+         // prefix search until the count lands instead of Searching a stale universe.
+         Set( gPrjUniverseN, Blank() );
+         Set( gPrjUniverseN, CountRows( If( tglShowComplete.Value, ActiveProjects, OpenProjects ) ) )
     Children:
       - hdrProjects:
           Control: CanvasComponent
@@ -158,18 +155,8 @@ Screens:
                 Properties:
                   Type: =TextInputType.Search
                   Placeholder: ="Search any part of a project name…"
-                  # Delayed: OnChange fires once the user stops typing, not per keystroke.
+                  # Delayed: the gallery re-queries once the user stops typing, not per keystroke.
                   TriggerOutput: =TriggerOutput.Delayed
-                  # LOADS THE SEARCH INDEX, once per visit (OnVisible drops it). One delegable
-                  # fetch, capped at the data row limit — which is why reaching gDataRowLimit
-                  # marks it TRUNCATED and keeps the gallery on the server prefix search. Until
-                  # this finishes the gallery shows the server results, so there is no empty flash.
-                  # The same three steps close scrProjects.OnVisible — keep the two in step.
-                  OnChange: |
-                    =If( Len( Trim(txtProjSearch.Text) ) > 0 && !gPrjIdxLoaded,
-                         ClearCollect( colPrjIdx, ActiveProjects );
-                         Set( gPrjIdxTrunc, CountRows(colPrjIdx) >= gDataRowLimit );
-                         Set( gPrjIdxLoaded, true ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Body
                   FillPortions: =0
@@ -209,6 +196,11 @@ Screens:
                 Control: Classic/Toggle@2.1.0
                 Properties:
                   Default: =false
+                  # The universe changes with this toggle, so it is recounted. Same Set as the
+                  # end of scrProjects.OnVisible.
+                  OnChange: |
+                    =Set( gPrjUniverseN, Blank() );
+                     Set( gPrjUniverseN, CountRows( If( tglShowComplete.Value, ActiveProjects, OpenProjects ) ) )
                   FalseText: =""
                   TrueText: =""
                   FillPortions: =0
@@ -227,15 +219,15 @@ Screens:
                   LayoutMinWidth: =150
                   Width: =150
                   Height: =40
-            # SHOWN ONLY WHEN THE SEARCH INDEX IS TRUNCATED, i.e. the gallery is on the server
+            # SHOWN ONLY WHEN THE UNIVERSE IS AT THE LIMIT, i.e. the gallery is on the server
             # prefix search while the placeholder promised any part of the name. One line at
             # Small fits 420 with room to spare; the row is 40 tall, so a second line would clip.
             - lblPrjSearchWarn:
                 Control: Label@2.5.1
                 Properties:
-                  Visible: =Len( Trim(txtProjSearch.Text) ) > 0 && gPrjIdxTrunc
+                  Visible: =Len( Trim(txtProjSearch.Text) ) > 0 && Coalesce(gPrjUniverseN, gDataRowLimit) >= gDataRowLimit
                   Text: |
-                    =gDataRowLimit & "+ live projects: matching the START of names only"
+                    =gDataRowLimit & "+ projects in view: matching the START of names only"
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.Danger
@@ -494,13 +486,13 @@ Screens:
       # mechanism; do not factor it away.
       #
       # TWO SEARCH MODES, chosen by the OUTER If.
-      # LOCAL — search text, colPrjIdx loaded, NOT truncated: every word of the search must
-      # appear anywhere in project_name. The substring `in` does NOT delegate on SharePoint,
-      # so this is correct ONLY because colPrjIdx holds every live project; gPrjIdxTrunc is
-      # what makes that true, and dropping it from the condition turns a missed match into a
-      # silent one. Its filters are the server predicates with each "off" state as an Or —
-      # colPrjIdx is ActiveProjects, so "not Complete" over it is exactly OpenProjects. It
-      # sorts with Sort on a LITERAL identifier per key, so no internal name reaches it.
+      # SEARCH — search text AND gPrjUniverseN < gDataRowLimit: Search() over the universe in
+      # view, so the text may appear anywhere in project_name. Search does NOT delegate on
+      # SharePoint, so this is correct ONLY because the whole universe fits in one fetch; the
+      # count is what makes that true, and dropping it from the condition turns a missed match
+      # into a silent one. Its filters are the server predicates with each "off" state as an
+      # Or; "mine" lower-cases the stored email because this Filter runs in the app. It sorts
+      # with Sort on a LITERAL identifier per key, so no internal name reaches it.
       # SERVER — everything else: the name search is the delegable PREFIX match, since
       # SharePoint delegates `StartsWith` on Text and has no row for `Search` or `in`.
       #
@@ -529,28 +521,38 @@ Screens:
           Variant: BrowseLayout_Vertical_TwoTextOneImageVariant_ver5.0
           Properties:
             Items: |
-              =If( Len( Trim(txtProjSearch.Text) ) > 0 && gPrjIdxLoaded && !gPrjIdxTrunc,
-                   With( { kw: Filter( ForAll( Split( Lower( Trim(txtProjSearch.Text) ), " " ) As t,
-                                               { Wd: t.Value } ),
-                                       Len(Wd) > 0 ) },
-                       With( { hits: Filter( colPrjIdx,
-                                       ( tglShowComplete.Value || project_phase.Value <> "Complete" )
-                                    && ( !tglOnlyMine.Value
-                                      || ( Lower(project_manager.Email) = gUserEmail
-                                        || Lower(project_manager.Email) = gUserMail
-                                        || Lower(project_manager.Email) = gUserUpn
-                                        || Lower(project_supporter.Email) = gUserEmail
-                                        || Lower(project_supporter.Email) = gUserMail
-                                        || Lower(project_supporter.Email) = gUserUpn ) )
-                                    && ( Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
-                                      || project_coverage.Value = cboPrjCoverage.Selected.Value )
-                                    && ( Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"
-                                      || project_priority.Value = cboPrjPriority.Selected.Value )
-                                    && IsEmpty( Filter( kw, !( Wd in Lower(project_name) ) ) ) ) },
-                           Switch( gPrjSortCol,
-                               "project_date_target",     Sort( hits, project_date_target, gPrjSortOrd ),
-                               "project_perc_completion", Sort( hits, project_perc_completion, gPrjSortOrd ),
-                               Sort( hits, project_name, gPrjSortOrd ) ) ) ),
+              =If( Len( Trim(txtProjSearch.Text) ) > 0 && Coalesce(gPrjUniverseN, gDataRowLimit) < gDataRowLimit,
+                   With( { hits: If( tglShowComplete.Value,
+                                     Search( Filter( ActiveProjects,
+                                         ( !tglOnlyMine.Value
+                                           || ( Lower(project_manager.Email) = gUserEmail
+                                             || Lower(project_manager.Email) = gUserMail
+                                             || Lower(project_manager.Email) = gUserUpn
+                                             || Lower(project_supporter.Email) = gUserEmail
+                                             || Lower(project_supporter.Email) = gUserMail
+                                             || Lower(project_supporter.Email) = gUserUpn ) )
+                                         && ( Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                                           || project_coverage.Value = cboPrjCoverage.Selected.Value )
+                                         && ( Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"
+                                           || project_priority.Value = cboPrjPriority.Selected.Value ) ),
+                                             Trim(txtProjSearch.Text), project_name ),
+                                     Search( Filter( OpenProjects,
+                                         ( !tglOnlyMine.Value
+                                           || ( Lower(project_manager.Email) = gUserEmail
+                                             || Lower(project_manager.Email) = gUserMail
+                                             || Lower(project_manager.Email) = gUserUpn
+                                             || Lower(project_supporter.Email) = gUserEmail
+                                             || Lower(project_supporter.Email) = gUserMail
+                                             || Lower(project_supporter.Email) = gUserUpn ) )
+                                         && ( Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
+                                           || project_coverage.Value = cboPrjCoverage.Selected.Value )
+                                         && ( Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"
+                                           || project_priority.Value = cboPrjPriority.Selected.Value ) ),
+                                             Trim(txtProjSearch.Text), project_name ) ) },
+                       Switch( gPrjSortCol,
+                           "project_date_target",     Sort( hits, project_date_target, gPrjSortOrd ),
+                           "project_perc_completion", Sort( hits, project_perc_completion, gPrjSortOrd ),
+                           Sort( hits, project_name, gPrjSortOrd ) ) ),
                    If( Len( Trim(txtProjSearch.Text) ) = 0,
                        If( tglShowComplete.Value && tglOnlyMine.Value
                         && Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
@@ -1138,9 +1140,9 @@ Screens:
                   Y: =0
                   Width: =Parent.TemplateWidth
                   Height: =Parent.TemplateHeight
-                  # RE-READ FROM THE LIST, never ThisItem: in search mode the row is a colPrjIdx copy
-                  # carrying only the columns this screen uses, and scrProject hands gSelProject on
-                  # to scrProjectEdit, whose save would write the missing columns back blank.
+                  # RE-READ FROM THE LIST, never ThisItem: in search mode the row comes from an in-app
+                  # Search() result that may carry only the columns this screen uses, and scrProject
+                  # hands gSelProject on to scrProjectEdit, whose save would write those back blank.
                   OnSelect: |
                     =Select(Parent);
                      Set( gSelProject, LookUp(taskmaster_projects, ID = ThisItem.ID) );
@@ -1160,8 +1162,8 @@ Screens:
             # both set names both, one set names that one, neither set falls through to a
             # sentence that blames no control at all.
             Text: |
-              =If( Len(Trim(txtProjSearch.Text)) > 0 && gPrjIdxLoaded && !gPrjIdxTrunc,
-                   "No project name contains every word of """ & Trim(txtProjSearch.Text) & """.",
+              =If( Len(Trim(txtProjSearch.Text)) > 0 && Coalesce(gPrjUniverseN, gDataRowLimit) < gDataRowLimit,
+                   "No project name contains """ & Trim(txtProjSearch.Text) & """.",
                    Len(Trim(txtProjSearch.Text)) > 0,
                    "No project name starts with """ & Trim(txtProjSearch.Text) & """.",
                    tglOnlyMine.Value && !tglShowComplete.Value,
