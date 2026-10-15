@@ -68,6 +68,9 @@ Screens:
          // on load and the heading arrows disagree with the order on screen.
          Set( gPrjSortCol, "Title" );
          Set( gPrjSortOrd, SortOrder.Ascending );
+         // SAME SEED AS scrHome and scrReports: a blank limit compares as 0 and would mark the
+         // index truncated on a cold start that beat App.OnStart.
+         If( IsBlank(gDataRowLimit), Set( gDataRowLimit, 2000 ) );
          // SEARCH INDEX, dropped on every visit so a search never runs over stale rows.
          // The flag goes false BEFORE the Clear, so the gallery never reads an emptied index.
          // Text left in the box from the last visit reloads it at once: the same three steps
@@ -533,12 +536,12 @@ Screens:
                        With( { hits: Filter( colPrjIdx,
                                        ( tglShowComplete.Value || project_phase.Value <> "Complete" )
                                     && ( !tglOnlyMine.Value
-                                      || ( project_manager.Email = gUserEmail
-                                        || project_manager.Email = gUserMail
-                                        || project_manager.Email = gUserUpn
-                                        || project_supporter.Email = gUserEmail
-                                        || project_supporter.Email = gUserMail
-                                        || project_supporter.Email = gUserUpn ) )
+                                      || ( Lower(project_manager.Email) = gUserEmail
+                                        || Lower(project_manager.Email) = gUserMail
+                                        || Lower(project_manager.Email) = gUserUpn
+                                        || Lower(project_supporter.Email) = gUserEmail
+                                        || Lower(project_supporter.Email) = gUserMail
+                                        || Lower(project_supporter.Email) = gUserUpn ) )
                                     && ( Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"
                                       || project_coverage.Value = cboPrjCoverage.Selected.Value )
                                     && ( Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"
@@ -1135,9 +1138,16 @@ Screens:
                   Y: =0
                   Width: =Parent.TemplateWidth
                   Height: =Parent.TemplateHeight
+                  # RE-READ FROM THE LIST, never ThisItem: in search mode the row is a colPrjIdx copy
+                  # carrying only the columns this screen uses, and scrProject hands gSelProject on
+                  # to scrProjectEdit, whose save would write the missing columns back blank.
                   OnSelect: |
                     =Select(Parent);
-                     Set(gSelProject, ThisItem); Navigate(scrProject, ScreenTransition.Cover)
+                     Set( gSelProject, LookUp(taskmaster_projects, ID = ThisItem.ID) );
+                     If( IsBlank(gSelProject.ID),
+                         Notify( "That project is no longer available. Clear the search and try again.",
+                                 NotificationType.Error ),
+                         Navigate( scrProject, ScreenTransition.Cover ) )
       - ProjectsEmptyLabel:
           Control: Label@2.5.1
           Properties:

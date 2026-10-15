@@ -95,6 +95,15 @@ MINE = ["( project_manager.Email = gUserEmail",
         "|| project_supporter.Email = gUserEmail",
         "|| project_supporter.Email = gUserMail",
         "|| project_supporter.Email = gUserUpn )"]
+# THE LOCAL BRANCH LOWER-CASES THE STORED EMAIL. Text `=` in Power Fx is case-sensitive, and
+# SharePoint's server-side Person equality is not, so the server arms above match a stored
+# "J.Smith@…" that a bare local `=` against the lower-cased globals would miss.
+MINE_LOCAL = ["( Lower(project_manager.Email) = gUserEmail",
+              "|| Lower(project_manager.Email) = gUserMail",
+              "|| Lower(project_manager.Email) = gUserUpn",
+              "|| Lower(project_supporter.Email) = gUserEmail",
+              "|| Lower(project_supporter.Email) = gUserMail",
+              "|| Lower(project_supporter.Email) = gUserUpn )"]
 SRCH = "StartsWith( project_name, Trim(txtProjSearch.Text) )"
 ALLC = 'Coalesce(cboPrjCoverage.Selected.Value, "All coverage") = "All coverage"'
 ALLP = 'Coalesce(cboPrjPriority.Selected.Value, "All priorities") = "All priorities"'
@@ -186,8 +195,8 @@ def _local(ind):
            I + "    With( { hits: Filter( colPrjIdx,",
            F + '( tglShowComplete.Value || project_phase.Value <> "Complete" )',
            F[:-3] + "&& ( !tglOnlyMine.Value",
-           F[:-3] + "  || " + MINE[0]]
-    out += [F[:-3] + "  " + " "*(len(MINE[0].split()[0]) - len(ln.split()[0]) + 3) + ln for ln in MINE[1:]]
+           F[:-3] + "  || " + MINE_LOCAL[0]]
+    out += [F[:-3] + "  " + " "*(len(MINE_LOCAL[0].split()[0]) - len(ln.split()[0]) + 3) + ln for ln in MINE_LOCAL[1:]]
     out[-1] += " )"
     out += [F[:-3] + "&& ( " + ALLC,
             F[:-3] + "  || " + COV + " )",
