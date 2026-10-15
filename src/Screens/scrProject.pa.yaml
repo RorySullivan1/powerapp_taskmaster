@@ -90,8 +90,8 @@ Screens:
                // issue_status, both INDEXED, so it delegates; issue_type and issue_impact are not
                // indexed and are only tested against the few rows it returns. Written as one flat
                // Filter the whole query goes non-delegable and reads an arbitrary page.
-               // The RAW list, not OpenIssues — that named formula also excludes archived projects,
-               // which would drive every task under one to Green instead of leaving it alone.
+               // OpenIssues, not the raw list: its exclusion of archived projects costs nothing,
+               // because an archived project's tasks cannot be reached (see scrTaskEdit).
                ClearCollect( colHlWork,
                    ForAll( colHlTasks As t,
                        { Id: t.Id,
@@ -712,8 +712,9 @@ Screens:
                                           Height: =22
                         # OUTPUTS: the count by source, and the one door into mdOl. Read off
                         # colProjectOut, so this costs no query of its own. Coalesce treats 0 as
-                        # unset. A row with neither id predates the task/transaction-only rule; it
-                        # is counted only when one exists.
+                        # unset. A row with neither id is an UNLINKED output — nothing in the app
+                        # writes one; docs/notes/unlinked-outputs-cleanup.md clears them. Shown
+                        # only when one exists.
                         - rowFacts3:
                             Control: GroupContainer@1.5.0
                             Variant: AutoLayout
@@ -2279,7 +2280,7 @@ Screens:
       # =====================================================================
       # DELETE CONFIRMATION — one instance serving every delete on the screen, keyed by
       # gDelKind. Declared after the content so positional z-order floats it over it, but
-      # BEFORE the dialogs: mdCv and mdOl close themselves before handing off to it.
+      # BEFORE the dialogs: mdCv closes itself before handing off to it.
       #
       # STUDIO CHECK BEFORE THIS SCREEN IS PASTED: a component crosses the gap in TWO
       # parts and only the CONTROLS paste — every custom property is declared and typed

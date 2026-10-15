@@ -13,7 +13,9 @@
 # client | product | sales owner | output | delete. The output is a button that opens
 # the pop-up; the row holds the output's fields (q_hasOut, q_oName, q_oDate, q_oFmt,
 # q_oAud, q_oLang, q_oBrand, q_oFlag, q_oAppr) and the save writes one taskmaster_output
-# row for each saved transaction whose row has one.
+# row for each saved transaction whose row has one. An EMPTY q_oName / BLANK q_oDate on a
+# row with an output means "the row's own label / trade date", read at SAVE time — so a
+# label or date edited after the pop-up closed still reaches the output.
 #
 # THE ROWS LIVE IN colQtRows AND NOWHERE ELSE. Every row input writes itself back on
 # OnChange (which fires on blur), and every reader — validation, + Add row, the save,
@@ -24,9 +26,10 @@
 # NO ROW-LEVEL ACTION, SO NO FULL-TEMPLATE HIT BUTTON. Each cell is its own target;
 # nothing is layered over an input.
 #
-# FIRST SUSPECT if a paste is rejected: IsEditable =false on dtpQtODate (fallback: =true).
-# Everything else here — in-gallery inputs and their OnChange, the AllItems sync, the
-# pop-up's shape (scrTransactionEdit's output editor) — has already landed.
+# FIRST SUSPECTS if a paste is rejected: IsEditable =false on dtpQtODate (fallback: =true),
+# then the record-merge Patch( gQtBlankRow, {...} ) in the three row constructors (fallback:
+# spell the record out in full). The in-gallery inputs and their OnChange, the AllItems
+# sync and the pop-up's shape (scrTransactionEdit's output editor) are proven in Studio.
 #
 # CONNECTION PREREQUISITES: Office 365 Users (manager and sales-owner picker) and
 # taskmaster_output (row outputs).
@@ -38,6 +41,18 @@ Screens:
       OnVisible: |
         =Set( gSaving, false );   // see btnQtSave
          Set( gQtOutOpen, false );
+         // THE ONE EMPTY ROW. Every row constructor (below, btnQtAddRow, btnQtSave's fresh row)
+         // is Patch( gQtBlankRow, {overrides} ), so the collection's shape is defined once.
+         // A row WITHOUT an output holds these empty output fields — mdQtORemove restores them
+         // — and btnQtRowOutput relies on that. q_oDate is a TYPE SEED only: it is read only
+         // under q_hasOut. Set before the If, so a resumed visit has it too.
+         Set( gQtBlankRow,
+             { q_rid: 1, q_name: "", q_date: Today(), q_notional: "", q_ccy: "USD",
+               q_clientId: 0, q_clientValue: "", q_productId: 0, q_productValue: "",
+               q_salesName: "", q_salesMail: "",
+               q_hasOut: false, q_oName: "", q_oDate: Today(),
+               q_oFmt: "", q_oAud: "", q_oLang: "", q_oBrand: "",
+               q_oFlag: false, q_oAppr: "" } );
          // RETURNING FROM "+ New client / product" must keep the batch: colQtRows and the new
          // project's fields exist nowhere else until Save. Every caller that opens this screen
          // fresh clears gQtResume first; only the picker's OnCreateNew raises it.
@@ -92,16 +107,8 @@ Screens:
          // ONE empty row dated today. q_notional is the raw TEXT so an entry that will not
          // parse can be named by lblQtMissing instead of saving as blank. Every text field
          // starts "" (not blank): the sales owner and the pop-up's choices test Len().
-         // EVERY CONSTRUCTOR OF A ROW (here, btnQtAddRow, btnQtSave's fresh row) CARRIES THE
-         // SAME FIELDS — the collection's shape is their union. The output starts empty.
          Clear( colQtRows );
-         Collect( colQtRows,
-             { q_rid: 1, q_name: "", q_date: Today(), q_notional: "", q_ccy: "USD",
-               q_clientId: 0, q_clientValue: "", q_productId: 0, q_productValue: "",
-               q_salesName: "", q_salesMail: "",
-               q_hasOut: false, q_oName: "", q_oDate: Today(),
-               q_oFmt: "", q_oAud: "", q_oLang: "", q_oBrand: "",
-               q_oFlag: false, q_oAppr: "" } );
+         Collect( colQtRows, gQtBlankRow );
          Clear( colQtResult );
          Clear( colQtOutResult );
          Set( gQtSeedPending, true ) );
@@ -526,10 +533,12 @@ Screens:
             # LayoutMinWidth pair-for-pair; change one and change the other — nothing in
             # Power Fx keeps them in step. The heading's width is READ from the gallery.
             # 13 cells: # | label 3 | date | notional 2 | ccy | client 2 | clr | product 2 | clr |
-            # sales owner 2 | clr | output | delete. At TemplateWidth ~1300: fixed 446
-            # (28+150+90+16+16+16+110+20), gaps+padding 112 (12 x 8 + 16), 11 portions share
-            # ~742 (~67 each): label ~202, the four 2-portion cells ~135. Mins total 650
-            # (180+110+3x120) <= 742; they bind only below TemplateWidth 1218 (portion < 60).
+            # sales owner 2 | clr | output | delete. At TemplateWidth ~1300: fixed 466
+            # (28+170+90+16+16+16+110+20), gaps+padding 112 (12 x 8 + 16), 11 portions share
+            # ~722 (~66 each): label ~197, the four 2-portion cells ~131. Mins total 630
+            # (160+110+3x120) <= 722; they bind only below TemplateWidth 1238 (portion < 60).
+            # The date cell stays at 170: a LongAbbreviated date ("Wed, Sep 30, 2026") beside
+            # the calendar icon needs the room. Take width from the label's min, not from it.
             # Row: 36-tall cells centred in 43; rctQtRowLine is the 44th px.
             # The gallery grows a row at a time up to 6, then scrolls. 66 = 18 + 4 + 44.
             # ---------------------------------------------------------------------
@@ -577,7 +586,7 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =3
-                              LayoutMinWidth: =180
+                              LayoutMinWidth: =160
                               Height: =18
                         - hdQtDate:
                             Control: Label@2.5.1
@@ -587,8 +596,8 @@ Screens:
                               Size: =gTheme.Size.Small
                               Color: =gTheme.Color.TextMuted
                               FillPortions: =0
-                              LayoutMinWidth: =150
-                              Width: =150
+                              LayoutMinWidth: =170
+                              Width: =170
                               Height: =18
                         - hdQtNotional:
                             Control: Label@2.5.1
@@ -753,7 +762,7 @@ Screens:
                                     Font: =gTheme.Font
                                     Size: =gTheme.Size.Small
                                     FillPortions: =3
-                                    LayoutMinWidth: =180
+                                    LayoutMinWidth: =160
                                     Height: =36
                                     OnChange: |
                                       =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
@@ -767,8 +776,8 @@ Screens:
                                     StartOfWeek: =StartOfWeek.Monday
                                     IsEditable: =true
                                     FillPortions: =0
-                                    LayoutMinWidth: =150
-                                    Width: =150
+                                    LayoutMinWidth: =170
+                                    Width: =170
                                     Height: =36
                                     OnChange: |
                                       =Patch( colQtRows, LookUp( colQtRows, q_rid = ThisItem.q_rid ),
@@ -929,8 +938,10 @@ Screens:
                                               { q_salesName: "", q_salesMail: "" } )
                               # THE OUTPUT LIVES ON THE ROW (q_hasOut, q_o*) and is edited only in
                               # the pop-up. Opening it seeds the pop-up's globals from this row and
-                              # Resets its inputs, which re-read their defaults only on Reset. A row
-                              # without an output defaults the name and date to its own.
+                              # Resets its inputs, which re-read their defaults only on Reset.
+                              # gQtORowName / gQtORowDate are what the row shows NOW; mdQtOOk
+                              # compares against them to decide whether the name and date follow
+                              # the row (stored empty) or were chosen in the pop-up.
                               - btnQtRowOutput:
                                   Control: Classic/Button@2.2.0
                                   Properties:
@@ -949,19 +960,26 @@ Screens:
                                     Width: =110
                                     Height: =36
                                     OnSelect: |
-                                      =// A new output defaults to what the row SHOWS (its sibling inputs), not
-                                       // ThisItem: a label typed just now may not have blurred into the row yet.
+                                      =// What the row SHOWS (its sibling inputs), not ThisItem: a label typed
+                                       // just now may not have blurred into the row yet.
+                                       // NO PER-FIELD If ON q_hasOut: a row without an output already holds
+                                       // the empty output fields (gQtBlankRow), so the row's values ARE the
+                                       // pop-up's defaults. Only q_oDate, a type seed on such a row, is gated.
                                        If( !gSaving,
-                                           Set( gQtOutRow, ThisItem.q_rid );
-                                           Set( gQtOHad,   ThisItem.q_hasOut );
-                                           Set( gQtOName,  If( ThisItem.q_hasOut, ThisItem.q_oName, Trim(txtQtRowName.Text) ) );
-                                           Set( gQtODate,  If( ThisItem.q_hasOut, ThisItem.q_oDate, Coalesce( dtpQtRowDate.SelectedDate, Today() ) ) );
-                                           Set( gQtOFmt,   If( ThisItem.q_hasOut, ThisItem.q_oFmt, "" ) );
-                                           Set( gQtOAud,   If( ThisItem.q_hasOut, ThisItem.q_oAud, "" ) );
-                                           Set( gQtOLang,  If( ThisItem.q_hasOut, ThisItem.q_oLang, "" ) );
-                                           Set( gQtOBrand, If( ThisItem.q_hasOut, ThisItem.q_oBrand, "" ) );
-                                           Set( gQtOFlag,  If( ThisItem.q_hasOut, ThisItem.q_oFlag, false ) );
-                                           Set( gQtOAppr,  If( ThisItem.q_hasOut, ThisItem.q_oAppr, "" ) );
+                                           With( { rowName: Trim(txtQtRowName.Text),
+                                                   rowDate: Coalesce( dtpQtRowDate.SelectedDate, Today() ) },
+                                               Set( gQtOutRow,   ThisItem.q_rid );
+                                               Set( gQtOHad,     ThisItem.q_hasOut );
+                                               Set( gQtORowName, rowName );
+                                               Set( gQtORowDate, rowDate );
+                                               Set( gQtOName,    Coalesce( ThisItem.q_oName, rowName ) );
+                                               Set( gQtODate,    Coalesce( If( ThisItem.q_hasOut, ThisItem.q_oDate ), rowDate ) );
+                                               Set( gQtOFmt,     ThisItem.q_oFmt );
+                                               Set( gQtOAud,     ThisItem.q_oAud );
+                                               Set( gQtOLang,    ThisItem.q_oLang );
+                                               Set( gQtOBrand,   ThisItem.q_oBrand );
+                                               Set( gQtOFlag,    ThisItem.q_oFlag );
+                                               Set( gQtOAppr,    ThisItem.q_oAppr ) );
                                            Reset( txtQtOName ); Reset( dtpQtODate );
                                            Reset( cboQtOFmt ); Reset( cboQtOAud );
                                            Reset( cboQtOLang ); Reset( cboQtOBrand );
@@ -1025,26 +1043,16 @@ Screens:
                           =If( !gSaving,
                                With( { last: Last(colQtRows) },
                                    Collect( colQtRows,
-                                       { q_rid:          If( IsEmpty(colQtRows), 1, Max(colQtRows, q_rid) + 1 ),
-                                         q_name:         "",
-                                         q_date:         Coalesce( last.q_date, Today() ),
-                                         q_notional:     "",
-                                         q_ccy:          Coalesce( last.q_ccy, "USD" ),
-                                         q_clientId:     Coalesce( last.q_clientId, 0 ),
-                                         q_clientValue:  Coalesce( last.q_clientValue, "" ),
-                                         q_productId:    Coalesce( last.q_productId, 0 ),
-                                         q_productValue: Coalesce( last.q_productValue, "" ),
-                                         q_salesName:    Coalesce( last.q_salesName, "" ),
-                                         q_salesMail:    Coalesce( last.q_salesMail, "" ),
-                                         q_hasOut:       false,
-                                         q_oName:        "",
-                                         q_oDate:        Coalesce( last.q_date, Today() ),
-                                         q_oFmt:         "",
-                                         q_oAud:         "",
-                                         q_oLang:        "",
-                                         q_oBrand:       "",
-                                         q_oFlag:        false,
-                                         q_oAppr:        "" } ) ) )
+                                       Patch( gQtBlankRow,
+                                           { q_rid:          If( IsEmpty(colQtRows), 1, Max(colQtRows, q_rid) + 1 ),
+                                             q_date:         Coalesce( last.q_date, Today() ),
+                                             q_ccy:          Coalesce( last.q_ccy, "USD" ),
+                                             q_clientId:     Coalesce( last.q_clientId, 0 ),
+                                             q_clientValue:  Coalesce( last.q_clientValue, "" ),
+                                             q_productId:    Coalesce( last.q_productId, 0 ),
+                                             q_productValue: Coalesce( last.q_productValue, "" ),
+                                             q_salesName:    Coalesce( last.q_salesName, "" ),
+                                             q_salesMail:    Coalesce( last.q_salesMail, "" ) } ) ) ) )
                   - lblQtAddHint:
                       Control: Label@2.5.1
                       Properties:
@@ -1297,6 +1305,9 @@ Screens:
                         // the grid — the transaction is saved, and a retry would insert it twice —
                         // so the Notify sends the user to the transaction screen.
                         // output_task_id is NEVER named: a row has at most one parent.
+                        // The Coalesces ARE the follow-the-row rule: an empty q_oName / blank
+                        // q_oDate takes the row's label and date as synced above, not as they
+                        // were when the pop-up opened.
                         ForAll( Filter( colQtResult, Len(Message) = 0 && TxId > 0 ) As k,
                             With( { r: LookUp( colQtRows, q_rid = k.Rid ) },
                                 If( r.q_hasOut,
@@ -1348,26 +1359,16 @@ Screens:
                         If( gQtFailN = 0,
                             Clear( colQtRows );
                             Collect( colQtRows,
-                                { q_rid:          Coalesce( gQtCarry.q_rid, 0 ) + 1,
-                                  q_name:         "",
-                                  q_date:         Coalesce( gQtCarry.q_date, Today() ),
-                                  q_notional:     "",
-                                  q_ccy:          Coalesce( gQtCarry.q_ccy, "USD" ),
-                                  q_clientId:     Coalesce( gQtCarry.q_clientId, 0 ),
-                                  q_clientValue:  Coalesce( gQtCarry.q_clientValue, "" ),
-                                  q_productId:    Coalesce( gQtCarry.q_productId, 0 ),
-                                  q_productValue: Coalesce( gQtCarry.q_productValue, "" ),
-                                  q_salesName:    Coalesce( gQtCarry.q_salesName, "" ),
-                                  q_salesMail:    Coalesce( gQtCarry.q_salesMail, "" ),
-                                  q_hasOut:       false,
-                                  q_oName:        "",
-                                  q_oDate:        Coalesce( gQtCarry.q_date, Today() ),
-                                  q_oFmt:         "",
-                                  q_oAud:         "",
-                                  q_oLang:        "",
-                                  q_oBrand:       "",
-                                  q_oFlag:        false,
-                                  q_oAppr:        "" } );
+                                Patch( gQtBlankRow,
+                                    { q_rid:          Coalesce( gQtCarry.q_rid, 0 ) + 1,
+                                      q_date:         Coalesce( gQtCarry.q_date, Today() ),
+                                      q_ccy:          Coalesce( gQtCarry.q_ccy, "USD" ),
+                                      q_clientId:     Coalesce( gQtCarry.q_clientId, 0 ),
+                                      q_clientValue:  Coalesce( gQtCarry.q_clientValue, "" ),
+                                      q_productId:    Coalesce( gQtCarry.q_productId, 0 ),
+                                      q_productValue: Coalesce( gQtCarry.q_productValue, "" ),
+                                      q_salesName:    Coalesce( gQtCarry.q_salesName, "" ),
+                                      q_salesMail:    Coalesce( gQtCarry.q_salesMail, "" ) } ) );
                             Notify( "Logged " & gQtOkN & If( gQtOkN = 1, " transaction", " transactions" )
                                       & " to " & gQtPname & "." & gQtOutMsg,
                                     If( gQtOutFailN > 0, NotificationType.Warning, NotificationType.Success ) ),
@@ -1737,7 +1738,8 @@ Screens:
                   Color: =gTheme.Color.Danger
                   Width: =Parent.Width - 48
                   Height: =36
-      # Only for a row that already had an output when the pop-up opened (gQtOHad).
+      # Only for a row that already had an output when the pop-up opened (gQtOHad). Restores
+      # gQtBlankRow's empty output fields, which btnQtRowOutput relies on.
       - mdQtORemove:
           Control: Classic/Button@2.2.0
           Properties:
@@ -1776,14 +1778,16 @@ Screens:
             Height: =40
             # THREE SINGLE-ARM Ifs, not one If with mixed arms: Notify, Patch and Set return
             # different types. None of them changes what the guard reads, so all three agree.
+            # A name or date LEFT EQUAL TO THE ROW'S is stored empty, so it follows the row:
+            # btnQtSave fills it from the row's label and trade date at save time.
             OnSelect: |
               =If( Len(lblQtOMissing.Text) > 0,
                    Notify( "Can't save this output yet. " & lblQtOMissing.Text, NotificationType.Error ) );
                If( Len(lblQtOMissing.Text) = 0,
                    Patch( colQtRows, LookUp( colQtRows, q_rid = gQtOutRow ),
                           { q_hasOut: true,
-                            q_oName:  Trim(txtQtOName.Text),
-                            q_oDate:  dtpQtODate.SelectedDate,
+                            q_oName:  If( Trim(txtQtOName.Text) = gQtORowName, "", Trim(txtQtOName.Text) ),
+                            q_oDate:  If( dtpQtODate.SelectedDate = gQtORowDate, Blank(), dtpQtODate.SelectedDate ),
                             q_oFmt:   gQtOFmt,
                             q_oAud:   gQtOAud,
                             q_oLang:  gQtOLang,
