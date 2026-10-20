@@ -23,7 +23,7 @@
 - **WAITING ON THE USER, TRACKED AS ISSUES:** SharePoint jobs #117–#124 (epic #109: date_start back-fill, Complete = 100%,
   phase default, two index checks, placeholder vocabularies, requestor-department back-fill, missing-projects counts,
   archival-flow reopen race); live tests #125, #127, #128 (epic #110 — the perf backlog #27–#40 has NEVER been measured, so
-  never cite it as a result); delete six dead components in Studio #129.
+  never cite it as a result); delete six dead components in Studio #129 (checklist in docs/notes/components.md; the last open item of epic #111).
 - **STRUCTURAL TRUTHS A SESSION MUST NOT RELEARN:** project_phase is DERIVED by the app (Complete by hand, Archived by the
   external flow); App.Formulas' filters (ActiveProjects, OpenProjects, OpenIssues, LiveTasks, LiveTransactions, LiveIssues,
   LiveTaskProducts, LiveOutputs) must stay named formulas or they stop delegating; every Person predicate ORs the three
@@ -258,3 +258,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-15 | Epic #108 authored: #113/#114/#115 in scrQuickTx (one paste), stale/changelog comments in scrProject/scrIssueEdit/scrReports/scrTransactionEdit, #112 runbook, #116 already done. 23/23 | (no session file)
 - 2026-10-20 | #131 memory prune: State rewritten to current truth; old State + pre-October Log pointers moved verbatim to ARCHIVE-2026.md | (no session file)
 - 2026-10-20 | #130 stale docs: CLAUDE.md App bullet (OnStart globals, all 8 named formulas, 12 screens), screen-map.md marked historical, open-questions.md cut to Q13/Q15 with the pre-build list archived verbatim at docs/notes/open-questions-prebuild.md. Docs only | (no session file)
+- 2026-10-20 | #129 repo side: docs/notes/components.md carries the Studio deletion checklist and no longer recommends the deleted components. The Studio delete is the user's; #111 closes when they report it done | (no session file)
