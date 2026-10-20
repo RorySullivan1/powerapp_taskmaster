@@ -14,8 +14,7 @@
   `main` is authoritative; work goes on `claude/dazzling-brown-pq0nim`, fast-forwarded from `main` after every merge
   (a merged PR never carries follow-up work). **The GitHub issues are the backlog of record** (epics #109–#111).
 - **EVERYTHING IN `src/` IS PASTED (user, 2026-10-14) EXCEPT, possibly, scrQuickTx from PR #135 (#108): delete, paste, re-type
-  cmpQtPick's custom properties.** Confirm with the user before treating #108 as landed. #112: user runs
-  `docs/notes/unlinked-outputs-cleanup.md` in SharePoint.
+  cmpQtPick's custom properties.** Confirm with the user before treating #108 as landed; it is #108's last open item (#112 clean-up DONE by the user, closed).
 - **PROJECT SEARCH (#132) IS LANDED AND CONFIRMED.** scrProjects counts the projects in view (gPrjUniverseN); under
   gDataRowLimit it uses Search(), at the limit the delegable prefix search plus a warning. Data row limit = 2000 = gDataRowLimit.
 - **OUTPUTS (epic #93) ARE LANDED.** `taskmaster_output` (SINGULAR); every output belongs to EXACTLY ONE task or transaction;
@@ -259,3 +258,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-20 | #131 memory prune: State rewritten to current truth; old State + pre-October Log pointers moved verbatim to ARCHIVE-2026.md | (no session file)
 - 2026-10-20 | #130 stale docs: CLAUDE.md App bullet (OnStart globals, all 8 named formulas, 12 screens), screen-map.md marked historical, open-questions.md cut to Q13/Q15 with the pre-build list archived verbatim at docs/notes/open-questions-prebuild.md. Docs only | (no session file)
 - 2026-10-20 | #129 repo side: docs/notes/components.md carries the Studio deletion checklist and no longer recommends the deleted components. The Studio delete is the user's; #111 closes when they report it done | (no session file)
+- 2026-10-20 | #112 closed: the user cleaned the unlinked outputs in SharePoint. Epic #108 now waits only on confirming the scrQuickTx paste (PR #135) | (no session file)
