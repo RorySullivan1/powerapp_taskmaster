@@ -1050,3 +1050,207 @@ Append-only. Do not edit or reorder.
 - 2026-08-19 | #32/#28/#30 LANDED and closed; scrHome clean on the paste. Select-from-a-component-OnAction is now grounded, not a risk | sessions/2026-08-19-2031-home-32-28-30-built.md
 - 2026-08-20 | docs/manuals/ built: user manual + maintainer manual, 7 chapters each, plus docs/README.md and a root-README documentation section. Root README's stale component count (12->10) and App.pa.yaml description corrected. Three findings left open: screen-map.md is historical, cmpAppBar's default Items carries a dead Admin entry, and the manuals have no staleness hook | sessions/2026-08-20-2346-manuals-section.md
 
+## PRUNE 2026-10-20 (#131) — the State section and the pre-October Log pointers, verbatim
+
+Moved here unchanged when INDEX.md's State was rewritten as current truth only. The Decisions
+ledger was NOT pruned: it stays append-only in INDEX.md.
+
+### State as it stood on 2026-10-20
+- **THE APP IS BUILT.** 12 screens (scrQuickTx is the 12th), 10 components, the App object; 23/23 valid.
+- **COMPLETE => 100% — AUTHORED 2026-10-08, FOUR PASTES (scrProject, scrTaskEdit, scrProjectEdit, scrProjects), NO SHAREPOINT.**
+  scrProject's paste ALSO carries `txtPrjDesc` (read-only description under the info card).
+  The phase overrides the task rollup in all three writers; Reopen writes `gPrjPcRollup` back. NEXT STEP
+  (optional): bulk-set project_perc_completion = 100 where phase = Complete in SharePoint, so the % sort is right.
+- **scrHome LISTS = OWNED OR SUPPORTED, CARDS = OWNED — AUTHORED 2026-10-13, ONE PASTE (scrHome).** Projects/Tasks lists read
+  colWorkProjects / colWorkTasks (supported rows prefixed "Support ·"); Issues list unchanged (no supporter column, by decision).
+- **project_date_start FIX — AUTHORED 2026-10-13: scrProject (auto-stamp) + scrProjectEdit (calendar-only) pastes, then a ONE-OFF
+  FLOW** (`docs/notes/backfill-project-date-start.md`) to copy Created into blank starts. Flow NOT RUN YET; check the column's internal name first.
+- **EPIC #93 OUTPUT LOG — BUILT AND PASTED (user, 2026-10-14); SUB-ISSUES #96-#101 CLOSED, #102 NOT PLANNED; EPIC CLOSED. Detail below is historical.**
+  List `taskmaster_output` (SINGULAR) live, connected, smoke-tested; LiveOutputs in App.Formulas. task_output_* RETIRED IN PLACE (schema `retired: true`; no src/ reads).
+  **PASTE ORDER:** scrProject (#99) and scrTransactionEdit (#98; still needs `transaction_comment` to exist) any time; scrReports (#100) and
+  **scrTaskEdit (#97) ONLY AFTER the user's #96 migration has run** (else tasks show empty logs / pies drop). All four: delete screen, then paste; check no `_1`.
+  scrTransactionEdit: re-type cmpTxConfirmDel + cmpTxPick custom props after paste. #101 runbook `docs/notes/archival-flow-outputs.md` (user adds the MERGE step to their flow);
+  #102 designed-not-built (`docs/notes/output-file-import.md`). **First suspects on paste:** `Value(Text(o.ID))` copies (fallback: Patch via scope record), Classic/Toggle in wrapped grid cell, `Sid: -gTkOutSeq`.
+- **EPIC #108 (code-review follow-ups) — AUTHORED 2026-10-15 PR #135 OPEN. ONE PASTE: scrQuickTx (delete, then paste;
+  re-type cmpQtPick custom props).** #113 output name/date follow the row, #114 date col 170 / label min 160, #115 template row + folded If. Other screens: comment-only,
+  NO PASTE NEEDED. #112 = user runs `docs/notes/unlinked-outputs-cleanup.md` in SharePoint. #116 was already done in code (OpenIssues); only stale comments fixed.
+- **#103 REQUESTOR DEPARTMENTS — AUTHORED 2026-10-14; BOTH TEXT COLUMNS CREATED IN SHAREPOINT (user, 2026-10-14)
+  (project_requestor_department, project_requestor_2_department). NEXT: refresh taskmaster_projects in Studio, then paste scrProjectEdit.** Back-fill of existing projects is the USER's (no flow from us).
+- **EPIC #77 QUICK TRANSACTION — CLOSED ON GITHUB 2026-10-13 (user); #79/#81/#82 re-marked NOT PLANNED (reverted). STUDIO PASTES STILL PENDING:** quick entry is its OWN screen `scrQuickTx` (#89).
+  scrTransactionEdit is RESTORED byte-for-byte to pre-PR-#88 (quick mode #79-#82 reverted). **The #88 quick-mode version
+  WAS pasted into Studio (user, 2026-10-08), so the restore NEEDS A PASTE: delete the screen, then paste.** scrQuickTx: Existing/New project switch + inline rows (colQtRows) + one Save. AWAITING STUDIO.
+  **PASTE ORDER: scrQuickTx FIRST (new screen), THEN scrHome** (btnQuickTx navigates to it). **2026-10-14 rework, ONE SITTING in this order:** (1) delete+paste scrQuickTx, then check EVERY cmpQtPick custom property (Title, Results, OnSearch, AllowCreate, OnConfirm, OnCancel, OnCreateNew) against source and re-type any that came in default; (2) scrHome btnQuickTx.OnSelect via formula bar; (3) scrProjects: paste btnPrjsQuickTx ON ITS OWN (a whole-screen re-paste may drop its X), then Reorder appBar → Bring to front; (4)(5) scrClientEdit btnClSave.OnSelect and scrProductEdit btnPdSave.OnSelect via formula bar (live screens — no re-paste). scrQuickTx never writes
+  transaction_comment, so it does not wait on that column; scrTransactionEdit still does (pending since 2026-09-04).
+- **EPIC #84 scrReports SCOPE + FORMAT PIE — AUTHORED 2026-10-09 (#85 + #86), PRE-PASTE REVIEW PASTE 2026-10-13, PR OPEN; ONE PASTE: scrReports (delete, then paste; check neither worker pasted as `_1`).**
+  btnRptLoad FETCHES into *Raw then `Select(btnRptFold)`; btnRptFold scopes the six sets and runs every fold. Scope
+  refolds only (no refetch; "as at" = fetch time). Format pie in new `rowRptOutput` beside the audience pie. No SharePoint.
+  **First suspect if the fold never runs after a load: the TWO-LEVEL queued Select (OnVisible→Load→Fold) has no precedent
+  in this app** — fallback: callers do `Select(btnRptLoad); Select(btnRptFold)` and drop the Select from btnRptLoad.
+- **#74 REOPEN A COMPLETED PROJECT — AUTHORED 2026-09-14, ONE PASTE (scrProject), NO SHAREPOINT.**
+  `btnPrjReopen` is an EXACTLY-NEGATED sibling of `btnPrjComplete` in the same slot; `= "Complete"`
+  also excludes Archived, so an archived project offers neither. **IT REOPENS TO `gPrjDerived`,
+  NEVER TO A LITERAL "Active"** — btnPrjRecompute re-derives the phase on every visit and writes it
+  back whenever it differs, so a literal survives only until the next visit and then silently
+  becomes Planning or Stalled. The Notify names the phase it landed on.
+  **DO NOT DELETE THE DERIVATION GUARD** (`scrProject`, the `<> "Complete" && <> "Archived"` test)
+  as obsolete now a human can reopen: without it, opening a completed project un-completes itself.
+  **Complete is terminal to the MACHINE and reversible by a PERSON; Archived is terminal to both.**
+  **CLEARING `project_date_complete` IS RETROACTIVE IN REPORTING** — scrReports counts completions
+  per bucket by filtering that column, so a reopened project leaves bars it used to appear in.
+  **OPEN QUESTION FOR THE USER, NOT ANSWERABLE HERE:** whether the external archival flow selects
+  on the phase or on that timestamp's age, and whether it re-checks the phase before writing — a
+  project reopened mid-run could still be archived.
+- **#73 SECOND REQUESTOR — AUTHORED 2026-09-09, BLOCKED ON SHAREPOINT, THEN ONE PASTE.**
+  **PROVISION `project_requestor_2` BEFORE PASTING scrProjectEdit** — Person, **SINGLE** (multi
+  returns a TABLE: the read errors and the write fails; project_requestor was provisioned multi
+  and corrected the same day), optional, NOT indexed. Name settled singular BEFORE creation
+  because internal names freeze. **It must NEVER join the only-mine Or-arm** — unindexed, and one
+  unindexed arm drops delegation for the whole filter.
+  scrProjectEdit: gPrRequestor2 seeded; people row reordered to manager · supporter · primary
+  requestor · secondary requestor; all four columns `(Parent.Width - 48) / 4` (a GAP count, not a
+  column count); "Requestor" relabelled "Primary requestor" in caption, pick label and dialog
+  title, internal name unchanged; `gPrPicker = "Requestor2"` wired at **ALL FOUR** sites (Title
+  Switch, BOTH Results conditions, OnConfirm Switch) — miss one and the dialog opens empty or
+  fills the wrong field, silently; Patch gains a guarded arm.
+- **IDENTITY IS THREE VALUES, NOT ONE — #71 SHIPPED AND CONFIRMED 2026-09-09, BOTH DIRECTIONS.**
+  The affected user sees his projects again AND a previously-working user is unchanged — the
+  regression half matters as much, because a blank identity global would have turned an optional
+  Person column into a wildcard. **ROOT CAUSE, WHICH IS STRUCTURAL AND STILL TRUE OF ANY NEW
+  PREDICATE: the app WRITES Person columns from `Office365Users...Mail` and `User().Email` is a
+  DIFFERENT Azure AD attribute.** They coincide for most people, so this was latent for the life of
+  the app and failed TOTALLY and SILENTLY for the one they differ for. `gUserEmail`, `gUserMail`
+  (MyProfile().Mail) and `gUserUpn` (MyProfile().UserPrincipalName) are all seeded in OnStart and
+  self-healed on scrHome/scrProjects/scrProject; **EVERY PERSON PREDICATE MUST OR OVER ALL THREE.**
+  **NONE MAY EVER BE BLANK** — `supporter.Email = ""` matches every row without a supporter. Each
+  falls back to gUserEmail. scrReports reads none of them, deliberately.
+  **NOT SEPARATELY REPORTED:** whether the comment author gate on scrProject now lets that user
+  edit his own comments. Same mechanism, so it should — but it was not read back.
+- **#66 DONE AND LANDED 2026-09-08 — scrProjects IS A TABLE, AND THERE IS NO COMPONENT.**
+  Pasted and confirmed working by the user: headings aligned, all three sorts, both heading
+  filters, both filter columns indexed in SharePoint. **PR #70 MERGED TO main 2026-09-08 — it
+  carried BOTH #60 and #66. A MERGED PR CANNOT CARRY FOLLOW-UP WORK: restart
+  `claude/powerapp-repo-init-xymvlm` from `main` before the next change.**
+  `galProjects` STAYS ON THE SCREEN, direct-bound, paging past 2,000 as it always did. A new
+  `rowTableHead` above it mirrors `rowBody`'s column budget EXACTLY (status 0/28 · name 3/200 ·
+  coverage 1/120 · priority 1/84 · due+pct 3/310 → 2/190+1/104, same gap, PaddingRight 32 vs the
+  row's 16 for the scrollbar) — **change one side and the headings leave their columns; nothing in
+  Power Fx holds them in step.** Three sort headings ONLY (name/target/% — Text/DateTime/Number);
+  Priority/Coverage/Phase/Lead are Complex and a sort on them would reorder one page silently.
+  `cboPrjCoverage` moved into the Coverage heading under the SAME NAME, so the sixteen branches
+  did not change; each `Sort(…, project_name)` became `SortByColumns(…, gPrjSortCol, gPrjSortOrd)`,
+  equivalence machine-verified. **#67 (probes) AND #68 (cmpProjectTable) ARE CLOSED not-planned —
+  the app stays at TEN components; do not resurrect either.**
+  **AWAITING THE PASTE (`a5a10f2`), plus ONE SHAREPOINT ACTION: index `project_coverage`.**
+  **`project_name`'s SHAREPOINT INTERNAL NAME IS `Title` — it is the built-in Title column RENAMED**
+  (user, 2026-09-08, on the first paste). Harmless everywhere the app names columns as Power Fx
+  IDENTIFIERS, which resolve by DISPLAY name; it bites ONLY where a column name travels as a
+  STRING. `SortByColumns(src, "project_name", ...)` was rejected for exactly this.
+  **THE OTHER COLUMNS' INTERNAL NAMES ARE UNVERIFIED — only Title is confirmed either way.**
+  **THE GALLERY IS 32 BRANCHES AND THE FORMULA IS MACHINE-GENERATED:**
+  `python3 tools/gen_projects_items.py --write` owns its shape and its reasoning; `--check` fails
+  if the screen has drifted. **DO NOT HAND-EDIT A BRANCH.** Five binary dimensions (search ×
+  completed × mine × coverage × priority), four of which multiply because an off state must be a
+  BRANCH. One `SortByColumns(src, gPrjSortCol, gPrjSortOrd)` per branch.
+  **gPrjSortCol IS A SHAREPOINT INTERNAL COLUMN NAME** — that is why this one formula says
+  `"Title"` where the rest of the app says `project_name`. ALL THREE SORT COLUMNS' INTERNAL NAMES
+  ARE CONFIRMED (user, 2026-09-08): `Title`, `project_date_target`, `project_perc_completion`;
+  the last two equal their display names. Every OTHER column's internal name is still unverified
+  and has never mattered — only a name passed as a STRING cares.
+  **SortByColumns DELEGATES WITH THE COLUMN NAME IN A VARIABLE — user-confirmed in Studio on the
+  live list, 2026-09-08.** MS Learn does not document it, so this screen is the only evidence that
+  exists; it is what the withdrawn #67 claim 3 was for, answered by using the app instead of a
+  probe. **THE FAILURE MODE IF IT EVER STOPS HOLDING IS SILENT** — one page sorted, the rest of the
+  list left alone, and it looks fine. **FALLBACK IS ONE FLAG:** `--mode switch` writes 96 branches
+  sorting on LITERAL identifiers — three times the size, certainly delegable.
+  **COVERAGE AND PRIORITY FILTER FROM THEIR HEADINGS; NEITHER SORTS.** Equality on a Choice's
+  `.Value` folds, a Sort on a Complex column does not. **PRIORITY WILL NOT BECOME SORTABLE BY
+  FIXING DELEGATION** — a text sort gives Critical/High/Low/Lowest/Moderate, which is not severity
+  order. It needs an indexed NUMBER rank column, written by all six edit screens and back-filled.
+  **BOTH FILTER COLUMNS ARE INDEXED IN SHAREPOINT, CONFIRMED BY THE USER 2026-09-08:**
+  `project_priority` and `project_coverage`. Nothing about this screen is waiting on SharePoint.
+  **HEADER WIDTH IS READ, NOT COMPUTED:** `rowTableHead.Width = galProjects.TemplateWidth`. An
+  earlier version guessed the scrollbar cost 16px and the headings landed misaligned.
+- **PASTE QUEUE — ALL 6 EDIT SCREENS + scrReports, AUTHORED 2026-09-04, NOT YET LANDED, AND ONE
+  NEEDS SHAREPOINT FIRST.** The required-fields message is reworked on ALL SIX edit screens to
+  `Required Fields Remaining: A | B` (so scrClientEdit / scrProductEdit / scrTaskEdit / scrIssueEdit
+  are in the queue for that alone). Beyond that:
+  `scrProjectEdit`: `transaction_client_name` / `transaction_sales` / `transaction_product_id`
+  optional at the staged writer, and its Add button now gates on label + date only.
+  `scrTransactionEdit`: the same three optional, PLUS the new `transaction_comment` field and a
+  regrouped/compacted layout. `scrReports`: level-2 product bucket handles a blank path.
+  **`scrProjects` is queued too, on its OWN branch `claude/projects-ready-to-complete-banner`:**
+  the "Ready To Mark Completed" banner. Proof: a project at 100% still phased Active shows the
+  green box in place of its due date and percent, and clicking it opens the project. **PROVISION `transaction_comment` ON `taskmaster_transactions` BEFORE
+  PASTING `scrTransactionEdit`** — Multiple lines of text, rich text OFF; pasting first stops the
+  screen saving transactions at all. **Proof: save a transaction with no client and no sales owner,
+  clear a set one on an existing row, and round-trip a comment.** Everything else in `src/` is landed.
+- **THE APP IS PAST ITS DESIGN ASSUMPTION: 2000+ projects and 2000+ tasks backfilled (user,
+  2026-09-02), plus a working archival flow.** The 5,000 list-view threshold — not the 2,000 data
+  row limit — is now the live constraint on every unindexed filter. **UNRESOLVED:** recent
+  non-archived projects and their children are in the lists but not in the app; only the user can
+  discriminate the three causes (see Decisions), and it needs two SharePoint views: `project_phase`
+  is empty, and `task_project_archived` is empty.
+- **App object is two formula-bar properties:** `OnStart` holds the constants (`gTheme`,
+  `gNavMenu`, `gStageWeights`, `gClaimPrefix`, `gUserEmail`); `Formulas` holds only the
+  data-source filters (`ActiveProjects`, `OpenIssues`, `LiveTasks`, `OpenProjects`), which **must
+  stay named formulas or they stop delegating.**
+- **`project_phase` is DERIVED BY THE APP, not picked:** open issue -> Stalled; started task or any
+  transaction -> Active; any child -> Planning; nothing -> Not Started. Vocabulary is exactly
+  Not Started · Planning · Active · Stalled · Complete · Archived. Complete comes ONLY from
+  scrProject's Mark-complete button, Archived ONLY from an external flow (which also owns the three
+  `*_project_archived` child flags); both are terminal. **PENDING IN SHAREPOINT: set the column
+  default to `Not Started`.**
+- **OPEN SCHEMA GAPS.** `taskproduct_project_archived` is live and `scrTaskEdit` writes it false on
+  new links, but its **indexed/default state is UNCONFIRMED** and links predating it stay blank.
+  **The `project_coverage` and `client_type`/`client_coverage`/`product_assetclass` vocabularies
+  are still PLACEHOLDERs in `schema.yaml`** — only `INTERNAL` is confirmed, uppercase.
+- **LANDED IS NOT EXERCISED — do not claim these work.** The completion gate has never blocked a
+  save; the confirm dialog has never been seen to open; `scrProjects`' search is a delegable
+  `StartsWith(project_name, …)` PREFIX match — complete past 2,000 rows, but prefix-only (#132 proposes partial/multi-word);
+  #22 back-fills nothing, so a task keeps its last health until touched; on `scrReports` the
+  truncation banner has never fired and no trend bar has yet carried two currencies.
+- **THE PERF BACKLOG #27–#40 WAS NEVER MEASURED.** All fourteen landed on paste confirmations —
+  no Live Monitor count, payload figure or wall-time reading, before or after. The gains are what
+  the source does, not observed numbers. **Do not let a later session cite them as results.**
+- **PROCESS.** `main` is authoritative; work on `claude/powerapp-repo-init-xymvlm` and open a PR
+  when asked (PRs #55, #56 merged 2026-09-04 — a merged PR cannot carry follow-up work: restart
+  the branch from `main`). Six superseded components still ship inside the `.msapp` (see Threads).
+  **`docs/screen-map.md` IS HISTORICAL AND READS AS CURRENT** (tmTickets, an Admin screen,
+  tmLookups — none shipped). **claudeBrain PR #36 is OPEN**, asking one question back: genericise
+  the ported skills' `tools/`/`schema/` path references, or leave them as worked-example voice?
+
+
+### Log pointers dated before 2026-10-01
+- 2026-09-04 | issue #51: both probes authored for the #50 epic — scrProbe-startswith-empty and scrProbe-namedformula-filter, each departing from the issue's CountRows table because CountRows is non-delegable and "expect N" is unmeasurable at 2000+ rows; match-all measured over a bounded subset instead, readable without noticing a delegation warning; OpenProjects added to App.Formulas as the row-8 prerequisite; #52/#53 remain blocked on the readings | sessions/2026-09-04-1526-issue-51-probes-authored.md
+- 2026-09-02 | second "Division by 0" at app start: NOT the timeline (deleted in #24) but scrHome's two KPI-card subtitles, guarded only by `= 0`. Fixed with Max(1, ...) at the point of division; the 2026-08-19 "ruled out, do not re-audit" call on these exact lines is superseded. Full divisor re-enumeration: these were the last two unguarded in the app. Branch audit: main was current, trees identical, PR #41 merged | sessions/2026-09-02-1256-div0-kpi-cards.md
+- 2026-09-04 | scrProjects assessed, no source touched: #45 (only-mine defect, 5 ranked candidates) + #46-#49, and #50 (Items is 155 lines/16 branches) + #51-#53. #45 sequenced BEFORE #50 — both rewrite the same eight person predicates. Blast radius: the same predicate is scrHome.pa.yaml:80 behind the "projects I lead" KPIs | sessions/2026-09-04-scrprojects-mine-and-items-epics.md
+- 2026-09-04 | question-only session on the lookup pickers: the 2000 ceiling is NOT the constraint (people are a connector action; product/client folds on indexed Text), but the empty-argument `StartsWith` fault from #51 was found LIVE in six client/product picker branches. Nothing authored | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | picker empty-query fix authored across scrTaskEdit / scrProjectEdit / scrTransactionEdit — six branches split into typed + off-state, validator 22/22, AWAITING PASTE | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | client_sales made optional across 5 sites (schema + scrClientEdit header, caption, validation ladder, guarded Patch). AWAITING PASTE with the picker fix | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | user confirmed BOTH open verification items tested and working: the two picker/client_sales proof cases, and the older main-side queue (scrHome dfb5080, raw-list audit, OpenIssues health derivations). Paste queue empty bar #52's scrProjects, never explicitly asked about | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | #52's scrProjects confirmed pasted and tested. Paste queue fully empty, GitHub backlog at zero open issues, and the bare Sort-over-a-named-formula shape is grounded by a working screen | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | transaction_client_name + transaction_sales made optional across 11 sites (schema, scrTransactionEdit, and the staged-transaction modal in scrProjectEdit). AWAITING PASTE — 2 screens | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | transaction_comment added (schema + full-width multiline on scrTransactionEdit) and the edit screen regrouped/compacted. NEEDS A SHAREPOINT COLUMN FIRST, then a paste | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | transaction_product_id made optional (schema, both edit screens) + scrReports level-2 bucket fixed for a blank product path. AWAITING PASTE — 3 screens now | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | required-fields message reworked to `Required Fields Remaining: A | B` across all six edit screens (Concat separator); two captions removed, six Notify prefixes changed. AWAITING PASTE — 6 screens | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | scrProjects: "Ready To Mark Completed" banner on any project at 100% not yet phased Complete — sibling swap in the row container, no overlay and no geometry; a Label-with-Fill first draft was caught as ungrounded (0 of 270 landed labels set Fill) and rebuilt as a filled container. Branch `claude/projects-ready-to-complete-banner`, cut off main per the user; PR #58. Validator 22/22, AWAITING PASTE | sessions/2026-09-04-1958-scrprojects-ready-banner.md
+- 2026-09-04 | scrProjects banner wording: "Ready To Mark Completed" -> "Ready To Mark Complete" (user; it names the `✓ Mark complete` button on scrProject, so it must not read as a past state). Two lines in scrProjects.pa.yaml, no structural change, 22/22. **scrProjects IS BACK IN THE PASTE QUEUE** — it landed earlier today with the old wording. Branch `claude/powerapp-repo-init-xymvlm`, PR #59. NOTE: the memory commit for the banner's landing is still unmerged on `claude/memory-ready-banner-landed`; that branch also touches this Log, so expect a trivial conflict | (no session file — one-word change)
+- 2026-09-04 | epic #60 Project comments filed with sub-issues #61–#65 (schema, panel, dialog, cascade, external flow). Design grounded in the recorded traps: Created By / Created do not resolve, so author+date are app-stamped columns; FK is a Number like the junction | sessions/2026-09-04-1650-picker-empty-query-defect.md
+- 2026-09-04 | epic #66 scrProjects table filed with sub-issues #67 (probe — blocks), #68 (cmpProjectTable), #69 (scrProjects + index project_coverage). Data contract deliberately left to the probe: a ForAll-fed component caps at 2000 where the direct-bound gallery pages | (no session file — filing only)
+- 2026-09-08 | epic #60 reviewed and #61's REPO half landed: `taskmaster_projectcomments` (five columns, `provisioned: pending`) in schema.yaml, both context briefs updated, column guard verified to accept the new namespace and reject a near-miss. 22/22. **BLOCKED ON THE USER** — the list must be created in SharePoint and added as a data source in Studio BY HAND before #62/#63/#64 can be authored as one scrProject paste. Open: the gallery row height for a Note column | sessions/2026-09-08-1408-projectcomments-schema.md
+- 2026-09-08 | #61 provisioned by the user (3 columns, FK + archived flag indexed, connected in Studio) and #62/#63/#64 AUTHORED in one scrProject paste: fourth fold arm, secIssues over secComments, manager highlight, screen-local add modal, comments in the delete cascade. 22/22, pushed. AWAITING THE PASTE | sessions/2026-09-08-projectcomments-authored.md
+- 2026-09-08 | comments gain read/edit/delete: 120-char row preview + mdCv detail dialog, author-only Edit/Delete via gCmtCanEdit, delete through a fourth gDelKind on cmpPrjConfirmDel, btnPrjCmtFetch shared by both write paths. Created/Created By now indexed. #60/#62/#63 bodies rewritten — they still described the dead five-column design. 22/22, AWAITING THE PASTE | sessions/2026-09-08-1440-projectcomments-authored.md
+- 2026-09-08 | scrProject PASTED AND CONFIRMED WORKING (user): project comments live end to end — panel, add, read, edit, delete. #61-#64 closed. Remaining in #60: #65 external archival flow, and item-level permissions on the list. Untested by the confirmation: the project-delete cascade with comments, and View-mode scrolling of a long comment | sessions/2026-09-08-1440-projectcomments-authored.md
+- 2026-09-08 | EPIC #60 CLOSED COMPLETE: archival flow built by the user, so #65 closed too. Project comments ship end to end. Open backlog is now #66 alone. Carried forward, untracked by any issue: item-level permissions on taskmaster_projectcomments | sessions/2026-09-08-1440-projectcomments-authored.md
+- 2026-09-08 | issue #67: all three probes authored for the #66 epic, plus ONE shared throwaway component (cmpProbeTable, three Table Inputs because a component input's TYPE IS ITS DEFAULT LITERAL). DEPARTS FROM #67 ON THE INSTRUMENT: lower the app's data row limit to 10 rather than bound the subset by phase — at 2000 a cap and a small result set are indistinguishable, which is why claims 2 and 3 were never settleable; at 10 a capped gallery reads exactly 10 and a delegated descending sort differs from a local one by two printed names. One setting serves both claims; IT IS APP-WIDE AND MUST BE PUT BACK. Claim 1's verdict is the FORMULA BAR, so the paste sets no inputs at all. #68/#69 stay blocked on the readings | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | #67 probe prefixes: an author-chosen StartsWith literal has now matched nothing TWICE ("ab" on #51 row 6, "a" on the first scrProbeCT run — not the first letter of any OPEN project). NEITHER WAS AN INSTRUMENT FAULT and the blank-phase theory raised for the second one was WRONG — the sheet read correctly, the letter was wrong. It still costs a whole run, because a true no-match prints "-- no rows --" exactly as a rejection does. All three probe prefix boxes now seed from Left(First(taskmaster_projects).project_name, 1) and scrProbeCT prints five real names. GENERAL RULE: no project name is visible from the repo side, so never hard-code a data literal into a probe — derive it | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | #66 RESCOPED MID-EPIC AFTER THE USER PUSHED BACK, and the pushback was right: the probes were testing my scaffolding, not their goal. "The gallery becomes a component" was a MEANS in the brief; the goal was a sortable/filterable table. Keeping galProjects on the screen delivers the table AND deletes the epic's only real risk (a ForAll-fed component caps at the row limit where a direct-bound gallery pages), so #67 and #68 both closed not-planned and scrProjects was built in one pass. FOUR TRIPS ACROSS THE GAP WERE SPENT ON PROBES THAT RETURNED NOTHING — each went on repairing the instrument. GENERAL RULE: probe the thing being shipped, not the scaffolding around it; a probe earns its cost only when a wrong guess is catastrophic or invisible, and the sort question is neither (one gesture on the real screen settles it) | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | FIRST PASTE OF THE scrProjects TABLE REJECTED SortByColumns: a column name passed as a STRING is matched against the SharePoint INTERNAL name, and project_name is not one — that column is the built-in Title RENAMED (user). Invisible everywhere else because every other formula names columns as Power Fx IDENTIFIERS, which resolve by DISPLAY name. Fixed by removing the dependency rather than supplying internal names: gPrjSortCol is now a KEY compared with `=`, and the gallery is a Switch over three arms each sorting on a LITERAL identifier (48 branches, each arm machine-verified equivalent to the landed sixteen). Internal names would have added a second naming scheme that schema.yaml cannot check, and only Title is confirmed. schema.yaml now records internal_name: Title and that the rest are UNVERIFIED | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | scrProjects table LANDED and refined on the user's report: header width was GUESSED (gallery width, PaddingRight 32 for a presumed 16px scrollbar) and came out misaligned — now reads galProjects.TemplateWidth so the two containers match by construction. Priority gained a heading FILTER (equality on a Choice .Value folds) but stays unsortable for TWO reasons, not one: Sort does not fold on Complex, AND a text sort of a severity vocabulary is alphabetical nonsense — sortable priority needs an indexed Number rank column, not a delegation fix. Gallery 48 -> 96 branches; the Items formula is GENERATED and the generator was verified to reproduce the landed 48 character-for-character before the new dimension was enabled | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | internal names CONFIRMED by the user (project_date_target and project_perc_completion equal their display names; project_name is Title), so scrProjects' gallery collapsed 96 -> 32 branches: SortByColumns with the name in a variable, instead of a Switch over three literal-identifier arms. gPrjSortCol flipped meaning — it WAS an opaque key, it IS now a SharePoint internal column name, and every comment saying otherwise was rewritten rather than left to mislead. Added tools/gen_projects_items.py, which owns the formula's shape, was verified to reproduce the landed 96 character-for-character before emitting the 32, and carries --mode switch as a one-flag fallback if the variable column name turns out not to delegate | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | scrProjects TABLE CONFIRMED WORKING BY THE USER — sorting included, which settles the last open question: SortByColumns DOES delegate with the column name in a variable (undocumented; this screen is the only evidence). That is the withdrawn #67 claim 3, answered by using the app rather than by a probe — the whole argument for rescoping. Epic #66 delivered: sortable headings, coverage AND priority heading filters, coverage column, 32 generated branches, both filter columns indexed | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-08 | #71 filed and fixed: a user with multiple addresses matched NO Person filter. Root cause is structural, not data — the app WRITES Person columns from Office365Users' Mail and READ User().Email, a different Azure AD attribute. Latent for the life of the app because the two coincide for most people; total and SILENT for anyone they differ for, since an empty result is indistinguishable from owning nothing. Now three identities (User().Email, MyProfile().Mail, MyProfile().UserPrincipalName) OR'd in every predicate — covers either direction. GENERAL RULE THIS ESTABLISHES: match identity on the SAME attribute you wrote, or on all of them; never assume User().Email is what landed in the column | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-09 | #71's four pastes LANDED cleanly (App.OnStart, scrProjects, scrHome, scrProject). The three-identity globals and the widened Person predicates are live. NOT YET VERIFIED and #71 stays open: the affected user has not reported whether he now sees his projects, nor has anyone run the regression check that a previously-working user sees the SAME projects and KPI numbers | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-09 | #71 CONFIRMED FIXED IN BOTH DIRECTIONS and closed: the affected user sees his projects, and a previously-working user is unchanged. The regression half was half the acceptance — a blank identity global would have made `supporter.Email = ""` a wildcard over every project without a supporter. STANDING RULE FOR ANY NEW PERSON PREDICATE: OR over gUserEmail / gUserMail / gUserUpn, never just one | sessions/2026-09-08-1724-epic66-probes-authored.md
+- 2026-09-09 | #73 second requestor authored: project_requestor_2 in the golden source (Person, SINGLE, optional, unindexed) plus a fourth picker on scrProjectEdit. Column name settled SINGULAR before provisioning — the user proposed project_requestors_2 and internal names freeze at creation, so the inconsistency would have been permanent. Blocked on SharePoint provisioning, then one paste. PR #72 now carries this alongside the #71 identity fix | (no session file — single feature)
+- 2026-09-14 | #74 authored: a completed project can be reopened from scrProject. THE EVALUATION FOUND THE USER'S PROPOSED "mark as active" WOULD NOT HAVE HELD — the screen re-derives the phase on every visit and writes it back, so a literal "Active" expires on the next visit; it reopens to gPrjDerived instead. Also corrected the premise that the button lives on scrProjectEdit (it is btnPrjComplete on scrProject). Records updated: Complete is no longer terminal to a human, and clearing project_date_complete retroactively changes scrReports' completion bars | (no session file — single feature)

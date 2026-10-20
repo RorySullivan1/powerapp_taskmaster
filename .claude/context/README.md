@@ -21,7 +21,7 @@ Two tiers:
 | `air-gap.md` | The **one-way** transfer model (repo → Studio; only binary confirmation returns; repo is the authoritative source). Governs every authoring/hand-off decision. | `studio-transfer` |
 | `schema.md` | Model shape, delegation/join costs, and open consequences. **Columns live in `schema/schema.yaml` (golden source)** — this brief points there, never repeats it. | `sharepoint-list-architecture` |
 | `app-structure.md` | Screens, components, and the native reporting surface (SVG charted). | `power-apps-components` |
-| `open-questions.md` | Unresolved decisions still shaping schema/app/provisioning. Answered ones live in `.claude/memory/`. | — |
+| `open-questions.md` | The platform questions still open (solution-awareness, Git integration). Work items are GitHub issues; answered questions live in `.claude/memory/`. | — |
 | `powerapps-docs-source.md` | The authoritative control & layout **docs source** (`MicrosoftDocs/powerapps-docs`) — paths + fetch methods. Grounds SEMANTICS/property meaning, not pa-yaml tokens. | `powerapp-canvas-controls` / `-design` |
 
 **Decisions with reasoning** are **not** a brief here — they live in the `session-memory`
