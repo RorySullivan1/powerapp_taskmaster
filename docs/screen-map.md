@@ -1,5 +1,10 @@
 # Screen map — the buildable skeleton
 
+> **Historical: this is the pre-build blueprint, not a description of the app.** It names
+> surfaces that never shipped (`tmTickets`, an Admin screen, `tmLookups`) and pre-build list
+> names. The app as built is `src/`: one file per screen in `src/Screens/`, and the lists in
+> `schema/schema.yaml`. `.claude/context/app-structure.md` describes the screens as they are.
+
 The concrete, screen-by-screen build blueprint: the PM-tracker template's 6-screen structure
 (`docs/powerapp-patterns-distillation.md` §E) **ported onto our SharePoint schema and decisions**,
 with the **Ticket** and **Issue** surfaces the template lacks. This is the checklist we build to.

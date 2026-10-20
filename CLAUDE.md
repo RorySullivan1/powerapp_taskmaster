@@ -56,10 +56,12 @@ surfaces each by its `description:`.
 The repo houses the app's source and nothing else — one file per unit, in pa-yaml v3.0.
 - **`src/App.pa.yaml`** — the App object, two formula-bar properties. **`OnStart`** sets the
   constants every screen reads (`gTheme`, `gNavMenu`, `gStageWeights`, `gClaimPrefix`,
-  `gUserEmail`); **`Formulas`** holds only the three data-source filters
-  (`ActiveProjects`, `OpenIssues`, `LiveTasks`), which must stay named formulas or they stop
+  `gDataRowLimit`) and the signed-in user's identity (`gUserProfile`, `gUserEmail`, `gUserMail`,
+  `gUserUpn`). **`Formulas`** holds the data-source filters (`ActiveProjects`, `OpenProjects`,
+  `OpenIssues`, `LiveTasks`, `LiveTransactions`, `LiveIssues`, `LiveTaskProducts`,
+  `LiveOutputs`). They must stay named formulas: moved into variables or collections, they stop
   delegating.
-- **`src/Screens/`** — one file per screen, 11 of them.
+- **`src/Screens/`** — one file per screen, 12 of them.
 - **`src/Components/`** — one file per component, 10 of them. A component is a **whole
   definition** here: its custom properties and its controls live in the same file.
 - **`schema/`** — **`schema.yaml` is the GOLDEN SOURCE** for the SharePoint backend (repo
@@ -76,8 +78,8 @@ The repo houses the app's source and nothing else — one file per unit, in pa-y
 
 ## Reference & output contract
 - **Reference:** `.claude/context/README.md` indexes the briefs — `schema.md` (model shape,
-  delegation/join costs, open consequences), `app-structure.md` (screens + the licence-gated Power
-  BI surface), `open-questions.md`.
+  delegation/join costs, open consequences), `app-structure.md` (screens, components and the native
+  SVG reporting surface), `open-questions.md` (the few questions the GitHub backlog doesn't hold).
   Deep-read only what the task needs.
 - **Output contract:** never invent a column name — every field token must resolve to a `name:`
   in **`schema/schema.yaml`** (the golden source). A change is not in the app until a human has
@@ -129,7 +131,7 @@ On compaction, preserve: **the air gap** (clipboard-only, **ONE-WAY** repo→Stu
 "works/doesn't" returns; repo is the authoritative source; resolve unknowns from public sources
 or ship fallbacks — no pull/round-trip exists), that
 **transactions are full transaction-level primary** (delegation/indexing critical), that
-**`schema/schema.yaml` is the golden source** (repo defines, SharePoint applies), that **not
+**`schema/schema.yaml` is the golden source** (repo defines, SharePoint applies), that
 **Power BI is OUT OF SCOPE — charts are SVG**, and that **the app is BUILT** — all
-11 screens, 10 components and the App object are authored here and live in Studio, so the work is
+12 screens, 10 components and the App object are authored here and live in Studio, so the work is
 editing and refining, not creating.
