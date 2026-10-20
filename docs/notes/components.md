@@ -43,7 +43,21 @@ The deletion is recoverable from git if that is ever wanted; the definitions are
 `e16688c^`.
 
 **The size win is only real once they are deleted in STUDIO too** — removing them from the
-repo does not shrink the running app.
+repo does not shrink the running app. `cmpPeoplePicker` and `cmpRecordPicker`, replaced by
+`cmpPicker`, are in the same position: gone from the repo, still in Studio.
+
+### The Studio clean-up (#129)
+
+1. Studio → Tree view → **Components**. Delete these six: `cmpPeoplePicker`,
+   `cmpRecordPicker`, `cmpUiKit`, `cmpEditableGrid`, `cmpStatusPill`, `cmpChoicePill`.
+   Nothing in `src/` has an instance of any of them. If Studio shows one in use, or a screen
+   errors after the delete, Studio has drifted from the repo: undo, note where the instance
+   is, and report it before changing anything else.
+2. Afterwards, the Components list must match `src/Components/` exactly. These are the ten:
+   `cmpAppBar`, `cmpConfirmDialog`, `cmpKpiRing`, `cmpLookupField`, `cmpNestedSelect`,
+   `cmpPicker`, `cmpSectionHeader`, `cmpSelection`, `cmpStatusCard`, `cmpToast`.
+3. Save, close the app and reopen it. Then open each screen and check the App checker
+   (the stethoscope) shows no new errors.
 
 ## The rule that shaped the original design: **no component inside a gallery/form**
 
@@ -184,27 +198,21 @@ What that changes:
   them at paste time — which is exactly how the `Parameters`-must-be-a-sequence error was found.
   Run `python tools/validate_pa_yaml.py` before carrying anything across.
 - **Paste one at a time** and report the outcome, so a rejection points at one component.
-- **`cmpUiKit` has no controls at all** — it is pure OutputFunction properties. There is nothing to
-  paste; it is built entirely from the build sheet.
 - A **component library** can't hold data sources or Power Automate flows — pass data in via
-  Input properties (all eleven already do).
+  Input properties (all ten already do).
 - Since nothing returns to the repo, these files remain the **authoritative source**: if you
   tweak a component in Studio, tell me and I'll mirror it here, or it's lost.
 
 ## Where these plug into the shell (Phase 2)
 
-- Home / Reports SVG-fallback: `cmpStatusCard` tiles (Value/Trend computed in-app).
-- Project detail **Tickets tab**: `cmpEditableGrid` (specialise the 3 demo columns to the
-  real `tmTickets` value columns; do the bulk `Patch` per `power-apps-editable-table`).
-- Any task/issue gallery: `cmpUiKit.StatusPillHtml` + `PersonChipHtml` in the row template.
-- Filter bars / project pickers: `cmpChoicePill`, `cmpSelection`.
+- Home / Reports: `cmpStatusCard` tiles (Value/Trend computed in-app).
+- Filter bars and project pickers: `cmpSelection`.
 - Every content section: `cmpSectionHeader`. Destructive actions (archive/delete):
-  `cmpConfirmDialog`. Save/patch feedback: `cmpToast`. Reports SVG-fallback for unlicensed
-  users (Q2): `cmpKpiRing` (Percent computed in-app from a delegable-filtered count).
+  `cmpConfirmDialog`. Save/patch feedback: `cmpToast`. Reports: `cmpKpiRing` (Percent computed in-app from a delegable-filtered count).
 
 ## Deferred to sibling skills (not in these files)
 
-- Delegation-safe `Patch`/`Collect` for the grid's bulk save, and any real data sourcing →
+- Delegation-safe `Patch`/`Collect` for bulk saves, and any real data sourcing →
   `power-fx-development` / `power-apps-editable-table`.
 - The Power Fx that computes a ring's `Percent` (delegable-filtered, bounded count) →
   `power-fx-development`. The SVG technique itself is grounded on `power-apps-svg`.
