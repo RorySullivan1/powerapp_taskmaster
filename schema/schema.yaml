@@ -556,9 +556,12 @@ lists:
                              # "lk.ID is unrecognized", because an unknown source leaves
                              # the row untyped and even the built-in ID stops resolving.
                              # Add it by hand in the Data pane before pasting scrTaskEdit.
-                             # EVEN CONNECTED, Studio does not resolve the built-in ID on a
-                             # row of this list (2026-10-21: `lk.ID` and `x.ID` both rejected
-                             # while the lookup columns resolved). Never read `.ID` off it.
+                             # WORSE THAN AN ERROR: with the list missing, `Collect(taskmaster_taskproduct, …)`
+                             # silently CREATES A COLLECTION of that name. Writes then 'succeed' into
+                             # memory, nothing reaches SharePoint, and `ID` is unrecognized (a collection
+                             # has none) — the cause of issue #14 (found 2026-10-21). If a collection of
+                             # this name exists, delete the screens that Collect into it BEFORE adding the
+                             # list, or Studio names the list taskmaster_taskproduct_1.
     join_cost: 2
     columns:
       # CASCADE DELETE, set in SharePoint and user-confirmed 2026-08-14: removing a

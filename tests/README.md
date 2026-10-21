@@ -156,8 +156,15 @@ does not currently need. It is now available, not required.
 
 ## `scrProbe-junction-write.pa.yaml` — why does the product link write not land?
 
-**Status: NOT YET RUN.** Written 2026-08-18 for issue #14, rewritten 2026-10-21 after
+**Status: RUN 2026-10-21. ANSWER: `taskmaster_taskproduct` IN THE APP IS A COLLECTION,
+NOT THE SHAREPOINT LIST.** Written 2026-08-18 for issue #14, rewritten 2026-10-21 after
 PRs #139–#142 left btnTkSave compiling and the links still missing.
+
+Result: 2 APP WRITE and 3 MINIMAL both returned no error and 4 COUNT rose, while the
+SharePoint list stayed empty. `Collect` on a name with no data source creates a
+collection of that name, so the writes landed in memory. That also explains why `ID`
+was unrecognized on its rows. The fix is to connect the list in Studio (see
+`.claude/memory/INDEX.md` → Decisions), not a code change.
 
 ### The claim under test
 
