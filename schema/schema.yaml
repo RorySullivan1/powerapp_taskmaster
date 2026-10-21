@@ -576,7 +576,7 @@ lists:
       # DERIVED IN SHAREPOINT from taskproduct_product_id (user, 2026-10-21). The app
       # never writes it, and scrTaskEdit looks product_uid up on taskmaster_products rather
       # than reading it here.
-      - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, derived: true, desc: "product_uid of the linked product, DERIVED by SharePoint from the taskproduct_product_id lookup. Read-only; the app does not write it" }
+      - { name: taskproduct_product_uid, type: Text,   required: false, indexed: false, derived: true, desc: "product_uid of the linked product, brought in by SharePoint as a field of the taskproduct_product_id lookup. Read-only and NOT INDEXABLE, so it cannot back a delegable filter or sort; the app neither writes nor queries it" }
       # WRITE-ONCE. The app has the parent to hand (gTkProject) and a task CANNOT be
       # re-parented — scrTaskEdit derives gTkProject in OnVisible and offers no picker
       # — so this cannot drift.
