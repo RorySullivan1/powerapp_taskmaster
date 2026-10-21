@@ -567,12 +567,12 @@ lists:
       # use cannot be deleted out from under its tasks. Nothing in the app deletes
       # products, so this only ever fires in the SharePoint UI — which is the point.
       - { name: taskproduct_product_id,  type: Lookup, required: true,  indexed: true, desc: "The product", lookup: { list: taskmaster_products, show: product_uid } }
-      # DENORMALISED, and not redundant even though the lookup above shows the same
-      # value. A lookup is a COMPLEX type and `Sort`/`SortByColumns` do NOT delegate
-      # on one (SharePoint delegation table: Complex is the only type with Sort: No).
-      # This column is what the app renders and the only thing it can sort server-side.
-      # Goes stale if a product_uid is renamed — same trade as project_region_path.
-      - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, desc: "product_uid of the linked product, copied at write time. The app always writes it" }
+      # DERIVED IN SHAREPOINT from taskproduct_product_id (user, 2026-10-21), so it is
+      # READ-ONLY to the app: scrTaskEdit reads it to show a link's product and must
+      # never name it in a write — doing so fails every link insert. A lookup is a
+      # COMPLEX type and `Sort`/`SortByColumns` do not delegate on one, so this flat
+      # value is also the only thing the app could sort links by server-side.
+      - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, derived: true, desc: "product_uid of the linked product, DERIVED by SharePoint from the taskproduct_product_id lookup. Read-only: the app reads it and never writes it" }
       # WRITE-ONCE. The app has the parent to hand (gTkProject) and a task CANNOT be
       # re-parented — scrTaskEdit derives gTkProject in OnVisible and offers no picker
       # — so this cannot drift.
