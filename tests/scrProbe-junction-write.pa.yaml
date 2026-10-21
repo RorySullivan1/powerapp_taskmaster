@@ -1,8 +1,8 @@
 # =============================================================================
-# scrProbe-junction-write — why does Collect(taskmaster_taskproduct, …) not land?
+# scrProbe-junction-write — why does Collect(taskmaster_taskproducts, …) not land?
 #
 # scrTaskEdit saves the task, then writes its product links, and no link ever
-# appears in taskmaster_taskproduct (issue #14, still true after PRs #139–#142).
+# appears in taskmaster_taskproducts (issue #14, still true after PRs #139–#142).
 # btnTkSave compiles, so this is a RUNTIME failure. This probe runs the write on
 # its own and SHOWS SharePoint's message, then counts what actually landed.
 #
@@ -23,7 +23,7 @@
 # BREAKS RULE 1 ON PURPOSE: the data source IS the claim. Every other rule is kept.
 # Reads nothing off a link row's ID — Studio does not resolve it on this list.
 #
-# BEFORE PASTING: taskmaster_taskproduct, taskmaster_tasks and taskmaster_products
+# BEFORE PASTING: taskmaster_taskproducts, taskmaster_tasks and taskmaster_products
 # must be in the Data pane, and LiveTaskProducts in App.Formulas.
 # =============================================================================
 Screens:
@@ -118,7 +118,7 @@ Screens:
             OnSelect: |
               =IfError(
                   Set( vPjW2,
-                  Collect( taskmaster_taskproduct,
+                  Collect( taskmaster_taskproducts,
                            { taskproduct_task_id:    { Id: Value(txtPjTask.Text),    Value: Coalesce(vPjTask.task_name, "probe") },
                              taskproduct_product_id: { Id: Value(txtPjProduct.Text), Value: Coalesce(vPjProd.product_uid, "probe") },
                              taskproduct_project_id: Coalesce(vPjTask.task_project_id.Id, 0),
@@ -141,7 +141,7 @@ Screens:
             OnSelect: |
               =IfError(
                   Set( vPjW3,
-                  Collect( taskmaster_taskproduct,
+                  Collect( taskmaster_taskproducts,
                            { taskproduct_task_id:    { Id: Value(txtPjTask.Text),    Value: Coalesce(vPjTask.task_name, "probe") },
                              taskproduct_product_id: { Id: Value(txtPjProduct.Text), Value: Coalesce(vPjProd.product_uid, "probe") } } ) );
                   Set( vPjMsg3, "MINIMAL returned no error. Press 4 to see whether it landed." ),
@@ -163,7 +163,7 @@ Screens:
               =IfError(
                   Set( vPjMsg4,
                        "COUNT for task " & txtPjTask.Text
-                       & ":  raw list " & CountRows( Filter( taskmaster_taskproduct,
+                       & ":  raw list " & CountRows( Filter( taskmaster_taskproducts,
                                                              taskproduct_task_id.Id = Value(txtPjTask.Text) ) )
                        & "  |  through LiveTaskProducts " & CountRows( Filter( LiveTaskProducts,
                                                              taskproduct_task_id.Id = Value(txtPjTask.Text) ) ) ),
@@ -184,7 +184,7 @@ Screens:
             OnSelect: |
               =IfError(
                   If( Len(txtPjTask.Text) > 0,
-                      RemoveIf( taskmaster_taskproduct, taskproduct_task_id.Id = Value(txtPjTask.Text) ) );
+                      RemoveIf( taskmaster_taskproducts, taskproduct_task_id.Id = Value(txtPjTask.Text) ) );
                   Set( vPjMsg5, "CLEAN UP ok: links for task " & txtPjTask.Text & " removed" ),
                   Set( vPjMsg5, "CLEAN UP FAILED: " & FirstError.Message & "  -  delete the rows in SharePoint" ) )
       - lblPjResult:

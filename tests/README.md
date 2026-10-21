@@ -156,7 +156,7 @@ does not currently need. It is now available, not required.
 
 ## `scrProbe-junction-write.pa.yaml` — why does the product link write not land?
 
-**Status: RUN 2026-10-21. ANSWER: `taskmaster_taskproduct` IN THE APP IS A COLLECTION,
+**Status: RUN 2026-10-21. ANSWER: `taskmaster_taskproducts` IN THE APP IS A COLLECTION,
 NOT THE SHAREPOINT LIST.** Written 2026-08-18 for issue #14, rewritten 2026-10-21 after
 PRs #139–#142 left btnTkSave compiling and the links still missing.
 
@@ -169,7 +169,7 @@ was unrecognized on its rows. The fix is to connect the list in Studio (see
 ### The claim under test
 
 `scrTaskEdit` saves the task and then `Collect`s its product links into
-`taskmaster_taskproduct`. The task saves and no link appears. The save compiles, so
+`taskmaster_taskproducts`. The task saves and no link appears. The save compiles, so
 this is a **runtime** failure. The probe runs the link write on its own, shows
 SharePoint's message, and counts what landed.
 

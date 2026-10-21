@@ -276,15 +276,15 @@ lists:
       - { name: task_output_branding,  type: Choice,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. Branding requirement", values: [Barclays, QIS, EXO, Custom] }
       - { name: task_output_asset,     type: Lookup,          required: false, retired: true,                 desc: "RETIRED — use taskmaster_output. Linked asset", lookup: { list: asset_library, show: asset_name } }
       - { name: task_client_name,      type: Lookup,          required: false,                 desc: "Associated client", lookup: { list: taskmaster_clients, show: client_name } }
-      # RETIRED 2026-08-14 — superseded by the taskmaster_taskproduct junction. The
+      # RETIRED 2026-08-14 — superseded by the taskmaster_taskproducts junction. The
       # column is LEFT IN PLACE rather than deleted: dropping it destroys the stored
       # values, and it costs nothing while no view projects it. The app no longer
       # reads or writes it.
-      - { name: task_product_id,       type: Lookup,          required: false, retired: true,   desc: "RETIRED — was the single associated product; use taskmaster_taskproduct", lookup: { list: taskmaster_products, show: product_uid } }
+      - { name: task_product_id,       type: Lookup,          required: false, retired: true,   desc: "RETIRED — was the single associated product; use taskmaster_taskproducts", lookup: { list: taskmaster_products, show: product_uid } }
       # DENORMALISED SUMMARY of the linked products, comma-joined, rewritten by
       # scrTaskEdit on every save. Galleries render this instead of querying the
       # junction once per visible row. Text, so join_cost is unaffected.
-      - { name: task_product_summary,  type: Text,            required: false,                 desc: "Comma-joined product_uid list of the task's taskmaster_taskproduct rows. Display only — the junction is the source of truth. Provisioned 2026-08-14" }
+      - { name: task_product_summary,  type: Text,            required: false,                 desc: "Comma-joined product_uid list of the task's taskmaster_taskproducts rows. Display only — the junction is the source of truth. Provisioned 2026-08-14" }
       - { name: task_client_stage,     type: Choice,          required: false,                 desc: "Client lifecycle stage", values: [Prospect, Active, Existing, "Post-Trade"] }
 
   # ---------------------------------------------------------------------------
@@ -537,7 +537,7 @@ lists:
       - { name: output_approval_id,      type: Text,     required: false,                 desc: "ID of the approval in the EXTERNAL portal. Free-text pointer only — not a lookup, not validated, not indexed" }
 
   # ---------------------------------------------------------------------------
-  taskmaster_taskproduct:
+  taskmaster_taskproducts:
     role: >-
       JUNCTION. One row per (task, product) pair. A task is 1:1 with a client but
       1:n with products, and task_product_id could only ever hold one — it is
@@ -546,7 +546,8 @@ lists:
       values or selections" as unsupported for canvas apps, they cannot be indexed
       and they do not delegate, so "which tasks use product X" would silently
       truncate. This shape delegates in BOTH directions on `.Id`.
-      NAME IS SINGULAR — provisioned as taskmaster_taskproduct, not ...products.
+      NAME IS PLURAL — the list is taskmaster_taskproducts (user, 2026-10-21). This file said
+      singular until then, and the app wrote to the singular name, which no data source had.
     provisioned: live        # 2026-08-14 — IN SHAREPOINT. That is not the same as
                              # being connected to the APP: a screen paste never adds a
                              # data source, so a list can be live here, correct in this
@@ -556,12 +557,11 @@ lists:
                              # "lk.ID is unrecognized", because an unknown source leaves
                              # the row untyped and even the built-in ID stops resolving.
                              # Add it by hand in the Data pane before pasting scrTaskEdit.
-                             # WORSE THAN AN ERROR: with the list missing, `Collect(taskmaster_taskproduct, …)`
-                             # silently CREATES A COLLECTION of that name. Writes then 'succeed' into
-                             # memory, nothing reaches SharePoint, and `ID` is unrecognized (a collection
-                             # has none) — the cause of issue #14 (found 2026-10-21). If a collection of
-                             # this name exists, delete the screens that Collect into it BEFORE adding the
-                             # list, or Studio names the list taskmaster_taskproduct_1.
+                             # WORSE THAN AN ERROR: `Collect(<name>, …)` on a name no data source
+                             # has silently CREATES A COLLECTION. Writes then 'succeed' into memory,
+                             # nothing reaches SharePoint, and `ID` is unrecognized (a collection has
+                             # none). That was issue #14: the app wrote to the SINGULAR name for months.
+                             # The data source name must match the list's display title exactly.
     join_cost: 2
     columns:
       # CASCADE DELETE, set in SharePoint and user-confirmed 2026-08-14: removing a
@@ -574,10 +574,9 @@ lists:
       # products, so this only ever fires in the SharePoint UI — which is the point.
       - { name: taskproduct_product_id,  type: Lookup, required: true,  indexed: true, desc: "The product", lookup: { list: taskmaster_products, show: product_uid } }
       # DERIVED IN SHAREPOINT from taskproduct_product_id (user, 2026-10-21). The app
-      # NEITHER WRITES NOR READS IT: naming it in a write fails every link insert, and
-      # read off a LiveTaskProducts row it comes back as an ERROR TYPE (Studio, on paste).
-      # scrTaskEdit gets a link's product_uid by LookUp on taskmaster_products instead.
-      - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, derived: true, desc: "product_uid of the linked product, DERIVED by SharePoint from the taskproduct_product_id lookup. Read-only, and the app does not read it either: see the note above" }
+      # never writes it, and scrTaskEdit looks product_uid up on taskmaster_products rather
+      # than reading it here.
+      - { name: taskproduct_product_uid, type: Text,   required: false, indexed: true, derived: true, desc: "product_uid of the linked product, DERIVED by SharePoint from the taskproduct_product_id lookup. Read-only; the app does not write it" }
       # WRITE-ONCE. The app has the parent to hand (gTkProject) and a task CANNOT be
       # re-parented — scrTaskEdit derives gTkProject in OnVisible and offers no picker
       # — so this cannot drift.
