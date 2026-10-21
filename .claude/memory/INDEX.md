@@ -12,18 +12,16 @@
 ## State            (rewrite in place — current truth only, ≤ ~10 lines)
 - **THE APP IS BUILT AND LIVE.** 12 screens (scrQuickTx is the 12th), 10 components, the App object; validator 23/23.
   `main` is authoritative; work goes on `claude/dazzling-brown-pq0nim`, fast-forwarded from `main` after every merge
-  (a merged PR never carries follow-up work). **The GitHub issues are the backlog of record** (epics #109–#111).
-- **EVERYTHING IN `src/` IS PASTED (user, 2026-10-14) EXCEPT, possibly, scrQuickTx from PR #135 (#108): delete, paste, re-type
-  cmpQtPick's custom properties.** Confirm with the user before treating #108 as landed; it is #108's last open item (#112 clean-up DONE by the user, closed).
+  (a merged PR never carries follow-up work). **The GitHub issues are the backlog of record.**
+- **EVERYTHING IN `src/` IS PASTED AND LANDED (user, 2026-10-21), scrQuickTx from PR #135 included.** The user reported every
+  open issue done on 2026-10-21; epics #108–#111 and their sub-issues are CLOSED. The backlog was empty at that point.
 - **PROJECT SEARCH (#132) IS LANDED AND CONFIRMED.** scrProjects counts the projects in view (gPrjUniverseN); under
   gDataRowLimit it uses Search(), at the limit the delegable prefix search plus a warning. Data row limit = 2000 = gDataRowLimit.
 - **OUTPUTS (epic #93) ARE LANDED.** `taskmaster_output` (SINGULAR); every output belongs to EXACTLY ONE task or transaction;
   scrProject only lists them. task_output_* are retired in place.
-- **WAITING ON THE USER, TRACKED AS ISSUES:** SharePoint jobs #117–#124 (epic #109: date_start back-fill, Complete = 100%,
-  phase default, two index checks, placeholder vocabularies, requestor-department back-fill, missing-projects counts,
-  archival-flow reopen race); live tests #125, #127, #128 (epic #110 — the perf backlog #27–#40 has NEVER been measured, so
-  never cite it as a result); delete six dead components in Studio #129 (checklist in docs/notes/components.md; the last open item of epic #111).
-- **ONE-PASS CHECKLIST:** `docs/notes/landing-checklist.md` bundles every user-side item (#108 paste, #129, #125, #127, #128, #117–#124) with a report-back block; the user will confirm them all at once. No code work is open.
+- **SHAREPOINT JOBS #117–#124 AND LIVE TESTS #125/#127/#128 REPORTED DONE (user, 2026-10-21) WITHOUT THE DETAILED RESULTS.** So schema.yaml
+  still carries #121's PLACEHOLDER Choice values and #119/#120's unconfirmed notes; ask for the values before relying on them.
+  The perf baseline numbers (#128) were not reported, so still never cite #27–#40 as measured.
 - **STRUCTURAL TRUTHS A SESSION MUST NOT RELEARN:** project_phase is DERIVED by the app (Complete by hand, Archived by the
   external flow); App.Formulas' filters (ActiveProjects, OpenProjects, OpenIssues, LiveTasks, LiveTransactions, LiveIssues,
   LiveTaskProducts, LiveOutputs) must stay named formulas or they stop delegating; every Person predicate ORs the three
@@ -261,3 +259,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-20 | #129 repo side: docs/notes/components.md carries the Studio deletion checklist and no longer recommends the deleted components. The Studio delete is the user's; #111 closes when they report it done | (no session file)
 - 2026-10-20 | #112 closed: the user cleaned the unlinked outputs in SharePoint. Epic #108 now waits only on confirming the scrQuickTx paste (PR #135) | (no session file)
 - 2026-10-20 | docs/notes/landing-checklist.md: every open (user-side) issue in one pass, incl. the #118 MERGE variant and the #124 re-check fix, with a report-back block | (no session file)
+- 2026-10-21 | PR #138 merged; user reported all open issues complete, so #108–#111 and #117–#125, #127, #128 closed (results not itemised). Next: a taskproduct logging issue | (no session file)
