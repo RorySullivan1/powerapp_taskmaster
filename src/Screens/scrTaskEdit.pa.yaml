@@ -56,8 +56,8 @@ Screens:
         // taskmaster_taskproduct is only touched on save.
         // INSIDE THE RESUME GUARD, like every other seed here — coming back from
         // "create a new product" must not wipe what the user already staged.
-        // Shaped to {Id, Uid} on read: taskproduct_product_uid is the denormalised copy,
-        // which avoids a LookUp per link just to show a name.
+        // Shaped to {Id, Uid} on read: taskproduct_product_uid is SharePoint's flat copy of the
+        // lookup's product_uid, which avoids a LookUp per link just to show a name.
         Clear( colTkProducts );
         If( gEditMode = "Edit",
             Collect( colTkProducts,
@@ -1524,8 +1524,9 @@ Screens:
                     ForAll( Filter( LiveTaskProducts,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
                     { ProdId: lk.taskproduct_product_id.Id } ) );
-                    // The lookup pair is written as {Id, Value}, and taskproduct_product_uid is the
-                    // flat copy that can be sorted server-side, which a lookup column cannot.
+                    // The lookup pair is written as {Id, Value}. taskproduct_product_uid is NOT written:
+                    // SharePoint derives it from taskproduct_product_id, so it is read-only to the app
+                    // and naming it in the record fails every add.
                     // THE ADDS CANNOT BE WRAPPED, SO THE ERROR IS READ AFTERWARDS. Set() is not callable
                     // inside ForAll and IfError's arms must be type-compatible, so a bare Collect cannot
                     // sit against a Set either. Errors() reports failures against a DATA SOURCE after
@@ -1534,7 +1535,6 @@ Screens:
                     Collect( taskmaster_taskproduct,
                     { taskproduct_task_id:     { Id: gTkSaved.ID, Value: gTkSaved.task_name },
                     taskproduct_product_id:  { Id: add.Id, Value: add.Uid },
-                    taskproduct_product_uid: add.Uid,
                     taskproduct_project_id:  gTkProject.Id,
                     // FALSE EXPLICITLY, and NOT redundant with the column default. A `= false`
                     // filter is an OData equality and does not match a null, so a link left
