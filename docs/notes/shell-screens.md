@@ -27,7 +27,7 @@ Key facts:
 - **Data is now bound (2026-08-03).** `scrHome`, `scrProjects` and `scrReports` carry live,
   delegable queries against `schema/schema.yaml`'s columns. The shape everywhere is
   **filter server-side → aggregate locally**, because `CountRows`/`Average` never delegate
-  to SharePoint. `scrReference` is now the reference-data screen (clients + products); `scrAdmin` was deleted 2026-08-11 and its galleries moved there.
+  to SharePoint. `scrReference` is the reference-data screen, laid out as a settings panel (epic #145); `scrAdmin` was deleted 2026-08-11 and its galleries moved there.
 - **Prerequisite:** these three screens **cannot paste until the lists are provisioned** and
   added as data sources — Studio can't bind to a list that doesn't exist. The two shells and
   the components still paste at any time.
@@ -45,7 +45,7 @@ Key facts:
 | `scrHome.pa.yaml` | Code view | Landing shell — the reference header+nav template |
 | `scrReports.pa.yaml` | Code view | Reports shell + the Q2 unlicensed empty-state card |
 | `scrProjects.pa.yaml` | Code view | Projects shell + search box + empty placeholder |
-| `scrReference.pa.yaml` | Code view | **Reference data** — clients + products browse/filter/open/create. Absorbed `scrAdmin` 2026-08-11. |
+| `scrReference.pa.yaml` | Code view | **Reference data, as a settings panel** — section rail (Activities · Products · Clients · Regions); one term editor over the three `mapping_*` vocabularies with rename cascade and delete guard; clients + products browse/filter/open/create. Epic #145. |
 | `scrProject.pa.yaml` | Code view | **Project detail — three tabs** (kanban / dense transactions table / issue feed) |
 | `scrTaskEdit.pa.yaml` | Code view | **Task edit** — the SOLE writer of a task, and the live home of the C3 rollup write-back. (Superseded `scrTask`, deleted 2026-08-10.) |
 

@@ -1,155 +1,592 @@
+# Reference data, laid out as a settings panel: a section rail on the left, the selected
+# section on the right. Activities, Regions and the Products ▸ Product types tab edit the three
+# mapping_* vocabularies through ONE term editor; Products and Clients open the record screens.
+#
+# gRfView names what the content pane shows: "activity" | "region" | "producttype" for a
+# vocabulary, "products" | "clients" for records. It is derived from gRfSection and gRfProdTab
+# in three handlers (OnVisible, the rail, the tabs) — keep the three Switches in step.
 Screens:
   scrReference:
     Properties:
       Fill: =gTheme.Color.Bg
+      # The section survives a visit to scrClientEdit / scrProductEdit, so Back() returns the
+      # user to the list they came from.
+      OnVisible: |
+        =Set( gRfSections, Table(
+             { Key: "Activities", Icon: Icon.Lightbulb,
+               Blurb: "Activity and project types that projects are classified by. Up to three levels." },
+             { Key: "Products",   Icon: Icon.Tag,
+               Blurb: "Products that tasks link to, and the product types that classify them." },
+             { Key: "Clients",    Icon: Icon.People,
+               Blurb: "Clients that tasks and transactions are booked against." },
+             { Key: "Regions",    Icon: Icon.Globe,
+               Blurb: "Regions that projects and clients belong to. Up to three levels." } ) );
+         If( Len( Coalesce(gRfSection, "") ) = 0, Set( gRfSection, "Activities" ) );
+         If( Len( Coalesce(gRfProdTab, "") ) = 0, Set( gRfProdTab, "Products" ) );
+         Set( gRfView, Switch( gRfSection,
+                               "Activities", "activity",
+                               "Regions",    "region",
+                               "Clients",    "clients",
+                               If( gRfProdTab = "Types", "producttype", "products" ) ) );
+         Set( gRfEdOpen, false );
+         Set( gRfDelOpen, false );
+         Set( gRfSaving, false );
+         Select( btnRfLoad )
     Children:
-      - RefEmpty:
+      # ---- Workers (hidden; invoked with Select) ------------------------------
+      # Loads the current vocabulary into colRfTerms. It refreshes the picker's session cache
+      # FIRST and builds colRfTerms from it, so the cascading pickers on the edit screens see
+      # every change made here without an app restart. colMapRegionCl is scrClientEdit's own
+      # copy of the region list and is refreshed with it.
+      - btnRfLoad:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =Switch( gRfView,
+                   "activity",
+                   ClearCollect( colMapActivity, mapping_activitytype );
+                   ClearCollect( colRfTerms,
+                       ForAll( colMapActivity As m,
+                           { Id: m.ID,
+                             L1: Coalesce(m.level1, ""),
+                             L2: Coalesce(m.level2, ""),
+                             L3: Coalesce(m.level3, ""),
+                             Path: Coalesce(m.level1, "")
+                                   & If( IsBlank(m.level2), "", " | " & m.level2 )
+                                   & If( IsBlank(m.level3), "", " | " & m.level3 ) } ) ),
+                   "region",
+                   ClearCollect( colMapRegion, mapping_region );
+                   ClearCollect( colMapRegionCl, mapping_region );
+                   ClearCollect( colRfTerms,
+                       ForAll( colMapRegion As m,
+                           { Id: m.ID,
+                             L1: Coalesce(m.level1, ""),
+                             L2: Coalesce(m.level2, ""),
+                             L3: Coalesce(m.level3, ""),
+                             Path: Coalesce(m.level1, "")
+                                   & If( IsBlank(m.level2), "", " | " & m.level2 )
+                                   & If( IsBlank(m.level3), "", " | " & m.level3 ) } ) ),
+                   "producttype",
+                   ClearCollect( colMapProdType, mapping_producttype );
+                   ClearCollect( colRfTerms,
+                       ForAll( colMapProdType As m,
+                           { Id: m.ID,
+                             L1: Coalesce(m.level1, ""),
+                             L2: Coalesce(m.level2, ""),
+                             L3: Coalesce(m.level3, ""),
+                             Path: Coalesce(m.level1, "")
+                                   & If( IsBlank(m.level2), "", " | " & m.level2 )
+                                   & If( IsBlank(m.level3), "", " | " & m.level3 ) } ) ),
+                   Clear( colRfTerms ) )
+      # Counts the records that store term gRfUseId by ID. -1 means "still counting" and every
+      # reader treats it as such: Select() QUEUES, so the caller has moved on before these land.
+      # A count at gDataRowLimit may be truncated, so the rename refuses at that ceiling.
+      - btnRfUsage:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: =""
+            Visible: =false
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+            OnSelect: |
+              =Set( gRfUseP, Switch( gRfView,
+                      "activity", CountRows( Filter( taskmaster_projects, project_type_id = gRfUseId ) ),
+                      "region",   CountRows( Filter( taskmaster_projects, project_region_id = gRfUseId ) ),
+                      0 ) );
+               Set( gRfUseC, If( gRfView = "region",
+                      CountRows( Filter( taskmaster_clients, client_region_id = gRfUseId ) ), 0 ) );
+               Set( gRfUseD, If( gRfView = "producttype",
+                      CountRows( Filter( taskmaster_products, product_type_id = gRfUseId ) ), 0 ) )
+      # The usage summary, shared by the editor and the delete dialog.
+      - lblRfUseParts:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =false
+            Text: |
+              =Concat( Filter( Table( { n: gRfUseP, l: "project" },
+                                      { n: gRfUseC, l: "client" },
+                                      { n: gRfUseD, l: "product" } ),
+                               n > 0 ),
+                       n & " " & l & If( n = 1, "", "s" ), ", " )
+            X: =0
+            Y: =0
+            Width: =1
+            Height: =1
+
+      # ---- Section rail -------------------------------------------------------
+      # Bands (1366x768): rail X 0..240 · heading 88..116 · sections 128..320
+      # content X 264..1342 · title 88..120 · blurb 120..140 · tabs 152..188 (Products only)
+      # toolbar T..T+36 where T = 152, or 200 under the tabs · caption T+48..T+68
+      # list T+76..H-24
+      - rectRfRail:
           Control: Rectangle@2.3.0
           Properties:
             Fill: =gTheme.Color.Surface
-            Height: =Parent.Height - gTheme.Space.HeaderH - (gTheme.Space.Gutter * 2)
-            Width: =Parent.Width - (gTheme.Space.Gutter * 2)
-            X: =gTheme.Space.Gutter
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter
-      - lblAdminRefHead:
+            X: =0
+            Y: =gTheme.Space.HeaderH
+            Width: =gTheme.Space.NavW
+            Height: =Parent.Height - gTheme.Space.HeaderH
+      - lineRfRail:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =gTheme.Color.Border
+            X: =gTheme.Space.NavW - 1
+            Y: =gTheme.Space.HeaderH
+            Width: =1
+            Height: =Parent.Height - gTheme.Space.HeaderH
+      - lblRfRailHead:
           Control: Label@2.5.1
           Properties:
-            Text: ="Reference data"
+            Text: ="Settings"
             Font: =gTheme.Font
             Size: =gTheme.Size.H3
             FontWeight: =FontWeight.Semibold
             Color: =gTheme.Color.TextPrimary
             VerticalAlign: =VerticalAlign.Middle
-            X: =gTheme.Space.Gutter * 2
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter * 2
-            Width: =400
+            X: =gTheme.Space.Gutter
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter
+            Width: =gTheme.Space.NavW - gTheme.Space.Gutter * 2
             Height: =28
-      - btnAdminNewClient:
-          Control: Classic/Button@2.2.0
+      - galRfSections:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
-            Text: ="＋  New client"
-            Fill: =gTheme.Color.Primary
-            Color: =gTheme.Color.OnPrimary
-            BorderColor: =gTheme.Color.Primary
+            Items: =gRfSections
+            WrapCount: =1
+            TemplateSize: =48
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
             BorderThickness: =0
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            X: =gTheme.Space.Gutter * 2
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter * 2 + 40
-            Width: =180
-            Height: =44
-            OnSelect: |
-              =Set( gClMode, "New" );
-               Set( gClReturn, "" );
-               Navigate( scrClientEdit, ScreenTransition.Cover )
-      - btnAdminNewProduct:
-          Control: Classic/Button@2.2.0
-          Properties:
-            Text: ="＋  New product"
-            Fill: =gTheme.Color.Primary
-            Color: =gTheme.Color.OnPrimary
-            BorderColor: =gTheme.Color.Primary
-            BorderThickness: =0
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            X: =gTheme.Space.Gutter * 2 + 180 + 12
-            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter * 2 + 40
-            Width: =180
-            Height: =44
-            OnSelect: |
-              =Set( gPdMode, "New" );
-               Set( gPdReturn, "" );
-               Navigate( scrProductEdit, ScreenTransition.Cover )
-      # ---- Maintenance lists -----------------------------------------------
-      # THESE ARE WHAT DEFINE `gEditClient` / `gEditProduct` — the two create screens read
-      # those globals, so without an entry point here they have no type and nothing resolves.
-      # Bands, computed (1366x768):
-      #   112..140  heading      152..196  new buttons
-      #   210..230  caption      234..270  search      278..744  gallery
-      #   left col X 24..675     right col X 691..1342
-      - lblAdminClients:
+            ShowScrollbar: =false
+            X: =0
+            Y: =128
+            Width: =gTheme.Space.NavW - 1
+            Height: =48 * CountRows(gRfSections)
+          Children:
+            - rectRfSecSel:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Visible: =ThisItem.Key = gRfSection
+                  Fill: =gTheme.Color.Press
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+            - rectRfSecBar:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Visible: =ThisItem.Key = gRfSection
+                  Fill: =gTheme.Color.Primary
+                  X: =0
+                  Y: =0
+                  Width: =4
+                  Height: =Parent.TemplateHeight
+            - icoRfSec:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =ThisItem.Icon
+                  Color: =If( ThisItem.Key = gRfSection, gTheme.Color.Primary, gTheme.Color.TextMuted )
+                  X: =gTheme.Space.Gutter
+                  Y: =12
+                  Width: =24
+                  Height: =24
+            - lblRfSec:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =ThisItem.Key
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FontWeight: =If( ThisItem.Key = gRfSection, FontWeight.Semibold, FontWeight.Normal )
+                  Color: =If( ThisItem.Key = gRfSection, gTheme.Color.Primary, gTheme.Color.TextPrimary )
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =gTheme.Space.Gutter + 36
+                  Y: =0
+                  Width: =Parent.TemplateWidth - gTheme.Space.Gutter - 48
+                  Height: =Parent.TemplateHeight
+            - hitRfSec:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  HoverFill: =gTheme.Color.Hover
+                  PressedFill: =gTheme.Color.Press
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gRfSection, ThisItem.Key );
+                     Set( gRfView, Switch( ThisItem.Key,
+                                           "Activities", "activity",
+                                           "Regions",    "region",
+                                           "Clients",    "clients",
+                                           If( gRfProdTab = "Types", "producttype", "products" ) ) );
+                     Reset( txtRfSearch );
+                     Set( gRfEdOpen, false );
+                     Select( btnRfLoad )
+
+      # ---- Section header -----------------------------------------------------
+      - lblRfTitle:
           Control: Label@2.5.1
           Properties:
-            Text: ="Clients"
+            Text: =gRfSection
+            Font: =gTheme.Font
+            Size: =gTheme.Size.H2
+            FontWeight: =FontWeight.Semibold
+            Color: =gTheme.Color.TextPrimary
+            VerticalAlign: =VerticalAlign.Middle
+            X: =gTheme.Space.NavW + gTheme.Space.Gutter
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter
+            Width: =Parent.Width - gTheme.Space.NavW - gTheme.Space.Gutter * 2
+            Height: =32
+      - lblRfBlurb:
+          Control: Label@2.5.1
+          Properties:
+            Text: =LookUp( gRfSections, Key = gRfSection ).Blurb
             Font: =gTheme.Font
             Size: =gTheme.Size.Small
             Color: =gTheme.Color.TextMuted
             VerticalAlign: =VerticalAlign.Middle
-            X: =gTheme.Space.Gutter
-            Y: =210
-            Width: =651
+            X: =gTheme.Space.NavW + gTheme.Space.Gutter
+            Y: =gTheme.Space.HeaderH + gTheme.Space.Gutter + 32
+            Width: =Parent.Width - gTheme.Space.NavW - gTheme.Space.Gutter * 2
             Height: =20
-      - txtAdminClientSearch:
+      # Products only: the records and their type vocabulary are two tabs of one section.
+      - btnRfTabProducts:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gRfSection = "Products"
+            Text: ="Products"
+            Fill: =If( gRfProdTab = "Products", gTheme.Color.Primary, gTheme.Color.Surface )
+            Color: =If( gRfProdTab = "Products", gTheme.Color.OnPrimary, gTheme.Color.Primary )
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =gTheme.Space.NavW + gTheme.Space.Gutter
+            Y: =152
+            Width: =140
+            Height: =36
+            OnSelect: |
+              =Set( gRfProdTab, "Products" );
+               Set( gRfView, "products" );
+               Reset( txtRfSearch );
+               Set( gRfEdOpen, false );
+               Select( btnRfLoad )
+      - btnRfTabTypes:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gRfSection = "Products"
+            Text: ="Product types"
+            Fill: =If( gRfProdTab = "Types", gTheme.Color.Primary, gTheme.Color.Surface )
+            Color: =If( gRfProdTab = "Types", gTheme.Color.OnPrimary, gTheme.Color.Primary )
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =gTheme.Space.NavW + gTheme.Space.Gutter + 140 + 8
+            Y: =152
+            Width: =140
+            Height: =36
+            OnSelect: |
+              =Set( gRfProdTab, "Types" );
+               Set( gRfView, "producttype" );
+               Reset( txtRfSearch );
+               Set( gRfEdOpen, false );
+               Select( btnRfLoad )
+
+      # ---- Toolbar ------------------------------------------------------------
+      - txtRfSearch:
           Control: ModernTextInput@1.1.1
           Properties:
-            Placeholder: ="Filter by name…"
+            Placeholder: |
+              =Switch( gRfView,
+                       "products", "Filter by product ID…",
+                       "clients",  "Filter by name…",
+                                   "Search terms…" )
             TriggerOutput: =TriggerOutput.Delayed
             Font: =gTheme.Font
             Size: =gTheme.Size.Body
-            X: =gTheme.Space.Gutter
-            Y: =234
-            Width: =651
+            X: =gTheme.Space.NavW + gTheme.Space.Gutter
+            Y: =If( gRfSection = "Products", 200, 152 )
+            Width: =360
             Height: =36
-      - galAdminClients:
+      - btnRfAdd:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: |
+              =Switch( gRfView,
+                       "activity",    "＋  Add activity type",
+                       "region",      "＋  Add region",
+                       "producttype", "＋  Add product type",
+                       "products",    "＋  New product",
+                                      "＋  New client" )
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - gTheme.Space.Gutter - 200
+            Y: =If( gRfSection = "Products", 200, 152 )
+            Width: =200
+            Height: =36
+            OnSelect: |
+              =Switch( gRfView,
+                   "products",
+                   Set( gPdMode, "New" );
+                   Set( gPdReturn, "" );
+                   Navigate( scrProductEdit, ScreenTransition.Cover ),
+                   "clients",
+                   Set( gClMode, "New" );
+                   Set( gClReturn, "" );
+                   Navigate( scrClientEdit, ScreenTransition.Cover ),
+                   Set( gRfEdId, 0 );
+                   Set( gRfEdOld, "" );
+                   Set( gRfEdL1, "" ); Set( gRfEdL2, "" ); Set( gRfEdL3, "" );
+                   Reset( txtRfL1 ); Reset( txtRfL2 ); Reset( txtRfL3 );
+                   Set( gRfUseP, 0 ); Set( gRfUseC, 0 ); Set( gRfUseD, 0 );
+                   Set( gRfEdOpen, true ) )
+      # Choices() reads the Choice columns' values; the app cannot add or change them, so the
+      # Clients section shows them read-only.
+      - lblRfCaption:
+          Control: Label@2.5.1
+          Properties:
+            Text: |
+              =Switch( gRfView,
+                  "products", "Select a product to edit it.",
+                  "clients",
+                  "Client types: " & Concat( Choices([@taskmaster_clients].client_type), Value, " · " )
+                  & "     Coverage: " & Concat( Choices([@taskmaster_clients].client_coverage), Value, " · " )
+                  & "     (edited in the SharePoint list's column settings)",
+                  CountRows(colRfTerms) & If( CountRows(colRfTerms) = 1, " term", " terms" )
+                  & If( Len(txtRfSearch.Text) = 0, "",
+                        "  ·  " & CountRows( Filter( colRfTerms, txtRfSearch.Text in Path ) ) & " shown" )
+                  & "  ·  select a term to edit it" )
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =gTheme.Space.NavW + gTheme.Space.Gutter
+            Y: =If( gRfSection = "Products", 200, 152 ) + 48
+            Width: =Parent.Width - gTheme.Space.NavW - gTheme.Space.Gutter * 2
+            Height: =20
+
+      # ---- List surface (shared by the three galleries) -------------------------
+      - rectRfList:
+          Control: Rectangle@2.3.0
+          Properties:
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =gTheme.Space.NavW + gTheme.Space.Gutter
+            Y: =If( gRfSection = "Products", 200, 152 ) + 76
+            Width: =Parent.Width - gTheme.Space.NavW - gTheme.Space.Gutter * 2
+            Height: =Parent.Height - (If( gRfSection = "Products", 200, 152 ) + 76) - gTheme.Space.Gutter
+
+      # ---- Vocabulary terms -----------------------------------------------------
+      - galRfTerms:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
-            # Delegable: StartsWith on an indexed Text column, and an empty search box
-            # matches everything rather than nothing.
+            Visible: =gRfView in ["activity", "region", "producttype"]
+            # colRfTerms is a local collection, so `in` (case-insensitive substring) is safe here.
             Items: |
-              =Sort( Filter( taskmaster_clients,
-                             StartsWith(client_name, txtAdminClientSearch.Text) ),
-                     client_name )
+              =Sort( Filter( colRfTerms, Len(txtRfSearch.Text) = 0 || txtRfSearch.Text in Path ),
+                     Path )
             WrapCount: =1
-            TemplateSize: =44
+            TemplateSize: =56
             TemplatePadding: =0
             TemplateFill: =RGBA(0, 0, 0, 0)
             BorderThickness: =0
             ShowScrollbar: =true
-            X: =gTheme.Space.Gutter
-            Y: =278
-            Width: =651
-            Height: =466
+            X: =rectRfList.X + 1
+            Y: =rectRfList.Y + 1
+            Width: =rectRfList.Width - 2
+            Height: =rectRfList.Height - 2
           Children:
-            - cellAdminClName:
+            # The term's own name: the deepest level it reaches.
+            - cellRfLeaf:
+                Control: Label@2.5.1
+                Properties:
+                  Text: =If( Len(ThisItem.L3) > 0, ThisItem.L3, Len(ThisItem.L2) > 0, ThisItem.L2, ThisItem.L1 )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Body
+                  FontWeight: =FontWeight.Semibold
+                  Color: =gTheme.Color.TextPrimary
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =16
+                  Y: =6
+                  Width: =Parent.TemplateWidth - 16 - 96
+                  Height: =24
+            - cellRfPath:
+                Control: Label@2.5.1
+                Properties:
+                  Text: |
+                    =ThisItem.Path & "   ·   level " &
+                     If( Len(ThisItem.L3) > 0, 3, Len(ThisItem.L2) > 0, 2, 1 )
+                  Font: =gTheme.Font
+                  Size: =gTheme.Size.Small
+                  Color: =gTheme.Color.TextMuted
+                  VerticalAlign: =VerticalAlign.Middle
+                  X: =16
+                  Y: =30
+                  Width: =Parent.TemplateWidth - 16 - 96
+                  Height: =18
+            # Decorative: declared UNDER the row's hit button, which does the editing.
+            - icoRfEdit:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =Icon.Edit
+                  Color: =gTheme.Color.TextMuted
+                  X: =Parent.TemplateWidth - 88
+                  Y: =16
+                  Width: =24
+                  Height: =24
+            - lineRfTerm:
+                Control: Rectangle@2.3.0
+                Properties:
+                  Fill: =gTheme.Color.Border
+                  X: =0
+                  Y: =55
+                  Width: =Parent.TemplateWidth
+                  Height: =1
+            - hitRfTerm:
+                Control: Classic/Button@2.2.0
+                Properties:
+                  Text: =""
+                  Fill: =RGBA(0, 0, 0, 0)
+                  HoverFill: =gTheme.Color.Hover
+                  PressedFill: =gTheme.Color.Press
+                  BorderThickness: =0
+                  X: =0
+                  Y: =0
+                  Width: =Parent.TemplateWidth
+                  Height: =Parent.TemplateHeight
+                  OnSelect: |
+                    =Select(Parent);
+                     Set( gRfEdId, ThisItem.Id );
+                     Set( gRfEdOld, ThisItem.Path );
+                     Set( gRfEdL1, ThisItem.L1 );
+                     Set( gRfEdL2, ThisItem.L2 );
+                     Set( gRfEdL3, ThisItem.L3 );
+                     Reset( txtRfL1 ); Reset( txtRfL2 ); Reset( txtRfL3 );
+                     Set( gRfUseId, ThisItem.Id );
+                     Set( gRfUseP, -1 ); Set( gRfUseC, -1 ); Set( gRfUseD, -1 );
+                     Select( btnRfUsage );
+                     Set( gRfEdOpen, true )
+            # Declared AFTER the hit button so it sits above it and receives its own clicks.
+            - icoRfDel:
+                Control: Classic/Icon@2.5.0
+                Properties:
+                  Icon: =Icon.Trash
+                  Color: =gTheme.Color.Danger
+                  Tooltip: ="Delete this term"
+                  X: =Parent.TemplateWidth - 48
+                  Y: =16
+                  Width: =24
+                  Height: =24
+                  OnSelect: |
+                    =Set( gRfDelId, ThisItem.Id );
+                     Set( gRfDelPath, ThisItem.Path );
+                     Set( gRfUseId, ThisItem.Id );
+                     Set( gRfUseP, -1 ); Set( gRfUseC, -1 ); Set( gRfUseD, -1 );
+                     Select( btnRfUsage );
+                     Set( gRfDelOpen, true )
+      - lblRfTermsEmpty:
+          Control: Label@2.5.1
+          Properties:
+            Visible: |
+              =gRfView in ["activity", "region", "producttype"]
+               && IsEmpty( Filter( colRfTerms, Len(txtRfSearch.Text) = 0 || txtRfSearch.Text in Path ) )
+            Text: |
+              =If( Len(txtRfSearch.Text) > 0,
+                   "No term matches """ & txtRfSearch.Text & """.",
+                   "No terms yet. Use " & btnRfAdd.Text & " to create the first one." )
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Color: =gTheme.Color.TextMuted
+            Align: =Align.Center
+            VerticalAlign: =VerticalAlign.Middle
+            X: =rectRfList.X
+            Y: =rectRfList.Y + 24
+            Width: =rectRfList.Width
+            Height: =40
+
+      # ---- Clients ----------------------------------------------------------------
+      # THESE TWO GALLERIES ARE WHAT DEFINE `gEditClient` / `gEditProduct` — the two edit
+      # screens read those globals, so without an entry point here they have no type.
+      - galRfClients:
+          Control: Gallery@2.15.0
+          Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
+          Properties:
+            Visible: =gRfView = "clients"
+            # Delegable: StartsWith on an indexed Text column, and an empty search box
+            # matches everything rather than nothing.
+            Items: |
+              =Sort( Filter( taskmaster_clients,
+                             StartsWith(client_name, txtRfSearch.Text) ),
+                     client_name )
+            WrapCount: =1
+            TemplateSize: =52
+            TemplatePadding: =0
+            TemplateFill: =RGBA(0, 0, 0, 0)
+            BorderThickness: =0
+            ShowScrollbar: =true
+            X: =rectRfList.X + 1
+            Y: =rectRfList.Y + 1
+            Width: =rectRfList.Width - 2
+            Height: =rectRfList.Height - 2
+          Children:
+            - cellRfClName:
                 Control: Label@2.5.1
                 Properties:
                   Text: =ThisItem.client_name
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Body
+                  FontWeight: =FontWeight.Semibold
                   Color: =gTheme.Color.TextPrimary
                   VerticalAlign: =VerticalAlign.Middle
-                  X: =12
-                  Y: =0
-                  Width: =Parent.TemplateWidth - 24
+                  X: =16
+                  Y: =4
+                  Width: =Parent.TemplateWidth - 32
                   Height: =24
-            - cellAdminClMeta:
+            - cellRfClMeta:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
                     =Coalesce(ThisItem.client_type.Value, "—") & "   ·   " &
+                     Coalesce(ThisItem.client_coverage.Value, "—") & "   ·   " &
                      Coalesce(ThisItem.client_region_path, "—")
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
-                  X: =12
-                  Y: =23
-                  Width: =Parent.TemplateWidth - 24
+                  X: =16
+                  Y: =28
+                  Width: =Parent.TemplateWidth - 32
                   Height: =18
-            - lineAdminCl:
+            - lineRfCl:
                 Control: Rectangle@2.3.0
                 Properties:
                   Fill: =gTheme.Color.Border
                   X: =0
-                  Y: =43
+                  Y: =51
                   Width: =Parent.TemplateWidth
                   Height: =1
-            - hitAdminCl:
+            - hitRfCl:
                 Control: Classic/Button@2.2.0
                 Properties:
-                  # Transparent full-template button declared LAST — a gallery's own OnSelect
-                  # does not reliably fire when the click lands on a child control.
                   Text: =""
                   Fill: =RGBA(0, 0, 0, 0)
                   HoverFill: =gTheme.Color.Hover
@@ -168,64 +605,44 @@ Screens:
                          Set( gClMode, "Edit" );
                          Set( gClReturn, "" );
                          Navigate( scrClientEdit, ScreenTransition.Cover ) )
-      - lblAdminProducts:
-          Control: Label@2.5.1
-          Properties:
-            Text: ="Products"
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Small
-            Color: =gTheme.Color.TextMuted
-            VerticalAlign: =VerticalAlign.Middle
-            X: =691
-            Y: =210
-            Width: =651
-            Height: =20
-      - txtAdminProductSearch:
-          Control: ModernTextInput@1.1.1
-          Properties:
-            Placeholder: ="Filter by product ID…"
-            TriggerOutput: =TriggerOutput.Delayed
-            Font: =gTheme.Font
-            Size: =gTheme.Size.Body
-            X: =691
-            Y: =234
-            Width: =651
-            Height: =36
-      - galAdminProducts:
+
+      # ---- Products -----------------------------------------------------------------
+      - galRfProducts:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
+            Visible: =gRfView = "products"
             Items: |
               =Sort( Filter( taskmaster_products,
-                             StartsWith(product_uid, txtAdminProductSearch.Text) ),
+                             StartsWith(product_uid, txtRfSearch.Text) ),
                      product_uid )
             WrapCount: =1
-            # 80, not 44: the #20 fields take a third line and features a fourth. Every Y below
-            # is measured against this number and the separator sits on its last pixel, so the five
-            # move together. THE COST IS ROWS ON SCREEN — ~5.8 products against ~10 at 44px.
+            # 80: four lines (ID, type, spec, features). Every Y below is measured against this
+            # number and the separator sits on its last pixel, so the five move together.
             TemplateSize: =80
             TemplatePadding: =0
             TemplateFill: =RGBA(0, 0, 0, 0)
             BorderThickness: =0
             ShowScrollbar: =true
-            X: =691
-            Y: =278
-            Width: =651
-            Height: =466
+            X: =rectRfList.X + 1
+            Y: =rectRfList.Y + 1
+            Width: =rectRfList.Width - 2
+            Height: =rectRfList.Height - 2
           Children:
-            - cellAdminPdUid:
+            - cellRfPdUid:
                 Control: Label@2.5.1
                 Properties:
                   Text: =ThisItem.product_uid
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Body
+                  FontWeight: =FontWeight.Semibold
                   Color: =gTheme.Color.TextPrimary
                   VerticalAlign: =VerticalAlign.Middle
-                  X: =12
+                  X: =16
                   Y: =0
-                  Width: =Parent.TemplateWidth - 24
+                  Width: =Parent.TemplateWidth - 32
                   Height: =24
-            - cellAdminPdMeta:
+            - cellRfPdMeta:
                 Control: Label@2.5.1
                 Properties:
                   Text: =Coalesce(ThisItem.product_type_path, "—")
@@ -233,14 +650,13 @@ Screens:
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
-                  X: =12
+                  X: =16
                   Y: =23
-                  Width: =Parent.TemplateWidth - 24
+                  Width: =Parent.TemplateWidth - 32
                   Height: =18
-            # THE #20 LINE. Blank fields COLLAPSE rather than printing a dash each: three
-            # placeholders on a reference row read as damage, and a product with none of these is
-            # the normal case. The separator is only emitted between two values that both exist.
-            - cellAdminPdSpec:
+            # Blank fields COLLAPSE rather than printing a dash each: a product with none of
+            # these is the normal case. The separator is only emitted between two values.
+            - cellRfPdSpec:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
@@ -255,15 +671,13 @@ Screens:
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
-                  X: =12
+                  X: =16
                   Y: =41
-                  Width: =Parent.TemplateWidth - 24
+                  Width: =Parent.TemplateWidth - 32
                   Height: =18
-            # FEATURES, ONE LINE, TRUNCATED. product_features is a Note, so LINE BREAKS BECOME
-            # SPACES — a stored newline would push the rest of the sentence out of the 18px box.
-            # The 100-character cap ends the text rather than clipping it mid-glyph, and the
-            # ellipsis signals that the edit form holds the rest.
-            - cellAdminPdFeat:
+            # product_features is a Note, so LINE BREAKS BECOME SPACES — a stored newline would
+            # push the rest of the sentence out of the 18px box.
+            - cellRfPdFeat:
                 Control: Label@2.5.1
                 Properties:
                   Text: |
@@ -271,17 +685,17 @@ Screens:
                                                               Char(13), " " ),
                                                   Char(10), " " ) ) },
                            If( Len(f) = 0,      "",
-                               Len(f) <= 100,   f,
-                                                Left(f, 99) & "…" ) )
+                               Len(f) <= 140,   f,
+                                                Left(f, 139) & "…" ) )
                   Font: =gTheme.Font
                   Size: =gTheme.Size.Small
                   Color: =gTheme.Color.TextMuted
                   VerticalAlign: =VerticalAlign.Middle
-                  X: =12
+                  X: =16
                   Y: =59
-                  Width: =Parent.TemplateWidth - 24
+                  Width: =Parent.TemplateWidth - 32
                   Height: =18
-            - lineAdminPd:
+            - lineRfPd:
                 Control: Rectangle@2.3.0
                 Properties:
                   Fill: =gTheme.Color.Border
@@ -289,7 +703,7 @@ Screens:
                   Y: =79
                   Width: =Parent.TemplateWidth
                   Height: =1
-            - hitAdminPd:
+            - hitRfPd:
                 Control: Classic/Button@2.2.0
                 Properties:
                   Text: =""
@@ -310,6 +724,406 @@ Screens:
                          Set( gPdMode, "Edit" );
                          Set( gPdReturn, "" );
                          Navigate( scrProductEdit, ScreenTransition.Cover ) )
+
+      # =======================================================================
+      # TERM EDITOR — side drawer, 440 wide, below the header. Declared after the lists so it
+      # floats above them. Every part shares the drawer's left edge, Parent.Width - 440.
+      # Bands (768 high): title 88..116 · hint 124..160 · L1 176..234 · L2 246..304
+      # L3 316..374 · path 390..434 · usage 446..506 · error 514..574 · buttons H-68..H-24
+      # =======================================================================
+      - mdRfScrim:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gRfEdOpen
+            Fill: =RGBA(32, 38, 45, 0.45)
+            X: =0
+            Y: =gTheme.Space.HeaderH
+            Width: =Parent.Width - 440
+            Height: =Parent.Height - gTheme.Space.HeaderH
+            OnSelect: =Set( gRfEdOpen, false )
+      - mdRfPanel:
+          Control: Rectangle@2.3.0
+          Properties:
+            Visible: =gRfEdOpen
+            Fill: =gTheme.Color.Surface
+            BorderColor: =gTheme.Color.Border
+            BorderThickness: =1
+            X: =Parent.Width - 440
+            Y: =gTheme.Space.HeaderH
+            Width: =440
+            Height: =Parent.Height - gTheme.Space.HeaderH
+      - lblRfEdTitle:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen
+            Text: |
+              =If( gRfEdId = 0, "New ", "Edit " ) &
+               Switch( gRfView, "activity", "activity type", "region", "region", "product type" )
+            Font: =gTheme.Font
+            Size: =gTheme.Size.H3
+            FontWeight: =FontWeight.Semibold
+            Color: =gTheme.Color.TextPrimary
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =88
+            Width: =392 - 32
+            Height: =28
+      - icoRfEdClose:
+          Control: Classic/Icon@2.5.0
+          Properties:
+            Visible: =gRfEdOpen
+            Icon: =Icon.Cancel
+            Color: =gTheme.Color.TextMuted
+            Tooltip: ="Close without saving"
+            X: =Parent.Width - gTheme.Space.Gutter - 24
+            Y: =90
+            Width: =24
+            Height: =24
+            OnSelect: =Set( gRfEdOpen, false )
+      - lblRfEdHint:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen
+            Text: ="Each term is one full path. Leave the lower levels empty for a broader term."
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Top
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =124
+            Width: =392
+            Height: =36
+      - lblRfL1Cap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen
+            Text: ="Level 1  *"
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =176
+            Width: =392
+            Height: =18
+      - txtRfL1:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Visible: =gRfEdOpen
+            Default: =gRfEdL1
+            Placeholder: ="Top level, e.g. EMEA"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =198
+            Width: =392
+            Height: =36
+      - lblRfL2Cap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen
+            Text: ="Level 2"
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =246
+            Width: =392
+            Height: =18
+      - txtRfL2:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Visible: =gRfEdOpen
+            Default: =gRfEdL2
+            Placeholder: ="Optional"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =268
+            Width: =392
+            Height: =36
+      - lblRfL3Cap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen
+            Text: ="Level 3"
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =316
+            Width: =392
+            Height: =18
+      - txtRfL3:
+          Control: ModernTextInput@1.1.1
+          Properties:
+            Visible: =gRfEdOpen
+            Default: =gRfEdL3
+            Placeholder: ="Optional"
+            TriggerOutput: =TriggerOutput.Delayed
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =338
+            Width: =392
+            Height: =36
+      - lblRfPathCap:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen
+            Text: ="Stored path"
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =390
+            Width: =392
+            Height: =18
+      - lblRfPath:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen
+            Text: |
+              =With( { a: Trim(txtRfL1.Text), b: Trim(txtRfL2.Text), c: Trim(txtRfL3.Text) },
+                     If( Len(a) = 0, "—",
+                         a & If( Len(b) > 0, " | " & b, "" ) & If( Len(c) > 0, " | " & c, "" ) ) )
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            Color: =gTheme.Color.TextPrimary
+            VerticalAlign: =VerticalAlign.Middle
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =410
+            Width: =392
+            Height: =24
+      # A rename rewrites the path on every record that stores this term's ID. A record that
+      # picked a BRANCH stores id 0 and is matched by path only, so it keeps its old path.
+      - lblRfEdUsage:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen && gRfEdId > 0
+            Text: |
+              =If( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0,
+                   "Checking where this term is used…",
+                   Len(lblRfUseParts.Text) = 0,
+                   "No project, client or product uses this term yet.",
+                   "Used by " & lblRfUseParts.Text & ". Renaming it updates the path stored on them." )
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.TextMuted
+            VerticalAlign: =VerticalAlign.Top
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =446
+            Width: =392
+            Height: =60
+      # Validation, checked before any write. `|` is refused because it is the separator the
+      # pickers split a stored path on. The duplicate test ignores case and skips the term
+      # being edited, so a change of case alone is allowed.
+      - lblRfEdErr:
+          Control: Label@2.5.1
+          Properties:
+            Visible: =gRfEdOpen && Len(Self.Text) > 0
+            Text: |
+              =With( { a: Trim(txtRfL1.Text), b: Trim(txtRfL2.Text), c: Trim(txtRfL3.Text) },
+                With( { p: a & If( Len(b) > 0, " | " & b, "" ) & If( Len(c) > 0, " | " & c, "" ) },
+                  If( Len(a) = 0,                        "Level 1 is required.",
+                      Len(b) = 0 && Len(c) > 0,           "Fill in Level 2 before Level 3.",
+                      "|" in a || "|" in b || "|" in c,   "A level can't contain the | character.",
+                      !IsBlank( LookUp( colRfTerms, Lower(Path) = Lower(p) && Id <> gRfEdId ) ),
+                                                          "That term already exists.",
+                      "" ) ) )
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Small
+            Color: =gTheme.Color.Danger
+            VerticalAlign: =VerticalAlign.Top
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =514
+            Width: =392
+            Height: =60
+      - btnRfEdCancel:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gRfEdOpen
+            Text: ="Cancel"
+            Fill: =gTheme.Color.Surface
+            Color: =gTheme.Color.Primary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =1
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - 440 + gTheme.Space.Gutter
+            Y: =Parent.Height - gTheme.Space.Gutter - 44
+            Width: =120
+            Height: =44
+            OnSelect: =Set( gRfEdOpen, false )
+      # ALWAYS ENABLED — a disabled button cannot say why it is disabled.
+      # A rename waits for the usage count (-1 = still counting) and refuses at
+      # gDataRowLimit, where a count may be truncated and the cascade would miss records.
+      # Each Patch has its OWN scrap variable: a global's type unifies across every Set.
+      - btnRfEdSave:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Visible: =gRfEdOpen
+            Text: =If( gRfSaving, "Saving…", If( gRfEdId = 0, "Add term", "Save term" ) )
+            Fill: =gTheme.Color.Primary
+            Color: =gTheme.Color.OnPrimary
+            BorderColor: =gTheme.Color.Primary
+            BorderThickness: =0
+            Font: =gTheme.Font
+            Size: =gTheme.Size.Body
+            X: =Parent.Width - gTheme.Space.Gutter - 160
+            Y: =Parent.Height - gTheme.Space.Gutter - 44
+            Width: =160
+            Height: =44
+            OnSelect: |
+              =If( gRfSaving,
+                   false,
+                   Set( gRfSaving, true );
+                   Set( gRfEdA, Trim(txtRfL1.Text) );
+                   Set( gRfEdB, Trim(txtRfL2.Text) );
+                   Set( gRfEdC, Trim(txtRfL3.Text) );
+                   Set( gRfEdPath, gRfEdA & If( Len(gRfEdB) > 0, " | " & gRfEdB, "" )
+                                         & If( Len(gRfEdC) > 0, " | " & gRfEdC, "" ) );
+                   Set( gRfRename, gRfEdId > 0 && gRfEdPath <> gRfEdOld );
+                   If( Len(lblRfEdErr.Text) > 0,
+                       Notify( "Can't save yet. " & lblRfEdErr.Text, NotificationType.Error ),
+                       gRfRename && ( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0 ),
+                       Notify( "Still checking where this term is used. Try again in a moment.",
+                               NotificationType.Warning ),
+                       gRfRename && Max( gRfUseP, gRfUseC, gRfUseD ) >= gDataRowLimit,
+                       Notify( "Too many records use this term to update them all from the app.",
+                               NotificationType.Error ),
+                       gRfEdId > 0 && !gRfRename,
+                       Set( gRfEdOpen, false ),
+                       Set( gRfErr, "" );
+                       Set( gRfCascErr, "" );
+                       Set( gRfSavedA, Blank() );
+                       Set( gRfSavedR, Blank() );
+                       Set( gRfSavedT, Blank() );
+                       Switch( gRfView,
+                           "activity",
+                           IfError( Set( gRfSavedA,
+                                         Patch( mapping_activitytype,
+                                                If( gRfEdId = 0, Defaults(mapping_activitytype),
+                                                    LookUp(mapping_activitytype, ID = gRfEdId) ),
+                                                { level1: gRfEdA, level2: gRfEdB, level3: gRfEdC } ) ),
+                                    Set( gRfErr, FirstError.Message ) ),
+                           "region",
+                           IfError( Set( gRfSavedR,
+                                         Patch( mapping_region,
+                                                If( gRfEdId = 0, Defaults(mapping_region),
+                                                    LookUp(mapping_region, ID = gRfEdId) ),
+                                                { level1: gRfEdA, level2: gRfEdB, level3: gRfEdC } ) ),
+                                    Set( gRfErr, FirstError.Message ) ),
+                           "producttype",
+                           IfError( Set( gRfSavedT,
+                                         Patch( mapping_producttype,
+                                                If( gRfEdId = 0, Defaults(mapping_producttype),
+                                                    LookUp(mapping_producttype, ID = gRfEdId) ),
+                                                { level1: gRfEdA, level2: gRfEdB, level3: gRfEdC } ) ),
+                                    Set( gRfErr, FirstError.Message ) ) );
+                       // Trust the RECORD, never the message.
+                       Set( gRfSavedId, Switch( gRfView,
+                                                "activity", Coalesce(gRfSavedA.ID, 0),
+                                                "region",   Coalesce(gRfSavedR.ID, 0),
+                                                            Coalesce(gRfSavedT.ID, 0) ) );
+                       If( gRfSavedId = 0 && Len(gRfErr) = 0,
+                           Set( gRfErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
+                       // The rename cascade, matched on the indexed Number id, so the Filter delegates.
+                       // Archived projects are included: they are read from the raw list.
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "activity" && gRfUseP > 0,
+                           IfError( Set( gRfScrapPA,
+                                         ForAll( Filter( taskmaster_projects, project_type_id = gRfEdId ) As r,
+                                                 Patch( taskmaster_projects, r, { project_type_path: gRfEdPath } ) ) ),
+                                    Set( gRfCascErr, FirstError.Message ) ) );
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "region" && gRfUseP > 0,
+                           IfError( Set( gRfScrapPR,
+                                         ForAll( Filter( taskmaster_projects, project_region_id = gRfEdId ) As r,
+                                                 Patch( taskmaster_projects, r, { project_region_path: gRfEdPath } ) ) ),
+                                    Set( gRfCascErr, FirstError.Message ) ) );
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "region" && gRfUseC > 0,
+                           IfError( Set( gRfScrapCR,
+                                         ForAll( Filter( taskmaster_clients, client_region_id = gRfEdId ) As r,
+                                                 Patch( taskmaster_clients, r, { client_region_path: gRfEdPath } ) ) ),
+                                    Set( gRfCascErr, FirstError.Message ) ) );
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "producttype" && gRfUseD > 0,
+                           IfError( Set( gRfScrapDT,
+                                         ForAll( Filter( taskmaster_products, product_type_id = gRfEdId ) As r,
+                                                 Patch( taskmaster_products, r, { product_type_path: gRfEdPath } ) ) ),
+                                    Set( gRfCascErr, FirstError.Message ) ) );
+                       If( Len(gRfErr) > 0,
+                           Notify( "Couldn't save the term: " & gRfErr, NotificationType.Error ),
+                           Len(gRfCascErr) > 0,
+                           Notify( "Term renamed, but some records still show the old path: " & gRfCascErr,
+                                   NotificationType.Warning ),
+                           Notify( If( gRfEdId = 0, "Term added", "Term saved" )
+                                   & If( gRfRename && gRfUseP + gRfUseC + gRfUseD > 0,
+                                         ". " & lblRfUseParts.Text & " updated.", "" ),
+                                   NotificationType.Success ) );
+                       If( Len(gRfErr) = 0,
+                           Set( gRfEdOpen, false );
+                           Select( btnRfLoad ) ) );
+                   Set( gRfSaving, false ) )
+
+      # ---- Delete confirmation --------------------------------------------------
+      # A term is deleted only when no record stores its ID; otherwise the dialog explains why
+      # it can't be, and Confirm just closes. While the count is still running (-1) Confirm
+      # waits rather than guessing.
+      - cmpRfConfirmDel:
+          Control: CanvasComponent
+          ComponentName: cmpConfirmDialog
+          Properties:
+            Visible: =gRfDelOpen
+            IsOpen: =gRfDelOpen
+            X: =0
+            Y: =0
+            Width: =Parent.Width
+            Height: =Parent.Height
+            Title: |
+              =If( Len(lblRfUseParts.Text) > 0, "Can't delete this term", "Delete this term?" )
+            Message: |
+              =If( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0,
+                   "Checking where """ & gRfDelPath & """ is used…",
+                   Len(lblRfUseParts.Text) > 0,
+                   """" & gRfDelPath & """ is used by " & lblRfUseParts.Text &
+                   ". Move them to another term first, then delete it.",
+                   "Delete """ & gRfDelPath & """? It will no longer be offered in the pickers. This can't be undone." )
+            ConfirmLabel: =If( Len(lblRfUseParts.Text) > 0, "OK", "Delete" )
+            CancelLabel: ="Cancel"
+            Destructive: =Len(lblRfUseParts.Text) = 0
+            OnConfirm: |
+              =If( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0,
+                   Notify( "Still checking where this term is used. Try again in a moment.",
+                           NotificationType.Warning ),
+                   gRfUseP + gRfUseC + gRfUseD > 0,
+                   Set( gRfDelOpen, false ),
+                   Set( gRfErr, "" );
+                   Switch( gRfView,
+                       "activity",
+                       IfError( Set( gRfScrapRA,
+                                     Remove( mapping_activitytype,
+                                             LookUp(mapping_activitytype, ID = gRfDelId) ) ),
+                                Set( gRfErr, FirstError.Message ) ),
+                       "region",
+                       IfError( Set( gRfScrapRR,
+                                     Remove( mapping_region,
+                                             LookUp(mapping_region, ID = gRfDelId) ) ),
+                                Set( gRfErr, FirstError.Message ) ),
+                       "producttype",
+                       IfError( Set( gRfScrapRT,
+                                     Remove( mapping_producttype,
+                                             LookUp(mapping_producttype, ID = gRfDelId) ) ),
+                                Set( gRfErr, FirstError.Message ) ) );
+                   If( Len(gRfErr) > 0,
+                       Notify( "Couldn't delete the term: " & gRfErr, NotificationType.Error ),
+                       Notify( "Term deleted", NotificationType.Success ) );
+                   Set( gRfDelOpen, false );
+                   Select( btnRfLoad ) )
+            OnCancel: =Set( gRfDelOpen, false )
 
       # ---- The whole shell is one component: header bar + fly-out nav rail ----
       # DECLARED LAST so positional z-order floats the fly-out over the content. Height is
