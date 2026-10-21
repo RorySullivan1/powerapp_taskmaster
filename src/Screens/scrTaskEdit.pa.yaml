@@ -1508,6 +1508,8 @@ Screens:
                     // load (OnVisible) — product IDs only, never the row's own ID — then each product
                     // dropped from the staged set has its link looked up by task + product and removed.
                     // The `in` test runs client-side over this task's handful; the FK tests delegate.
+                    // NOTHING HERE READS A LINK ROW'S `ID`: Studio does not resolve ID on a
+                    // taskmaster_taskproduct record (rejected twice), so the guard tests the record.
                     ClearCollect( colTkLinksBefore,
                     ForAll( Filter( LiveTaskProducts,
                     taskproduct_task_id.Id = gTkSaved.ID ) As lk,
@@ -1515,7 +1517,7 @@ Screens:
                     ForAll( Filter( colTkLinksBefore, !(ProdId in colTkWanted.Id) ) As d,
                     With( { x: LookUp( taskmaster_taskproduct,
                     taskproduct_task_id.Id = gTkSaved.ID && taskproduct_product_id.Id = d.ProdId ) },
-                    If( !IsBlank(x.ID), Remove( taskmaster_taskproduct, x ) ) ) );
+                    If( !IsBlank(x), Remove( taskmaster_taskproduct, x ) ) ) );
                     // Read AFTER the delete, so the add diff is against live state. Only the lookup
                     // subfield is projected — `<collection>.taskproduct_product_id.Id` is not a
                     // projection Power Fx will give you, which is why the shaping exists at all.
