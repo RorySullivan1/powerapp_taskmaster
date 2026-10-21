@@ -15,6 +15,8 @@
   (a merged PR never carries follow-up work). **The GitHub issues are the backlog of record.**
 - **EVERYTHING IN `src/` IS PASTED AND LANDED (user, 2026-10-21), scrQuickTx from PR #135 included.** The user reported every
   open issue done on 2026-10-21; epics #108–#111 and their sub-issues are CLOSED. The backlog was empty at that point.
+- **PRODUCT LINKS (issue #14) LANDED AND CONFIRMED (user, 2026-10-21).** scrTaskEdit writes, reloads and removes links in
+  `taskmaster_taskproducts` (PLURAL — the singular name had been silently creating a collection). PRs #139–#143.
 - **PROJECT SEARCH (#132) IS LANDED AND CONFIRMED.** scrProjects counts the projects in view (gPrjUniverseN); under
   gDataRowLimit it uses Search(), at the limit the delegable prefix search plus a warning. Data row limit = 2000 = gDataRowLimit.
 - **OUTPUTS (epic #93) ARE LANDED.** `taskmaster_output` (SINGULAR); every output belongs to EXACTLY ONE task or transaction;
@@ -272,3 +274,4 @@ Pre-2026-08-13 pointers: `sessions/ARCHIVE-2026.md`.
 - 2026-10-21 | ROOT CAUSE of #14 found by the probe: taskmaster_taskproduct was a collection (Collect auto-created it; the list was never connected). Studio steps given (delete scrTaskEdit + probe, add list, re-paste). No code change | (no session file)
 - 2026-10-21 | Junction renamed to taskmaster_taskproducts (plural) across App.Formulas, scrTaskEdit, schema, probe, docs. Paste: App.Formulas + scrTaskEdit. 23/23, AWAITING PASTE | (no session file)
 - 2026-10-21 | schema: taskproduct_product_uid is a lookup-derived field, so indexed: false (user); nothing in src/ queries it | (no session file)
+- 2026-10-21 | Product links CONFIRMED in Studio (add lands, reopen lists it, remove deletes). #14 commented with the root cause | (no session file)
