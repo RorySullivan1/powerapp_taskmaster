@@ -154,45 +154,43 @@ does not currently need. It is now available, not required.
 
 ---
 
-## `scrProbe-junction-write.pa.yaml` — why is the junction write rejected?
+## `scrProbe-junction-write.pa.yaml` — why does the product link write not land?
 
-**Status: NOT YET RUN.** Written 2026-08-18 for issue #14.
+**Status: RUN 2026-10-21. ANSWER: `taskmaster_taskproducts` IN THE APP IS A COLLECTION,
+NOT THE SHAREPOINT LIST.** Written 2026-08-18 for issue #14, rewritten 2026-10-21 after
+PRs #139–#142 left btnTkSave compiling and the links still missing.
+
+Result: 2 APP WRITE and 3 MINIMAL both returned no error and 4 COUNT rose, while the
+SharePoint list stayed empty. `Collect` on a name with no data source creates a
+collection of that name, so the writes landed in memory. That also explains why `ID`
+was unrecognized on its rows. The fix is to connect the list in Studio (see
+`.claude/memory/INDEX.md` → Decisions), not a code change.
 
 ### The claim under test
 
-`scrTaskEdit` saves the task row and then writes task↔product links to
-`taskmaster_taskproduct`. The task saves; the links never appear. The write
-**compiles** — and a property in compile error runs nothing at all, so the task
-would not have saved either — which makes this a **runtime** rejection, the one
-class this repo has no instrument for. The reconcile carried no `IfError`, so
-SharePoint's message was discarded at the point it was produced.
-
-The probe performs that one `Collect` alone and shows the message verbatim.
+`scrTaskEdit` saves the task and then `Collect`s its product links into
+`taskmaster_taskproducts`. The task saves and no link appears. The save compiles, so
+this is a **runtime** failure. The probe runs the link write on its own, shows
+SharePoint's message, and counts what landed.
 
 ### Why this one names a data source
 
-Rule 1 says a probe names none, so that a null result cannot be confused with the
-app being wrong. Here **the data source is the claim** — there is nothing else to
-test. Every other rule is kept: no `gTheme`, no component, literal colours, one
-claim, a positive control, and this entry.
+Rule 1 says a probe names none. Here **the data source is the claim**. Every other
+rule is kept. The app's own task save is the positive control for writes reaching
+the site; button 1 is the control for the two IDs and the connection.
 
 ### Reading the result
 
-Three buttons, in order. They answer different questions and the order matters:
-
 | Press | Result | Means |
 |---|---|---|
-| **1 CONTROL** | fails | the instrument, connection or permissions are broken — nothing below means anything |
-| **2 JUNCTION** | names an error | that message is the answer; fix SharePoint, not the app |
-| **2 JUNCTION** | "no error" | the write did not throw — which is **not** the same as landing |
-| **3 COUNT** | 0 after a clean 2 | the write is being **silently dropped**, the worst case and the one no `IfError` can catch |
+| **1 CHECK IDS** | a name is NOT FOUND, or it fails | wrong ID or a broken connection — nothing below means anything |
+| **2 APP WRITE** | names an error | that message is the answer: fix SharePoint (or the record), not the loop |
+| **3 MINIMAL** | lands where 2 did not | the fault is `taskproduct_project_id` or `taskproduct_project_archived` |
+| **3 MINIMAL** | fails too | the fault is the lookups, permissions or a required column the app does not write (e.g. Title) |
+| **4 COUNT** | raw 0 after a clean 2 or 3 | the write is **silently dropped** |
+| **4 COUNT** | raw > LiveTaskProducts | rows land but the app cannot see them: the archived flag is blank, not No |
 
-`taskmaster_taskproduct` and `taskmaster_tasks` must both be in the Data pane
-before pasting. A screen paste never adds a data source, and an unknown name makes
-`OnSelect` a compile error that runs nothing — which would imitate the very silence
-under investigation.
-
-Delete the PROBE task row and any PROBE link afterwards.
+Press **5 CLEAN UP** afterwards. Use a throwaway task.
 
 ---
 

@@ -29,7 +29,7 @@ design. **Internal names freeze at creation** — the YAML's `name:` key *is* th
 
 **Relationships** — via SharePoint **Lookup** columns, which Power Fx sees as *records*
 (`.Id` / `.Value`), never integers — **with one deliberate exception**: `taskmaster_projectcomments`,
-`taskmaster_output` and the `taskmaster_taskproduct` junction hold the parent's `ID` as a plain **Number**, so `=`
+`taskmaster_output` and the `taskmaster_taskproducts` junction hold the parent's `ID` as a plain **Number**, so `=`
 delegates and costs no join. See the note below the diagram.
 
 ```

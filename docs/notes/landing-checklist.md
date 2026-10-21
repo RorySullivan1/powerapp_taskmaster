@@ -58,7 +58,7 @@ Use Preview (F5) or the published app. Behaviour formulas don't run in the edito
 - **C1 · `project_phase` default (#119).** taskmaster_projects → List settings → `project_phase`
   → Default value **Not Started**.
 - **C2 · Indexes and defaults (#120).** In List settings → **Indexed columns**:
-  - Is `taskmaster_taskproduct.taskproduct_project_archived` indexed? What is its default? How
+  - Is `taskmaster_taskproducts.taskproduct_project_archived` indexed? What is its default? How
     many rows are blank? Back-fill any blanks to **No**.
   - Is `taskmaster_tasks.task_supporter` indexed?
 - **C3 · Choice values (#121).** Copy the choice list from List settings for `project_coverage`,
