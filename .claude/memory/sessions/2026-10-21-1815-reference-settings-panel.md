@@ -28,8 +28,24 @@
 - **Client type/coverage are Choice columns** — the app can read them (Choices()) but not edit them.
   Shown read-only in the Clients caption; #150 holds the decision whether to migrate to mapping lists.
 
+## Pre-paste review
+- First pass DO-NOT-PASTE on ONE blocker, carried over from the OLD screen: `StartsWith(col, txtSearch.Text)`
+  with an empty box is `StartsWith(col, "")`, which SharePoint rejects ("the query is not valid",
+  tests/README.md scrProbe-startswith-empty). The old scrReference had the same construct and was recorded
+  landed, so its client/product lists probably never showed rows with an empty box. Fixed: two branches,
+  Sort inside each. Also took W2 (cascade not gated on the open-time count), W3 (Coalesce(gDataRowLimit,
+  2000)), W5 (dialog labels while counting), W6 (Save re-entry guard), explicit icon hover colours, and
+  replaced `x in ["a","b"]` (no precedent in src/) with `=`/`||`.
+- Left for the user: W1 (renaming a level-1 row does NOT rename the descendant rows that share that level,
+  each row is its own term), W4 (confirm Title is not required on mapping_activitytype).
+
+## Paste notes
+- Code view, whole screen. Paste the new screen FIRST, then delete the old one (this screen types
+  gEditClient / gEditProduct), then rename the suffixed screen and appBar back and log the suffixes.
+- Run OnStart before testing. Check the two row icons sit at the right edge (Parent.TemplateWidth X).
+
 ## State at end
-- Authored, validated, NOT PASTED. Pre-paste review requested.
+- Authored, validated 23/23, review blocker fixed, NOT PASTED.
 
 ## Open threads
 - #150 decision (recommendation: keep Choice columns, read-only).

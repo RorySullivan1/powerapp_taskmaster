@@ -399,7 +399,7 @@ Screens:
           Control: Gallery@2.15.0
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
-            Visible: =gRfView in ["activity", "region", "producttype"]
+            Visible: =( gRfView = "activity" || gRfView = "region" || gRfView = "producttype" )
             # colRfTerms is a local collection, so `in` (case-insensitive substring) is safe here.
             Items: |
               =Sort( Filter( colRfTerms, Len(txtRfSearch.Text) = 0 || txtRfSearch.Text in Path ),
@@ -491,6 +491,9 @@ Screens:
                 Properties:
                   Icon: =Icon.Trash
                   Color: =gTheme.Color.Danger
+                  HoverColor: =gTheme.Color.Danger
+                  HoverFill: =gTheme.Color.Hover
+                  HoverBorderColor: =RGBA(0, 0, 0, 0)
                   Tooltip: ="Delete this term"
                   X: =Parent.TemplateWidth - 48
                   Y: =16
@@ -507,7 +510,7 @@ Screens:
           Control: Label@2.5.1
           Properties:
             Visible: |
-              =gRfView in ["activity", "region", "producttype"]
+              =( gRfView = "activity" || gRfView = "region" || gRfView = "producttype" )
                && IsEmpty( Filter( colRfTerms, Len(txtRfSearch.Text) = 0 || txtRfSearch.Text in Path ) )
             Text: |
               =If( Len(txtRfSearch.Text) > 0,
@@ -531,12 +534,15 @@ Screens:
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
             Visible: =gRfView = "clients"
-            # Delegable: StartsWith on an indexed Text column, and an empty search box
-            # matches everything rather than nothing.
+            # TWO BRANCHES, AND THEY MUST STAY SPLIT. StartsWith(col, "") is not a match-everything:
+            # SharePoint rejects the whole query (tests/README.md, scrProbe-startswith-empty), and
+            # every section change resets the box to empty. Sort sits inside each branch so it folds.
             Items: |
-              =Sort( Filter( taskmaster_clients,
-                             StartsWith(client_name, txtRfSearch.Text) ),
-                     client_name )
+              =If( Len(txtRfSearch.Text) = 0,
+                   Sort( taskmaster_clients, client_name ),
+                   Sort( Filter( taskmaster_clients,
+                                 StartsWith(client_name, txtRfSearch.Text) ),
+                         client_name ) )
             WrapCount: =1
             TemplateSize: =52
             TemplatePadding: =0
@@ -612,10 +618,13 @@ Screens:
           Variant: BrowseLayout_Vertical_OneTextVariant_ver5.0
           Properties:
             Visible: =gRfView = "products"
+            # Split for the same reason as galRfClients.
             Items: |
-              =Sort( Filter( taskmaster_products,
-                             StartsWith(product_uid, txtRfSearch.Text) ),
-                     product_uid )
+              =If( Len(txtRfSearch.Text) = 0,
+                   Sort( taskmaster_products, product_uid ),
+                   Sort( Filter( taskmaster_products,
+                                 StartsWith(product_uid, txtRfSearch.Text) ),
+                         product_uid ) )
             WrapCount: =1
             # 80: four lines (ID, type, spec, features). Every Y below is measured against this
             # number and the separator sits on its last pixel, so the five move together.
@@ -774,6 +783,9 @@ Screens:
             Visible: =gRfEdOpen
             Icon: =Icon.Cancel
             Color: =gTheme.Color.TextMuted
+            HoverColor: =gTheme.Color.TextPrimary
+            HoverFill: =gTheme.Color.Hover
+            HoverBorderColor: =RGBA(0, 0, 0, 0)
             Tooltip: ="Close without saving"
             X: =Parent.Width - gTheme.Space.Gutter - 24
             Y: =90
@@ -980,7 +992,7 @@ Screens:
             Width: =160
             Height: =44
             OnSelect: |
-              =If( gRfSaving,
+              =If( gRfSaving || !gRfEdOpen,
                    false,
                    Set( gRfSaving, true );
                    Set( gRfEdA, Trim(txtRfL1.Text) );
@@ -994,7 +1006,7 @@ Screens:
                        gRfRename && ( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0 ),
                        Notify( "Still checking where this term is used. Try again in a moment.",
                                NotificationType.Warning ),
-                       gRfRename && Max( gRfUseP, gRfUseC, gRfUseD ) >= gDataRowLimit,
+                       gRfRename && Max( gRfUseP, gRfUseC, gRfUseD ) >= Coalesce(gDataRowLimit, 2000),
                        Notify( "Too many records use this term to update them all from the app.",
                                NotificationType.Error ),
                        gRfEdId > 0 && !gRfRename,
@@ -1034,23 +1046,24 @@ Screens:
                        If( gRfSavedId = 0 && Len(gRfErr) = 0,
                            Set( gRfErr, "SharePoint returned no record and no error message, so nothing was saved." ) );
                        // The rename cascade, matched on the indexed Number id, so the Filter delegates.
-                       // Archived projects are included: they are read from the raw list.
-                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "activity" && gRfUseP > 0,
+                       // Archived projects are included: they are read from the raw list. Not gated on the
+                       // count taken when the drawer opened, so a record linked since then is still caught.
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "activity",
                            IfError( Set( gRfScrapPA,
                                          ForAll( Filter( taskmaster_projects, project_type_id = gRfEdId ) As r,
                                                  Patch( taskmaster_projects, r, { project_type_path: gRfEdPath } ) ) ),
                                     Set( gRfCascErr, FirstError.Message ) ) );
-                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "region" && gRfUseP > 0,
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "region",
                            IfError( Set( gRfScrapPR,
                                          ForAll( Filter( taskmaster_projects, project_region_id = gRfEdId ) As r,
                                                  Patch( taskmaster_projects, r, { project_region_path: gRfEdPath } ) ) ),
                                     Set( gRfCascErr, FirstError.Message ) ) );
-                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "region" && gRfUseC > 0,
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "region",
                            IfError( Set( gRfScrapCR,
                                          ForAll( Filter( taskmaster_clients, client_region_id = gRfEdId ) As r,
                                                  Patch( taskmaster_clients, r, { client_region_path: gRfEdPath } ) ) ),
                                     Set( gRfCascErr, FirstError.Message ) ) );
-                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "producttype" && gRfUseD > 0,
+                       If( Len(gRfErr) = 0 && gRfRename && gRfView = "producttype",
                            IfError( Set( gRfScrapDT,
                                          ForAll( Filter( taskmaster_products, product_type_id = gRfEdId ) As r,
                                                  Patch( taskmaster_products, r, { product_type_path: gRfEdPath } ) ) ),
@@ -1084,7 +1097,9 @@ Screens:
             Width: =Parent.Width
             Height: =Parent.Height
             Title: |
-              =If( Len(lblRfUseParts.Text) > 0, "Can't delete this term", "Delete this term?" )
+              =If( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0, "Checking this term…",
+                   Len(lblRfUseParts.Text) > 0,             "Can't delete this term",
+                                                             "Delete this term?" )
             Message: |
               =If( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0,
                    "Checking where """ & gRfDelPath & """ is used…",
@@ -1092,9 +1107,12 @@ Screens:
                    """" & gRfDelPath & """ is used by " & lblRfUseParts.Text &
                    ". Move them to another term first, then delete it.",
                    "Delete """ & gRfDelPath & """? It will no longer be offered in the pickers. This can't be undone." )
-            ConfirmLabel: =If( Len(lblRfUseParts.Text) > 0, "OK", "Delete" )
+            ConfirmLabel: |
+              =If( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0, "Wait…",
+                   Len(lblRfUseParts.Text) > 0,             "OK",
+                                                             "Delete" )
             CancelLabel: ="Cancel"
-            Destructive: =Len(lblRfUseParts.Text) = 0
+            Destructive: =gRfUseP >= 0 && gRfUseC >= 0 && gRfUseD >= 0 && Len(lblRfUseParts.Text) = 0
             OnConfirm: |
               =If( gRfUseP < 0 || gRfUseC < 0 || gRfUseD < 0,
                    Notify( "Still checking where this term is used. Try again in a moment.",
