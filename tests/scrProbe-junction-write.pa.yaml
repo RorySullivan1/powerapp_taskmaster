@@ -1,24 +1,30 @@
 # =============================================================================
-# scrProbe-junction-write — why is Collect(taskmaster_taskproduct, …) rejected?
+# scrProbe-junction-write — why does Collect(taskmaster_taskproduct, …) not land?
 #
-# Issue #14. scrTaskEdit writes the task row, then writes the junction, and the
-# junction never appears. The write COMPILES — the task saves, and a property in
-# compile error runs nothing at all — so this is a RUNTIME rejection, the one
-# class this repo has no instrument for. The reconcile is bare of IfError, so
-# SharePoint's message is thrown away where it happens.
+# scrTaskEdit saves the task, then writes its product links, and no link ever
+# appears in taskmaster_taskproduct (issue #14, still true after PRs #139–#142).
+# btnTkSave compiles, so this is a RUNTIME failure. This probe runs the write on
+# its own and SHOWS SharePoint's message, then counts what actually landed.
 #
-# This probe does one thing: perform the write on its own and SHOW THE MESSAGE.
+# Sub-cases, each with its OWN message line:
+#   1 CHECK IDS — reads the task and the product by ID. Proves the two IDs typed
+#                 are real and the connection reads. If this fails, nothing below
+#                 means anything.
+#   2 APP WRITE — the exact record btnTkSave writes: two lookups, project ID and
+#                 archived = false.
+#   3 MINIMAL   — only the two required lookups. If 3 lands and 2 does not, the
+#                 fault is project ID or the archived flag, not the lookups.
+#   4 COUNT     — links for the task, counted on the RAW list and through
+#                 LiveTaskProducts. Raw > Live means rows land but the app cannot
+#                 see them (archived flag blank, not No).
+#   5 CLEAN UP  — removes every link for the task.
+# The app's own task save is the write control: it proves writes reach the site.
 #
-# BREAKS RULE 1 ON PURPOSE. Rule 1 says a probe names no data source, so that a
-# null result cannot be confused with the app being wrong. Here the data source
-# IS the claim — there is nothing else to test. Every other rule is kept: no
-# gTheme, no component, literal colours, one claim, positive control, and the
-# result goes in README.md.
+# BREAKS RULE 1 ON PURPOSE: the data source IS the claim. Every other rule is kept.
+# Reads nothing off a link row's ID — Studio does not resolve it on this list.
 #
-# BEFORE PASTING: taskmaster_taskproduct and taskmaster_tasks must both be in the
-# Data pane. A screen paste never adds a data source, and an unknown name makes
-# OnSelect a compile error that runs nothing — which would look like the very
-# silence being investigated.
+# BEFORE PASTING: taskmaster_taskproduct, taskmaster_tasks and taskmaster_products
+# must be in the Data pane, and LiveTaskProducts in App.Formulas.
 # =============================================================================
 Screens:
   scrProbeJunction:
@@ -30,32 +36,28 @@ Screens:
           Properties:
             # Block scalar: YAML eats " #" in a plain scalar along with the rest of the line.
             Text: |
-              ="Junction write probe  ·  issue #14"
+              ="Product link write probe  ·  issue #14"
             Font: =Font.'Segoe UI'
             Size: =20
             FontWeight: =FontWeight.Semibold
             Color: =RGBA(32, 38, 45, 1)
             X: =16
             Y: =16
-            Width: =700
+            Width: =820
             Height: =28
       - lblPjHow:
           Control: Label@2.5.1
           Properties:
             Text: |
-              ="1. Type the ID of any existing task, and the ID of any existing product.
-              2. Press CONTROL first — it writes a row to taskmaster_tasks. If that fails the
-              instrument is broken, not the junction, and nothing below means anything.
-              3. Press JUNCTION. Whatever SharePoint says appears in the box, verbatim.
-              4. Press COUNT to see whether a row actually landed — a write can be rejected
-              with no message at all, and that is a different answer from an error."
+              ="Type the ID of a throwaway task and of any product, then press the buttons IN ORDER.
+              Each writes its own line below. Run in Preview (F5). Press 5 when you are done."
             Font: =Font.'Segoe UI'
             Size: =13
             Color: =RGBA(110, 120, 130, 1)
             X: =16
             Y: =52
-            Width: =700
-            Height: =104
+            Width: =820
+            Height: =44
       - txtPjTask:
           Control: ModernTextInput@1.1.1
           Properties:
@@ -64,7 +66,7 @@ Screens:
             Font: =Font.'Segoe UI'
             Size: =14
             X: =16
-            Y: =168
+            Y: =108
             Width: =150
             Height: =40
       - txtPjProduct:
@@ -75,89 +77,131 @@ Screens:
             Font: =Font.'Segoe UI'
             Size: =14
             X: =180
-            Y: =168
+            Y: =108
             Width: =150
             Height: =40
-      # POSITIVE CONTROL. A write to a list that is KNOWN to accept writes, in the
-      # same formula shape. If this reports an error too, the fault is the probe,
-      # the connection or permissions — not taskmaster_taskproduct.
-      - btnPjControl:
+      - btnPjCheck:
           Control: Classic/Button@2.2.0
           Properties:
-            Text: ="1 · CONTROL — write a task"
+            Text: ="1 · CHECK IDS"
             Fill: =RGBA(110, 120, 130, 1)
             Color: =RGBA(255, 255, 255, 1)
             BorderThickness: =0
             Font: =Font.'Segoe UI'
             Size: =14
             X: =16
-            Y: =228
-            Width: =260
+            Y: =168
+            Width: =156
             Height: =44
             OnSelect: |
               =IfError(
-                  Set( vPjCtl,
-                       Patch( taskmaster_tasks, Defaults(taskmaster_tasks),
-                              { task_name: "PROBE — delete me" } ) );
-                  Set( vPjMsg,
-                       "CONTROL wrote task ID " & Coalesce(Text(vPjCtl.ID), "(no ID returned)") ),
-                  Set( vPjMsg, "CONTROL FAILED: " & FirstError.Message ) )
-      # THE CLAIM. The same Collect scrTaskEdit runs, alone, with the message kept.
-      - btnPjJunction:
+                  Set( vPjTask, LookUp( taskmaster_tasks, ID = Value(txtPjTask.Text) ) );
+                  Set( vPjProd, LookUp( taskmaster_products, ID = Value(txtPjProduct.Text) ) );
+                  Set( vPjMsg1,
+                       "CHECK: task = " & Coalesce(vPjTask.task_name, "(NOT FOUND)")
+                       & "  |  project " & Coalesce(Text(vPjTask.task_project_id.Id), "?")
+                       & "  |  product = " & Coalesce(vPjProd.product_uid, "(NOT FOUND)") ),
+                  Set( vPjMsg1, "CHECK FAILED: " & FirstError.Message ) )
+      - btnPjApp:
           Control: Classic/Button@2.2.0
           Properties:
-            Text: ="2 · JUNCTION — write a link"
+            Text: ="2 · APP WRITE"
             Fill: =RGBA(0, 90, 158, 1)
             Color: =RGBA(255, 255, 255, 1)
             BorderThickness: =0
             Font: =Font.'Segoe UI'
             Size: =14
-            X: =292
-            Y: =228
-            Width: =260
+            X: =184
+            Y: =168
+            Width: =156
             Height: =44
             OnSelect: |
               =IfError(
-                  Set( vPjLink,
+                  Set( vPjW2,
                   Collect( taskmaster_taskproduct,
-                           { taskproduct_task_id:     { Id: Value(txtPjTask.Text),    Value: "probe" },
-                             taskproduct_product_id:  { Id: Value(txtPjProduct.Text), Value: "probe" },
-                             taskproduct_product_uid: "PROBE",
-                             taskproduct_project_id:  0 } ) );
-                  Set( vPjMsg, "JUNCTION returned no error — press COUNT to see if a row landed" ),
-                  Set( vPjMsg, "JUNCTION FAILED: " & FirstError.Message ) )
-      # A REJECTED WRITE CAN BE SILENT. Counting is the only way to tell a write
-      # that threw from a write that was quietly dropped.
+                           { taskproduct_task_id:    { Id: Value(txtPjTask.Text),    Value: Coalesce(vPjTask.task_name, "probe") },
+                             taskproduct_product_id: { Id: Value(txtPjProduct.Text), Value: Coalesce(vPjProd.product_uid, "probe") },
+                             taskproduct_project_id: Coalesce(vPjTask.task_project_id.Id, 0),
+                             taskproduct_project_archived: false } ) );
+                  Set( vPjMsg2, "APP WRITE returned no error. Press 4 to see whether it landed." ),
+                  Set( vPjMsg2, "APP WRITE FAILED: " & FirstError.Message ) )
+      - btnPjMin:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="3 · MINIMAL"
+            Fill: =RGBA(0, 90, 158, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =352
+            Y: =168
+            Width: =156
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  Set( vPjW3,
+                  Collect( taskmaster_taskproduct,
+                           { taskproduct_task_id:    { Id: Value(txtPjTask.Text),    Value: Coalesce(vPjTask.task_name, "probe") },
+                             taskproduct_product_id: { Id: Value(txtPjProduct.Text), Value: Coalesce(vPjProd.product_uid, "probe") } } ) );
+                  Set( vPjMsg3, "MINIMAL returned no error. Press 4 to see whether it landed." ),
+                  Set( vPjMsg3, "MINIMAL FAILED: " & FirstError.Message ) )
       - btnPjCount:
           Control: Classic/Button@2.2.0
           Properties:
-            Text: ="3 · COUNT links for that task"
+            Text: ="4 · COUNT"
             Fill: =RGBA(49, 130, 93, 1)
             Color: =RGBA(255, 255, 255, 1)
             BorderThickness: =0
             Font: =Font.'Segoe UI'
             Size: =14
-            X: =568
-            Y: =228
-            Width: =260
+            X: =520
+            Y: =168
+            Width: =156
             Height: =44
             OnSelect: |
               =IfError(
-                  Set( vPjMsg,
-                       "COUNT: taskmaster_taskproduct holds "
-                       & CountRows( Filter( taskmaster_taskproduct,
-                                            taskproduct_task_id.Id = Value(txtPjTask.Text) ) )
-                       & " link(s) for task " & txtPjTask.Text ),
-                  Set( vPjMsg, "COUNT FAILED: " & FirstError.Message ) )
+                  Set( vPjMsg4,
+                       "COUNT for task " & txtPjTask.Text
+                       & ":  raw list " & CountRows( Filter( taskmaster_taskproduct,
+                                                             taskproduct_task_id.Id = Value(txtPjTask.Text) ) )
+                       & "  |  through LiveTaskProducts " & CountRows( Filter( LiveTaskProducts,
+                                                             taskproduct_task_id.Id = Value(txtPjTask.Text) ) ) ),
+                  Set( vPjMsg4, "COUNT FAILED: " & FirstError.Message ) )
+      - btnPjClean:
+          Control: Classic/Button@2.2.0
+          Properties:
+            Text: ="5 · CLEAN UP"
+            Fill: =RGBA(110, 120, 130, 1)
+            Color: =RGBA(255, 255, 255, 1)
+            BorderThickness: =0
+            Font: =Font.'Segoe UI'
+            Size: =14
+            X: =688
+            Y: =168
+            Width: =148
+            Height: =44
+            OnSelect: |
+              =IfError(
+                  If( Len(txtPjTask.Text) > 0,
+                      RemoveIf( taskmaster_taskproduct, taskproduct_task_id.Id = Value(txtPjTask.Text) ) );
+                  Set( vPjMsg5, "CLEAN UP ok: links for task " & txtPjTask.Text & " removed" ),
+                  Set( vPjMsg5, "CLEAN UP FAILED: " & FirstError.Message & "  -  delete the rows in SharePoint" ) )
       - lblPjResult:
           Control: Label@2.5.1
           Properties:
-            Text: =Coalesce(vPjMsg, "— no result yet —")
+            Text: |
+              =Coalesce(vPjMsg1, "1 -") & Char(10) & Char(10)
+              & Coalesce(vPjMsg2, "2 -") & Char(10) & Char(10)
+              & Coalesce(vPjMsg3, "3 -") & Char(10) & Char(10)
+              & Coalesce(vPjMsg4, "4 -") & Char(10) & Char(10)
+              & Coalesce(vPjMsg5, "5 -")
             Font: =Font.'Segoe UI'
             Size: =14
             Color: =RGBA(32, 38, 45, 1)
             Fill: =RGBA(255, 255, 255, 1)
+            VerticalAlign: =VerticalAlign.Top
             X: =16
-            Y: =292
-            Width: =812
-            Height: =120
+            Y: =232
+            Width: =820
+            Height: =300
